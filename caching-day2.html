@@ -41,6 +41,15 @@ pre code{background:none;color:inherit;padding:0;font-size:1em}
 table{width:100%;border-collapse:collapse;margin:14px 0;font-size:0.9rem}
 th,td{padding:8px 12px;text-align:left;border-bottom:1px solid rgba(100,200,255,0.15)}
 th{color:#64c8ff;font-weight:600;background:rgba(100,200,255,0.05)}
+details{background:rgba(100,200,255,0.04);border:1px solid rgba(100,200,255,0.18);border-radius:6px;padding:12px 16px;margin:10px 0;transition:all 0.15s}
+details:hover{border-color:rgba(100,200,255,0.35)}
+details[open]{background:rgba(94,234,212,0.05);border-color:rgba(94,234,212,0.3)}
+details summary{font-weight:600;color:#e8eef5;list-style:none;outline:none;cursor:pointer;display:flex;align-items:flex-start;gap:10px;font-size:0.96rem}
+details summary::-webkit-details-marker{display:none}
+details summary::before{content:'▶';color:#64c8ff;font-size:0.75em;transition:transform 0.2s;flex-shrink:0;margin-top:5px}
+details[open] summary::before{transform:rotate(90deg);color:#5eead4}
+details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
+details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
 </style>
 <script type="module">
@@ -318,14 +327,90 @@ func GetHot(key string) (any, error) {
 <h2>English Summary</h2>
 <p>Caching is a multi-layer art spanning browser, CDN, reverse proxy, in-process, distributed (Redis/Memcached), and DB buffer pools. Choose eviction policy by access pattern: LRU for recency, LFU for frequency, W-TinyLFU (Caffeine) when in doubt. Write strategies trade consistency for performance: cache-aside is the default, write-through ensures correctness, write-back maximizes throughput at the cost of durability. The hardest part is invalidation — beware thundering herd, avalanche (use TTL jitter), penetration (bloom filter), and the eternal question of <em>delete</em> vs <em>update</em> cache (always delete).</p>
 
-<h2>动手作业（30 分钟）</h2>
-<p>设计 Twitter『查看某用户最近 20 条推文』的缓存方案：</p>
-<ol>
-<li>画出 cache 结构（key 设计、TTL、对象大小估算）。</li>
-<li>用户发新推文时怎么 invalidate？</li>
-<li>遇到顶流（1 亿粉丝同一秒查）怎么避免 hot key？</li>
-<li>用户删推文时，缓存一致性怎么保证？</li>
-</ol>
+<h2>深入思考（点击展开答案）</h2>
+
+<details>
+<summary>1. 命中率从 95% 降到 90%，DB 负载会变成几倍？为什么不是简单的 2 倍？</summary>
+<div class="answer">
+<p><strong>表面算法</strong>：miss rate 5% → 10%，回源 QPS 翻倍 = DB 2 倍负载。</p>
+<p><strong>实际更严重</strong>，至少 3 个放大效应：</p>
+<ul>
+<li><strong>缓存被打穿时往往伴随写入</strong>：miss 后要回填 cache，多一次 Redis SET；高并发下还会 thundering herd——同一 key 1000 个并发请求同时回源，DB 收到的是 1000 次而不是 1 次。</li>
+<li><strong>DB 自身的 cache 也连锁失效</strong>：Postgres shared_buffers / MySQL buffer pool 命中率会跟着掉，磁盘 IO 飙升，p99 不止 2 倍。</li>
+<li><strong>连接池争抢</strong>：DB connection pool 通常按 95% 命中设计的容量，突然 2 倍 QPS 直接打满，新请求排队，p99 雪崩。</li>
+</ul>
+<p><em>真实数字</em>：90% 命中率下 DB 实际负载通常是 3-5 倍。所以监控里看到命中率掉 5 个百分点就要警觉。</p>
+</div>
+</details>
+
+<details>
+<summary>2. cache-aside『先写 DB → 再删 cache』，生产仍偶尔读到旧值。至少列 3 种可能原因及对应修法。</summary>
+<div class="answer">
+<ul>
+<li><strong>并发写读交错</strong>：A 读 cache miss → A 读 DB（拿到旧值 v1）→ B 写 DB（v2）→ B 删 cache → A 回填 cache(v1)。cache 永远是旧值。<em>修法</em>：延迟双删（B 删 → sleep 500ms → 再删一次）；或用 single-flight 限制并发回填。</li>
+<li><strong>主从复制延迟</strong>：写主库后删 cache，但有人立刻读，路由到 replica（还没复制完），拿到旧值回填 cache。<em>修法</em>：删 cache 后强制读主一段时间；或者『先写主 → wait for replica → 再删 cache』。</li>
+<li><strong>删除失败</strong>：DB 写成功但 Redis 网络抖动删除失败，没有重试。<em>修法</em>：用 outbox / CDC 模式，把 invalidation 事件落地（Debezium 监听 binlog → 发到 Kafka → consumer 删 cache），保证 at-least-once。</li>
+<li><strong>多区缓存不同步</strong>：US-East 删了 cache，US-West 没删。<em>修法</em>：跨区广播 invalidation（Facebook 用 mcsqueal）。</li>
+<li><strong>客户端本地缓存</strong>：app 进程内 Caffeine 还在用旧值，远端 Redis 删了也没用。<em>修法</em>：本地 cache TTL 短一点，或订阅 Redis pub/sub 主动失效。</li>
+</ul>
+</div>
+</details>
+
+<details>
+<summary>3. Redis Cluster 不支持跨 slot 的 MULTI / 事务。这个限制怎么影响 key 设计？hash tag（{user:123}）解决了什么、引入了什么新问题？</summary>
+<div class="answer">
+<p><strong>影响</strong>：你不能在一个事务里同时操作 <code>user:123:profile</code> 和 <code>user:123:posts</code>——它们 hash 到不同 slot 在不同节点上，MULTI 会被拒绝（CROSSSLOT 错误）。同理 MGET、MSET 跨 slot 也不行。</p>
+<p><strong>Hash tag 怎么用</strong>：把要放一起的 key 写成 <code>{user:123}:profile</code> 和 <code>{user:123}:posts</code>，<code>{}</code> 里的部分作为 hash 输入，保证两个 key 落同一 slot。</p>
+<p><strong>引入的新问题</strong>：</p>
+<ul>
+<li><strong>数据倾斜</strong>：一个 user 所有 key 都在同一节点，顶流用户那个 slot 变 hot spot，单节点 CPU 飙红。</li>
+<li><strong>大 key 风险</strong>：把多个 collection 绑到一起，单个用户数据膨胀就是单节点内存爆炸。</li>
+<li><strong>resharding 痛苦</strong>：cluster 扩容时 slot 迁移要把整组 key 一起搬，迁移期间这组 key 的写操作要排队。</li>
+<li><strong>反模式诱惑</strong>：开发者会把『可能一起读』的所有 key 都打 tag，最后退化成单节点 Redis。</li>
+</ul>
+<p><em>实战建议</em>：hash tag 只用在<em>真正必须原子</em>的场景（购物车 + 库存）；展示型多 key 拼装，让 app 端做并发 GET 而不是依赖事务。</p>
+</div>
+</details>
+
+<details>
+<summary>4. Hot key 单点 QPS 100w，单 Redis 实例顶不住。至少列 3 种解法（不同方向），各自代价？</summary>
+<div class="answer">
+<ul>
+<li><strong>① Key 分片（写时拆、读时合并）</strong>：把 <code>celebrity:123:followers_count</code> 拆成 <code>celebrity:123:followers_count:{0..15}</code>，写时随机选一个 +1，读时 16 个 SUM。<em>代价</em>：读放大 16 倍、强一致性丢失（瞬时 sum 可能短暂偏小）、只适合可累加数据。</li>
+<li><strong>② 多副本读（local replica）</strong>：把 hot key 复制到多个 Redis 节点，client 随机选一个读。<em>代价</em>：写要 fanout 到 N 个副本、副本一致性（用 master-replica 异步同步会有 lag）。Redis Cluster 的 READONLY 模式就是这个思路。</li>
+<li><strong>③ 多级缓存：app 进程内 L1 cache</strong>：每个 app 实例本地 Caffeine 缓存这个 hot key，TTL 1s。100 台 app × 每秒 1 次回源 = 100 QPS，Redis 压力立刻消失。<em>代价</em>：最长 1s stale、内存浪费（100 份副本）、invalidation 困难。</li>
+<li><strong>④ CDN / edge cache</strong>：如果是公开数据（明星粉丝数），直接放 CDN，边缘节点扛 100w QPS。<em>代价</em>：只适合可公开缓存的内容、失效慢（30s+）。</li>
+<li><strong>⑤ Pre-compute + 推送</strong>：根本不让用户实时查，把数据预生成在每个用户的 timeline cache 里（Twitter fanout-on-write）。<em>代价</em>：写放大极大，对 1 亿粉丝的明星不适用。</li>
+</ul>
+<p><em>实战组合</em>：通常 ① + ③ 一起上——分片承担写、本地 L1 承担读。</p>
+</div>
+</details>
+
+<details>
+<summary>5. 服务重启时命中率瞬间 0%，DB 直接被打爆。预热怎么做？预热过程本身如何不把 DB 打挂？</summary>
+<div class="answer">
+<p><strong>预热时机</strong>：</p>
+<ul>
+<li>新版本上线前（蓝绿部署的 green 环境预热好再切流量）；</li>
+<li>Redis cluster 替换时（旧集群导出 → 新集群导入）；</li>
+<li>大促前夜（提前把可预测的热数据灌进去）。</li>
+</ul>
+<p><strong>怎么预热</strong>：</p>
+<ul>
+<li><strong>离线分析 + 批量灌入</strong>：从过去 7 天访问日志算 top 10w key，离线 dump 出 KV，用 RESTORE 或 pipeline 批量写 Redis（避免一条条 SET）。</li>
+<li><strong>线上慢启动放量</strong>：新实例上线时 LB 只给 1% 流量，cache 慢慢填，5 分钟后线性放到 100%。Envoy 的 slow_start_config 直接支持。</li>
+<li><strong>双 cache 切换</strong>：旧 Redis 还在服务，新 Redis 后台 mirror 一份流量预热，切流时 hit rate 已经高了。</li>
+</ul>
+<p><strong>预热本身不打挂 DB</strong>：</p>
+<ul>
+<li><strong>限速</strong>：预热脚本用 token bucket，比如 5k QPS 上限，避免把 DB connection 打满。</li>
+<li><strong>读 replica</strong>：预热从 replica 读，不挤占主库的事务能力。</li>
+<li><strong>错峰</strong>：在低谷时段（凌晨 3-5 点）预热；或者用线上自然流量『顺路』预热（first user 触发回源，后面的人受益）。</li>
+<li><strong>Single-flight</strong>：预热过程也要防 thundering herd，同一 key 只让一个 worker 回源。</li>
+</ul>
+<p><em>真实故事</em>：Pinterest 2014 年因 Memcached 整集群替换没预热，DB 被打挂 30 分钟，事后改成『新旧集群并行运行 1 小时』。</p>
+</div>
+</details>
 
 <div class="nav"><a href="index.html">← 回到 index</a></div>
 </div></body></html>

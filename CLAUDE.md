@@ -73,7 +73,7 @@ HTML 输出格式
 - 【面试问题示例】：3-5 个可能的面试追问
 - 【关键资源】：1-2 个资源。优先 Designing Data-Intensive Applications (Kleppmann)、High Scalability blog、公司工程博客、ByteByteGo 书籍
 - 【English Summary】：2-3 句英文概述。记住术语英文表达
-- 【动手作业】：一个可以 30 分钟内拆解/画出的小设计问题
+- 【深入思考】：5 个开放式问题，每个用 `<details><summary>问题</summary><div>答案/思路</div></details>` 包裹，点击展开答案。问题要超出正文已直接提到的内容，强迫读者把概念串起来——可包含：反直觉的二阶效应、生产故障复盘、容量/成本的数量级估算、跨章节关联、面试官最爱追问的『假如换个约束怎么办』。答案要给出推理路径而非只给结论。
 - 底部：导航回 index.html
 
 文件命名：主题英文-dayX.html，例如 caching-day2.html, sharding-day4.html

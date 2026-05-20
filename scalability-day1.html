@@ -41,6 +41,15 @@ pre code{background:none;color:inherit;padding:0;font-size:1em}
 table{width:100%;border-collapse:collapse;margin:14px 0;font-size:0.9rem}
 th,td{padding:8px 12px;text-align:left;border-bottom:1px solid rgba(100,200,255,0.15)}
 th{color:#64c8ff;font-weight:600;background:rgba(100,200,255,0.05)}
+details{background:rgba(100,200,255,0.04);border:1px solid rgba(100,200,255,0.18);border-radius:6px;padding:12px 16px;margin:10px 0;transition:all 0.15s}
+details:hover{border-color:rgba(100,200,255,0.35)}
+details[open]{background:rgba(94,234,212,0.05);border-color:rgba(94,234,212,0.3)}
+details summary{font-weight:600;color:#e8eef5;list-style:none;outline:none;cursor:pointer;display:flex;align-items:flex-start;gap:10px;font-size:0.96rem}
+details summary::-webkit-details-marker{display:none}
+details summary::before{content:'▶';color:#64c8ff;font-size:0.75em;transition:transform 0.2s;flex-shrink:0;margin-top:5px}
+details[open] summary::before{transform:rotate(90deg);color:#5eead4}
+details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
+details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
 </style>
 <script type="module">
@@ -233,16 +242,90 @@ def auth(req):
 <h2>English Summary</h2>
 <p>Scaling means surviving load growth without rewriting from scratch. <strong>Vertical scaling</strong> (bigger box) is underrated — Stack Overflow runs SO at billions of pageviews on a handful of fat SQL servers. <strong>Horizontal scaling</strong> demands <em>stateless services</em>, smart <em>load balancing</em> (L4 for throughput, L7 for routing; P2C beats round-robin under skewed load), and capacity planning via <em>back-of-envelope math</em>. The cardinal sin is premature distribution: complexity grows superlinearly, debuggability collapses. Scale when you must, not when you can.</p>
 
-<h2>动手作业（30 分钟）</h2>
-<div class="callout">
-<strong>题目：</strong>设计一个图片上传服务，预计 1 年内从 0 → 1M DAU，平均每人每天上传 2 张（avg 2MB）。
-<ol>
-<li>估算 QPS、存储增长率、带宽峰值。</li>
-<li>画出 Day-1（MVP）和 Day-365（成熟）两个版本的架构图。</li>
-<li>列出从 Day-1 到 Day-365 中你预期会遇到的 3 个瓶颈和触发条件（"当 X 指标到 Y 时升级到 Z 方案"）。</li>
-</ol>
-要求：用 ASCII 画架构、用 napkin math 写出数字。
+<h2>深入思考（点击展开答案）</h2>
+
+<details>
+<summary>1. 服务从 1k QPS 扩到 100k QPS，每加一台机器 p99 反而变高。瓶颈可能在哪？至少列出 3 个不同层的可能原因。</summary>
+<div class="answer">
+<ul>
+<li><strong>共享瓶颈</strong>：DB 连接池、Redis 单点、文件锁——加 app 服务器只是让排队队伍更长。典型表现：DB CPU 100% / connection pool 耗尽。</li>
+<li><strong>LB 本身</strong>：L7 LB（Envoy/Nginx）单实例 ~50k QPS 顶；TLS 握手或 keepalive 配置错会让 LB 成为瓶颈。要看 LB 的 CPU、文件描述符。</li>
+<li><strong>分布式协调成本</strong>：分布式锁（Redlock）、跨节点 cache invalidation、service discovery 的 gossip 流量。机器越多，协调成本是 O(N²)。</li>
+<li><strong>下游放大效应</strong>：每个 app 实例对 DB 都开 20 connection，100 台 = 2000 连接，Postgres 默认 max_connections=100 直接拒绝。</li>
+<li><strong>跨 AZ 网络</strong>：横扩后请求路径从同 AZ 变成跨 AZ，每跳 +0.5ms。10 跳就是 5ms 增量。</li>
+</ul>
+<p><em>诊断顺序</em>：先看哪些指标随机器数<em>线性增长</em>（CPU 应该降，但延迟上升 = 共享资源饱和）。</p>
 </div>
+</details>
+
+<details>
+<summary>2. 为什么 stateless 是横扩的入场券？业务必须保持会话（游戏房间、长事务），有哪些办法既保留状态又能扩缩容？</summary>
+<div class="answer">
+<p><strong>为什么</strong>：stateless 意味着任一请求可以打到任一实例，LB 不用记忆、实例挂掉不丢数据、扩容秒级生效。有状态意味着 LB 必须 sticky session，扩缩容时状态要迁移，节点故障 = 用户掉线。</p>
+<p><strong>有状态服务的解法</strong>：</p>
+<ul>
+<li><strong>状态外置</strong>：把会话状态搬到 Redis / DynamoDB，服务本身依然 stateless。最常见。</li>
+<li><strong>Sticky routing + 状态分片</strong>：consistent hashing 路由（user_id → node），node 挂掉时局部影响。游戏房间通常这样——一个房间永远落在同一台。代价：扩缩容要 rehash 一部分用户。</li>
+<li><strong>Actor model</strong>：Erlang/Akka/Orleans，每个 actor 自己管状态，框架管迁移。Discord 用 Elixir，每个频道一个 process。</li>
+<li><strong>分布式状态机 + Raft</strong>：少量需要强一致的状态用 Raft 集群（etcd / TiKV 模式），多副本 + 选主，节点挂掉自动 failover。</li>
+</ul>
+<p><em>实战经验</em>：90% 业务用『外置 Redis』就够；游戏/IM 用 sticky；金融账本才上 Raft。</p>
+</div>
+</details>
+
+<details>
+<summary>3. L4 LB 和 L7 LB 一定要二选一吗？大厂典型『L4 在外、L7 在内』为什么不反过来？</summary>
+<div class="answer">
+<p><strong>不是二选一</strong>，大厂典型『L4 → L7 → App』两层组合。</p>
+<p><strong>为什么 L4 在外</strong>：</p>
+<ul>
+<li>L4（LVS / AWS NLB / Google Maglev）只看 TCP 五元组，单机能扛 数百万 QPS / 百 Gbps 流量，是抗 DDoS 第一道墙。</li>
+<li>L4 不解 TLS、不看 HTTP，CPU 几乎为零，适合做 anycast 入口。</li>
+<li>L4 用 DSR（Direct Server Return）可以让响应直接从 backend 回客户端，不经过 LB——上行流量减半。</li>
+</ul>
+<p><strong>为什么 L7 在内</strong>：</p>
+<ul>
+<li>L7（Envoy / Nginx）要解 TLS、parse HTTP header、做路由/限流，单机 ~50k QPS，扛不住外网洪水。</li>
+<li>L7 提供丰富功能（path routing、retry、circuit breaker），但前提是流量已经过滤过。</li>
+</ul>
+<p><strong>反过来会怎样</strong>：L7 直接对外，第一次 SYN flood 就把它的连接表打爆，TLS 握手 CPU 飙到 100%。</p>
+</div>
+</details>
+
+<details>
+<summary>4. 一台 c7g.metal（192 vCPU）vs 16 台 c7g.4xlarge（16 vCPU）——总价相同。各自适合什么 workload？故障爆炸半径怎么对比？</summary>
+<div class="answer">
+<p><strong>1 台大机器适合</strong>：</p>
+<ul>
+<li>内存密集且不易分片的：内存数据库（Redis / Memcached）、大 buffer pool 的 OLTP DB（Postgres / MySQL）。</li>
+<li>需要 NUMA-local 访问的低延迟服务：高频交易、广告竞价。</li>
+<li>共享缓存命中率高的：单 JVM 大堆比 16 个小堆，热点 cache 共享更好。</li>
+</ul>
+<p><strong>16 台小机器适合</strong>：</p>
+<ul>
+<li>无状态 web/API 服务、CPU bound 但易并发的：渲染、转码、ML inference。</li>
+<li>需要高可用：滚动发布时只摘一台，影响 6.25% 流量；摘一台大机器影响 100%。</li>
+</ul>
+<p><strong>爆炸半径</strong>：1 台大机器挂 = 100% 服务中断（除非有热备，那就翻倍成本）；16 台中挂 1 台 = 6.25% 容量损失，剩余 15 台能否扛？要预留 ~10% headroom。</p>
+<p><em>结论</em>：CPU bound 且无状态 → 多台小的；内存/IO 密集且需 locality → 大机器（但至少 2 台做 HA）。</p>
+</div>
+</details>
+
+<details>
+<summary>5. 黑五大促预期流量平日 5 倍。容量规划怎么做？headroom 留多少？为什么不能直接『加 5 倍机器』完事？</summary>
+<div class="answer">
+<p><strong>headroom 一般留 30-50%</strong>：因为流量不是均匀分布，p95 峰值可能是均值的 2-3 倍；秒杀场景峰值 / 均值可达 10 倍。所以『5 倍流量』实操要按 7-8 倍 peak 准备。</p>
+<p><strong>为什么不能直接加机器</strong>：</p>
+<ul>
+<li><strong>DB 不是线性扩</strong>：app 加 5 倍，DB QPS 也 5 倍，但 DB 通常只能纵向扩或加 read replica（replication lag 风险）。</li>
+<li><strong>缓存命中率会变</strong>：新用户/新商品意味着 cache miss 增加，DB 压力比预期更大。</li>
+<li><strong>下游依赖</strong>：支付、风控、第三方 API 都有自己的 rate limit，你的流量打过去会被拒。</li>
+<li><strong>冷启动</strong>：新加的实例 JIT 没 warm、connection pool 没满、cache 是空的——刚上线那几分钟反而更慢。要慢启动放量。</li>
+<li><strong>成本失控</strong>：平日 5 倍容量持续跑等于平日成本 5 倍。要能 auto-scaling 在大促结束后秒级缩回去。</li>
+</ul>
+<p><strong>实操</strong>：提前 1 周做 5 倍流量压测（线下 + 影子流量）、降级开关就位（关掉非核心功能腾资源）、上 CDN/缓存预热、扩容预案脚本化（一键扩 N 倍）、监控告警门槛临时调严。</p>
+</div>
+</details>
 
 <div class="nav"><a href="index.html">← 回到目录</a></div>
 
