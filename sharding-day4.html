@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 4 · 数据库分片 (Sharding) — System Design Bi-daily</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"SF Pro Display","Noto Sans SC",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
+.container{max-width:820px;margin:0 auto;padding:24px 20px 60px}
+header{padding:40px 0 28px;border-bottom:1px solid rgba(100,200,255,0.15);margin-bottom:32px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem}
+.tag{padding:3px 10px;border-radius:4px;background:rgba(100,200,255,0.12);color:#64c8ff;border:1px solid rgba(100,200,255,0.25)}
+.tag.diff{background:rgba(94,234,212,0.1);color:#5eead4;border-color:rgba(94,234,212,0.3)}
+.tag.day{background:rgba(255,180,80,0.1);color:#ffb450;border-color:rgba(255,180,80,0.25)}
+h1{font-size:1.75rem;font-weight:800;background:linear-gradient(135deg,#64c8ff 0%,#5eead4 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:0.5px;line-height:1.3}
+h1 .en{display:block;font-size:1rem;color:#7a8590;-webkit-text-fill-color:#7a8590;margin-top:6px;font-weight:500}
+h2{font-size:1.2rem;color:#5eead4;margin:36px 0 14px;padding-left:12px;border-left:3px solid #5eead4}
+h3{font-size:1rem;color:#64c8ff;margin:20px 0 10px;font-weight:600}
+p{margin:10px 0;color:#c8cfd6}
+ul,ol{margin:10px 0 10px 22px;color:#c8cfd6}
+li{margin:6px 0}
+strong{color:#e8eef5;font-weight:600}
+em{color:#5eead4;font-style:normal;font-weight:500}
+code{font-family:"SF Mono",Menlo,Consolas,monospace;background:rgba(100,200,255,0.1);color:#5eead4;padding:1px 6px;border-radius:3px;font-size:0.88em}
+pre{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:14px 16px;overflow-x:auto;margin:12px 0;font-family:"SF Mono",Menlo,Consolas,monospace;font-size:0.84rem;line-height:1.55;color:#c8cfd6}
+pre code{background:none;color:inherit;padding:0;font-size:1em}
+.mermaid{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:18px;margin:14px 0;text-align:center;overflow-x:auto;cursor:zoom-in;transition:border-color 0.15s}
+.mermaid:hover{border-color:rgba(100,200,255,0.4)}
+.mermaid svg{width:100%;max-width:100%;height:auto;min-height:280px}
+.lightbox{position:fixed;inset:0;background:rgba(8,12,18,0.96);z-index:9999;display:none;align-items:center;justify-content:center;padding:24px;cursor:grab;backdrop-filter:blur(4px);overflow:hidden}
+.lightbox.open{display:flex}
+.lightbox.dragging{cursor:grabbing}
+.lightbox svg{width:auto;height:auto;max-width:96vw;max-height:92vh;transform-origin:center center;will-change:transform}
+.lightbox .hint{position:fixed;top:16px;right:20px;font-size:0.78rem;color:#7a8590;font-family:"SF Mono",Menlo,monospace;pointer-events:none}
+.callout{background:rgba(255,180,80,0.06);border-left:3px solid #ffb450;padding:12px 14px;margin:14px 0;border-radius:4px;font-size:0.94rem}
+.callout strong{color:#ffb450}
+.tradeoff{background:rgba(100,200,255,0.05);border:1px solid rgba(100,200,255,0.2);border-radius:6px;padding:12px 14px;margin:12px 0;font-size:0.94rem}
+.case{background:rgba(94,234,212,0.05);border-left:3px solid #5eead4;padding:12px 14px;margin:12px 0;border-radius:4px;font-size:0.94rem}
+.case strong{color:#5eead4}
+.nav{margin-top:50px;padding-top:24px;border-top:1px solid rgba(100,200,255,0.15);text-align:center}
+.nav a{color:#64c8ff;text-decoration:none;font-size:0.92rem;padding:8px 16px;border:1px solid rgba(100,200,255,0.3);border-radius:4px;transition:all 0.15s}
+.nav a:hover{background:rgba(100,200,255,0.1)}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:0.9rem}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid rgba(100,200,255,0.15)}
+th{color:#64c8ff;font-weight:600;background:rgba(100,200,255,0.05)}
+details{background:rgba(100,200,255,0.04);border:1px solid rgba(100,200,255,0.18);border-radius:6px;padding:12px 16px;margin:10px 0;transition:all 0.15s}
+details:hover{border-color:rgba(100,200,255,0.35)}
+details[open]{background:rgba(94,234,212,0.05);border-color:rgba(94,234,212,0.3)}
+details summary{font-weight:600;color:#e8eef5;list-style:none;outline:none;cursor:pointer;display:flex;align-items:flex-start;gap:10px;font-size:0.96rem}
+details summary::-webkit-details-marker{display:none}
+details summary::before{content:'▶';color:#64c8ff;font-size:0.75em;transition:transform 0.2s;flex-shrink:0;margin-top:5px}
+details[open] summary::before{transform:rotate(90deg);color:#5eead4}
+details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
+details .answer ul,details .answer ol{margin:6px 0 6px 22px}
+@media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+</style>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({startOnLoad:true,theme:'base',flowchart:{useMaxWidth:true,htmlLabels:true,nodeSpacing:50,rankSpacing:60},themeVariables:{primaryColor:'#1a2530',primaryTextColor:'#e8eef5',primaryBorderColor:'#64c8ff',lineColor:'#5eead4',secondaryColor:'#0e1419',tertiaryColor:'#0a0f14',background:'#0a0f14',mainBkg:'#1a2530',secondBkg:'#0e1419',textColor:'#d4dae0',fontFamily:'-apple-system,"SF Pro Display",sans-serif',fontSize:'16px'}});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const lb=document.createElement('div');lb.className='lightbox';
+  lb.innerHTML='<span class="hint">scroll = zoom · drag = pan · Esc / click bg = close</span>';
+  document.body.appendChild(lb);
+  let scale=1,panX=0,panY=0,dragging=false,moved=false,lx=0,ly=0;
+  const apply=()=>{const s=lb.querySelector('svg');if(s)s.style.transform=`translate(${panX}px,${panY}px) scale(${scale})`};
+  const reset=()=>{scale=1;panX=0;panY=0};
+  const close=()=>{lb.classList.remove('open');const s=lb.querySelector('svg');if(s)s.remove();reset()};
+  document.addEventListener('click',e=>{
+    if(e.target.closest('.lightbox')){if(moved){moved=false;return}close();return}
+    const w=e.target.closest('.mermaid');if(!w)return;
+    const svg=w.querySelector('svg');if(!svg)return;
+    const c=svg.cloneNode(true);c.removeAttribute('style');
+    c.style.maxWidth='96vw';c.style.maxHeight='92vh';
+    lb.appendChild(c);lb.classList.add('open');reset();apply();
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+  lb.addEventListener('wheel',e=>{
+    if(!lb.classList.contains('open'))return;
+    e.preventDefault();
+    const svg=lb.querySelector('svg');if(!svg)return;
+    const ns=Math.max(0.3,Math.min(10,scale*(1-e.deltaY*0.002)));
+    const r=svg.getBoundingClientRect();
+    const cx=e.clientX-(r.left+r.width/2),cy=e.clientY-(r.top+r.height/2);
+    const k=ns/scale-1;panX-=cx*k;panY-=cy*k;scale=ns;apply();
+  },{passive:false});
+  lb.addEventListener('mousedown',e=>{
+    if(!lb.classList.contains('open'))return;
+    dragging=true;moved=false;lx=e.clientX;ly=e.clientY;lb.classList.add('dragging');e.preventDefault();
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    const dx=e.clientX-lx,dy=e.clientY-ly;
+    if(Math.abs(dx)+Math.abs(dy)>3)moved=true;
+    panX+=dx;panY+=dy;lx=e.clientX;ly=e.clientY;apply();
+  });
+  document.addEventListener('mouseup',()=>{dragging=false;lb.classList.remove('dragging')});
+});
+</script>
+</head><body><div class="container">
+
+<header>
+<div class="meta">
+<span class="tag day">Day 4</span>
+<span class="tag diff">Hard</span>
+<span class="tag">Database</span>
+<span class="tag">Sharding</span>
+<span class="tag">Consistent Hashing</span>
+<span class="tag">Resharding</span>
+</div>
+<h1>数据库分片 — 单机的尽头是分片，分片的尽头是后悔<span class="en">Sharding: Hash vs Range, Consistent Hashing, Hot Spots, Resharding</span></h1>
+</header>
+
+<h2>问题场景</h2>
+<p>『加一台机器就能扛 10 倍流量』——这是新手对 sharding 的幻想。现实是：<strong>分片是不可逆的架构债务</strong>。一旦分了，你失去跨分片事务、失去全表 join、失去自动二级索引；获得的是『可以无限加机器』和『从此每个 schema change 都是噩梦』。</p>
+<p>那为什么还分？因为单机有硬上限：Postgres 单机写 ~50k QPS、数据量 ~10TB；MySQL InnoDB buffer pool 几百 GB 就到顶；垂直加 CPU/内存/SSD 价格曲线非线性陡升（r6i.32xlarge 月费 ~$8k，再大没有 SKU 了）。当单机不够，sharding 是必然。<em>问题不是要不要分，是何时分、怎么分、怎么改</em>。</p>
+<p>反面教材：Foursquare 2010 年 MongoDB 单 shard 装不下，迁移时一台从节点 OOM 全集群雪崩，宕机 11 小时；Slack 2017 年第一次 reshard 花了 9 个月（按 team_id 分片，热门 workspace 还是不均匀）；Notion 2021 年从单 Postgres 拆 32 shard 用了半年，2023 年又从 32 拆到 480。</p>
+
+<h2>需求与约束（面试必问）</h2>
+<ul>
+<li><strong>当前规模与增长</strong>：数据量、写 QPS、读 QPS、增速。如果一年内不会超过单机上限，<em>不要分</em>。</li>
+<li><strong>主导访问模式</strong>：90% 的查询是按什么 key 走的？这就是分片键候选。</li>
+<li><strong>跨分片查询占比</strong>：如果 30% 查询要 fan-out 到所有 shard，分片几乎没收益。</li>
+<li><strong>数据分布</strong>：用户、订单、租户的『size 分布』是均匀还是长尾？长尾 = hot shard 风险。</li>
+<li><strong>事务需求</strong>：跨用户/跨租户事务多吗？分片后这些必须改为 saga 或最终一致。</li>
+<li><strong>未来再分代价</strong>：能接受 1-2 次再分片（数月工程）吗？还是要 consistent hashing 一开始就免再分？</li>
+<li><strong>运维与组件成熟度</strong>：自建 application-side sharding？用 Vitess（MySQL）/ Citus（Postgres）？还是直接换分布式 SQL（TiDB / CockroachDB）？</li>
+</ul>
+
+<h2>高层架构</h2>
+<pre class="mermaid">
+graph TD
+    APP["Application"]
+    PROXY["Shard Router<br/><i>Vitess vtgate / 应用层 / Citus coordinator</i>"]
+    META["Shard Metadata<br/><i>ZK / etcd / config DB</i>"]
+
+    S1[("Shard 0<br/><i>user_id % 16 == 0</i>")]
+    S2[("Shard 1<br/><i>user_id % 16 == 1</i>")]
+    S3[("...")]
+    SN[("Shard 15<br/><i>user_id % 16 == 15</i>")]
+
+    R1[("Shard 0<br/>Replica")]
+    R2[("Shard 1<br/>Replica")]
+
+    APP --> PROXY
+    PROXY -.读 routing 表.-> META
+    PROXY --> S1
+    PROXY --> S2
+    PROXY --> S3
+    PROXY --> SN
+    S1 -.async repl.-> R1
+    S2 -.async repl.-> R2
+
+    classDef app fill:#1a2530,stroke:#64c8ff,color:#e8eef5
+    classDef proxy fill:#2a1530,stroke:#ff7ab6,color:#e8eef5
+    classDef meta fill:#1a1a30,stroke:#ffb450,color:#e8eef5
+    classDef shard fill:#0e2030,stroke:#5eead4,color:#e8eef5
+    class APP app
+    class PROXY proxy
+    class META meta
+    class S1,S2,S3,SN,R1,R2 shard
+</pre>
+<p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">三层：应用 → 路由层（查 metadata 决定去哪个 shard）→ 物理 shard（每个 shard 还有自己的主从复制）</p>
+
+<h2>关键技术点</h2>
+
+<h3>1. Hash sharding vs Range sharding：性能、热点、跨分片查询的三角</h3>
+<p><strong>原理</strong>：两种基本分片策略，决定数据怎么映射到物理节点。</p>
+<table>
+<thead><tr><th></th><th>Hash Sharding</th><th>Range Sharding</th></tr></thead>
+<tbody>
+<tr><td><strong>映射</strong></td><td><code>shard = hash(key) % N</code></td><td>按 key 的区间划分（[a-f] → S0, [g-m] → S1...）</td></tr>
+<tr><td><strong>分布均匀</strong></td><td>✅ 好哈希函数下接近均匀</td><td>❌ 易倾斜（新用户都在最后一个 shard）</td></tr>
+<tr><td><strong>点查</strong></td><td>✅ O(1) 算 hash 直接找</td><td>✅ 二分查找路由表</td></tr>
+<tr><td><strong>范围扫</strong></td><td>❌ 必须 fan-out 全 shard</td><td>✅ 连续 range 落同一 shard</td></tr>
+<tr><td><strong>热点</strong></td><td>单 key 热（如 superuser）= 单 shard 热</td><td>连续写入热（如时间序列）= 最后一个 shard 热</td></tr>
+<tr><td><strong>再分片</strong></td><td>简单 mod 重做痛苦，consistent hash 缓解</td><td>分裂区间相对容易（按 range 拆）</td></tr>
+<tr><td><strong>典型</strong></td><td>DynamoDB（partition key）, Cassandra, Memcached</td><td>HBase, Bigtable, MongoDB（可选）, CockroachDB</td></tr>
+</tbody></table>
+<div class="tradeoff">
+<strong>怎么选：</strong>
+<ul>
+<li>访问以<strong>点查为主</strong>且数据均匀（社交、电商订单按 user_id） → Hash。</li>
+<li>需要<strong>范围扫描</strong>（时序数据、日志、按时间拉一段） → Range（但要警惕最新数据热）。</li>
+<li>混合：<strong>复合 key</strong>（如 <code>(user_id hash, timestamp range)</code>）= 跨用户 hash 分散，单用户内 range 顺序。Cassandra 的 partition key + clustering key 就是这思路。</li>
+</ul></div>
+<pre><code># 简单 hash sharding（应用层）
+import hashlib
+NUM_SHARDS = 16
+
+def shard_of(user_id: int) -> int:
+    h = hashlib.md5(str(user_id).encode()).digest()
+    return int.from_bytes(h[:4], 'big') % NUM_SHARDS
+
+def get_conn(user_id):
+    return shard_pool[shard_of(user_id)]
+
+# ⚠️ 不要用 Python 内置 hash()——进程间不一致 (PYTHONHASHSEED)
+# ⚠️ 不要直接 user_id % N——若 user_id 顺序生成且 N 很小,
+#    新用户会集中落在少数 shard
+</code></pre>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Instagram</strong>：按 user_id 分了几千个『逻辑 shard』，多个逻辑 shard 复用一个 Postgres 实例。新 user_id 由 Snowflake-like ID 生成器分配，自带 shard 标记。</li>
+<li><strong>Notion</strong>：按 workspace 哈希分 480 个逻辑 shard，分布在 96 个 Postgres 实例（每实例 5 个 shard）。所有 block 在同一张 <code>block</code> 表，按 workspace 路由。</li>
+<li><strong>Discord（ScyllaDB）</strong>：消息按 <code>(channel_id, bucket)</code> 复合 key，channel_id 决定 partition（hash），bucket 是时间窗口（range），同一频道同一时段连续读快。</li>
+<li><strong>HBase / Bigtable</strong>：纯 range，行按 rowkey 字典序分 region；Google 推荐 rowkey 加前缀打散（防『最近数据全热』）。</li>
+<li><strong>Pinterest</strong>：自己做 MySQL sharding，按 user_id 哈希，board 和 pin 跟随 user shard（co-located），保证 user 维度的所有数据在同一 shard 上。</li>
+</ul></div>
+
+<h3>2. Consistent Hashing：让加节点不要全表搬</h3>
+<p><strong>原理</strong>：朴素 <code>hash(key) % N</code> 在 N 变化时，几乎所有 key 都要迁移（N: 8→9 时 ~88% 的 key 重映射）。<em>Consistent hashing</em>：把 hash 空间想象成一个环（0 到 2^32），节点和 key 都映射到环上，key 顺时针找到第一个节点。加/减一个节点只影响相邻的一段 key。</p>
+<pre class="mermaid">
+graph LR
+    subgraph Ring["Hash Ring (2^32)"]
+        direction LR
+        N1["Node A<br/>vnode 0..200"]
+        N2["Node B<br/>vnode 201..400"]
+        N3["Node C<br/>vnode 401..600"]
+        N4["Node D (new)<br/>插入处只接管<br/>这段 key"]
+    end
+    K1["key1 hash=150"] --> N1
+    K2["key2 hash=350"] --> N2
+    K3["key3 hash=480"] --> N3
+    K4["key4 hash=270"] --> N4
+    classDef node fill:#0e2030,stroke:#5eead4,color:#e8eef5
+    classDef key fill:#1a1a30,stroke:#ffb450,color:#e8eef5
+    classDef new fill:#2a1530,stroke:#ff7ab6,color:#e8eef5
+    class N1,N2,N3 node
+    class K1,K2,K3,K4 key
+    class N4 new
+</pre>
+<p>但裸 consistent hashing 有问题：节点分布不均时负载倾斜。<em>虚拟节点（vnode）</em>解决——每个物理节点在环上放 100-200 个虚拟点，统计上更均匀；删节点时其负载也均匀分摊到其他节点而非全压到下一个邻居。</p>
+<div class="tradeoff">
+<strong>Trade-off：</strong>
+<ul>
+<li><strong>朴素 mod hash</strong>：✅ 实现 1 行；❌ 加节点等于重做分片。</li>
+<li><strong>Consistent hashing + vnode</strong>：✅ 加/减节点只迁移 <code>1/N</code> 数据；❌ 路由表更复杂、需要查询 vnode 映射；vnode 太多则单节点重启慢（每个 vnode 都要重新加入）。</li>
+<li><strong>Jump consistent hash</strong>（Google 2014）：完全无状态、不需要 vnode，O(log N)；但只能增删尾部节点（不能任意删中间节点）。Vitess、Discord（部分）在用。</li>
+<li><strong>Rendezvous (HRW) hashing</strong>：每个 key 对所有节点算分，取最大者。和 consistent hash 同等迁移率，实现更简单，但 lookup 是 O(N) 不是 O(log N)。</li>
+</ul></div>
+<pre><code># Consistent hashing 简化版 (vnode 版)
+import bisect, hashlib
+
+class ConsistentHash:
+    def __init__(self, nodes, vnodes=150):
+        self.ring = []        # sorted list of (hash, node)
+        self.vnodes = vnodes
+        for n in nodes:
+            self.add_node(n)
+
+    def _h(self, key):
+        return int(hashlib.md5(key.encode()).hexdigest(), 16)
+
+    def add_node(self, node):
+        for i in range(self.vnodes):
+            h = self._h(f"{node}#{i}")
+            bisect.insort(self.ring, (h, node))
+
+    def get(self, key):
+        h = self._h(key)
+        i = bisect.bisect(self.ring, (h, ''))
+        return self.ring[i % len(self.ring)][1]
+
+# 加 1 个节点 (N → N+1), 重映射比例 ≈ 1/(N+1)
+# 朴素 mod: 重映射比例 ≈ N/(N+1)
+</code></pre>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Amazon Dynamo</strong>（2007 论文）：consistent hashing 的开山之作，vnode 概念发源；DynamoDB 至今底层是这思路。</li>
+<li><strong>Cassandra</strong>：每节点默认 256 vtokens（virtual tokens），加节点时只搬 <code>1/N</code> 的数据；Apple 部署 10w+ Cassandra 节点。</li>
+<li><strong>Riak / ScyllaDB</strong>：同 Dynamo 模型。</li>
+<li><strong>Memcached</strong>（client-side）：Ketama 算法（consistent hash + vnode）几乎是事实标准；Facebook 早期 1k+ Memcached 节点全靠它。</li>
+<li><strong>Discord</strong>：voice server 分配用 consistent hashing 把 guild 映射到 voice node，节点故障只重连受影响 guild。</li>
+<li><strong>Cloudflare</strong>：边缘节点请求路由部分用 HRW / consistent hash 把同 host 的请求落到同一台机器以最大化缓存命中。</li>
+</ul></div>
+
+<h3>3. Hot Spots：均匀分片为什么仍会被打爆</h3>
+<p><strong>原理</strong>：『统计均匀』 ≠ 『实际均匀』。三类 hot spot：</p>
+<ol>
+<li><strong>Key hot</strong>：单 key 流量过高（明星账号 1 亿粉、爆款商品 100k QPS）。哈希再好，这个 key 永远落同一 shard。</li>
+<li><strong>Range hot</strong>：range 分片下『最新数据』集中（按 timestamp 分片，写流量永远在最后一个 shard）。</li>
+<li><strong>Tenant hot</strong>：multi-tenant 系统中大客户（Slack 中的 Salesforce、Notion 中的 Adobe）占用一个 shard 的 90%。</li>
+</ol>
+<p><strong>缓解策略</strong>：</p>
+<table>
+<thead><tr><th>策略</th><th>做法</th><th>适用</th><th>代价</th></tr></thead>
+<tbody>
+<tr><td>Salting</td><td>key 加随机/可枚举后缀：<code>celebrity_42#{0..15}</code></td><td>写极热的单 key</td><td>读放大 N 倍（要并发查 N 个分片合并）</td></tr>
+<tr><td>Cache 前置</td><td>热 key 走 Redis / CDN，DB 只承接 miss</td><td>读极热</td><td>cache 一致性 / TTL 抖动</td></tr>
+<tr><td>专属 shard</td><td>大租户独占一个 shard / 实例</td><td>tenant hot</td><td>需要识别 + 迁移 + 容量规划</td></tr>
+<tr><td>动态分裂</td><td>Spanner / DynamoDB / Cockroach 自动检测热 region 并裂开</td><td>系统支持时</td><td>分裂期间短暂 throttle</td></tr>
+<tr><td>反向时间戳</td><td>rowkey 加 <code>MAX_LONG - timestamp</code> 或 hash 前缀</td><td>range 时序热</td><td>失去自然顺序，需要应用层翻转</td></tr>
+<tr><td>读副本扩展</td><td>热 shard 多加几个 read replica</td><td>读热</td><td>写还是单点，replica lag</td></tr>
+</tbody></table>
+<pre><code># Salting 示例：write-heavy celebrity 账户的 follower 表
+# 原 schema:
+#   follower(celebrity_id, follower_id, ts)  partition by celebrity_id
+# 问题: celebrity_id=42 (Elon) 写 QPS 50k, 远超单 partition 1000 WCU 上限
+
+# 改造：加散列后缀
+shard_suffix = random.randint(0, 15)
+write(table, partition=f"42#{shard_suffix}", row={...})
+
+# 读时 fan-out
+results = []
+for i in range(16):
+    results += query(partition=f"42#{i}")
+return merge_sort_by_ts(results)
+
+# Trade-off: 读吞吐放大 16x; 但写解决了
+# 适合 write >> read 场景; 反过来不适用
+</code></pre>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Twitter</strong>：Justin Bieber 时代的『超级用户问题』，Manhattan 数据库（Twitter 自研 KV）专门给 celeb account 走『分裂存储 + 单写多读副本』；timeline fanout 改为 hybrid（普通用户 push, celeb pull）。</li>
+<li><strong>DynamoDB Adaptive Capacity</strong>：2017 起自动检测 hot partition 并分裂，无感扩容；但仍有上限，业务方常常被迫 salting。</li>
+<li><strong>Slack</strong>：『vitess pod』概念把热 workspace 单独放一个 MySQL 实例；冷 workspace 几百个挤一个实例。</li>
+<li><strong>Bigtable / HBase</strong>：官方文档第一条建议就是『rowkey 前缀打散』防 hot region；Salesforce 用 hash 前缀解决时序写热。</li>
+<li><strong>Shopify Vitess</strong>：黑五前手动把头部商户迁到独立 pod，避免单 shard 被打爆。</li>
+</ul></div>
+
+<h3>4. Resharding：从 32 个 shard 到 480 个的工程噩梦</h3>
+<p><strong>原理</strong>：再分片是分布式系统中最痛的操作之一，因为它要做到：（a）数据从旧拓扑搬到新拓扑；（b）业务不能停；（c）切换前后强一致；（d）出错可回滚。<em>没有 shadow read/write 和回滚预案的 resharding 都是赌博</em>。</p>
+<pre class="mermaid">
+sequenceDiagram
+    participant App
+    participant Router
+    participant Old as Old Shard (16)
+    participant New as New Shard (32)
+
+    Note over Router: Phase 1 · 双写
+    App->>Router: write k1
+    Router->>Old: write k1 (主)
+    Router->>New: write k1 (影子, 异步)
+
+    Note over Router: Phase 2 · backfill 历史
+    Router-->>New: 后台 copy: 全量 + 增量 CDC
+
+    Note over Router: Phase 3 · shadow read 校验
+    App->>Router: read k1
+    Router->>Old: read (返回给用户)
+    Router->>New: read (对比, 不返回)
+    Note right of Router: diff > 阈值 → 暂停切换
+
+    Note over Router: Phase 4 · 切流 (按 % 灰度)
+    App->>Router: write k1
+    Router->>New: write k1 (主)
+    Router->>Old: write k1 (回写, 备份)
+
+    Note over Router: Phase 5 · 拆链 / 删除旧数据
+</pre>
+<div class="tradeoff">
+<strong>Resharding 策略对比：</strong>
+<ul>
+<li><strong>Stop-the-world 迁移</strong>：维护窗口里把数据搬完。✅ 简单；❌ 几小时停机，现代业务不可接受。</li>
+<li><strong>Online resharding（双写）</strong>：上面的 5 阶段。✅ 零停机；❌ 工程量大（数月）、双写期间一致性维护麻烦。</li>
+<li><strong>Logical shards over physical shards</strong>：一开始就建 1024 个逻辑 shard，分布在 16 个物理实例上；再分片时只是把一些逻辑 shard 搬到新实例，<em>不改路由 hash 函数</em>。Vitess、Notion、Figma 都这么做。这是最现代的方案。</li>
+<li><strong>Consistent hashing</strong>：理论上加节点只搬 <code>1/N</code>，但 vnode 映射变化时仍要在线 backfill，工程上没那么白嫖。</li>
+<li><strong>分布式 SQL（TiDB / CockroachDB / Spanner）</strong>：自动 region 分裂与迁移，运维几乎免费——但你要接受其 trade-off（写延迟、生态、成本）。</li>
+</ul></div>
+<pre><code># Resharding 关键: idempotent dual write + version stamp
+def write(key, value):
+    version = current_ms()
+    # 双写, 带 version 防止旧值覆盖新值
+    write_old(key, value, version)
+    if reshard_phase >= DUAL_WRITE:
+        try:
+            write_new(key, value, version)  # if-newer
+        except Exception as e:
+            log_drift(key, e)   # 告警, 不阻塞主流程
+
+def read(key):
+    if reshard_phase == SHADOW_READ:
+        v_old = read_old(key)
+        v_new = read_new(key)
+        if v_old != v_new:
+            metrics.diff_count.inc()
+            log_diff(key, v_old, v_new)
+        return v_old  # 还是返回老的, 直到切换
+    elif reshard_phase >= CUTOVER:
+        return read_new(key)
+    else:
+        return read_old(key)
+</code></pre>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Notion 2021 → 2023</strong>：单 Postgres → 32 shard → 480 shard。两次再分片各花约 6 个月。第二次用 logical-over-physical 方案，未来再扩只需迁逻辑 shard 到新机器，不改路由。</li>
+<li><strong>Figma 2023</strong>：从单 Postgres 拆出 horizontally sharded Postgres（按 file 维度），用 PgBouncer + 自研 routing 层；做了 9 个月，shadow read 校验跑了 1 个月。</li>
+<li><strong>Slack 2017</strong>：把 messages 表从单库 reshard 到 vitess，工程化 9 个月，CDC 增量同步 + shadow read。</li>
+<li><strong>Shopify Vitess</strong>：定期 reshard 是常规运维，已有成熟 tooling（vreplication）；黑五前会主动平衡热 pod。</li>
+<li><strong>Foursquare 2010 反面教材</strong>：MongoDB shard 满了再迁，迁移触发 OOM 雪崩，宕机 11 小时；事后总结：『分片要在容量 50% 时就规划好下一次』。</li>
+</ul></div>
+
+<h2>扩展与优化（增长后怎么办）</h2>
+<ul>
+<li><strong>选择 shard key 比选数据库更重要</strong>。错的 shard key 是一辈子的债。原则：高基数（cardinality 高，区分度好）、与主导查询模式匹配（90% 查询带这个 key）、随时间稳定（不会从一个值变到另一个）。</li>
+<li><strong>Co-location（同位）</strong>：相关数据放同一 shard。Pinterest 把 user 的 boards 和 pins 跟随 user shard；Citus 用 colocation group；Vitess 用 keyspace + sequence。这样 user 维度的事务和 join 都在单 shard 完成。</li>
+<li><strong>跨 shard 二级索引</strong>：要么应用层维护『全局索引表』（同步双写），要么走外部搜索（ES / 反向索引服务）。强一致跨 shard 索引非常贵。</li>
+<li><strong>跨 shard join / 聚合</strong>：放弃实时 join；通过 CDC → 数仓做分析；交互 API 改成 fan-out + 应用层 merge（限制 K 个 shard）。</li>
+<li><strong>容量规划提前 2x</strong>：每个 shard 占用不要超过 50%，否则再分片来不及。Foursquare 教训。</li>
+<li><strong>逻辑 shard 远多于物理实例</strong>（1024 vs 32）：扩容时迁移逻辑 shard，不改路由函数，零代码改动。</li>
+</ul>
+
+<h2>常见陷阱</h2>
+<div class="callout">
+<strong>1. shard key 选了『增量字段』</strong>：用 <code>auto_increment id</code> 做 hash key，新数据全集中在少数 shard（auto_increment 在分片场景常有 prefix 偏置）；用 timestamp 做 range key，写永远在尾巴。
+</div>
+<div class="callout">
+<strong>2. 用 <code>%</code> 做 shard 函数，加节点 = 灾难</strong>：N 从 16 → 32 时 ~93.75% key 要搬。要么 consistent hashing，要么 logical-over-physical。
+</div>
+<div class="callout">
+<strong>3. 跨 shard 事务硬上 2PC</strong>：性能崩塌、协调器单点。改 saga / outbox / 应用层补偿。
+</div>
+<div class="callout">
+<strong>4. 没有 shadow read 就 cutover</strong>：你以为一致，结果用户看到丢数据 / 重复。Shadow read 跑至少 1-2 周积累 diff 数据再切。
+</div>
+<div class="callout">
+<strong>5. 忽视 connection 爆炸</strong>：分了 N 个 shard，每个应用实例如果都连所有 shard，连接数 = N × instance 数，Postgres 5k 连接上限秒爆。必须 PgBouncer / proxy 层池化。
+</div>
+<div class="callout">
+<strong>6. 跨 shard 唯一约束</strong>：unique(email) 在分片表里不能由 DB 保证（不同 shard 可能同 email 都成功）。需要中央 unique 服务（小型 KV 或一个集中表）。
+</div>
+<div class="callout">
+<strong>7. 太早分片</strong>：单机 Postgres 配 r6i.32xlarge + 良好 schema 能扛 50k QPS / 5TB。很多团队 1k QPS 就开始分片，徒增复杂度。先垂直扩、加 cache、加 replica，最后才分。
+</div>
+
+<h2>面试问题示例</h2>
+<ol>
+<li>设计 Twitter，你怎么分 tweets 表？user_id 还是 tweet_id？为什么？分别有什么问题？</li>
+<li>解释 consistent hashing 和 vnode；用一个『加节点』场景说明 mod hash 与 consistent hash 的迁移比例差异。</li>
+<li>DynamoDB 一个 partition 突然被限流（hot partition），你不能改 schema，能想到几种缓解方案？</li>
+<li>你设计一个 multi-tenant SaaS，某客户突然涨到全平台 30% 流量，怎么把它『单独搬出来』而其他人无感？</li>
+<li>online resharding 的关键阶段是什么？双写期间数据漂移怎么发现？</li>
+<li>为什么 logical shard 数量要远大于物理实例数？给一个具体的扩容场景说明它的好处。</li>
+</ol>
+
+<h2>关键资源</h2>
+<ul>
+<li><strong>《Designing Data-Intensive Applications》Ch 6 — Partitioning</strong>（Kleppmann）：hash/range、二级索引、resharding 的系统讨论，本主题最权威读物。</li>
+<li><strong>Notion 工程博客《Sharding Postgres》(2021) + 《The great re-shard》(2023)</strong>：从单库 → 32 shard → 480 shard 的完整复盘，含 logical-over-physical 设计。</li>
+<li><strong>Vitess 官方文档 + Slack 博客《Scaling Datastores at Slack with Vitess》</strong>：MySQL 横向扩展的工业级参考。</li>
+</ul>
+
+<h2>English Summary</h2>
+<p>Sharding is irreversible architectural debt — you trade away cross-shard transactions, joins, and global secondary indexes for unbounded horizontal scale. Two basic strategies: hash sharding distributes evenly but kills range scans; range sharding preserves locality but creates hotspots on monotonically increasing keys. Consistent hashing with virtual nodes minimizes data movement when adding/removing nodes — N→N+1 moves only 1/N of keys versus ~N/(N+1) with naive mod-hash. Hot spots are inevitable: celebrity accounts, tenant whales, and time-series tails all break statistical uniformity. Mitigations include salting, dedicated shards, adaptive capacity, and caching. Modern best practice is logical-over-physical sharding: provision many more logical shards (e.g., 1024) than physical instances, so scaling out is just migrating logical shards without changing the routing hash. Online resharding requires dual writes, shadow reads, and gradual cutover; expect 3-9 months of engineering. Default to vertical scale and read replicas first — only shard when you must.</p>
+
+<h2>深入思考（点击展开答案）</h2>
+
+<details>
+<summary>1. Notion 用 logical-over-physical（1024 逻辑 shard / 32 物理实例）的关键好处是『扩容不改路由函数』。但如果有一天逻辑 shard 数也不够了（要从 1024 加到 4096），他们会面临什么？是不是只是把问题推迟了？</summary>
+<div class="answer">
+<p><strong>本质</strong>：logical-over-physical 把『分片函数』和『物理拓扑』解耦。前者稳定，后者可调。但只解决了『扩物理容量』的问题，没解决『单个逻辑 shard 容量见顶』。</p>
+<ul>
+<li><strong>什么时候要加逻辑 shard</strong>：单个逻辑 shard 数据量或 QPS 触顶（例如一个 workspace 大到 1 个逻辑 shard 也装不下）。</li>
+<li><strong>这时确实要重新 hash</strong>：1024 → 4096，路由 hash 改变，几乎所有 key 都要重新映射。代价等同于第一次分片。</li>
+<li><strong>缓解方案 A：一开始就开『超额』逻辑 shard</strong>。Notion 选 480 其实留了余量；Figma 直接开了 4096。1 个逻辑 shard 占 1 MB metadata，4096 个也才 4MB，几乎免费。</li>
+<li><strong>缓解方案 B：分裂式 resharding</strong>。把 shard k 分裂为 k_a 和 k_b，hash range 一半给 a 一半给 b，只影响一个 shard 的数据。CockroachDB / Spanner 内置 range split 就是这思路；应用层 sharding 也能仿照，但路由表会膨胀。</li>
+<li><strong>缓解方案 C：异质分片</strong>。大租户单独放专属 shard（physical isolation），不参与 hash 池。Slack vitess pod 就这么干。</li>
+</ul>
+<p><em>结论</em>：logical-over-physical 不是银弹，但把『常态扩容』成本降到接近零，把『重新分片』的痛苦推迟数年。这种『推迟』本身就是巨大的工程价值——业务有时间演化、团队有时间成熟、工具有时间完善。<strong>不必要的复杂度推迟到必要时再付，是分布式系统设计的核心智慧</strong>。</p>
+</div>
+</details>
+
+<details>
+<summary>2. Pinterest 把 user 的 boards、pins 都 co-locate 在同一 shard（按 user_id）。听起来很美，但如果有用户『关注』另一个用户的 board，关注关系跨 shard。讲讲他们怎么处理跨 shard 的『关注 + feed 生成』？</summary>
+<div class="answer">
+<p>Pinterest（以及 Twitter / Instagram）面对同样的『社交图跨分片』难题。核心思路：<strong>放弃在 OLTP 实时 join，改用预计算 + 异步流水线</strong>。</p>
+<ul>
+<li><strong>关注关系存哪里</strong>：单独一张『关系表』，按 follower_id 分片（与 user shard 同 key），存『谁关注了谁』；同时按 followee_id 再存一份（fanout 用），双写。</li>
+<li><strong>Feed 生成：fanout-on-write</strong>。A 发新 pin → 查 A 的 follower 列表 → 给每个 follower 的 feed 表追加一条。每个 follower 的 feed 都在自己的 shard 上，读时 O(1)。</li>
+<li><strong>Celebrity 问题（10M 粉的明星）</strong>：fanout 10M 次代价巨大。改为 hybrid：普通用户继续 fanout-on-write；celebrity 改 fanout-on-read（关注者读 feed 时实时拉 celeb 最近 pin 合并）。</li>
+<li><strong>跨 shard 强一致丢了</strong>：A 关注 B 这一刻，feed 不会立刻有 B 的 pin。最终一致几秒到几分钟，产品上可接受。</li>
+<li><strong>反向索引（谁 pin 了这张图）</strong>：单独一个反向索引服务（按 pin_id 分片），异步从主表 CDC 出来。</li>
+</ul>
+<p><strong>关键模式</strong>：分片系统中，跨 shard 的关系通过<em>异步 fanout / 物化视图</em>来转化为 shard 内的本地查询。Twitter timeline、Instagram feed、Facebook News Feed 全是这套思路。代价是写放大（fanout 1 写变 N 写）和短暂不一致，换得读路径 O(1) 和水平扩展能力。</p>
+<p><em>面试拓展</em>：被问到『社交 feed 怎么做』，能答出 fanout-on-write/read 混合 + celebrity 特殊处理，已经是高级答案。Day 14 Feed 系统会详细展开。</p>
+</div>
+</details>
+
+<details>
+<summary>3. 你设计 SaaS 后端，用 tenant_id 做 shard key。一年后发现：80% 租户 &lt; 1GB，但前 5 名占了总数据的 60%（典型 power law）。这时该怎么演进？</summary>
+<div class="answer">
+<p>这是经典的『tenant skew』，几乎所有 multi-tenant SaaS 都会遇到。一个分片策略下两层不同的容量级别，必须用『分级架构』解决。</p>
+<ul>
+<li><strong>识别层级</strong>：先做数据分析，按租户大小划三档：（a）long-tail（&lt; 1GB，几百万个）；（b）mid（1GB-100GB，几千个）；（c）whale（&gt; 100GB，几十个）。</li>
+<li><strong>Long-tail：共享 shard pool</strong>。一个物理实例放成千上万 tenant，按 hash 分布；这是默认情况。</li>
+<li><strong>Mid：固定 logical shard</strong>。每个 tenant 分配 1 个固定 logical shard，多个 logical shard 共享物理实例，需要时可独立迁移。</li>
+<li><strong>Whale：dedicated instance</strong>。每个 whale 一个独立实例（甚至独立集群），可单独调优、独立 SLA、独立计费。Slack 把 Salesforce/Verizon 这种大客户都单独放 vitess pod。</li>
+<li><strong>路由层封装</strong>：应用代码看不到差异，<code>get_shard(tenant_id)</code> 查 metadata 决定走哪一档。</li>
+<li><strong>过渡机制</strong>：tenant 增长跨越档位时（一个 mid 涨到 whale），需要在线迁移；shadow read + dual write + 切流，几小时到几天。</li>
+<li><strong>定价上的好处</strong>：whale 用独立实例 → 成本可追溯 → 可设置 enterprise tier 收高价。Snowflake、Databricks、MongoDB Atlas 都用这套：『共享 → 独立』就是产品分层的物理基础。</li>
+</ul>
+<p><em>反模式</em>：</p>
+<ul>
+<li>『全部 tenant 一视同仁 hash 分布』：whale 把 shard 撑爆，long-tail 浪费容量。</li>
+<li>『一开始就给每个 tenant 独立 DB』：long-tail 几百万实例运维爆炸。</li>
+</ul>
+<p><em>核心智慧</em>：物理资源向数据分布形状靠拢，而不是硬塞进均匀模型。这也是为什么『tenant_id 做 shard key』只是起点不是终点。</p>
+</div>
+</details>
+
+<details>
+<summary>4. Consistent hashing 加节点只搬 1/N 数据，听起来很美。但 Notion 选了 logical-over-physical 而非 consistent hashing。为什么？两者真实工程上差异在哪？</summary>
+<div class="answer">
+<p>表面看两者都解决『加节点不大搬数据』，但有几个真实工程差异让 logical-over-physical 在 OLTP 数据库场景更友好。</p>
+<ul>
+<li><strong>(a) 数据迁移粒度</strong>。Consistent hashing 加节点时，要搬的是『环上某一段 key』——这些 key 散落在历史所有写入里，迁移本质是 scan + filter，IO 模式随机、慢。Logical shard 迁移是『整个逻辑 shard 整体搬运』——文件级 / 表级 copy，顺序 IO、快、原子性好。</li>
+<li><strong>(b) 监控与运维直观度</strong>。Logical shard 是『可命名实体』：你能看到 shard #237 在 instance-3，占用 X GB，QPS Y。Consistent hash 下 key range 是抽象的环段，监控、debug、容量规划都没有直观对应物。</li>
+<li><strong>(c) 跨 shard 操作的边界</strong>。Logical shard 边界稳定，跨 shard 操作清晰（哪些 query 跨 shard 可预知）。Consistent hash 下相同 key 集合可能在加节点后落入不同段，跨段查询的物理拓扑动态变化。</li>
+<li><strong>(d) 故障隔离</strong>。Logical shard 失败只影响该 shard 的租户；consistent hash 下一段 key 失败可能影响多个不相关业务。</li>
+<li><strong>(e) 二级索引、外键、约束</strong>。OLTP 数据库的 unique / FK 约束往往要绑定到具体表 / shard；logical shard 提供稳定容器，consistent hash 流动的 range 不好绑。</li>
+<li><strong>(f) Consistent hash 更适合 KV / cache</strong>。Memcached、DynamoDB 这种『无 schema、无跨行约束、加减节点频繁』的系统是 consistent hash 天堂。Postgres 这种有 schema 有约束的不是。</li>
+</ul>
+<p><em>结论</em>：consistent hashing 的『最少迁移』优化在 KV cache 类系统价值巨大（节点频繁变动）；在 OLTP 数据库（节点变动罕见、每次都是计划内）这点节省不重要，反而是『可观测性 + 运维简洁』更重要。这是为什么 DynamoDB / Cassandra（KV）用 consistent hash，Notion / Figma / Slack（OLTP）用 logical-over-physical。<strong>选型不是看哪个理论优雅，是看哪个匹配业务变化频率和运维心智模型</strong>。</p>
+</div>
+</details>
+
+<details>
+<summary>5. 容量估算：你设计一个电商平台，预计 1 亿用户、每用户 100 个订单 / 年、每订单 2KB。要支持 5 年数据。从『要不要分片』『分几片』『shard key』『跨片查询』四个层面给出推演。</summary>
+<div class="answer">
+<p><strong>第一步：算总规模</strong></p>
+<ul>
+<li>5 年订单总数 = 1e8 × 100 × 5 = <strong>5e10 = 500 亿条</strong>。</li>
+<li>裸数据 = 500e9 × 2KB = <strong>1000 TB = 1 PB</strong>。</li>
+<li>加索引（2-3 个二级索引，约 50% 数据量）+ MVCC bloat = 实际 <strong>~2 PB</strong>。</li>
+<li>写 QPS 平均：5e10 / (5 × 365 × 86400) ≈ <strong>317 QPS</strong>。但峰值（黑五）放大 20x = <strong>~6.3k QPS</strong>。</li>
+<li>读 QPS：用户每天看 10 次订单页 → 1e8 × 10 / 86400 ≈ <strong>11.6k QPS</strong>，峰值 ~200k。</li>
+</ul>
+
+<p><strong>第二步：要不要分片</strong></p>
+<ul>
+<li>数据量 2PB 远超单机（即使 r6i.32xlarge 也只有 ~10TB 实用 SSD）→ <em>必须分片</em>。</li>
+<li>QPS 看似单机能扛，但 2PB 数据在单机上 index 维护、备份恢复、vacuum 都不现实 → 数据量本身就是分片驱动力。</li>
+<li>不分片的替代是分布式 SQL（TiDB / Spanner / CockroachDB），但成本可能 3-5x，trade-off 题。</li>
+</ul>
+
+<p><strong>第三步：分几片</strong></p>
+<ul>
+<li>目标单 shard：&lt; 1TB 数据 + &lt; 5k QPS（留 50% 余量）。</li>
+<li>2PB / 1TB = <strong>2000 个 shard</strong>。</li>
+<li>但 2000 个物理实例太贵 → logical-over-physical：开 2048 个 logical shard，部署在 64-128 个物理实例（每实例 16-32 logical shard）。</li>
+<li>未来扩容只需要把 logical shard 迁到新实例，不改路由 hash。</li>
+</ul>
+
+<p><strong>第四步：shard key 选什么</strong></p>
+<ul>
+<li>候选 1：<strong>user_id</strong>。用户查自己订单（90% 流量）一个 shard 完成 ✅。问题：商家维度查询要跨 shard fan-out。</li>
+<li>候选 2：<strong>order_id</strong>（Snowflake-like，含时间戳）。订单详情页 O(1) ✅。问题：用户的『订单列表』要扫所有 shard ❌。</li>
+<li>候选 3：<strong>(merchant_id, user_id)</strong> 复合。商户视角和用户视角都能本地完成。但跨 merchant 的用户『我的所有订单』就难了。</li>
+<li><em>实际选择</em>：user_id 哈希，order_id 包含 user_id 前缀（如 <code>{user_id_hash}_{snowflake}</code>），保证『按 order_id 查也能定位到 shard』。商户维度独立做物化视图（CDC → 商户索引表，按 merchant_id 分片）。</li>
+</ul>
+
+<p><strong>第五步：跨片查询怎么办</strong></p>
+<ul>
+<li><strong>用户单维度</strong>（订单列表、订单详情）→ 单 shard，无跨片。</li>
+<li><strong>商户单维度</strong>（商户后台看自家订单）→ 维护商户视角的二级表（CDC 异步同步，按 merchant_id 分片）。</li>
+<li><strong>聚合分析</strong>（『过去 30 天 GMV』）→ 不走 OLTP，CDC 到 Snowflake / ClickHouse。</li>
+<li><strong>风控、推荐</strong>→ 走数仓 + 离线 pipeline，不打 OLTP。</li>
+</ul>
+
+<p><strong>成本估算</strong></p>
+<ul>
+<li>2PB 实际存储（包含索引、副本 3x）= 6PB。AWS gp3 SSD $0.08/GB/月 → 6PB × $80/TB = <strong>$480k/月 仅存储</strong>。</li>
+<li>冷热分层：最近 6 个月热数据（200TB）走 SSD，剩余走对象存储 + ClickHouse → 实际 SSD 需求 600TB，月成本压到 ~$50k。</li>
+<li>计算：128 实例 r6i.8xlarge ≈ $150k/月。</li>
+<li>总成本量级 $200k-$500k/月，年 $3M-$6M。这就是为什么大型电商必须做冷热分层、数据归档、压缩等优化。</li>
+</ul>
+
+<p><em>面试关键</em>：能从『数据量』推到『要不要分』，从『QPS + 余量』推到『分几个』，从『主导访问模式』推到『shard key』，从『次要访问模式』推到『二级索引/物化视图』，最后能算出『成本量级』并提冷热分层。这一套下来基本是 staff 级答案。</p>
+</div>
+</details>
+
+<div class="nav"><a href="index.html">← 回到 index</a></div>
+</div></body></html>
