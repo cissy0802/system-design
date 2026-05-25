@@ -318,22 +318,22 @@ def read(doc_id, min_lsn):
 <pre class="mermaid">
 sequenceDiagram
     participant O as Orchestrator
-    participant L as Old Leader (us-east-1a)
-    participant R1 as Replica R1 (1a, semi-sync)
-    participant R2 as Replica R2 (1b, async, lag 800ms)
+    participant L as "Old Leader 1a"
+    participant R1 as "Replica R1 sync"
+    participant R2 as "Replica R2 async"
     participant App as Apps
 
-    Note over L,R2: 正常: L 写, R1 sync ACK, R2 lag
-    L--xO: 心跳超时 (10s)
+    Note over L,R2: 正常 — L 写, R1 sync ACK, R2 lag 800ms
+    L--xO: 心跳超时 10s
     O->>R1: 检查 R1 LSN
     O->>R2: 检查 R2 LSN
-    Note over O: R1=lsn:1000  R2=lsn:880<br/>选 R1 (最新)
+    Note over O: R1 lsn=1000, R2 lsn=880<br/>选 R1 最新
     O->>R1: PROMOTE
-    O->>App: 切路由 → R1 作为新 leader
+    O->>App: 切路由到 R1 作为新 leader
     R1->>R2: 重新建立复制
-    Note over L: L 网络恢复, 自认还是 leader<br/>但 STONITH/fencing token 已失效
+    Note over L: L 网络恢复, 自认还是 leader<br/>但 fencing token 已失效
     O->>L: DEMOTE / kill
-    Note over L: 旧 L 上 lsn:1000~1010 的写若未 ACK<br/>直接丢; 若已 ACK 给客户端 → 数据丢失!
+    Note over L: 旧 L 上 lsn 1000~1010 的写若未 ACK 直接丢<br/>若已 ACK 给客户端 — 数据丢失
 </pre>
 <div class="tradeoff">
 <strong>关键设计决策：</strong>

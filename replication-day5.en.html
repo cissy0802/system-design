@@ -319,22 +319,22 @@ def read(doc_id, min_lsn):
 <pre class="mermaid">
 sequenceDiagram
     participant O as Orchestrator
-    participant L as Old Leader (us-east-1a)
-    participant R1 as Replica R1 (1a, semi-sync)
-    participant R2 as Replica R2 (1b, async, lag 800ms)
+    participant L as "Old Leader 1a"
+    participant R1 as "Replica R1 sync"
+    participant R2 as "Replica R2 async"
     participant App as Apps
 
-    Note over L,R2: Normal: L writes, R1 sync-ACKs, R2 lags
-    L--xO: heartbeat timeout (10s)
+    Note over L,R2: Normal — L writes, R1 sync-ACKs, R2 lags 800ms
+    L--xO: heartbeat timeout 10s
     O->>R1: check R1 LSN
     O->>R2: check R2 LSN
-    Note over O: R1=lsn:1000  R2=lsn:880<br/>pick R1 (most recent)
+    Note over O: R1 lsn=1000, R2 lsn=880<br/>pick R1 most recent
     O->>R1: PROMOTE
-    O->>App: reroute → R1 is the new leader
+    O->>App: reroute to R1 as new leader
     R1->>R2: re-establish replication
-    Note over L: L network recovers, still thinks it's leader<br/>but STONITH / fencing token invalidated
+    Note over L: L network recovers, still thinks it's leader<br/>but fencing token invalidated
     O->>L: DEMOTE / kill
-    Note over L: writes lsn:1000~1010 on old L: if un-ACKed, lost<br/>if already ACKed to client → data loss!
+    Note over L: writes lsn 1000~1010 on old L if un-ACKed are lost<br/>if already ACKed to client — data loss
 </pre>
 <div class="tradeoff">
 <strong>Key design decisions:</strong>
