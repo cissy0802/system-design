@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 1 · Scalability Foundations — System Design Bi-daily</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"SF Pro Display","Noto Sans SC",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
+.container{max-width:820px;margin:0 auto;padding:24px 20px 60px}
+header{padding:40px 0 28px;border-bottom:1px solid rgba(100,200,255,0.15);margin-bottom:32px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem}
+.tag{padding:3px 10px;border-radius:4px;background:rgba(100,200,255,0.12);color:#64c8ff;border:1px solid rgba(100,200,255,0.25)}
+.tag.diff{background:rgba(94,234,212,0.1);color:#5eead4;border-color:rgba(94,234,212,0.3)}
+.tag.day{background:rgba(255,180,80,0.1);color:#ffb450;border-color:rgba(255,180,80,0.25)}
+h1{font-size:1.75rem;font-weight:800;background:linear-gradient(135deg,#64c8ff 0%,#5eead4 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:0.5px;line-height:1.3}
+h1 .en{display:block;font-size:1rem;color:#7a8590;-webkit-text-fill-color:#7a8590;margin-top:6px;font-weight:500}
+h2{font-size:1.2rem;color:#5eead4;margin:36px 0 14px;padding-left:12px;border-left:3px solid #5eead4}
+h3{font-size:1rem;color:#64c8ff;margin:20px 0 10px;font-weight:600}
+p{margin:10px 0;color:#c8cfd6}
+ul,ol{margin:10px 0 10px 22px;color:#c8cfd6}
+li{margin:6px 0}
+strong{color:#e8eef5;font-weight:600}
+em{color:#5eead4;font-style:normal;font-weight:500}
+code{font-family:"SF Mono",Menlo,Consolas,monospace;background:rgba(100,200,255,0.1);color:#5eead4;padding:1px 6px;border-radius:3px;font-size:0.88em}
+pre{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:14px 16px;overflow-x:auto;margin:12px 0;font-family:"SF Mono",Menlo,Consolas,monospace;font-size:0.84rem;line-height:1.55;color:#c8cfd6}
+pre code{background:none;color:inherit;padding:0;font-size:1em}
+.mermaid{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:18px;margin:14px 0;text-align:center;overflow-x:auto;cursor:zoom-in;transition:border-color 0.15s}
+.mermaid:hover{border-color:rgba(100,200,255,0.4)}
+.mermaid svg{width:100%;max-width:100%;height:auto;min-height:280px}
+.lightbox{position:fixed;inset:0;background:rgba(8,12,18,0.96);z-index:9999;display:none;align-items:center;justify-content:center;padding:24px;cursor:grab;backdrop-filter:blur(4px);overflow:hidden}
+.lightbox.open{display:flex}
+.lightbox.dragging{cursor:grabbing}
+.lightbox svg{width:auto;height:auto;max-width:96vw;max-height:92vh;transform-origin:center center;will-change:transform}
+.lightbox .hint{position:fixed;top:16px;right:20px;font-size:0.78rem;color:#7a8590;font-family:"SF Mono",Menlo,monospace;pointer-events:none}
+.callout{background:rgba(255,180,80,0.06);border-left:3px solid #ffb450;padding:12px 14px;margin:14px 0;border-radius:4px;font-size:0.94rem}
+.callout strong{color:#ffb450}
+.tradeoff{background:rgba(100,200,255,0.05);border:1px solid rgba(100,200,255,0.2);border-radius:6px;padding:12px 14px;margin:12px 0;font-size:0.94rem}
+.case{background:rgba(94,234,212,0.05);border-left:3px solid #5eead4;padding:12px 14px;margin:12px 0;border-radius:4px;font-size:0.94rem}
+.case strong{color:#5eead4}
+.nav{margin-top:50px;padding-top:24px;border-top:1px solid rgba(100,200,255,0.15);text-align:center}
+.nav a{color:#64c8ff;text-decoration:none;font-size:0.92rem;padding:8px 16px;border:1px solid rgba(100,200,255,0.3);border-radius:4px;transition:all 0.15s}
+.nav a:hover{background:rgba(100,200,255,0.1)}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:0.9rem}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid rgba(100,200,255,0.15)}
+th{color:#64c8ff;font-weight:600;background:rgba(100,200,255,0.05)}
+details{background:rgba(100,200,255,0.04);border:1px solid rgba(100,200,255,0.18);border-radius:6px;padding:12px 16px;margin:10px 0;transition:all 0.15s}
+details:hover{border-color:rgba(100,200,255,0.35)}
+details[open]{background:rgba(94,234,212,0.05);border-color:rgba(94,234,212,0.3)}
+details summary{font-weight:600;color:#e8eef5;list-style:none;outline:none;cursor:pointer;display:flex;align-items:flex-start;gap:10px;font-size:0.96rem}
+details summary::-webkit-details-marker{display:none}
+details summary::before{content:'▶';color:#64c8ff;font-size:0.75em;transition:transform 0.2s;flex-shrink:0;margin-top:5px}
+details[open] summary::before{transform:rotate(90deg);color:#5eead4}
+details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
+details .answer ul,details .answer ol{margin:6px 0 6px 22px}
+@media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+</style>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({startOnLoad:true,theme:'base',flowchart:{useMaxWidth:true,htmlLabels:true,nodeSpacing:50,rankSpacing:60},themeVariables:{primaryColor:'#1a2530',primaryTextColor:'#e8eef5',primaryBorderColor:'#64c8ff',lineColor:'#5eead4',secondaryColor:'#0e1419',tertiaryColor:'#0a0f14',background:'#0a0f14',mainBkg:'#1a2530',secondBkg:'#0e1419',textColor:'#d4dae0',fontFamily:'-apple-system,"SF Pro Display",sans-serif',fontSize:'16px'}});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const lb=document.createElement('div');lb.className='lightbox';
+  lb.innerHTML='<span class="hint">scroll = zoom · drag = pan · Esc / click bg = close</span>';
+  document.body.appendChild(lb);
+  let scale=1,panX=0,panY=0,dragging=false,moved=false,lx=0,ly=0;
+  const apply=()=>{const s=lb.querySelector('svg');if(s)s.style.transform=`translate(${panX}px,${panY}px) scale(${scale})`};
+  const reset=()=>{scale=1;panX=0;panY=0};
+  const close=()=>{lb.classList.remove('open');const s=lb.querySelector('svg');if(s)s.remove();reset()};
+  document.addEventListener('click',e=>{
+    if(e.target.closest('.lightbox')){if(moved){moved=false;return}close();return}
+    const w=e.target.closest('.mermaid');if(!w)return;
+    const svg=w.querySelector('svg');if(!svg)return;
+    const c=svg.cloneNode(true);c.removeAttribute('style');
+    c.style.maxWidth='96vw';c.style.maxHeight='92vh';
+    lb.appendChild(c);lb.classList.add('open');reset();apply();
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+  lb.addEventListener('wheel',e=>{
+    if(!lb.classList.contains('open'))return;
+    e.preventDefault();
+    const svg=lb.querySelector('svg');if(!svg)return;
+    const ns=Math.max(0.3,Math.min(10,scale*(1-e.deltaY*0.002)));
+    const r=svg.getBoundingClientRect();
+    const cx=e.clientX-(r.left+r.width/2),cy=e.clientY-(r.top+r.height/2);
+    const k=ns/scale-1;panX-=cx*k;panY-=cy*k;scale=ns;apply();
+  },{passive:false});
+  lb.addEventListener('mousedown',e=>{
+    if(!lb.classList.contains('open'))return;
+    dragging=true;moved=false;lx=e.clientX;ly=e.clientY;lb.classList.add('dragging');e.preventDefault();
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    const dx=e.clientX-lx,dy=e.clientY-ly;
+    if(Math.abs(dx)+Math.abs(dy)>3)moved=true;
+    panX+=dx;panY+=dy;lx=e.clientX;ly=e.clientY;apply();
+  });
+  document.addEventListener('mouseup',()=>{dragging=false;lb.classList.remove('dragging')});
+});
+</script>
+</head><body><div class="container">
+
+<header>
+<div class="meta">
+<span class="tag day">Day 1</span>
+<span class="tag diff">Easy</span>
+<span class="tag">Scalability</span>
+<span class="tag">Load Balancing</span>
+<span class="tag">Foundations</span>
+</div>
+<h1>Scalability Foundations — From One Box to a Million QPS<span class="en">Scalability Fundamentals: Vertical vs Horizontal, Load Balancing, Statelessness</span></h1>
+</header>
+
+<h2>The Problem</h2>
+<p>Day one of your product: 1k DAU, one EC2 box running Postgres and Node, everything fine. Six months later you're at 1M DAU and 3k QPS, p99 latency has gone from 80ms to 2.4s, and the DB drops out occasionally. <strong>This story is almost universal</strong> — Instagram carried 14M users with three engineers in 2010; Notion moved from a single Postgres instance to a sharded fleet around 2019. Same arc, every time.</p>
+<p>This issue isn't "throw more boxes at it." It's about figuring out <em>which loads should be scaled up vs out, when you actually have to go horizontal, what hidden costs come with that</em>, and why stateless services are the price of admission for horizontal scale.</p>
+
+<h2>Requirements and Constraints (the interview opener)</h2>
+<ul>
+<li><strong>Read/write ratio</strong>: 100:1 (social feeds) or 1:1 (instant messaging)? Determines whether you scale reads with replicas first, or shard writes.</li>
+<li><strong>QPS magnitude</strong>: 100, 10k, or 1M? Below 10k QPS you almost never need distributed anything; at 1M you're forced into sharding and CDN.</li>
+<li><strong>Data volume and growth curve</strong>: 1TB or 1PB? A single Postgres instance is comfortable up to about 10TB in practice.</li>
+<li><strong>Latency SLO</strong>: p99 at 100ms (search) or 10ms (ad bidding)? The latter rules out any cross-region hop.</li>
+<li><strong>Consistency requirements</strong>: bank-transfer strong, or like-button eventual?</li>
+<li><strong>Budget</strong>: an m5.large is a few tens of dollars a month; a c7gn.16xlarge is thousands. Often overlooked as a constraint.</li>
+</ul>
+
+<h2>High-Level Architecture (one box to N tiers)</h2>
+<pre class="mermaid">
+graph TD
+    C[Client]
+    DNS["DNS / GeoDNS"]
+    L4["L4 LB · LVS<br/><i>~1M QPS ingress</i>"]
+    L7["L7 LB · Nginx/Envoy<br/><i>routing · TLS · rate limit</i>"]
+    A1["App-1<br/><i>stateless</i>"]
+    A2["App-2<br/><i>stateless</i>"]
+    AN["App-N<br/><i>stateless</i>"]
+    R[("Redis<br/>Cluster")]
+    PG[("PG Primary")]
+    R1[("Replica-1<br/>read replica")]
+    R2[("Replica-2<br/>read replica")]
+
+    C --> DNS --> L4 --> L7
+    L7 --> A1 & A2 & AN
+    A1 & A2 & AN --> R
+    A1 & A2 & AN --> PG
+    PG -.replicate.-> R1
+    PG -.replicate.-> R2
+
+    classDef edge fill:#1a2530,stroke:#64c8ff,color:#e8eef5
+    classDef app fill:#0e2030,stroke:#5eead4,color:#e8eef5
+    classDef data fill:#1a1a30,stroke:#ffb450,color:#e8eef5
+    class C,DNS,L4,L7 edge
+    class A1,A2,AN app
+    class R,PG,R1,R2 data
+</pre>
+
+<h2>Key Technical Points</h2>
+
+<h3>1. Vertical vs Horizontal Scaling</h3>
+<p><strong>Principle</strong>: vertical scaling = bigger machine (more CPU / RAM / NVMe); horizontal scaling = more machines. Vertical scaling stays roughly linear in price-performance until you hit <em>x86 memory bandwidth or NUMA limits</em>. A single box today can reach 192 vCPU / 2TB RAM (c7g.metal, x2idn.32xlarge) — so don't go distributed too early.</p>
+<div class="tradeoff">
+<strong>Trade-off:</strong>
+<ul>
+<li><strong>Vertical</strong>: ✅ no code changes, ACID intact, simple ops; ❌ single point of failure, non-linear pricing (96 → 192 vCPU costs 2.3×), hard physical ceiling.</li>
+<li><strong>Horizontal</strong>: ✅ linear cost, fault tolerance; ❌ forces statelessness, introduces network partitions, debugging is N× harder, you need distributed locks or transactions.</li>
+</ul>
+</div>
+<div class="case"><strong>Real cases:</strong> Stack Overflow's 2016 architecture writeup — 9 web servers + 4 SQL Servers (one machine with 96 cores and 1.5TB RAM), handling 6000 req/s. Their philosophy: "Hardware is cheap, programmers are expensive." They scaled vertically until 2024 before seriously sharding. The counter-example: Pinterest in 2012 rode MySQL vertical scaling until the master couldn't take it, then did an emergency 6-month sharding migration under fire.</div>
+
+<h3>2. Load Balancer: L4 vs L7</h3>
+<p><strong>Principle</strong>: L4 (TCP/UDP) only inspects the four-tuple, forwards without unpacking, and can do 2M+ QPS per box (LVS/IPVS, AWS NLB). L7 (HTTP) can route by path, header, or cookie and handle TLS termination, compression, and rate limiting — but the CPU cost is much higher (Envoy does roughly 50k QPS per core). In production you typically see <em>L4 in front, L7 behind</em>.</p>
+<div class="tradeoff">
+<strong>Load balancing algorithms:</strong>
+<ul>
+<li><strong>Round Robin</strong>: simple, but ignores actual backend load; long-lived connections skew quickly.</li>
+<li><strong>Least Connections</strong>: the choice for long connections (WebSocket, gRPC).</li>
+<li><strong>Consistent Hashing</strong>: required when you need session affinity or cache locality (CDNs, Redis proxies).</li>
+<li><strong>EWMA / P2C</strong>: "Power of Two Choices" — pick two backends at random, take the less loaded one. Envoy's default. Minimal logic, near-optimal behavior.</li>
+</ul>
+</div>
+<pre><code># P2C pseudocode (Envoy default)
+def pick_backend(backends):
+    a, b = random.sample(backends, 2)
+    return a if a.active_requests &lt;= b.active_requests else b
+# Math: with N backends, peak load drops from O(log N) to O(log log N)</code></pre>
+<div class="case"><strong>Real cases:</strong> Cloudflare uses LVS plus its own Unimog L4 LB to absorb global traffic, hundreds of Gbps per data center. AWS ALB is a managed L7 service built on a modified Envoy; NLB is L4, runs on Hyperplane, with sub-100μs latency.</div>
+
+<h3>3. Stateless Services (the ticket to horizontal scale)</h3>
+<p><strong>Principle</strong>: service instances hold no "state needed for the next request" — sessions, caches, counters all live externally in Redis or a DB. Then the LB can route any request to any instance, and a crash hurts no one.</p>
+<div class="tradeoff">
+<strong>Trade-off:</strong> stateless ≠ no caching. Local caches (Caffeine, in-process LRU) are still fine, but you accept that they disagree across instances. Pushing everything to Redis adds about a 0.5ms hop and a single-point risk. <em>The usual compromise: local cache + 30s TTL + pub/sub invalidation.</em></div>
+<pre><code># Anti-pattern: sessions in memory
+sessions = {}  # ❌ lost on restart, scale-up drops users, A's session invisible to B
+
+# Correct: JWT (stateless) or Redis (shared state)
+def auth(req):
+    token = req.headers["Authorization"]
+    return jwt.verify(token, PUBLIC_KEY)  # zero server-side state</code></pre>
+<div class="case"><strong>Real cases:</strong> Netflix mandates stateless microservices, with releases handled by Spinnaker red-black deploys — bring up a new fleet, swing traffic, kill the old one. Counter-example: Discord's voice service has to be stateful (a voice channel is anchored to a single server). They solve it with <em>consistent hashing plus a state-migration protocol</em>, and a 2020 talk admitted that's the hardest part of their architecture.</div>
+
+<h3>4. Capacity Planning and "Good Enough"</h3>
+<p><strong>Principle</strong>: don't reach for Kubernetes and microservices on day one. Shopify handled 76M peak QPS on Black Friday with a <em>monolithic Rails app on a large pod fleet</em>. Stay monolithic as long as you can; add machines before sharding. <strong>Back-of-envelope math</strong> is core interview material:</p>
+<pre><code># Example: designing a Twitter timeline
+# 300M DAU × 100 refreshes/day = 3e10 reads/day
+# = 3e10 / 86400 ≈ 350k QPS average, peak ~3× = 1M QPS
+# A 4-core box handles ~5k QPS of static reads
+# → at least 200 read instances (with 2× headroom)</code></pre>
+<div class="callout"><strong>Interview tip:</strong> the interviewer will almost certainly ask you to estimate QPS, storage, and bandwidth. Memorize three numbers: 1 day ≈ 1e5 seconds, 1 QPS × 1 year ≈ 30M rows, 1 Gbps ≈ 125 MB/s.</div>
+
+<h2>Scaling Up: Where the Next Bottlenecks Live</h2>
+<ol>
+<li><strong>The first bottleneck is usually DB writes</strong>: reads relax with replicas; writes either scale vertically or shard. When you see <em>p99 write latency &gt; 100ms</em>, it's time.</li>
+<li><strong>The second is cache hot keys</strong>: one popular key saturates a Redis shard. You need a local cache plus multiple replicas.</li>
+<li><strong>The third is the network</strong>: cross-AZ traffic is billed per GB (~$0.01/GB on AWS); too-fine microservice slicing gets schooled by transfer fees and RTT.</li>
+<li><strong>Multi-region</strong>: when users span more than two continents, you introduce GeoDNS, in-region closure, and async global replication.</li>
+</ol>
+
+<h2>Common Pitfalls</h2>
+<ul>
+<li><strong>Going distributed too early</strong>: 1k QPS on Kubernetes with eight microservices, and debugging takes 10× longer than the monolith would have.</li>
+<li><strong>The sticky-session trap</strong>: binding instances by cookie hash means scale-up or restart drops many users, and a hot instance has no relief valve.</li>
+<li><strong>LB with no health checks</strong>: a half-dead instance (accepts connections, doesn't respond) still gets traffic, and every RTT spikes. Always configure <em>active health checks + outlier ejection</em> (Envoy's P2C also auto-ejects).</li>
+<li><strong>No capacity drills</strong>: not load-testing before Black Friday, then learning your connection pool ceiling during the actual event. Netflix's Chaos Monkey culture exists for this reason.</li>
+<li><strong>Ignoring the thundering herd</strong>: when a cache expires, 1000 instances hit the DB at once. Solve with singleflight, mutexes, or probabilistic early refresh.</li>
+</ul>
+
+<h2>Sample Interview Questions</h2>
+<ol>
+<li>"You're at 5k QPS p99 200ms; you need 50k QPS p99 100ms. What's your five-step plan?" (Expect to ask about read/write ratio and current bottleneck before proposing solutions.)</li>
+<li>"Why not just buy one 192-core box?" (Tests your grasp of vertical scaling ceilings, blast radius, and SPOF.)</li>
+<li>"Where do L4 and L7 LBs go, and why not just use L7 everywhere?"</li>
+<li>"If you move sessions to stateless, do you pick JWT or Redis sessions?" (Tests trade-offs around revocation, payload size, security.)</li>
+<li>"How does round robin fall apart with long-lived connections? How do you fix it?" (Leads into least-conn / P2C.)</li>
+</ol>
+
+<h2>Key Resources</h2>
+<ul>
+<li>📕 <em>Designing Data-Intensive Applications</em> (Kleppmann), Ch. 1: Reliable, Scalable, and Maintainable Applications.</li>
+<li>📝 Stack Overflow Architecture (2016, Nick Craver) — the canonical case for vertical scaling to its limit. <code>nickcraver.com/blog/2016/02/17/stack-overflow-the-architecture-2016-edition/</code></li>
+<li>📝 High Scalability blog: the classic "Power of Two Random Choices" article.</li>
+</ul>
+
+<h2>English Summary</h2>
+<p>Scaling means surviving load growth without rewriting from scratch. <strong>Vertical scaling</strong> (bigger box) is underrated — Stack Overflow runs billions of pageviews on a handful of fat SQL servers. <strong>Horizontal scaling</strong> demands <em>stateless services</em>, smart <em>load balancing</em> (L4 for throughput, L7 for routing; P2C beats round-robin under skewed load), and capacity planning via <em>back-of-envelope math</em>. The cardinal sin is premature distribution: complexity grows superlinearly, debuggability collapses. Scale when you must, not when you can.</p>
+
+<h2>Going Deeper (click to expand)</h2>
+
+<details>
+<summary>1. Service goes from 1k to 100k QPS, and adding machines makes p99 worse. List at least three possible causes at different layers.</summary>
+<div class="answer">
+<ul>
+<li><strong>A shared bottleneck</strong>: the DB connection pool, a single Redis node, a file lock — adding app servers just lengthens the queue. Classic signs: DB CPU at 100%, connection pool exhausted.</li>
+<li><strong>The LB itself</strong>: an L7 LB (Envoy/Nginx) tops out around 50k QPS per instance; TLS handshakes or bad keepalive settings can make the LB the bottleneck. Check LB CPU and file descriptors.</li>
+<li><strong>Distributed coordination cost</strong>: distributed locks (Redlock), cross-node cache invalidation, service-discovery gossip. More machines means O(N²) coordination overhead.</li>
+<li><strong>Downstream amplification</strong>: each app instance opens 20 DB connections; 100 instances = 2000 connections, but Postgres's default max_connections=100 starts rejecting.</li>
+<li><strong>Cross-AZ networking</strong>: scaling out moves traffic from intra-AZ to cross-AZ, adding ~0.5ms per hop. Ten hops = 5ms of pure overhead.</li>
+</ul>
+<p><em>Diagnostic order</em>: look at metrics that scale <em>linearly</em> with machine count (CPU should drop, but latency rises = shared resource is saturating).</p>
+</div>
+</details>
+
+<details>
+<summary>2. Why is statelessness the ticket to horizontal scale? When the business needs sessions (game rooms, long transactions), how do you keep state and still scale?</summary>
+<div class="answer">
+<p><strong>Why</strong>: stateless means any request can land on any instance; the LB doesn't need memory, a crashed instance loses nothing, scaling is instant. Stateful means the LB needs sticky sessions, scaling requires state migration, and a failed node means dropped users.</p>
+<p><strong>Solutions for stateful services:</strong></p>
+<ul>
+<li><strong>Externalize the state</strong>: move sessions to Redis or DynamoDB; the service itself stays stateless. Most common pattern.</li>
+<li><strong>Sticky routing + state sharding</strong>: consistent-hash route (user_id → node); failure has only local impact. Game rooms typically pin to one server. Cost: scale-up has to rehash a fraction of users.</li>
+<li><strong>Actor model</strong>: Erlang, Akka, Orleans — each actor manages its own state and the framework handles migration. Discord uses Elixir, one process per channel.</li>
+<li><strong>Distributed state machine + Raft</strong>: small amounts of strongly consistent state on a Raft cluster (etcd, TiKV pattern) — multi-replica, leader election, automatic failover.</li>
+</ul>
+<p><em>Field guide</em>: 90% of businesses are fine with "Redis externalized"; gaming and IM use sticky routing; financial ledgers reach for Raft.</p>
+</div>
+</details>
+
+<details>
+<summary>3. Do you really have to choose between L4 and L7? Why is "L4 outside, L7 inside" the canonical big-tech layout — and what breaks if you reverse it?</summary>
+<div class="answer">
+<p><strong>It's not a binary choice.</strong> Big tech runs the canonical "L4 → L7 → App" sandwich.</p>
+<p><strong>Why L4 is at the edge:</strong></p>
+<ul>
+<li>L4 (LVS, AWS NLB, Google Maglev) sees only the TCP five-tuple, can sustain millions of QPS and hundreds of Gbps per box, and is your first wall against DDoS.</li>
+<li>L4 doesn't terminate TLS or parse HTTP — CPU is nearly free, perfect for an anycast ingress.</li>
+<li>L4 with DSR (Direct Server Return) lets responses bypass the LB entirely, cutting outbound LB bandwidth in half.</li>
+</ul>
+<p><strong>Why L7 sits inside:</strong></p>
+<ul>
+<li>L7 (Envoy, Nginx) has to terminate TLS, parse HTTP headers, and run routing/rate-limit logic — about 50k QPS per box. It can't take the public flood.</li>
+<li>L7 gives you rich features (path routing, retry, circuit breakers) — but only valuable on already-filtered traffic.</li>
+</ul>
+<p><strong>If you reverse it:</strong> L7 at the edge gets its connection table blown apart by the first SYN flood, and TLS handshake CPU pegs at 100%.</p>
+</div>
+</details>
+
+<details>
+<summary>4. One c7g.metal (192 vCPU) vs sixteen c7g.4xlarge (16 vCPU) — same total cost. What workload fits each, and how do their blast radii compare?</summary>
+<div class="answer">
+<p><strong>One big box fits:</strong></p>
+<ul>
+<li>Memory-heavy workloads that don't shard cleanly: in-memory databases (Redis, Memcached), OLTP databases with large buffer pools (Postgres, MySQL).</li>
+<li>Latency-critical services that need NUMA-local access: high-frequency trading, ad bidding.</li>
+<li>Workloads with high shared-cache hit rates: one large JVM heap beats 16 small ones for hot-key sharing.</li>
+</ul>
+<p><strong>Sixteen small boxes fit:</strong></p>
+<ul>
+<li>Stateless, CPU-bound, easily parallel: rendering, transcoding, ML inference.</li>
+<li>HA requirements: rolling deploys take down 6.25% of traffic per node; killing the big box takes down 100%.</li>
+</ul>
+<p><strong>Blast radius</strong>: the big box dies = 100% outage (unless you hot-spare, doubling cost). 1 of 16 dies = 6.25% capacity gone; can the remaining 15 absorb it? Plan ~10% headroom.</p>
+<p><em>Bottom line</em>: CPU-bound and stateless → many small. Memory/IO heavy with locality → one big (but at least two for HA).</p>
+</div>
+</details>
+
+<details>
+<summary>5. Black Friday is expected at 5× normal traffic. How do you capacity-plan? How much headroom? Why can't you just "add 5× machines"?</summary>
+<div class="answer">
+<p><strong>Headroom is typically 30–50%</strong>: traffic isn't uniform; p95 peaks are 2–3× the mean, and flash-sale peaks can be 10× the mean. So "5× traffic" in practice means provisioning for 7–8× peak.</p>
+<p><strong>Why "just add machines" doesn't work:</strong></p>
+<ul>
+<li><strong>DBs don't scale linearly</strong>: 5× app means 5× DB QPS, but DBs scale vertically or via read replicas (with replication-lag risk).</li>
+<li><strong>Cache hit rates change</strong>: new users and new products mean more cache misses, so DB pressure is worse than expected.</li>
+<li><strong>Downstream dependencies</strong>: payments, fraud, third-party APIs each have their own rate limits and will start rejecting you.</li>
+<li><strong>Cold starts</strong>: new instances have cold JIT, empty connection pools, empty caches — the first few minutes are slower, not faster. Use slow-start ramp.</li>
+<li><strong>Cost runaway</strong>: keeping 5× provisioned daily = 5× spend. You need auto-scaling that can shrink within seconds after the event.</li>
+</ul>
+<p><strong>Operational drill</strong>: 5× load test (offline + shadow traffic) a week ahead, degradation switches ready (turn off non-core features to free resources), CDN/cache pre-warming, scripted scale-up playbook ("scale N×" as one command), tightened monitoring thresholds for the event.</p>
+</div>
+</details>
+
+<div class="nav"><a href="index.en.html">← Back to index</a></div>
+
+</div></body></html>
