@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 6 · Consistency — System Design Bi-daily</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"SF Pro Display","Noto Sans SC",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
+.container{max-width:820px;margin:0 auto;padding:24px 20px 60px}
+header{padding:40px 0 28px;border-bottom:1px solid rgba(100,200,255,0.15);margin-bottom:32px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem}
+.tag{padding:3px 10px;border-radius:4px;background:rgba(100,200,255,0.12);color:#64c8ff;border:1px solid rgba(100,200,255,0.25)}
+.tag.diff{background:rgba(94,234,212,0.1);color:#5eead4;border-color:rgba(94,234,212,0.3)}
+.tag.day{background:rgba(255,180,80,0.1);color:#ffb450;border-color:rgba(255,180,80,0.25)}
+h1{font-size:1.75rem;font-weight:800;background:linear-gradient(135deg,#64c8ff 0%,#5eead4 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:0.5px;line-height:1.3}
+h1 .en{display:block;font-size:1rem;color:#7a8590;-webkit-text-fill-color:#7a8590;margin-top:6px;font-weight:500}
+h2{font-size:1.2rem;color:#5eead4;margin:36px 0 14px;padding-left:12px;border-left:3px solid #5eead4}
+h3{font-size:1rem;color:#64c8ff;margin:20px 0 10px;font-weight:600}
+p{margin:10px 0;color:#c8cfd6}
+ul,ol{margin:10px 0 10px 22px;color:#c8cfd6}
+li{margin:6px 0}
+strong{color:#e8eef5;font-weight:600}
+em{color:#5eead4;font-style:normal;font-weight:500}
+code{font-family:"SF Mono",Menlo,Consolas,monospace;background:rgba(100,200,255,0.1);color:#5eead4;padding:1px 6px;border-radius:3px;font-size:0.88em}
+pre{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:14px 16px;overflow-x:auto;margin:12px 0;font-family:"SF Mono",Menlo,Consolas,monospace;font-size:0.84rem;line-height:1.55;color:#c8cfd6}
+pre code{background:none;color:inherit;padding:0;font-size:1em}
+.mermaid{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:18px;margin:14px 0;text-align:center;overflow-x:auto;cursor:zoom-in;transition:border-color 0.15s}
+.mermaid:hover{border-color:rgba(100,200,255,0.4)}
+.mermaid svg{width:100%;max-width:100%;height:auto;min-height:280px}
+.lightbox{position:fixed;inset:0;background:rgba(8,12,18,0.96);z-index:9999;display:none;align-items:center;justify-content:center;padding:24px;cursor:grab;backdrop-filter:blur(4px);overflow:hidden}
+.lightbox.open{display:flex}
+.lightbox.dragging{cursor:grabbing}
+.lightbox svg{width:auto;height:auto;max-width:96vw;max-height:92vh;transform-origin:center center;will-change:transform}
+.lightbox .hint{position:fixed;top:16px;right:20px;font-size:0.78rem;color:#7a8590;font-family:"SF Mono",Menlo,monospace;pointer-events:none}
+.callout{background:rgba(255,180,80,0.06);border-left:3px solid #ffb450;padding:12px 14px;margin:14px 0;border-radius:4px;font-size:0.94rem}
+.callout strong{color:#ffb450}
+.tradeoff{background:rgba(100,200,255,0.05);border:1px solid rgba(100,200,255,0.2);border-radius:6px;padding:12px 14px;margin:12px 0;font-size:0.94rem}
+.case{background:rgba(94,234,212,0.05);border-left:3px solid #5eead4;padding:12px 14px;margin:12px 0;border-radius:4px;font-size:0.94rem}
+.case strong{color:#5eead4}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:0.9rem}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid rgba(100,200,255,0.15)}
+th{color:#64c8ff;font-weight:600;background:rgba(100,200,255,0.05)}
+details{background:rgba(100,200,255,0.04);border:1px solid rgba(100,200,255,0.18);border-radius:6px;padding:12px 16px;margin:10px 0;transition:all 0.15s}
+details:hover{border-color:rgba(100,200,255,0.35)}
+details[open]{background:rgba(94,234,212,0.05);border-color:rgba(94,234,212,0.3)}
+details summary{font-weight:600;color:#e8eef5;list-style:none;outline:none;cursor:pointer;display:flex;align-items:flex-start;gap:10px;font-size:0.96rem}
+details summary::-webkit-details-marker{display:none}
+details summary::before{content:'▶';color:#64c8ff;font-size:0.75em;transition:transform 0.2s;flex-shrink:0;margin-top:5px}
+details[open] summary::before{transform:rotate(90deg);color:#5eead4}
+details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
+details .answer ul,details .answer ol{margin:6px 0 6px 22px}
+@media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+</style>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({startOnLoad:true,theme:'base',flowchart:{useMaxWidth:true,htmlLabels:true,nodeSpacing:50,rankSpacing:60},themeVariables:{primaryColor:'#1a2530',primaryTextColor:'#e8eef5',primaryBorderColor:'#64c8ff',lineColor:'#5eead4',secondaryColor:'#0e1419',tertiaryColor:'#0a0f14',background:'#0a0f14',mainBkg:'#1a2530',secondBkg:'#0e1419',textColor:'#d4dae0',fontFamily:'-apple-system,"SF Pro Display",sans-serif',fontSize:'16px'}});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const lb=document.createElement('div');lb.className='lightbox';
+  lb.innerHTML='<span class="hint">scroll = zoom · drag = pan · Esc / click bg = close</span>';
+  document.body.appendChild(lb);
+  let scale=1,panX=0,panY=0,dragging=false,moved=false,lx=0,ly=0;
+  const apply=()=>{const s=lb.querySelector('svg');if(s)s.style.transform=`translate(${panX}px,${panY}px) scale(${scale})`};
+  const reset=()=>{scale=1;panX=0;panY=0};
+  const close=()=>{lb.classList.remove('open');const s=lb.querySelector('svg');if(s)s.remove();reset()};
+  document.addEventListener('click',e=>{
+    if(e.target.closest('.lightbox')){if(moved){moved=false;return}close();return}
+    const w=e.target.closest('.mermaid');if(!w)return;
+    const svg=w.querySelector('svg');if(!svg)return;
+    const c=svg.cloneNode(true);c.removeAttribute('style');
+    c.style.maxWidth='96vw';c.style.maxHeight='92vh';
+    lb.appendChild(c);lb.classList.add('open');reset();apply();
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+  lb.addEventListener('wheel',e=>{
+    if(!lb.classList.contains('open'))return;
+    e.preventDefault();
+    const svg=lb.querySelector('svg');if(!svg)return;
+    const ns=Math.max(0.3,Math.min(10,scale*(1-e.deltaY*0.002)));
+    const r=svg.getBoundingClientRect();
+    const cx=e.clientX-(r.left+r.width/2),cy=e.clientY-(r.top+r.height/2);
+    const k=ns/scale-1;panX-=cx*k;panY-=cy*k;scale=ns;apply();
+  },{passive:false});
+  lb.addEventListener('mousedown',e=>{
+    if(!lb.classList.contains('open'))return;
+    dragging=true;moved=false;lx=e.clientX;ly=e.clientY;lb.classList.add('dragging');e.preventDefault();
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    const dx=e.clientX-lx,dy=e.clientY-ly;
+    if(Math.abs(dx)+Math.abs(dy)>3)moved=true;
+    panX+=dx;panY+=dy;lx=e.clientX;ly=e.clientY;apply();
+  });
+  document.addEventListener('mouseup',()=>{dragging=false;lb.classList.remove('dragging')});
+});
+</script>
+</head><body><div class="container">
+
+<header>
+<div class="meta">
+<span class="tag day">Day 6</span>
+<span class="tag diff">Hard</span>
+<span class="tag">Distributed Systems</span>
+<span class="tag">Consistency</span>
+<span class="tag">CAP / PACELC</span>
+<span class="tag">Causal</span>
+</div>
+<h1>Consistency — It's Not a Switch, It's a Whole Spectrum<span class="en">Linearizable / Sequential / Causal / RYW / Monotonic / Eventual · CAP & PACELC · HLC & Version Vectors</span></h1>
+</header>
+
+<h2>Scenario &amp; Constraints</h2>
+<p>Design a global e-commerce platform that mixes "<strong>flash sale inventory + product details + comments</strong>" — three regions (US/EU/AP), <strong>500k DAU</strong>, peak <strong>20k orders/sec, 200k product-view QPS, 50k comment R/W QPS</strong>. Three radically different consistency requirements live in one system:</p>
+<ul>
+<li><strong>Inventory &amp; checkout (strong / linearizable)</strong>: 100 items must not oversell, must not undersell; any client read must see monotonically decreasing stock. RPO=0.</li>
+<li><strong>"My orders" view (read-your-writes + monotonic)</strong>: a user who just placed an order must see it on refresh; state must not regress (paid → pending).</li>
+<li><strong>Product comments (causal + eventual)</strong>: a reply must appear after the comment it replies to (causal order); but European users can lag 1-2 seconds behind Asian ones.</li>
+</ul>
+<p>This forces you to <em>mix multiple consistency models in one system</em> — which is what real systems look like. Day 5 covered how replication works; today is: <strong>which consistency guarantees are worth their latency &amp; availability cost, which aren't, and how to implement them in practice</strong>.</p>
+
+<h2>High-Level Architecture</h2>
+<pre class="mermaid">
+graph TD
+    subgraph Edge["Edge / CDN"]
+        CDN["Product Detail Page<br/><i>eventual, TTL 60s</i>"]
+    end
+    subgraph Core["Core (us-east, strong zone)"]
+        INV["Inventory Service<br/><i>Spanner / CockroachDB<br/>Linearizable</i>"]
+        ORD["Order Service<br/><i>Postgres semi-sync<br/>RYW via session token</i>"]
+    end
+    subgraph Comments["Comments Domain (Multi-Region)"]
+        CMT_US["Comments us-east"]
+        CMT_EU["Comments eu-west"]
+        CMT_AP["Comments ap-south"]
+        HLC[("HLC<br/>Hybrid Logical Clock")]
+    end
+
+    Client["Client<br/><i>carries session LSN / HLC</i>"]
+
+    Client -- "view product" --> CDN
+    CDN -. miss .-> INV
+    Client -- "order / decrement stock" --> INV
+    Client -- "list my orders" --> ORD
+    Client -- "post / read comments" --> CMT_US
+    Client -- "post / read comments" --> CMT_EU
+    Client -- "post / read comments" --> CMT_AP
+
+    INV -. CDC .-> CDN
+    ORD -. CDC .-> CDN
+    CMT_US <-. async + HLC .-> CMT_EU
+    CMT_EU <-. async + HLC .-> CMT_AP
+    CMT_AP <-. async + HLC .-> CMT_US
+
+    classDef strong fill:#2a1530,stroke:#ff7ab6,color:#e8eef5
+    classDef ryw fill:#1a2530,stroke:#64c8ff,color:#e8eef5
+    classDef causal fill:#0e2030,stroke:#5eead4,color:#e8eef5
+    class INV strong
+    class ORD ryw
+    class CMT_US,CMT_EU,CMT_AP,HLC causal
+</pre>
+<p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">Three consistency domains: inventory uses global linearizable (Spanner-class quorum), orders use single-region primary + client LSN, comments use multi-region async + HLC for causal order. Edge CDN absorbs 95% of pure display traffic.</p>
+
+<h2>Key Technical Points</h2>
+
+<h3>1. The Consistency Spectrum: 6 Models, From "Absolutely Right" to "Eventually Aligned"</h3>
+<p><strong>Principle</strong>: A consistency model defines "how far the order seen by clients can deviate from some ideal order". Strong to weak (each step weaker buys you performance/availability):</p>
+<table>
+<thead><tr><th>Model</th><th>Promise</th><th>Implementation Cost</th><th>Typical</th></tr></thead>
+<tbody>
+<tr><td><strong>Linearizable</strong></td><td>All ops behave as if executed in wall-clock order at a single point; reads see the latest committed write</td><td>Quorum sync + global clock / consensus</td><td>etcd, ZooKeeper, Spanner</td></tr>
+<tr><td><strong>Sequential</strong></td><td>All replicas see the same op order (but not necessarily matching real time)</td><td>Global serialization (leader / total order broadcast)</td><td>Kafka single partition, Redis</td></tr>
+<tr><td><strong>Causal</strong></td><td>Causally-related ops are ordered; concurrent ops are not constrained</td><td>HLC / version vector + dep tracking</td><td>MongoDB causal session, COPS</td></tr>
+<tr><td><strong>Read-your-writes</strong></td><td>Read your own write immediately</td><td>Session sticky or client LSN token</td><td>Minimum bar for most web apps</td></tr>
+<tr><td><strong>Monotonic Read</strong></td><td>Reads don't "go back in time"</td><td>Client pinning to one replica / high-watermark</td><td>Twitter timeline</td></tr>
+<tr><td><strong>Eventual</strong></td><td>All replicas converge after writes stop</td><td>Async replication + convergence function (LWW / CRDT)</td><td>DNS, S3 list, Cassandra default</td></tr>
+</tbody></table>
+<div class="tradeoff">
+<strong>Key insight: "strong consistency" is not the default — it must be justified to be chosen.</strong>
+<ul>
+<li><strong>Linearizable</strong>: only when business correctness depends on "latest value". Inventory, leader election, distributed locks, uniqueness constraints. Cost per op: cross-replica RTT + one round of consensus.</li>
+<li><strong>Causal</strong>: chat, comments, social feed — "order matters" but global order doesn't. Far cheaper than linearizable; users can't tell the difference.</li>
+<li><strong>RYW + Monotonic</strong>: 90% of "users feel the system works" comes from these two. <em>Client carries a token</em> — almost zero server cost.</li>
+<li><strong>Eventual</strong>: pure display, counters (approximate OK), caches. Start with "everything eventual by default", upgrade when needed.</li>
+</ul></div>
+<pre><code># Differences users can't see vs differences they immediately complain about
+# Can't see (yet engineers fight for):
+#   linearizable vs sequential in a single datacenter is imperceptible
+# Will complain instantly:
+#   - "I just ordered, can't see the order"  → violates RYW
+#   - "I saw 5 comments, now only 3"          → violates monotonic read
+#   - "Reply appears before the question"     → violates causal (consistent prefix)
+#   - "100 items sold 102 times"              → violates linearizable
+
+# Engineering priority (must-have → optional):
+#   linearizable[critical resources]  ≫  RYW + monotonic + causal[UX]  ≫  eventual[fallback]
+</code></pre>
+<div class="case">
+<strong>Real cases:</strong>
+<ul>
+<li><strong>Google Spanner</strong>: global linearizable (external consistency) via TrueTime API (GPS+atomic clocks) bounding clock uncertainty to ~7ms; commits wait until safe before becoming visible. <a href="https://research.google/pubs/spanner-googles-globally-distributed-database-2/">Original paper, 2012</a>.</li>
+<li><strong>CockroachDB / YugabyteDB</strong>: open-source homages to Spanner, using HLC (no TrueTime) for serializable + bounded staleness.</li>
+<li><strong>Amazon DynamoDB</strong>: default eventual, with per-request <code>ConsistentRead=true</code> for strong (cost: read capacity ×2, latency doubled).</li>
+<li><strong>Facebook TAO</strong>: social graph cache — writes go to primary region, reads are eventual; only a few critical ops (privacy settings) use strong path.</li>
+<li><strong>Discord messages</strong>: Cassandra QUORUM R/W (W+R&gt;N), giving sequential per-channel; cross-channel unordered — fine for the business.</li>
+</ul></div>
+
+<h3>2. CAP and PACELC: "Pick Two" Is Misleading; "Two of Four" Is Closer to Truth</h3>
+<p><strong>Principle</strong>: The CAP theorem (Brewer 2000, proved by Gilbert &amp; Lynch 2002) says: during a network partition (P), you must choose between consistency (C) and availability (A). But this only describes <em>behavior during a partition</em> — and partitions are rare. <em>It says nothing about the rest of the time</em>.</p>
+<p>PACELC (Abadi 2012) fills the other half: during <strong>P</strong>artition pick <strong>A</strong> or <strong>C</strong>; <strong>E</strong>lse (normal time) pick <strong>L</strong>atency or <strong>C</strong>onsistency. Four full combinations:</p>
+<table>
+<thead><tr><th>Type</th><th>Partition</th><th>Normal</th><th>Typical</th></tr></thead>
+<tbody>
+<tr><td><strong>PA / EL</strong></td><td>Keep availability</td><td>Low latency (weak consistency)</td><td>Cassandra, DynamoDB, Riak</td></tr>
+<tr><td><strong>PA / EC</strong></td><td>Keep availability</td><td>Strong consistency</td><td>MongoDB default (writeConcern majority)</td></tr>
+<tr><td><strong>PC / EL</strong></td><td>Keep consistency (unavailable)</td><td>Low latency</td><td>Rare — if you want C in partition you usually want it normally too</td></tr>
+<tr><td><strong>PC / EC</strong></td><td>Keep consistency</td><td>Strong consistency</td><td>Spanner, CockroachDB, etcd, HBase</td></tr>
+</tbody></table>
+<div class="tradeoff">
+<strong>Interview soundbite</strong>: "CAP is the partition-time pick; PACELC tells you what 99% of the time should look like."<br><br>
+<strong>Real production picks are two:</strong>
+<ul>
+<li><strong>PA/EL</strong> (most common): "During partition keep writing, converge after; in normal time, latency first". Social, e-commerce browsing, IoT ingestion. Cost: write conflicts converge via LWW/CRDT, business must be designed mergeable.</li>
+<li><strong>PC/EC</strong>: "Consistency is the floor; rather unavailable than wrong; in normal time spend latency for accuracy". Finance, inventory, leader election, config. Cost: one side unwritable during partition; 100+ms cross-region writes.</li>
+</ul>
+<em>Anti-pattern: defaulting to PC/EC for non-critical data</em>. Storing "social comments" in etcd is engineering disaster.</div>
+<pre><code># Common CAP misconceptions, debunked
+# ❌ "CAP forces me to give up one"  — wrong. P is not optional, it's physical fact.
+#    Real choice: when P happens, pick A or C.
+# ❌ "We chose AP"  — too coarse. AP further splits:
+#    - read AP, write CP (DynamoDB ConsistentWrite + EventualRead)
+#    - per-key configurable (Cassandra LOCAL_QUORUM)
+# ❌ "CAP is 2 of 3"  — wrong, it's 1 of 2 during P; otherwise there's also E (latency vs C).
+# ❌ "Strong = high latency"  — only cross-region. Single-region Raft quorum is often &lt; 5ms.
+# ❌ "Eventual = data is lost"  — wrong. Eventual means "temporarily inconsistent, eventually converges".
+#    Data loss is durability, not consistency.
+</code></pre>
+<div class="case">
+<strong>Real cases:</strong>
+<ul>
+<li><strong>Jepsen reports overturn vendor claims</strong>: <a href="https://jepsen.io/">aphyr.com/jepsen</a> has tested MongoDB, Redis Sentinel, Galera, CockroachDB and repeatedly disproved official docs — best reminder that PACELC must be verified, not trusted.</li>
+<li><strong>Amazon DynamoDB</strong>: tunable per-request — purchase goes strong, product list goes eventual.</li>
+<li><strong>Stripe</strong>: accounts &amp; billing PC/EC (Postgres primary + multi-AZ semi-sync); event log &amp; audit PA/EL (Kafka + ClickHouse). Same company, different subsystems, different quadrants.</li>
+<li><strong>Cloudflare KV vs Durable Objects</strong>: KV is PA/EL (eventual, ~60s global convergence); Durable Objects is PC/EC (single-point strong + cross-region routing). Their docs explicitly warn "wrong quadrant = pain".</li>
+</ul></div>
+
+<h3>3. Causal Consistency: HLC and Version Vectors</h3>
+<p><strong>Principle</strong>: Causal consistency guarantees that "causally related operations" are seen in the same order by all replicas. Formal definition from Lamport's 1978 happens-before relation (<code>a → b</code> iff a and b are in the same process and a precedes b, or a is a message b received).</p>
+<p>Two main implementation tools:</p>
+<ul>
+<li><strong>Lamport timestamp</strong>: single integer, increments on each op; on receive <code>L = max(local, msg)+1</code>. Provides total order but <em>cannot</em> distinguish causal from concurrent.</li>
+<li><strong>Version Vector / Vector Clock</strong>: each node tracks "last version seen from every other node". Can distinguish causal vs concurrent, but size = O(node count) — hard to maintain with dynamic membership.</li>
+<li><strong>Hybrid Logical Clock (HLC)</strong>: combines physical time + logical counter, <code>(phys_time, logical)</code>. Has the causality of vector clocks + readability close to wall-clock + constant size. Used by CockroachDB, YugabyteDB, MongoDB 5+.</li>
+</ul>
+<pre class="mermaid">
+sequenceDiagram
+    participant U as Alice (us-east)
+    participant US as Comments US
+    participant EU as Comments EU
+    participant V as Bob (eu-west)
+
+    Note over U,V: Causal scenario: Bob replies to Alice
+    U->>US: post "Looks good?" HLC=(t1, 0)
+    US->>EU: replicate (t1, 0)
+    EU->>V: read shows "Looks good?"
+    V->>EU: reply "Yes!" with deps=[(t1,0)] HLC=(t2, 0)
+    Note over EU: t2 > t1 preserves causality
+    EU->>US: replicate reply with deps
+    Note over US: receive reply, check deps<br/>if (t1,0) not yet arrived → buffer
+    US-->>U: now shows — "Looks good?" first, then "Yes!" ✓
+
+    Note over U,V: Wrong path (no HLC, just async):
+    Note over US: reply may arrive before question<br/>users see reply before question ✗
+</pre>
+<pre><code># Hybrid Logical Clock (HLC) — simplified pseudocode
+class HLC:
+    def __init__(self):
+        self.l = 0      # logical (max wall time seen so far)
+        self.c = 0      # counter to break ties
+
+    def now(self):     # local event (e.g. write)
+        pt = physical_time_ms()
+        if pt > self.l:
+            self.l, self.c = pt, 0
+        else:
+            self.c += 1
+        return (self.l, self.c)
+
+    def update(self, remote_l, remote_c):  # receiving msg
+        pt = physical_time_ms()
+        new_l = max(self.l, remote_l, pt)
+        if new_l == self.l == remote_l:
+            self.c = max(self.c, remote_c) + 1
+        elif new_l == self.l:
+            self.c += 1
+        elif new_l == remote_l:
+            self.c = remote_c + 1
+        else:
+            self.c = 0
+        self.l = new_l
+        return (self.l, self.c)
+
+# Properties:
+#  - Monotonic (no rollback on local or remote events)
+#  - Preserves happens-before: a→b ⇒ HLC(a) < HLC(b)
+#  - Close to wall clock (diff bounded by max clock skew)
+#  - Constant size (8 bytes), not O(N) like vector clocks
+</code></pre>
+<div class="case">
+<strong>Real cases:</strong>
+<ul>
+<li><strong>MongoDB 5.0+ Causal Consistency Session</strong>: client session carries <code>operationTime</code> (effectively HLC); reads use <code>afterClusterTime</code> to wait for sync — provides RYW + monotonic + read-your-causal.</li>
+<li><strong>CockroachDB</strong>: every transaction carries an HLC timestamp; comparison across nodes gives serializable + causal order, no GPS clock needed.</li>
+<li><strong>Riak / Dynamo</strong>: dotted version vector (DVV), correctly merges even under dynamic node changes.</li>
+<li><strong>COPS (Cluster of Order-Preserving Servers)</strong>: Lloyd et al. 2011 — causal+ model, academic baseline for social networks; influenced Facebook TAO.</li>
+<li><strong>Git</strong>: commit DAG is essentially a version vector; merge auto-detects concurrent branches and demands human resolution.</li>
+</ul></div>
+
+<h3>4. Engineering: Pick Consistency per Data Type Within One System</h3>
+<p><strong>Principle</strong>: Real systems never use a single consistency model. <em>Layer by "cost of violation"</em> is the core methodology.</p>
+<div class="tradeoff">
+<strong>Layered decision (driven by SLO/business loss):</strong>
+<ul>
+<li><strong>Violation → data corruption / financial loss</strong> (inventory, balance, uniqueness) → Linearizable / Serializable. Spanner / CockroachDB / Postgres strong constraints.</li>
+<li><strong>Violation → user complaints + support cost</strong> (can't see my order, my comment vanished) → RYW + Monotonic. Client LSN/HLC token, zero extra server cost.</li>
+<li><strong>Violation → weird UX but no error</strong> (comment order scrambled) → Causal. HLC + dependency tracking.</li>
+<li><strong>Violation → user can't tell</strong> (product view counter, recommendation ranking) → Eventual. Redis / CDN / async index.</li>
+</ul></div>
+<pre><code># Mixing consistency per business field on the same request path (pseudocode)
+
+# Scenario: user clicks "Buy now" on a limited-edition product
+def place_order(user, sku, qty):
+    # Step 1: Strong — decrement stock. Must be linearizable.
+    #   Spanner / CockroachDB, global quorum, ~30ms is acceptable.
+    reserved = inventory_db.atomic_decrement(sku, qty)   # CP
+    if not reserved:
+        return "Sold out"
+
+    # Step 2: RYW — write order. Session token so user sees it immediately.
+    order = orders_db.insert(user, sku, qty)             # primary write
+    session.set_lsn(order.lsn)                            # client carries it back
+
+    # Step 3: Eventual — recommendations & popularity counter
+    fan_out_async("user.purchased", {user, sku})         # Kafka → reco/search
+    increment_counter_eventual(sku + ":popular", 1)      # Redis, weak is fine
+
+    # Step 4: Causal — notifications (downstream actions must preserve causality)
+    notify_with_hlc(user, "order_placed", deps=[order.hlc])
+
+    return order
+
+# Key insight: ONE action — "Buy now" — has FOUR consistency modes
+# because business needs differ.
+# All-Spanner: slow. All-Cassandra: oversells.
+</code></pre>
+<div class="case">
+<strong>Real cases:</strong>
+<ul>
+<li><strong>Stripe payments</strong>: transactions (CP/EC, Postgres + idempotency key) + event stream (PA/EL, Kafka + Outbox) + reports (eventual, ClickHouse) — three clear layers.</li>
+<li><strong>Shopify Storefront</strong>: inventory decrement strong (MySQL row lock + global counter); product page eventual (Fastly CDN, 60s TTL); order state RYW (cookie with last-update token).</li>
+<li><strong>Twitter Timeline</strong>: user's own recent tweet → forced read leader for 5s (RYW); others' tweets → fan-out async (eventual); like counts → eventual + periodic recompute.</li>
+<li><strong>Notion / Linear</strong>: document content CRDT collaboration (causal+eventual); permissions/billing strong (Postgres); comments partition by doc — within doc causal, across docs eventual.</li>
+</ul></div>
+
+<h2>Extensions &amp; Optimizations</h2>
+<ul>
+<li><strong>Bounded Staleness</strong>: "read data at most X seconds old". Stricter than pure eventual, cheaper than strong. Supported by Cosmos DB / Aurora Global Database / CockroachDB. Great for dashboards, analytics, geo-local reads.</li>
+<li><strong>Client SDK with built-in token routing</strong>: MongoDB, Vitess, Aurora let the SDK auto-manage session LSN; apps get RYW transparently. The trend: <em>move consistency from infra into SDK</em>.</li>
+<li><strong>Tunable Consistency</strong>: Cassandra <code>ONE/QUORUM/ALL</code>, DynamoDB <code>ConsistentRead</code> per request — business decides per query, not per database.</li>
+<li><strong>Follower reads</strong>: CockroachDB / TiDB allow "5-seconds-stale follower reads", bypassing quorum RTT. Great for BI and geo-local reads.</li>
+<li><strong>Fallback when linearizable unreachable</strong>: when quorum is lost, fail-stop (recommended) or fail-open (dangerous)? etcd, ZooKeeper choose fail-stop — that's the "C" in PC/EC. If the business can't tolerate, don't pick PC; pick PA.</li>
+</ul>
+
+<h2>Common Pitfalls &amp; Interview Questions</h2>
+<div class="callout">
+<strong>1. Strong consistency as default</strong>: jumping straight to Spanner / Raft, eating 200ms cross-region writes. Ask first: "what's the cost of inconsistency?", then pick.</div>
+<div class="callout">
+<strong>2. Confusing ACID with strong consistency</strong>: ACID is a single-db transaction guarantee; distributed "C" is a cross-node guarantee. Postgres has ACID on one machine but may be eventual across replicas — don't mix them.</div>
+<div class="callout">
+<strong>3. Wall-clock ordering</strong>: clocks drift 1-100ms in distributed systems; NTP doesn't guarantee monotonicity. Use HLC / Lamport / version vector, never <code>time.time()</code>.</div>
+<div class="callout">
+<strong>4. Thinking quorum (W+R&gt;N) = linearizable</strong>: Dynamo-style quorum with sloppy quorum + hinted handoff can break linearizability. True linearizability needs read-repair + leader or consensus (Raft/Paxos).</div>
+<div class="callout">
+<strong>5. Client cache breaks monotonic read</strong>: browser cached an older page, refresh shows stale data — looks like the system went backward. The frontend is part of the consistency domain too; mind cache busting / ETag.</div>
+<p><strong>Likely interview follow-ups:</strong></p>
+<ol>
+<li>In 30 seconds, explain the difference between linearizable, sequential, and causal, with a violation scenario for each.</li>
+<li>Your system needs "no oversold inventory + ordered comments + fast recommendations" — sketch the consistency choice for each subsystem and why.</li>
+<li>CAP is often called "outdated". What does PACELC solve? Why is 99% of time spent in E, not P?</li>
+<li>Why is Hybrid Logical Clock better than Lamport timestamps and Vector Clocks? Size, readability, causal detection?</li>
+<li>How can Spanner claim "global linearizable"? How does TrueTime's ε affect commit wait? What if you don't have GPS clocks (CockroachDB)?</li>
+</ol>
+
+<h2>Deep Resources</h2>
+<ul>
+<li><strong>《Designing Data-Intensive Applications》Ch 5 §Consistency + Ch 9 §Consistency and Consensus</strong> (Kleppmann) — the most thorough industrial discussion of this topic.</li>
+<li><strong>Daniel Abadi — "Consistency Tradeoffs in Modern Distributed Database Design"</strong> (2012, IEEE Computer) — the original PACELC paper, 6 pages.</li>
+<li><strong>Spanner: Google's Globally-Distributed Database</strong> (OSDI 2012) — TrueTime + external consistency foundation.</li>
+<li><strong>Logical Physical Clocks and Consistent Snapshots in Globally Distributed Databases</strong> (Kulkarni et al. 2014) — original HLC paper.</li>
+<li><strong>Jepsen — aphyr.com/jepsen</strong>: real partition behavior of MongoDB / etcd / Galera / CockroachDB, debunking vendor claims.</li>
+<li><strong>Peter Bailis — "Highly Available Transactions: Virtues and Limitations"</strong> (VLDB 2014) — what isolation/consistency is achievable under partition.</li>
+<li><strong>Marc Brooker's blog — brooker.co.za</strong>: senior AWS engineer's short pieces on consistency/availability with strong engineering taste.</li>
+<li><strong>Werner Vogels — "Eventually Consistent" (ACM Queue 2008)</strong>: Amazon CTO on why eventual isn't scary.</li>
+</ul>
+
+<h2>Deep Reflection</h2>
+
+<details>
+<summary>1. For a single "checkout", inventory is Linearizable, order is RYW, recommendation is Eventual. If a PM says "let's also make orders Linearizable, just to be safe", how do you argue back? Give numbers.</summary>
+<div class="answer">
+<p>Classic "consistency as comfort blanket" anti-pattern. You need to <strong>quantify the cost</strong> — not just say "it's engineering complexity", which never lands.</p>
+<p><strong>Step 1: What does "order" actually need?</strong></p>
+<ul>
+<li>User writes order, must see it immediately → RYW (session token suffices)</li>
+<li>Order state must not regress → Monotonic Read (same)</li>
+<li>Payment, shipping, refund for one order stay causal → Causal (HLC suffices)</li>
+<li>Must "all orders across users" be globally ordered? <em>No</em>. User A sees A's orders in order, B sees B's, mutually independent.</li>
+</ul>
+<p>So Linearizable is over-promising — it requires "a global observer to see all orders in wall-clock order", a guarantee the business does not consume.</p>
+<p><strong>Step 2: Quantify cost.</strong> Today: Postgres semi-sync primary (PA/EC, cross-AZ ~5ms commit), write P50=8ms / P99=25ms. Switch to Spanner-style global linearizable:</p>
+<ul>
+<li>Each write needs cross-region majority + TrueTime commit wait (~7ms). <strong>P50 → ~80ms (cross-ocean RTT), P99 → ~200ms</strong>.</li>
+<li>20k QPS at peak → user perception goes from "instant" to "laggy"; checkout conversion historically drops 5-15% (Amazon's "100ms = 1% revenue").</li>
+<li>Infra cost: a Spanner-class DB + global presence is 5-10× a single-region Postgres.</li>
+<li>R&amp;D: cross-region strong writes + idempotency + retry design is far more complex; incident diagnosis harder.</li>
+</ul>
+<p><strong>Step 3: Real solution to PM's "safety" concern</strong>:</p>
+<ol>
+<li>Order writes to primary Postgres, semi-sync with ≥1 replica ACK → RPO ≈ 0.</li>
+<li>Client carries LSN token → RYW + monotonic.</li>
+<li>State transitions (pending→paid) use idempotency keys; event stream via Outbox → 0 data loss.</li>
+<li>Reconciliation job: order totals = inventory out × price ± refunds. Alert on any drift.</li>
+</ol>
+<p><em>Punchline</em>: "Order system safety doesn't come from a stronger consistency model — it comes from <strong>a correct failure model + reconciliation</strong>. Linearizable doesn't solve 'lost orders' — that's a durability problem, not a consistency problem." Once you separate the terms, PMs usually get it.</p>
+</div>
+</details>
+
+<details>
+<summary>2. Spanner's TrueTime ε is ~7ms. If GPS is jammed and ε spikes to 200ms, what happens? Why is this "safe degradation" rather than "wrong"?</summary>
+<div class="answer">
+<p>This tests understanding of the <strong>commit-wait</strong> mechanism. Spanner's external consistency relies on: after assigning commit timestamp <code>t</code> to a transaction, <em>wait until real time has passed t+ε before making the result visible</em>. That guarantees "all external observers see transactions in real-time order".</p>
+<p><strong>When ε spikes to 200ms</strong>:</p>
+<ul>
+<li>Every transaction waits ~200ms more. <strong>Throughput drops sharply, P99 latency spikes</strong>.</li>
+<li>But <em>correctness is preserved</em> — the key point. Spanner picks "slow but right" (PC/EC); it does not relax linearizability when ε grows.</li>
+<li>Monitoring fires, ops intervene; once GPS recovers, ε returns to 7ms and performance recovers naturally.</li>
+</ul>
+<p><strong>Why this is safe degradation</strong>: ε is "upper bound on clock uncertainty"; Spanner always assumes worst case. Larger ε is just "we acknowledge clocks are off", commit wait backstops semantics. This is totally different from "clock is wrong and system doesn't know" — the latter would break consistency.</p>
+<p><strong>Compare CockroachDB (no TrueTime)</strong>: uses HLC + max_offset (default 500ms) as bound; transactions beyond max_offset are aborted and retried. No GPS needed but max_offset is set conservatively, so cross-region latency is higher. Classic "engineering compromise vs hardware investment" trade-off.</p>
+<p><strong>Deeper insight</strong>: Spanner converts "clock uncertainty" into "wait time" — transforming a seemingly unsolvable physics problem (clock sync) into a quantifiable engineering resource (waiting). That's distributed systems design aesthetics at its peak: <em>don't fight physics, fold it into the abstraction</em>. HLC is the cheaper version of the same idea (logical counter compensates for clock skew).</p>
+<p>So the "right answer" isn't "Spanner is broken"; it's "Spanner trades speed for correctness, which validates its philosophy".</p>
+</div>
+</details>
+
+<details>
+<summary>3. Cross-chapter: Day 4 (Sharding) + Day 5 (Replication) + Day 6 (Consistency). For a sharded multi-replica OLTP, how do you get strong consistency across shards? Why is 2PC inefficient here and why is deterministic transaction trending?</summary>
+<div class="answer">
+<p>The core problem of distributed databases. Stack the three dimensions:</p>
+<ul>
+<li><strong>Within a shard</strong>: multi-replica using Raft/Paxos for linearizable (CockroachDB, TiKV, Spanner).</li>
+<li><strong>Across shards</strong>: a transaction may touch multiple shards (e.g., "transfer $100 from A to B" — A, B in different shards).</li>
+</ul>
+<p><strong>Classical: 2PC (Two-Phase Commit)</strong></p>
+<ul>
+<li>Phase 1: coordinator asks all shards to prepare (lock rows, write prepare log)</li>
+<li>Phase 2: all yes → commit, any no → abort</li>
+<li><em>Problems</em>: (a) coordinator is a SPOF; (b) prepared rows are locked, blocking other ops; (c) if coordinator dies between phases → participants blocked; (d) 2 RTT × N shards = high latency.</li>
+</ul>
+<p><strong>Modern improvements:</strong></p>
+<ol>
+<li><strong>Spanner / CockroachDB: 2PC + Paxos</strong> — coordinator role is itself a Paxos group (HA); each shard is also a Paxos group. Still 2PC, but participants are HA — slow but not blocked.</li>
+<li><strong>Calvin / FaunaDB: deterministic transactions</strong> — pre-order all transactions via a global sequencer (log); every node executes in the same order → no locks, no 2PC. <em>Pros</em>: extreme throughput. <em>Cons</em>: writes wait for global log fan-in; transactions must be deterministic (no randomness, no external I/O).</li>
+<li><strong>Saga</strong> (microservices favorite): split into local transactions + compensations. Not ACID, but "eventual + compensation". Cost: business must design compensation logic. Day 7 expands.</li>
+</ol>
+<p><strong>Why deterministic is the trend</strong>:</p>
+<ul>
+<li>Cloud-era "global sequencers" got cheap (Kafka, Raft log); single-coordinator is no longer the bottleneck.</li>
+<li>2PC's root issue (locking + blocking) cannot be optimized away — only displaced by a new paradigm.</li>
+<li>Determinism gives free replay / recovery / cross-region replication (replay=correct).</li>
+</ul>
+<p><strong>Soundbite</strong>: "2PC isn't wrong — it's not good enough. The future of distributed transactions is either deterministic (strong semantics, high throughput) or admitted-as-Saga (weak semantics, business compensation). Sprinkling 2PC is tech debt."</p>
+</div>
+</details>
+
+<details>
+<summary>4. "Read-your-writes" sounds simple, but breaks when "user writes on phone, reads on laptop seconds later" — session stickiness fails. Give 3 engineering solutions + their costs.</summary>
+<div class="answer">
+<p>Cross-device consistency is a classic gotcha — session sticky usually routes by IP/cookie and doesn't survive a device switch.</p>
+<p><strong>Solution 1: Account-level last-write LSN (recommended)</strong></p>
+<ul>
+<li>On every write, server updates <code>users.last_write_lsn = max(current, new_lsn)</code> in Redis / Postgres.</li>
+<li>Any device's read first looks up <code>user.last_write_lsn</code>; if replica lags behind, wait or route to primary.</li>
+<li><em>Cost</em>: extra Redis lookup per read (&lt;1ms). Degrades to "read primary" if Redis is down.</li>
+<li><em>Upside</em>: clean cross-device semantics; account-level matches user mental model better than session-level.</li>
+</ul>
+<p><strong>Solution 2: Client token + server wait (for high-real-time apps)</strong></p>
+<ul>
+<li>Server returns LSN/HLC token on write; client stores locally.</li>
+<li>Reads carry token via SDK; cross-device with no token → fall back to read primary.</li>
+<li><em>Cost</em>: cross-device degrades to strong read, primary pressure.</li>
+<li><em>Fit</em>: mobile apps where single-device is primary use, cross-device is secondary.</li>
+</ul>
+<p><strong>Solution 3: Acknowledge lag in UX (product-side fix)</strong></p>
+<ul>
+<li>Accept 1-2s lag across devices; cover with UI — "syncing…", pull-to-refresh, push notification to the other device.</li>
+<li>Turn inconsistency into a UX cue rather than a bug.</li>
+<li><em>Cost</em>: UX surface; not acceptable for some domains (finance, medical).</li>
+<li><em>Fit</em>: Notion / Apple Notes / Dropbox all do this — "eventual + sync indicator".</li>
+</ul>
+<p><strong>Combined</strong>: account-level LSN + UX fallback. The LSN handles 95% of cases (&lt;1s readable); the remaining 5% (Redis slow, severe replica lag) gets the "syncing" UI. <em>Pure technical 100% consistency is uneconomical</em>.</p>
+<p><strong>Deeper insight</strong>: Cross-device RYW is really "how user identity spans sessions" — a user-identity-modeling problem, not a distributed-systems problem. The best solutions usually <em>treat "user's current state" as a first-class entity</em> (user.last_write_lsn) rather than letting each session manage its own. This generalizes to multi-tenant, cross-device sync, real-time collaboration.</p>
+</div>
+</details>
+
+<details>
+<summary>5. Counter-intuitive: between "5 nines availability" and "strong consistency", why should the business often pick availability? Walk through a real "picked strong, got disaster" scenario.</summary>
+<div class="answer">
+<p>Engineers instinctively pick strong — "data must be right". From the product view: <em>user-perceived SLA = system availability × data correctness</em>. If consistency causes frequent unavailability, the product is worse.</p>
+<p><strong>Real walkthrough: a social app's globally linearizable comments</strong></p>
+<ul>
+<li>Pick: comments on Spanner-style global linearizable. Reason: "comment order can't be wrong".</li>
+<li>Normal operation: EU/Asia user post latency P99 = 300ms (cross-ocean quorum). Users feel "posting is slow", engagement -8%.</li>
+<li>Once or twice a year, us-east ↔ eu-west partitions (5-30 min):</li>
+<ul>
+<li>EU loses majority → EU users can't post.</li>
+<li>Users see error pages / loading spinners. Complaints flood.</li>
+<li>Support cost spikes, social-media backlash, DAU dips.</li>
+</ul>
+<li>Postmortem: "comment order mustn't be wrong" — users don't actually feel it. Timelines are already roughly time-sorted; 1-2 swapped causal events are imperceptible.</li>
+<li>Re-pick: causal+eventual. Both sides writable during partition; merge by HLC. Annual downtime drops from 60 minutes to 0; UX is fluid; occasional reorder is well within user tolerance.</li>
+</ul>
+<p><strong>Counter-intuitive logic</strong>:</p>
+<ol>
+<li>Consistency violations are usually <em>soft harm</em> (slightly wrong order, slightly stale data); unavailability is <em>hard harm</em> (nothing works).</li>
+<li>Users tolerate "consistency bugs" with massive patience ("refresh fixes it"); unavailability tolerance is near zero ("this app sucks").</li>
+<li>Strong consistency is the most expensive thing in distributed systems — it demands quorum sync, cross-region RTT, coordination overhead. Routinely costs an order of magnitude in throughput and latency.</li>
+</ol>
+<p><strong>When strong is still required</strong>:</p>
+<ul>
+<li>Money (accounts, billing, pricing);</li>
+<li>Uniqueness (usernames, order IDs, inventory);</li>
+<li>Critical state-machine transitions (paid vs unpaid);</li>
+<li>Config / permissions (errors here affect global behavior).</li>
+</ul>
+<p><strong>Soundbite</strong>: "Strong consistency pays for <em>hard correctness constraints</em>, not for engineers' peace of mind. Spanner and Cassandra aren't good vs bad — they're different fits. A senior architect picks per data domain, not 'whole system strong' or 'whole system eventual'."</p>
+<p>This is also "be a super-individual" expressed at the system-design layer: <em>replace "safe by default" with "precise by choice"</em> — the mark of mature technical judgment.</p>
+</div>
+</details>
+
+</div></body></html>

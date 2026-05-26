@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 6 · 一致性 (Consistency) — System Design Bi-daily</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"SF Pro Display","Noto Sans SC",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
+.container{max-width:820px;margin:0 auto;padding:24px 20px 60px}
+header{padding:40px 0 28px;border-bottom:1px solid rgba(100,200,255,0.15);margin-bottom:32px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem}
+.tag{padding:3px 10px;border-radius:4px;background:rgba(100,200,255,0.12);color:#64c8ff;border:1px solid rgba(100,200,255,0.25)}
+.tag.diff{background:rgba(94,234,212,0.1);color:#5eead4;border-color:rgba(94,234,212,0.3)}
+.tag.day{background:rgba(255,180,80,0.1);color:#ffb450;border-color:rgba(255,180,80,0.25)}
+h1{font-size:1.75rem;font-weight:800;background:linear-gradient(135deg,#64c8ff 0%,#5eead4 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:0.5px;line-height:1.3}
+h1 .en{display:block;font-size:1rem;color:#7a8590;-webkit-text-fill-color:#7a8590;margin-top:6px;font-weight:500}
+h2{font-size:1.2rem;color:#5eead4;margin:36px 0 14px;padding-left:12px;border-left:3px solid #5eead4}
+h3{font-size:1rem;color:#64c8ff;margin:20px 0 10px;font-weight:600}
+p{margin:10px 0;color:#c8cfd6}
+ul,ol{margin:10px 0 10px 22px;color:#c8cfd6}
+li{margin:6px 0}
+strong{color:#e8eef5;font-weight:600}
+em{color:#5eead4;font-style:normal;font-weight:500}
+code{font-family:"SF Mono",Menlo,Consolas,monospace;background:rgba(100,200,255,0.1);color:#5eead4;padding:1px 6px;border-radius:3px;font-size:0.88em}
+pre{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:14px 16px;overflow-x:auto;margin:12px 0;font-family:"SF Mono",Menlo,Consolas,monospace;font-size:0.84rem;line-height:1.55;color:#c8cfd6}
+pre code{background:none;color:inherit;padding:0;font-size:1em}
+.mermaid{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:18px;margin:14px 0;text-align:center;overflow-x:auto;cursor:zoom-in;transition:border-color 0.15s}
+.mermaid:hover{border-color:rgba(100,200,255,0.4)}
+.mermaid svg{width:100%;max-width:100%;height:auto;min-height:280px}
+.lightbox{position:fixed;inset:0;background:rgba(8,12,18,0.96);z-index:9999;display:none;align-items:center;justify-content:center;padding:24px;cursor:grab;backdrop-filter:blur(4px);overflow:hidden}
+.lightbox.open{display:flex}
+.lightbox.dragging{cursor:grabbing}
+.lightbox svg{width:auto;height:auto;max-width:96vw;max-height:92vh;transform-origin:center center;will-change:transform}
+.lightbox .hint{position:fixed;top:16px;right:20px;font-size:0.78rem;color:#7a8590;font-family:"SF Mono",Menlo,monospace;pointer-events:none}
+.callout{background:rgba(255,180,80,0.06);border-left:3px solid #ffb450;padding:12px 14px;margin:14px 0;border-radius:4px;font-size:0.94rem}
+.callout strong{color:#ffb450}
+.tradeoff{background:rgba(100,200,255,0.05);border:1px solid rgba(100,200,255,0.2);border-radius:6px;padding:12px 14px;margin:12px 0;font-size:0.94rem}
+.case{background:rgba(94,234,212,0.05);border-left:3px solid #5eead4;padding:12px 14px;margin:12px 0;border-radius:4px;font-size:0.94rem}
+.case strong{color:#5eead4}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:0.9rem}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid rgba(100,200,255,0.15)}
+th{color:#64c8ff;font-weight:600;background:rgba(100,200,255,0.05)}
+details{background:rgba(100,200,255,0.04);border:1px solid rgba(100,200,255,0.18);border-radius:6px;padding:12px 16px;margin:10px 0;transition:all 0.15s}
+details:hover{border-color:rgba(100,200,255,0.35)}
+details[open]{background:rgba(94,234,212,0.05);border-color:rgba(94,234,212,0.3)}
+details summary{font-weight:600;color:#e8eef5;list-style:none;outline:none;cursor:pointer;display:flex;align-items:flex-start;gap:10px;font-size:0.96rem}
+details summary::-webkit-details-marker{display:none}
+details summary::before{content:'▶';color:#64c8ff;font-size:0.75em;transition:transform 0.2s;flex-shrink:0;margin-top:5px}
+details[open] summary::before{transform:rotate(90deg);color:#5eead4}
+details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
+details .answer ul,details .answer ol{margin:6px 0 6px 22px}
+@media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+</style>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({startOnLoad:true,theme:'base',flowchart:{useMaxWidth:true,htmlLabels:true,nodeSpacing:50,rankSpacing:60},themeVariables:{primaryColor:'#1a2530',primaryTextColor:'#e8eef5',primaryBorderColor:'#64c8ff',lineColor:'#5eead4',secondaryColor:'#0e1419',tertiaryColor:'#0a0f14',background:'#0a0f14',mainBkg:'#1a2530',secondBkg:'#0e1419',textColor:'#d4dae0',fontFamily:'-apple-system,"SF Pro Display",sans-serif',fontSize:'16px'}});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const lb=document.createElement('div');lb.className='lightbox';
+  lb.innerHTML='<span class="hint">scroll = zoom · drag = pan · Esc / click bg = close</span>';
+  document.body.appendChild(lb);
+  let scale=1,panX=0,panY=0,dragging=false,moved=false,lx=0,ly=0;
+  const apply=()=>{const s=lb.querySelector('svg');if(s)s.style.transform=`translate(${panX}px,${panY}px) scale(${scale})`};
+  const reset=()=>{scale=1;panX=0;panY=0};
+  const close=()=>{lb.classList.remove('open');const s=lb.querySelector('svg');if(s)s.remove();reset()};
+  document.addEventListener('click',e=>{
+    if(e.target.closest('.lightbox')){if(moved){moved=false;return}close();return}
+    const w=e.target.closest('.mermaid');if(!w)return;
+    const svg=w.querySelector('svg');if(!svg)return;
+    const c=svg.cloneNode(true);c.removeAttribute('style');
+    c.style.maxWidth='96vw';c.style.maxHeight='92vh';
+    lb.appendChild(c);lb.classList.add('open');reset();apply();
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+  lb.addEventListener('wheel',e=>{
+    if(!lb.classList.contains('open'))return;
+    e.preventDefault();
+    const svg=lb.querySelector('svg');if(!svg)return;
+    const ns=Math.max(0.3,Math.min(10,scale*(1-e.deltaY*0.002)));
+    const r=svg.getBoundingClientRect();
+    const cx=e.clientX-(r.left+r.width/2),cy=e.clientY-(r.top+r.height/2);
+    const k=ns/scale-1;panX-=cx*k;panY-=cy*k;scale=ns;apply();
+  },{passive:false});
+  lb.addEventListener('mousedown',e=>{
+    if(!lb.classList.contains('open'))return;
+    dragging=true;moved=false;lx=e.clientX;ly=e.clientY;lb.classList.add('dragging');e.preventDefault();
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    const dx=e.clientX-lx,dy=e.clientY-ly;
+    if(Math.abs(dx)+Math.abs(dy)>3)moved=true;
+    panX+=dx;panY+=dy;lx=e.clientX;ly=e.clientY;apply();
+  });
+  document.addEventListener('mouseup',()=>{dragging=false;lb.classList.remove('dragging')});
+});
+</script>
+</head><body><div class="container">
+
+<header>
+<div class="meta">
+<span class="tag day">Day 6</span>
+<span class="tag diff">Hard</span>
+<span class="tag">Distributed Systems</span>
+<span class="tag">Consistency</span>
+<span class="tag">CAP / PACELC</span>
+<span class="tag">Causal</span>
+</div>
+<h1>一致性 (Consistency) — 它不是一个开关，是一整条光谱<span class="en">Linearizable / Sequential / Causal / RYW / Monotonic / Eventual · CAP & PACELC · HLC & Version Vectors</span></h1>
+</header>
+
+<h2>问题场景与约束</h2>
+<p>设计一个全球电商「<strong>限量发售 + 商品详情 + 评论</strong>」混合系统：欧美亚三大洲，<strong>50 万 DAU</strong>，发售时段瞬时 <strong>20k 下单 QPS / 200k 商品查看 QPS / 50k 评论读写 QPS</strong>。同一个系统里有三类截然不同的一致性要求：</p>
+<ul>
+<li><strong>库存与下单（强一致 / linearizable）</strong>：100 件限量必须不超卖、不少卖；任何客户端读到的库存数字之后只能更少。RPO=0。</li>
+<li><strong>『我的订单』状态（read-your-writes + monotonic）</strong>：用户下单成功立刻在『订单列表』看到；刷新不能消失、不能状态回退（已支付 → 待支付）。</li>
+<li><strong>商品评论（causal + eventual）</strong>：必须保证『回复』出现在『被回复评论』之后（因果序）；但允许欧洲用户晚 1-2 秒看到亚洲用户的新评论。</li>
+</ul>
+<p>这三套需求强迫你 <em>在同一系统内混用多种一致性模型</em>——这才是真实系统的样子。Day 5 已经讲了复制怎么做；今天讲：<strong>哪些一致性保证值得为之付出延迟与可用性，哪些不值，工程上怎么落地</strong>。</p>
+
+<h2>高层架构</h2>
+<pre class="mermaid">
+graph TD
+    subgraph Edge["Edge / CDN"]
+        CDN["商品详情页<br/><i>eventual, TTL 60s</i>"]
+    end
+    subgraph Core["Core (us-east, 强一致区)"]
+        INV["库存服务<br/><i>Spanner / CockroachDB<br/>Linearizable</i>"]
+        ORD["订单服务<br/><i>Postgres semi-sync<br/>RYW via session token</i>"]
+    end
+    subgraph Comments["评论域 (Multi-Region)"]
+        CMT_US["评论 us-east"]
+        CMT_EU["评论 eu-west"]
+        CMT_AP["评论 ap-south"]
+        HLC[("HLC<br/>Hybrid Logical Clock")]
+    end
+
+    Client["客户端<br/><i>携带 session LSN / HLC</i>"]
+
+    Client -- "view product" --> CDN
+    CDN -. miss .-> INV
+    Client -- "order / decrement stock" --> INV
+    Client -- "list my orders" --> ORD
+    Client -- "post / read comments" --> CMT_US
+    Client -- "post / read comments" --> CMT_EU
+    Client -- "post / read comments" --> CMT_AP
+
+    INV -. CDC .-> CDN
+    ORD -. CDC .-> CDN
+    CMT_US <-. async + HLC .-> CMT_EU
+    CMT_EU <-. async + HLC .-> CMT_AP
+    CMT_AP <-. async + HLC .-> CMT_US
+
+    classDef strong fill:#2a1530,stroke:#ff7ab6,color:#e8eef5
+    classDef ryw fill:#1a2530,stroke:#64c8ff,color:#e8eef5
+    classDef causal fill:#0e2030,stroke:#5eead4,color:#e8eef5
+    class INV strong
+    class ORD ryw
+    class CMT_US,CMT_EU,CMT_AP,HLC causal
+</pre>
+<p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">三种一致性域：库存走全球 linearizable（Spanner 类多数派），订单走单 region 主从 + 客户端 LSN，评论走 multi-region async + HLC 保因果序。Edge CDN 兜住 95% 的纯展示流量。</p>
+
+<h2>关键技术点</h2>
+
+<h3>1. 一致性光谱：6 种模型，从『绝对正确』到『最终对齐』</h3>
+<p><strong>原理</strong>：一致性模型定义了『多个客户端看到的操作顺序，与某个理想顺序的偏差程度』。从强到弱（每弱一档，性能/可用性升一档）：</p>
+<table>
+<thead><tr><th>模型</th><th>承诺</th><th>实现代价</th><th>典型</th></tr></thead>
+<tbody>
+<tr><td><strong>Linearizable</strong></td><td>所有 op 像在单点按 wall-clock 顺序执行；读必看到最新已提交写</td><td>多数派同步 + global clock / consensus</td><td>etcd, ZooKeeper, Spanner</td></tr>
+<tr><td><strong>Sequential</strong></td><td>所有副本看到的 op 顺序相同（但不必匹配真实时间）</td><td>全局序列化（leader / total order broadcast）</td><td>Kafka 单 partition, Redis</td></tr>
+<tr><td><strong>Causal</strong></td><td>有因果依赖的 op 保序；并发 op 不约束</td><td>HLC / version vector + 携带依赖</td><td>MongoDB causal session, COPS</td></tr>
+<tr><td><strong>Read-your-writes</strong></td><td>自己写完立刻读到</td><td>session sticky 或客户端 LSN token</td><td>大多数 web app 的最低标</td></tr>
+<tr><td><strong>Monotonic Read</strong></td><td>读不会『回到过去』</td><td>客户端粘到 follower / 带 high-watermark</td><td>Twitter timeline</td></tr>
+<tr><td><strong>Eventual</strong></td><td>停止写后所有副本最终收敛</td><td>异步复制 + 收敛函数 (LWW / CRDT)</td><td>DNS, S3 list, Cassandra default</td></tr>
+</tbody></table>
+<div class="tradeoff">
+<strong>关键认知：『强一致』不是默认应该选的——是要被论证才能用的。</strong>
+<ul>
+<li><strong>Linearizable</strong>：仅当业务正确性依赖『最新值』时才上。库存、leader election、分布式锁、唯一性约束。每次操作的代价：跨副本 RTT + consensus 一轮。</li>
+<li><strong>Causal</strong>：聊天、评论、社交 feed——『先后顺序』有意义但不需要全局顺序。代价远低于 linearizable，体验差异用户感觉不到。</li>
+<li><strong>RYW + Monotonic</strong>：90% 的『用户感觉系统好用』来自这两条。<em>客户端携带 token</em> 实现，几乎零服务端代价。</li>
+<li><strong>Eventual</strong>：纯展示、计数器（粗略 OK）、缓存。从『default 全部 eventual』开始，遇到问题再升级。</li>
+</ul></div>
+<pre><code># 用户看不见的差异 vs 看得见的差异
+# 看不见 (但有人为之卖命): linearizable vs sequential 在单数据中心通常无感
+# 看得见 (用户立刻投诉):
+#   - 我刚下单看不到订单     → 违反 RYW
+#   - 评论先看到 5 条又只剩 3 条 → 违反 monotonic read
+#   - 回复出现在被回复之前    → 违反 causal (consistent prefix)
+#   - 限量 100 件卖出 102 件  → 违反 linearizable
+
+# 工程优先级 (从一定要 → 可选):
+#   linearizable[关键资源]  ≫  RYW + monotonic + causal[用户体验]  ≫  eventual[兜底]
+</code></pre>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Google Spanner</strong>：全球 linearizable（external consistency），靠 TrueTime API（GPS+原子钟）把 clock 不确定性压到 7ms 内，等待 commit timestamp 安全可见才返回。<a href="https://research.google/pubs/spanner-googles-globally-distributed-database-2/">原论文 2012</a>。</li>
+<li><strong>CockroachDB / YugabyteDB</strong>：开源致敬 Spanner，用 HLC（无 TrueTime）实现 serializable + bounded staleness。</li>
+<li><strong>Amazon DynamoDB</strong>：default eventual，按需 <code>ConsistentRead=true</code> 升强一致（代价：读容量 ×2、延迟翻倍）。</li>
+<li><strong>Facebook TAO</strong>：social graph 缓存层，写穿主区域、读最终一致；只有少数关键操作（隐私设置变更）走强一致路径。</li>
+<li><strong>Discord 消息</strong>：Cassandra QUORUM 读写（W+R&gt;N），获得 sequential per-channel，但跨 channel 无序——业务上够用。</li>
+</ul></div>
+
+<h3>2. CAP 与 PACELC：『二选一』是误导，『四选二』才接近真相</h3>
+<p><strong>原理</strong>：CAP 定理（Brewer 2000，Gilbert &amp; Lynch 2002 证明）说：网络分区（P）发生时，必须在一致性（C）和可用性（A）之间选一个。但这只刻画了『分区时』的行为，<em>没说分区不发生时怎么办</em>——而分区是罕见事件，绝大多数时间系统都不在分区中。</p>
+<p>PACELC（Abadi 2012）补全了另一半：<strong>P</strong>artition 时 <strong>A</strong> 还是 <strong>C</strong>；<strong>E</strong>lse（正常时）<strong>L</strong>atency 还是 <strong>C</strong>onsistency。完整决策有 4 种组合：</p>
+<table>
+<thead><tr><th>类型</th><th>分区时</th><th>正常时</th><th>典型</th></tr></thead>
+<tbody>
+<tr><td><strong>PA / EL</strong></td><td>保可用</td><td>低延迟（弱一致）</td><td>Cassandra, DynamoDB, Riak</td></tr>
+<tr><td><strong>PA / EC</strong></td><td>保可用</td><td>强一致</td><td>MongoDB default (writeConcern majority)</td></tr>
+<tr><td><strong>PC / EL</strong></td><td>保一致（不可用）</td><td>低延迟</td><td>较少见 — 想保 C 通常正常时也要 C</td></tr>
+<tr><td><strong>PC / EC</strong></td><td>保一致</td><td>强一致</td><td>Spanner, CockroachDB, etcd, HBase</td></tr>
+</tbody></table>
+<div class="tradeoff">
+<strong>面试金句</strong>：『CAP 是分区时的二选一，PACELC 才告诉你 99% 的时间该如何取舍』。<br><br>
+<strong>真实生产决策只有两类</strong>：
+<ul>
+<li><strong>PA/EL</strong>（最常见）：『分区时继续接受写、收敛后合并；不分区时低延迟为先』。社交、电商展示、IoT 数据收集。代价：写冲突要靠 LWW/CRDT 收敛，业务必须设计为可合并。</li>
+<li><strong>PC/EC</strong>：『一致性是底线，宁可不可用也不出错；正常时多花延迟换准确』。金融、库存、leader 选举、配置中心。代价：分区时单边不可写；跨区域写延迟 100+ ms。</li>
+</ul>
+<em>反模式：默认就上 PC/EC 给非关键数据</em>。把『社交评论』放 etcd 是工程灾难。</div>
+<pre><code># CAP 的常见误解逐一拆穿
+# ❌ "CAP 让我必须放弃一个" — 错. P 不是『可选』, 是物理事实.
+#    真实选择是: P 发生时, 你选 A 还是 C.
+# ❌ "我们选了 AP" — 太粗. AP 也分:
+#    - read AP, write CP (DynamoDB ConsistentWrite + EventualRead)
+#    - per-key 可配 (Cassandra LOCAL_QUORUM)
+# ❌ "CAP 是 2 选 1" — 错, 是 P 时 2 选 1; 平时还有 E (latency vs consistency).
+# ❌ "强一致 = 高延迟" — 跨区域才如此. 单 region Raft 多数派常 &lt; 5ms.
+# ❌ "Eventual = 数据会丢" — 错. eventual 只是『暂时不一致』, 最终收敛.
+#    数据丢失是『耐久性』(durability) 问题, 不是一致性问题.
+</code></pre>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Jepsen 报告颠覆官方宣传</strong>：<a href="https://jepsen.io/">aphyr.com/jepsen</a> 系列测出 MongoDB、Redis Sentinel、Galera、CockroachDB 等在分区下的真实行为，多次推翻产品文档；这是『PACELC 不能光听厂家说』的最佳教材。</li>
+<li><strong>Amazon DynamoDB</strong>：可调一致性，按 <em>每次请求</em> 决定走 eventual 还是 strong；purchase 走 strong，product list 走 eventual。</li>
+<li><strong>Stripe</strong>：账户与计费 PC/EC（Postgres 主从 + 多 AZ semi-sync）；事件日志与审计 PA/EL（Kafka + ClickHouse）。同公司不同子系统不同象限。</li>
+<li><strong>Cloudflare KV vs Durable Objects</strong>：KV 是 PA/EL（eventual，全球 60 秒收敛）；Durable Objects 是 PC/EC（单点强一致 + 跨区域路由）。文档明确告诉你『选错象限你会吃苦头』。</li>
+</ul></div>
+
+<h3>3. Causal Consistency：用 HLC 和 Version Vector 实现『因果序』</h3>
+<p><strong>原理</strong>：因果一致性保证『有因果关系的操作』被所有副本以相同顺序看到。形式定义来自 Lamport 1978 的 happens-before 关系（<code>a → b</code> 当且仅当 a 与 b 在同进程且 a 先发生，或 a 是 b 收到的消息）。</p>
+<p>工程实现两个主力：</p>
+<ul>
+<li><strong>Lamport timestamp</strong>：单整数，每次 op 递增；收消息时 <code>L = max(local, msg)+1</code>。能保 total order 但<em>无法</em>判断两个 op 是因果还是并发。</li>
+<li><strong>Version Vector / Vector Clock</strong>：每节点维护一个『各节点最后看到的版本』数组。可判断因果 vs 并发，但 size = O(节点数)，节点动态时维护复杂。</li>
+<li><strong>Hybrid Logical Clock (HLC)</strong>：物理时间 + 逻辑计数器组合，<code>(phys_time, logical)</code>。具备 vector clock 的因果性 + 接近 wall-clock 的可读性 + 常数 size。CockroachDB、YugabyteDB、MongoDB 5+ 都用 HLC。</li>
+</ul>
+<pre class="mermaid">
+sequenceDiagram
+    participant U as Alice (us-east)
+    participant US as Comments US
+    participant EU as Comments EU
+    participant V as Bob (eu-west)
+
+    Note over U,V: 因果场景: Bob 回复 Alice 的评论
+    U->>US: post "好看吗?" HLC=(t1, 0)
+    US->>EU: replicate (t1, 0)
+    EU->>V: read shows "好看吗?"
+    V->>EU: reply "好看" with deps=[(t1,0)] HLC=(t2, 0)
+    Note over EU: t2 > t1 保证因果
+    EU->>US: replicate reply with deps
+    Note over US: 收到 reply, 检查 deps<br/>若 (t1,0) 未到 → 暂存
+    US-->>U: 现在看 — 先看到"好看吗?", 再看到"好看" ✓
+
+    Note over U,V: 错误对比 (无 HLC, 异步复制):
+    Note over US: reply 可能先于 question 到达<br/>导致用户先看到回复, 后看到提问 ✗
+</pre>
+<pre><code># Hybrid Logical Clock (HLC) — 简化伪代码
+class HLC:
+    def __init__(self):
+        self.l = 0      # logical (max wall time seen so far)
+        self.c = 0      # counter to break ties
+
+    def now(self):     # local event (e.g. write)
+        pt = physical_time_ms()
+        if pt > self.l:
+            self.l, self.c = pt, 0
+        else:
+            self.c += 1
+        return (self.l, self.c)
+
+    def update(self, remote_l, remote_c):  # receiving msg
+        pt = physical_time_ms()
+        new_l = max(self.l, remote_l, pt)
+        if new_l == self.l == remote_l:
+            self.c = max(self.c, remote_c) + 1
+        elif new_l == self.l:
+            self.c += 1
+        elif new_l == remote_l:
+            self.c = remote_c + 1
+        else:
+            self.c = 0
+        self.l = new_l
+        return (self.l, self.c)
+
+# 性质:
+#  - 单调递增 (本地或外部触发都不会回退)
+#  - happens-before 关系保留: a→b ⇒ HLC(a) < HLC(b)
+#  - 接近 wall clock (差异 bounded by max clock skew)
+#  - 常数 size (8 bytes), 不像 vector clock 随节点数膨胀
+</code></pre>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>MongoDB 5.0+ Causal Consistency Session</strong>：客户端 session 携带 <code>operationTime</code>（即 HLC），读时 <code>afterClusterTime</code> 强制等齐，保证 RYW + monotonic + read-your-causal。</li>
+<li><strong>CockroachDB</strong>：每个事务带 HLC 时间戳，跨节点比较实现 serializable + 因果序，无需 GPS 钟。</li>
+<li><strong>Riak / Dynamo</strong>：dotted version vector（DVV），节点动态变化下也能正确合并。</li>
+<li><strong>COPS (Cluster of Order-Preserving Servers)</strong>：Lloyd 等 2011 提出的 causal+ 模型，社交网络场景的学术基线；Facebook TAO 借鉴。</li>
+<li><strong>Git</strong>：commit DAG 本质就是 version vector；merge 时自动检测并发分支并要求人工解决。</li>
+</ul></div>
+
+<h3>4. 工程落地：在同一系统里『按数据类型』切一致性</h3>
+<p><strong>原理</strong>：真实系统不会全用一种一致性。<em>按数据的『违反代价』分层</em>是核心方法论。</p>
+<div class="tradeoff">
+<strong>分层决策表（用 SLO/业务损失驱动）</strong>：
+<ul>
+<li><strong>违反 → 数据损坏 / 财务损失</strong>（库存、余额、唯一性）→ Linearizable / Serializable。Spanner / CockroachDB / Postgres 强约束。</li>
+<li><strong>违反 → 用户投诉 + 客服成本</strong>（我的订单看不到、我的评论消失）→ RYW + Monotonic。客户端 LSN/HLC token，零额外服务端代价。</li>
+<li><strong>违反 → 体验诡异但不报错</strong>（评论顺序乱）→ Causal。HLC + 依赖追踪。</li>
+<li><strong>违反 → 用户压根看不出来</strong>（商品浏览人数、推荐排序）→ Eventual。Redis / CDN / 异步索引。</li>
+</ul></div>
+<pre><code># 同一请求路径上按业务字段切一致性 (伪代码)
+
+# 场景: 用户在限量商品页点击"立即购买"
+def place_order(user, sku, qty):
+    # Step 1: 强一致 — 扣库存. 必须 linearizable.
+    #   走 Spanner / CockroachDB, 全球多数派, ~30ms 延迟可接受.
+    reserved = inventory_db.atomic_decrement(sku, qty)   # CP
+    if not reserved:
+        return "Sold out"
+
+    # Step 2: RYW — 写订单. session token 让用户立刻看到.
+    order = orders_db.insert(user, sku, qty)             # primary write
+    session.set_lsn(order.lsn)                            # 客户端带回
+
+    # Step 3: Eventual — 推荐 & 热度计数
+    fan_out_async("user.purchased", {user, sku})         # Kafka → 推荐/搜索
+    increment_counter_eventual(sku + ":popular", 1)      # Redis, 弱一致 OK
+
+    # Step 4: Causal — 通知 (用户的下游动作要保因果)
+    notify_with_hlc(user, "order_placed", deps=[order.hlc])
+
+    return order
+
+# 关键: "立即购买" 一个动作四种一致性, 因为业务诉求不同.
+# 一刀切走 Spanner: 慢. 一刀切走 Cassandra: 超卖.
+</code></pre>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Stripe 支付</strong>：交易（CP/EC，Postgres + idempotency key）+ 事件流（PA/EL，Kafka + Outbox）+ 报表（最终一致，ClickHouse）三层分明。</li>
+<li><strong>Shopify Storefront</strong>：库存扣减 strong（MySQL row lock + 全局序列号）；商品页 eventual（Fastly CDN，60s TTL）；订单状态 RYW（cookie 带 last-update-token）。</li>
+<li><strong>Twitter Timeline</strong>：用户自己刚发推 → 强制读 leader 5 秒（RYW）；他人推 → 走 fan-out async（eventual）；点赞计数 → eventual + 周期重算。</li>
+<li><strong>Notion / Linear</strong>：文档内容 CRDT 协作（causal+eventual）；权限/付费 strong（Postgres）；评论按文档分区，文档内 causal、文档间 eventual。</li>
+</ul></div>
+
+<h2>扩展与优化</h2>
+<ul>
+<li><strong>Bounded Staleness（有界陈旧）</strong>：『读至多 X 秒前的数据』。比纯 eventual 严格，比 strong 廉价。Cosmos DB / Aurora Global Database / CockroachDB 都支持。适合 dashboard、analytics、地理就近读。</li>
+<li><strong>客户端 SDK 内置 token 路由</strong>：MongoDB、Vitess、Aurora 都让 SDK 自动管理 session LSN；业务无感即可获得 RYW。这是『把一致性从基础设施挪到 SDK 层』的趋势。</li>
+<li><strong>多模一致性 (Tunable Consistency)</strong>：Cassandra 的 <code>ONE/QUORUM/ALL</code>、DynamoDB 的 <code>ConsistentRead</code> 按请求选；让业务对每个查询独立决策，而非建多套数据库。</li>
+<li><strong>Read-only follower 的 follower read</strong>：CockroachDB / TiDB 支持『落后 5 秒的副本响应只读』，避开多数派 RTT；适合 BI 查询、地理就近读。</li>
+<li><strong>Linearizable 的 fallback</strong>：当 quorum 不可达，是 fail-stop（推荐）还是 fail-open（危险）？etcd、ZooKeeper 都选 fail-stop——这就是 PC/EC 的『C』。如果业务接受不了，就别选 PC，去选 PA。</li>
+</ul>
+
+<h2>常见陷阱与面试问题</h2>
+<div class="callout">
+<strong>1. 把 strong consistency 当默认</strong>：上来就 Spanner / Raft，结果跨区域写 200ms。先问『违反一致性的代价是什么』，再选模型。</div>
+<div class="callout">
+<strong>2. 误把 ACID 等于强一致</strong>：ACID 是单库事务保证；分布式『C』是跨节点保证。Postgres 单机有 ACID，但跨副本可能是 eventual——别混。</div>
+<div class="callout">
+<strong>3. 用墙钟实现 ordering</strong>：分布式系统时钟漂移 1-100ms，NTP 也无法保证单调。用 HLC / Lamport / version vector，不要 <code>time.time()</code>。</div>
+<div class="callout">
+<strong>4. 以为 quorum (W+R&gt;N) = linearizable</strong>：Dynamo-style quorum 在 sloppy quorum + hinted handoff 下可破坏 linearizable。真正 linearizable 需要 read-repair + leader 或 consensus（Raft/Paxos）。</div>
+<div class="callout">
+<strong>5. 客户端缓存破坏 monotonic read</strong>：浏览器缓存了较旧的页面，刷新看见 stale 数据看似系统倒退。前端也是一致性域的一部分，记得清缓存或 ETag。</div>
+<p><strong>面试可能追问：</strong></p>
+<ol>
+<li>用 30 秒解释 linearizable、sequential、causal 三者的差异，举各自的『违反场景』。</li>
+<li>你的系统要『库存不超卖 + 评论顺序对 + 推荐快』，画出每一部分的一致性选型与理由。</li>
+<li>CAP 定理常被批评为『过时』，PACELC 解决了什么？为什么 99% 时间在 E 而不是 P？</li>
+<li>解释 Hybrid Logical Clock 比 Lamport timestamp 和 Vector Clock 各强在哪？size、可读性、因果判断？</li>
+<li>Spanner 为什么能号称『全球 linearizable』？TrueTime 的 ε 是怎么影响 commit 等待时间的？没有 GPS 钟怎么做（CockroachDB）？</li>
+</ol>
+
+<h2>深入资源</h2>
+<ul>
+<li><strong>《Designing Data-Intensive Applications》Ch 5 §一致性 + Ch 9 §Consistency and Consensus</strong>（Kleppmann）：本主题最完整的工业级讨论。</li>
+<li><strong>Daniel Abadi — "Consistency Tradeoffs in Modern Distributed Database Design"</strong>（2012, IEEE Computer）：PACELC 原始论文，6 页读完。</li>
+<li><strong>Spanner: Google's Globally-Distributed Database</strong>（OSDI 2012）：TrueTime + external consistency 的奠基。</li>
+<li><strong>Logical Physical Clocks and Consistent Snapshots in Globally Distributed Databases</strong>（Kulkarni et al. 2014）：HLC 原始论文。</li>
+<li><strong>Jepsen — aphyr.com/jepsen</strong>：MongoDB / etcd / Galera / CockroachDB 等的真实分区行为测试，揭穿厂家宣传。</li>
+<li><strong>Peter Bailis — "Highly Available Transactions: Virtues and Limitations"</strong>（VLDB 2014）：哪些隔离/一致性可在分区下达成。</li>
+<li><strong>Marc Brooker 博客 — brooker.co.za</strong>：AWS 资深工程师的一致性/可用性短文，工程视角极佳。</li>
+<li><strong>Werner Vogels — "Eventually Consistent" (ACM Queue 2008)</strong>：Amazon CTO 解释为什么 eventual 不可怕。</li>
+</ul>
+
+<h2>深入思考</h2>
+
+<details>
+<summary>1. 同一笔『购物结账』，库存走 Linearizable、订单走 RYW、推荐走 Eventual。如果某天产品经理说『订单也走 Linearizable 吧，安全点』，你怎么劝？给数字。</summary>
+<div class="answer">
+<p>这是典型的『把一致性当默认护身符』的反模式。回答需要把<strong>代价用数字摊给业务看</strong>，不能讲『工程上更难』这种听不进去的话。</p>
+<p><strong>第一步：定位订单的一致性诉求到底是什么。</strong></p>
+<ul>
+<li>用户写了订单要立刻看到 → RYW（session token 即可）</li>
+<li>订单状态不能回退 → Monotonic Read（同上）</li>
+<li>同一订单的支付、发货、退款保持因果 → Causal（HLC 即可）</li>
+<li>『跨用户的订单顺序』是否必须全局一致？答案是：<em>不</em>。用户 A 看到自己的订单顺序、用户 B 看自己的，互不影响。</li>
+</ul>
+<p>所以 Linearizable 是过度承诺——它要求『全局观察者按 wall-clock 看到所有订单顺序一致』，而业务根本不消费这个保证。</p>
+<p><strong>第二步：数字化代价。</strong>假设当前 Postgres semi-sync 主从（PA/EC，跨 AZ 5ms commit），写延迟 P50=8ms / P99=25ms。换 Spanner-style 全球 linearizable：</p>
+<ul>
+<li>每次写需要跨区域多数派 ACK + TrueTime commit wait（约 7ms）。<strong>P50 涨到 ~80ms（跨洋 RTT），P99 ~200ms</strong>。</li>
+<li>20k QPS 下单（按场景）→ 用户感知延迟从『几乎瞬时』变成『明显卡顿』，结账转化率历史经验下降 5-15%（Amazon 100ms = 1% revenue 那条法则）。</li>
+<li>基础设施成本：Spanner-class 数据库 + 全球节点是单 region Postgres 的 5-10 倍。</li>
+<li>研发：跨区域强一致写 + idempotency + retry 设计远复杂；事故诊断也更难。</li>
+</ul>
+<p><strong>第三步：给替代方案。</strong>真正解决 PM 的『安全』焦虑：</p>
+<ol>
+<li>订单写主 Postgres，semi-sync 至少 1 副本 ACK → RPO ≈ 0。</li>
+<li>客户端带 LSN token → RYW + monotonic 保证。</li>
+<li>关键状态变更（待支付→已支付）用 idempotency key 防重；事件流走 Outbox 模式 → 0 数据丢失。</li>
+<li>对账定时跑：订单总额 = 库存出货 × 单价 ± 退款。任何差异告警。</li>
+</ol>
+<p><em>劝说金句</em>：『订单系统的安全不是来自更强的一致性模型，而是来自<strong>正确的故障模型 + 对账机制</strong>。Linearizable 解决不了你真正担心的"丢订单"——那是 durability 问题不是 consistency 问题』。这一句把术语层级捋清，PM 通常就听懂了。</p>
+</div>
+</details>
+
+<details>
+<summary>2. Spanner 的 TrueTime ε（不确定性）大约 7ms。如果某天 GPS 信号被干扰，ε 涨到 200ms，会发生什么？为什么这是『安全降级』而不是『错误』？</summary>
+<div class="answer">
+<p>这道题考察对 <strong>commit-wait</strong> 机制的深入理解。Spanner 保 external consistency 的关键是：每个事务在分配 commit timestamp <code>t</code> 后，<em>等待真实时间过了 t+ε 才让结果可见</em>。这样保证『所有外部观察者看到的事务顺序匹配真实时间序』。</p>
+<p><strong>ε 涨到 200ms 时</strong>：</p>
+<ul>
+<li>每次事务多等 ~200ms。<strong>吞吐量直接砍掉一大块</strong>，P99 延迟雪崩。</li>
+<li>但 <em>正确性不受影响</em>——这是关键。Spanner 选择『慢但对』（PC/EC），不会因为 ε 大就放弃 linearizable 承诺。</li>
+<li>系统会触发监控告警，运维介入；如果 GPS 修复，ε 回到 7ms 性能自然恢复。</li>
+</ul>
+<p><strong>为什么是安全降级</strong>：ε 是『clock 不确定性的上界』，Spanner 永远假设最坏情况。ε 大只是『我们承认时钟不准』，commit wait 兜底保证语义。这与『时钟错了但系统不知道』是天壤之别——后者会破坏一致性。</p>
+<p><strong>对比 CockroachDB（无 TrueTime）</strong>：用 HLC + max_offset（默认 500ms）兜底，超过 max_offset 的事务会冲突重试。没有 GPS 钟也能保 serializable，但代价是 max_offset 设得保守，跨区域延迟更高。这是『工程妥协 vs 硬件投资』的经典对比。</p>
+<p><strong>更深的洞察</strong>：Spanner 把『时钟不确定性』变成『等待时间』——把一个看似无解的物理问题（时钟同步）转化为一个工程可量化的资源（等待）。这是分布式系统设计美学的高峰：<em>不和物理对抗，而是把物理量纳入抽象</em>。HLC 是同一思路的更便宜版本（用 logical counter 弥补 clock skew）。</p>
+<p>所以这道题的『正确答案』不是『Spanner 完了』，而是『Spanner 用更慢换正确，这恰恰证明它的设计哲学』。</p>
+</div>
+</details>
+
+<details>
+<summary>3. 跨章节：Day 4 (Sharding) + Day 5 (Replication) + Day 6 (Consistency) 一起部署。一个『分片 + 多副本』的 OLTP，怎么在 shard 之间做强一致？为什么 2PC 在这里效率很差，而 deterministic transaction 是 trend？</summary>
+<div class="answer">
+<p>这是分布式数据库的核心难题。把三个维度叠加：</p>
+<ul>
+<li><strong>分片内</strong>：单 shard 多副本，Raft / Paxos 多数派达成 linearizable（CockroachDB、TiKV、Spanner 都这么干）。</li>
+<li><strong>跨分片</strong>：一个事务可能涉及多 shard（如『从用户 A 账户转 100 到用户 B』，A、B 在不同 shard）。</li>
+</ul>
+<p><strong>传统方案：2PC（Two-Phase Commit）</strong></p>
+<ul>
+<li>Phase 1: coordinator 让所有 shard prepare（锁记录、写 prepare log）</li>
+<li>Phase 2: 全 yes → commit，任一 no → abort</li>
+<li><em>问题</em>：（a）coordinator 是单点；（b）prepare 阶段所有 shard 锁记录，期间任何分片不可服务这些行；（c）协调者挂在 phase 1 与 phase 2 之间 → 阻塞所有参与者；（d）2 个 RTT × N 分片 = 高延迟。</li>
+</ul>
+<p><strong>现代改进：</strong></p>
+<ol>
+<li><strong>Spanner / CockroachDB 的 2PC + Paxos</strong>：coordinator 角色由 Paxos group 担任（高可用）；每个 shard 自己也是 Paxos group。仍是 2PC 但参与者都是高可用 group——慢但不阻塞。</li>
+<li><strong>Calvin / FaunaDB 的 deterministic transactions</strong>：先用全局序列器（log）对所有事务定一个总序，所有节点按相同序执行 → 不需要锁、不需要 2PC，只要每个节点跑出来结果一定相同。<em>优势</em>：吞吐量极高；<em>代价</em>：写要先经全局 log（latency 由 log fan-in 决定），读写要 deterministic（不能依赖随机数/外部 IO）。</li>
+<li><strong>Saga 模式</strong>（微服务常用）：把跨 shard 事务拆成多个本地事务 + 补偿。不是 ACID，是『最终一致 + 补偿』。代价：业务必须设计补偿逻辑（退款、回滚库存）。Day 7 详谈。</li>
+</ol>
+<p><strong>Trend 是 deterministic 路线</strong>，因为：</p>
+<ul>
+<li>云时代『全球序列器』变便宜了（Kafka、Raft log），瓶颈不再是 single coordinator；</li>
+<li>2PC 的根本问题（锁 + 阻塞）无法靠工程优化掉，只能换范式；</li>
+<li>determinism 给 replay / 故障恢复 / 跨区域复制带来额外好处（可重放即正确）。</li>
+</ul>
+<p><strong>面试金句</strong>：『2PC 不是错，是不够好。分布式事务的未来要么走 deterministic（强语义、高吞吐），要么承认 Saga（弱语义、业务补偿），混着用 2PC 是技术债』。</p>
+</div>
+</details>
+
+<details>
+<summary>4. 『读自己写』听起来朴素，但在『用户 A 用手机写，立刻用电脑读』场景下，session 粘性失效。给 3 种工程解法 + 各自代价。</summary>
+<div class="answer">
+<p>这是『跨设备一致性』经典难题，session sticky 失效是因为 sticky 通常按 IP 或 cookie 路由，跨设备就跨了。</p>
+<p><strong>解法 1：账号级别 last-write LSN（推荐）</strong></p>
+<ul>
+<li>用户每次写，服务端记 <code>users.last_write_lsn = max(current, new_lsn)</code> 到 Redis / Postgres。</li>
+<li>用户任何设备读，先查 <code>user.last_write_lsn</code>；副本若落后于这个 LSN，等待或转主。</li>
+<li><em>代价</em>：每次读多一次 Redis lookup（&lt; 1ms）。Redis 故障时降级『直接读主』。</li>
+<li><em>优点</em>：跨设备语义清晰；账号级粒度比 session 粒度更符合用户心智模型。</li>
+</ul>
+<p><strong>解法 2：客户端 token + 服务端等待（适合实时性高的场景）</strong></p>
+<ul>
+<li>写后服务端返回 LSN/HLC token，客户端存到本地。</li>
+<li>读时 SDK 自动带 token；如果跨设备没有 token 怎么办？降级为读主。</li>
+<li><em>代价</em>：跨设备退化为强一致读，主库压力。</li>
+<li><em>适用</em>：移动 app 单设备主要使用，跨设备是次要场景。</li>
+</ul>
+<p><strong>解法 3：『写延迟可见』容忍化（产品侧解法）</strong></p>
+<ul>
+<li>承认跨设备会有 1-2 秒 lag，用 UI 设计兜底——『正在同步…』、『下拉刷新』、push 通知到另一设备。</li>
+<li>把不一致变成 UX 而非 bug。</li>
+<li><em>代价</em>：产品体验；某些场景（金融、医疗）不能接受。</li>
+<li><em>适用</em>：Notion / Apple Notes / Dropbox 都这么做——『最终一致 + 同步提示』。</li>
+</ul>
+<p><strong>组合方案</strong>：账号级 LSN + UX 兜底。账号级 LSN 解决 95% 场景（&lt; 1 秒可读），剩下 5%（Redis 慢、副本严重 lag）UX 提示『同步中』。<em>纯技术 100% 解决不一致是不经济的</em>。</p>
+<p><strong>更深的洞察</strong>：跨设备『读自己写』本质是『用户身份在多个会话中表达』，不是分布式系统问题，是『用户身份建模』问题。最优解通常是<em>把『用户的当前状态』作为 first-class entity</em> 持久化（user.last_write_lsn），而不是让每个 session 自己管。这思路推广到 multi-tenant、跨设备同步、协作场景都适用。</p>
+</div>
+</details>
+
+<details>
+<summary>5. 反直觉：在『可用性 5 个 9』和『强一致』之间，业务为什么常常应该选可用性？给一个『选强一致结果灾难』的真实推演。</summary>
+<div class="answer">
+<p>工程师本能倾向强一致——『数据对就是底线』。但产品视角看：<em>用户体验到的 SLA 是『系统可用 × 数据正确』的乘积</em>。如果一致性带来频繁不可用，乘积反而更小。</p>
+<p><strong>真实推演：某社交 app 跨区域强一致评论系统</strong></p>
+<ul>
+<li>选型：评论走 Spanner-style 全球 linearizable。理由：『评论顺序不能乱』。</li>
+<li>正常运行：欧亚用户评论 P99 延迟 300ms（跨洋多数派）。用户感觉『发评论好慢』，参与度 -8%。</li>
+<li>某次 us-east ↔ eu-west 网络分区（一年 ~2 次，每次 5-30 分钟）：</li>
+<ul>
+<li>欧洲多数派不可达 → 欧洲用户无法发评论。</li>
+<li>用户看到错误页 / 旋转加载。投诉飙升。</li>
+<li>客服成本飙升、社交媒体差评涌现、当日 DAU 下降。</li>
+</ul>
+<li>事故后复盘：『评论顺序乱』这个所谓的核心需求，用户实际并不感知——本来 timeline 已经按时间近似排序，因果序错乱 1-2 条的概率极低且不致命。</li>
+<li>重选：改 causal+eventual。分区时双边都可写、合并时按 HLC 排序。年均不可用从 60 分钟降到 0；体验流畅；数据『偶尔乱序』完全在用户容忍范围内。</li>
+</ul>
+<p><strong>反直觉的逻辑</strong>：</p>
+<ol>
+<li>『一致性违反』通常是<em>软伤害</em>（用户看到稍微乱序、稍微旧的数据），而<em>不可用是硬伤害</em>（用户什么都看不到、什么都做不了）。</li>
+<li>用户对『一致性 bug』的忍耐度极高（『刷一下就好了』）；对『不可用』的忍耐度极低（『这个 app 烂』）。</li>
+<li>强一致代价是分布式系统中最贵的——它要求多数派同步、跨区域 RTT、协调开销，常常吃掉一个数量级的吞吐和延迟预算。</li>
+</ol>
+<p><strong>哪些场景仍必须强一致</strong>：</p>
+<ul>
+<li>钱（账户、计费、定价）；</li>
+<li>唯一性（用户名、订单号、库存）；</li>
+<li>状态机的关键转换（已支付 vs 未支付）；</li>
+<li>配置 / 权限（错了影响全局行为）。</li>
+</ul>
+<p><strong>金句</strong>：『强一致是为<em>正确性的硬约束</em>买单，不是为"心里舒坦"买单。Spanner 和 Cassandra 不是好坏关系，是适用场景关系。一个有经验的架构师在每个数据域上都做单独决策，而非"全系统强一致"或"全系统最终一致"』。</p>
+<p>这也是 CLAUDE.md 强调的『追求超级个体』在系统设计层的体现：<em>把『默认安全』替换为『精确选择』</em>——技术决策的成熟标志。</p>
+</div>
+</details>
+
+</div></body></html>
