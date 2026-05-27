@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 7 · Distributed Transactions — System Design Bi-daily</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"SF Pro Display","Noto Sans SC",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
+.container{max-width:820px;margin:0 auto;padding:24px 20px 60px}
+header{padding:40px 0 28px;border-bottom:1px solid rgba(100,200,255,0.15);margin-bottom:32px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem}
+.tag{padding:3px 10px;border-radius:4px;background:rgba(100,200,255,0.12);color:#64c8ff;border:1px solid rgba(100,200,255,0.25)}
+.tag.diff{background:rgba(94,234,212,0.1);color:#5eead4;border-color:rgba(94,234,212,0.3)}
+.tag.day{background:rgba(255,180,80,0.1);color:#ffb450;border-color:rgba(255,180,80,0.25)}
+h1{font-size:1.75rem;font-weight:800;background:linear-gradient(135deg,#64c8ff 0%,#5eead4 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:0.5px;line-height:1.3}
+h1 .en{display:block;font-size:1rem;color:#7a8590;-webkit-text-fill-color:#7a8590;margin-top:6px;font-weight:500}
+h2{font-size:1.2rem;color:#5eead4;margin:36px 0 14px;padding-left:12px;border-left:3px solid #5eead4}
+h3{font-size:1rem;color:#64c8ff;margin:20px 0 10px;font-weight:600}
+p{margin:10px 0;color:#c8cfd6}
+ul,ol{margin:10px 0 10px 22px;color:#c8cfd6}
+li{margin:6px 0}
+strong{color:#e8eef5;font-weight:600}
+em{color:#5eead4;font-style:normal;font-weight:500}
+code{font-family:"SF Mono",Menlo,Consolas,monospace;background:rgba(100,200,255,0.1);color:#5eead4;padding:1px 6px;border-radius:3px;font-size:0.88em}
+pre{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:14px 16px;overflow-x:auto;margin:12px 0;font-family:"SF Mono",Menlo,Consolas,monospace;font-size:0.84rem;line-height:1.55;color:#c8cfd6}
+pre code{background:none;color:inherit;padding:0;font-size:1em}
+.mermaid{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:18px;margin:14px 0;text-align:center;overflow-x:auto;cursor:zoom-in;transition:border-color 0.15s}
+.mermaid:hover{border-color:rgba(100,200,255,0.4)}
+.mermaid svg{width:100%;max-width:100%;height:auto;min-height:280px}
+.lightbox{position:fixed;inset:0;background:rgba(8,12,18,0.96);z-index:9999;display:none;align-items:center;justify-content:center;padding:24px;cursor:grab;backdrop-filter:blur(4px);overflow:hidden}
+.lightbox.open{display:flex}
+.lightbox.dragging{cursor:grabbing}
+.lightbox svg{width:auto;height:auto;max-width:96vw;max-height:92vh;transform-origin:center center;will-change:transform}
+.lightbox .hint{position:fixed;top:16px;right:20px;font-size:0.78rem;color:#7a8590;font-family:"SF Mono",Menlo,monospace;pointer-events:none}
+.callout{background:rgba(255,180,80,0.06);border-left:3px solid #ffb450;padding:12px 14px;margin:14px 0;border-radius:4px;font-size:0.94rem}
+.callout strong{color:#ffb450}
+.tradeoff{background:rgba(100,200,255,0.05);border:1px solid rgba(100,200,255,0.2);border-radius:6px;padding:12px 14px;margin:12px 0;font-size:0.94rem}
+.case{background:rgba(94,234,212,0.05);border-left:3px solid #5eead4;padding:12px 14px;margin:12px 0;border-radius:4px;font-size:0.94rem}
+.case strong{color:#5eead4}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:0.9rem}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid rgba(100,200,255,0.15)}
+th{color:#64c8ff;font-weight:600;background:rgba(100,200,255,0.05)}
+details{background:rgba(100,200,255,0.04);border:1px solid rgba(100,200,255,0.18);border-radius:6px;padding:12px 16px;margin:10px 0;transition:all 0.15s}
+details:hover{border-color:rgba(100,200,255,0.35)}
+details[open]{background:rgba(94,234,212,0.05);border-color:rgba(94,234,212,0.3)}
+details summary{font-weight:600;color:#e8eef5;list-style:none;outline:none;cursor:pointer;display:flex;align-items:flex-start;gap:10px;font-size:0.96rem}
+details summary::-webkit-details-marker{display:none}
+details summary::before{content:'▶';color:#64c8ff;font-size:0.75em;transition:transform 0.2s;flex-shrink:0;margin-top:5px}
+details[open] summary::before{transform:rotate(90deg);color:#5eead4}
+details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
+details .answer ul,details .answer ol{margin:6px 0 6px 22px}
+@media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+</style>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({startOnLoad:true,theme:'base',flowchart:{useMaxWidth:true,htmlLabels:true,nodeSpacing:50,rankSpacing:60},themeVariables:{primaryColor:'#1a2530',primaryTextColor:'#e8eef5',primaryBorderColor:'#64c8ff',lineColor:'#5eead4',secondaryColor:'#0e1419',tertiaryColor:'#0a0f14',background:'#0a0f14',mainBkg:'#1a2530',secondBkg:'#0e1419',textColor:'#d4dae0',fontFamily:'-apple-system,"SF Pro Display",sans-serif',fontSize:'16px'}});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const lb=document.createElement('div');lb.className='lightbox';
+  lb.innerHTML='<span class="hint">scroll = zoom · drag = pan · Esc / click bg = close</span>';
+  document.body.appendChild(lb);
+  let scale=1,panX=0,panY=0,dragging=false,moved=false,lx=0,ly=0;
+  const apply=()=>{const s=lb.querySelector('svg');if(s)s.style.transform=`translate(${panX}px,${panY}px) scale(${scale})`};
+  const reset=()=>{scale=1;panX=0;panY=0};
+  const close=()=>{lb.classList.remove('open');const s=lb.querySelector('svg');if(s)s.remove();reset()};
+  document.addEventListener('click',e=>{
+    if(e.target.closest('.lightbox')){if(moved){moved=false;return}close();return}
+    const w=e.target.closest('.mermaid');if(!w)return;
+    const svg=w.querySelector('svg');if(!svg)return;
+    const c=svg.cloneNode(true);c.removeAttribute('style');
+    c.style.maxWidth='96vw';c.style.maxHeight='92vh';
+    lb.appendChild(c);lb.classList.add('open');reset();apply();
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+  lb.addEventListener('wheel',e=>{
+    if(!lb.classList.contains('open'))return;
+    e.preventDefault();
+    const svg=lb.querySelector('svg');if(!svg)return;
+    const ns=Math.max(0.3,Math.min(10,scale*(1-e.deltaY*0.002)));
+    const r=svg.getBoundingClientRect();
+    const cx=e.clientX-(r.left+r.width/2),cy=e.clientY-(r.top+r.height/2);
+    const k=ns/scale-1;panX-=cx*k;panY-=cy*k;scale=ns;apply();
+  },{passive:false});
+  lb.addEventListener('mousedown',e=>{
+    if(!lb.classList.contains('open'))return;
+    dragging=true;moved=false;lx=e.clientX;ly=e.clientY;lb.classList.add('dragging');e.preventDefault();
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    const dx=e.clientX-lx,dy=e.clientY-ly;
+    if(Math.abs(dx)+Math.abs(dy)>3)moved=true;
+    panX+=dx;panY+=dy;lx=e.clientX;ly=e.clientY;apply();
+  });
+  document.addEventListener('mouseup',()=>{dragging=false;lb.classList.remove('dragging')});
+});
+</script>
+</head><body><div class="container">
+
+<header>
+<div class="meta">
+<span class="tag day">Day 7</span>
+<span class="tag diff">Hard</span>
+<span class="tag">Distributed Systems</span>
+<span class="tag">Transactions</span>
+<span class="tag">Saga / Outbox</span>
+<span class="tag">Microservices</span>
+</div>
+<h1>Distributed Transactions — Don't. And if you must, keep them tiny.<span class="en">2PC / 3PC · Saga (Orchestration vs Choreography) · Transactional Outbox · Idempotency · Why Microservices Avoid Distributed Transactions</span></h1>
+</header>
+
+<h2>Scenario &amp; Constraints</h2>
+<p>Design a cross-border e-commerce <strong>checkout</strong> flow. A single checkout must complete 5 things at once:</p>
+<ol>
+<li><strong>Order service</strong> writes the order (own Postgres)</li>
+<li><strong>Inventory service</strong> decrements stock (own Postgres)</li>
+<li><strong>Payment service</strong> calls Stripe to charge (external API, <em>not rollbackable</em>)</li>
+<li><strong>Points service</strong> deducts loyalty points (own DynamoDB)</li>
+<li><strong>Notification service</strong> sends email + push (external SES / FCM)</li>
+</ol>
+<p>Scale: <strong>5k peak TPS checkout</strong>, <strong>P99 ≤ 800ms</strong> end-to-end, <strong>0 oversells, 0 duplicate charges</strong>. The 5 services are owned by 5 teams with <em>no shared database</em>. Every intermediate step may fail: service crash, network partition, Stripe 504, message loss.</p>
+<p>Question: how do these 5 steps guarantee "all succeed or none happen (or compensate observably)"? This is the <strong>distributed transactions</strong> problem. Today: why textbook 2PC/3PC is almost never used in production, how Saga actually lands, how Outbox solves dual-write, and why <em>"the best distributed transaction is none at all."</em></p>
+
+<h2>High-level Architecture</h2>
+<pre class="mermaid">
+graph TD
+    Client["Client"]
+    Orch["Saga Orchestrator<br/><i>Temporal / Cadence<br/>persists every step</i>"]
+
+    subgraph S1["Order Domain"]
+        OrdSvc["Order Service"]
+        OrdDB[("Postgres<br/>orders + outbox")]
+    end
+    subgraph S2["Inventory Domain"]
+        InvSvc["Inventory Service"]
+        InvDB[("Postgres<br/>reservations + outbox")]
+    end
+    subgraph S3["Payment Domain"]
+        PaySvc["Payment Service"]
+        Stripe["Stripe API<br/><i>external, not rollbackable</i>"]
+    end
+    subgraph S4["Points Domain"]
+        PtsSvc["Points Service"]
+        PtsDB[("DynamoDB<br/>+ idempotency table")]
+    end
+    subgraph S5["Notification Domain"]
+        Notify["Notify Service"]
+    end
+
+    CDC["Debezium CDC<br/><i>reads outbox table</i>"]
+    Kafka["Kafka<br/>order.events"]
+
+    Client --> Orch
+    Orch -->|1 createOrder| OrdSvc
+    Orch -->|2 reserveStock| InvSvc
+    Orch -->|3 charge| PaySvc
+    Orch -->|4 deductPoints| PtsSvc
+    Orch -.->|5 async notify| Kafka
+    OrdSvc --> OrdDB
+    InvSvc --> InvDB
+    PaySvc --> Stripe
+    PtsSvc --> PtsDB
+
+    OrdDB -.-> CDC
+    InvDB -.-> CDC
+    CDC --> Kafka
+    Kafka --> Notify
+
+    classDef orch fill:#2a1530,stroke:#ff7ab6,color:#e8eef5
+    classDef ext fill:#3a2010,stroke:#ffb450,color:#e8eef5
+    class Orch orch
+    class Stripe ext
+</pre>
+<p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px"><strong>Core idea</strong>: a Saga (Temporal/Cadence) chains the 5 steps; each is a local transaction with a reverse compensation on failure. Event fan-out goes through Outbox + CDC (DB commit ⇒ Kafka emit is guaranteed). Weak-transaction work like notifications goes eventual. The whole system has <em>zero 2PC</em>.</p>
+
+<h2>Key Techniques</h2>
+
+<h3>1. 2PC / 3PC: textbook answer, production liability</h3>
+<p><strong>Mechanism</strong>: Two-Phase Commit uses a <em>coordinator</em> to orchestrate multiple <em>participants</em>:</p>
+<ul>
+<li><strong>Phase 1 (prepare)</strong>: coordinator asks all participants "can you commit?"; each writes a prepare log + locks resources, replies yes/no.</li>
+<li><strong>Phase 2 (commit/abort)</strong>: all yes → commit all; any no → abort all.</li>
+</ul>
+<p>Correctness gives ACID atomicity across nodes. But:</p>
+<div class="tradeoff">
+<strong>2PC's three fatal flaws</strong>
+<ul>
+<li><strong>Blocking</strong>: after prepare, participants must wait for the coordinator's decision. If the coordinator crashes between phase 1 and phase 2, <em>all participants hold locks indefinitely</em>; affected rows/resources are inaccessible to any other transaction. 3PC adds a pre-commit phase to mitigate, but requires more round trips and assumes synchronous networks (unrealistic), so <strong>almost no one runs 3PC in production</strong>.</li>
+<li><strong>Performance</strong>: 2 RTTs × N participants + multiple disk fsyncs. Cross-service latency jumps from 5ms to 50-200ms; throughput halves.</li>
+<li><strong>Heterogeneous systems</strong>: Stripe doesn't expose prepare/commit; sent emails can't roll back. <em>Most real-world side effects are inherently non-rollbackable.</em></li>
+</ul>
+<strong>Who still uses 2PC</strong>: legacy enterprise XA (Oracle + MQ + another Oracle, one DBA team); distributed-DB internals (Spanner uses 2PC for cross-shard, but each participant is itself a Paxos group, so no single-point block). <em>Across microservices or external APIs → never 2PC.</em>
+</div>
+<pre><code># 2PC disaster — why Pat Helland called it a "Maginot Line"
+# T = 0    coord -> all: PREPARE
+# T = 10ms all -> coord: YES (each locks resources, writes prepare log)
+# T = 11ms coord crashes ⚠
+# T = ∞    participants hold locks waiting for coord to recover
+#          other transactions blocked, business halts
+#
+# Even when coord restarts, it must replay its transaction log
+# before deciding; participants stay locked. This is the worst
+# failure mode in distributed systems: "one process death stalls
+# the entire system."
+</code></pre>
+<div class="case">
+<strong>Real cases</strong>:
+<ul>
+<li><strong>Pat Helland (Microsoft / Salesforce / Amazon)</strong> — <a href="https://queue.acm.org/detail.cfm?id=3025012">"Life Beyond Distributed Transactions" (ACM Queue 2017, originally CIDR 2007)</a>: the industry's seminal argument that large-scale systems cannot rely on distributed transactions, launching the saga / messaging / entity school of thought.</li>
+<li><strong>Google Spanner</strong>: uses 2PC across shards, but coordinator and participants are Paxos groups (highly available) — single-node failure doesn't block. A rare "2PC done right."</li>
+<li><strong>MySQL XA</strong>: supports XA, but <em>the official docs warn</em> about prepare-after-commit edge cases between binlog and InnoDB; large internet companies have largely abandoned it.</li>
+<li><strong>Java JTA / Atomikos</strong>: J2EE-era pattern for DB + JMS transactions; cloud-native era has replaced it with Saga + Outbox.</li>
+</ul></div>
+
+<h3>2. Saga: break one big transaction into N local transactions + N-1 compensations</h3>
+<p><strong>Origin</strong>: Garcia-Molina &amp; Salem introduced <em>Saga</em> at SIGMOD 1987, originally for "long-running transactions inside a single DB" (to avoid long-held locks). Microservices adopted it: <strong>split a cross-service transaction into a chain of local transactions T1…Tn; if any Ti fails, execute compensations C(i-1)…C1 in reverse order for completed steps</strong>.</p>
+<p>You lose ACID isolation but gain <em>eventual consistency + business-level reversibility</em>. Two landing patterns:</p>
+<table>
+<thead><tr><th>Pattern</th><th>Coordinator</th><th>Pros</th><th>Cons</th><th>Use when</th></tr></thead>
+<tbody>
+<tr><td><strong>Orchestration</strong></td><td>Central orchestrator (Temporal / Cadence / Step Functions) explicitly calls each step</td><td>Logic is centralized and readable; clear compensation path; easy to debug/visualize</td><td>Orchestrator is a new component to operate; could become a bottleneck</td><td>Many steps (≥4), complex compensations, audit needs</td></tr>
+<tr><td><strong>Choreography</strong></td><td>No center; services subscribe to events and act</td><td>Fully decoupled; no single point</td><td>Flow is scattered across services; one change affects N services; hard to trace</td><td>Few steps (≤3), naturally event-driven within a bounded context</td></tr>
+</tbody></table>
+<pre class="mermaid">
+sequenceDiagram
+    participant C as Client
+    participant O as Orchestrator (Temporal)
+    participant Ord as Order Svc
+    participant Inv as Inventory Svc
+    participant Pay as Payment (Stripe)
+    participant Pts as Points Svc
+
+    C->>O: placeOrder()
+    O->>Ord: 1 createOrder (PENDING)
+    Ord-->>O: orderId=42
+    O->>Inv: 2 reserveStock(sku, qty)
+    Inv-->>O: reserved
+    O->>Pay: 3 charge($100, idempKey=42)
+    Pay-->>O: paid (charge_xyz)
+    O->>Pts: 4 deductPoints(user, 50, idempKey=42)
+    Pts--xO: fail! insufficient points
+    Note over O: Saga reverse compensations
+    O->>Pay: C3 refund(charge_xyz, idempKey=42-refund)
+    O->>Inv: C2 releaseStock(sku, qty, idempKey=42-rel)
+    O->>Ord: C1 markFailed(42, reason="points")
+    O-->>C: failed: insufficient points, fully rolled back
+</pre>
+<pre><code># Temporal Workflow-style pseudocode (Python SDK)
+@workflow.defn
+class PlaceOrderSaga:
+    @workflow.run
+    async def run(self, req: OrderReq) -> Result:
+        compensations = []          # stack of comp actions for completed steps
+        try:
+            order = await activity.execute(create_order, req)
+            compensations.append(lambda: mark_failed(order.id))
+
+            await activity.execute(reserve_stock, req.sku, req.qty)
+            compensations.append(lambda: release_stock(req.sku, req.qty))
+
+            charge = await activity.execute(
+                stripe_charge,
+                amount=req.amount,
+                idempotency_key=f"order-{order.id}"   # key: idempotency
+            )
+            compensations.append(
+                lambda: stripe_refund(charge.id, key=f"refund-{order.id}")
+            )
+
+            await activity.execute(deduct_points, req.user, req.points,
+                                   key=f"pts-{order.id}")
+            return Result.ok(order.id)
+
+        except ActivityError as e:
+            # Run compensations in reverse. Temporal guarantees at-least-once + retry.
+            for comp in reversed(compensations):
+                await activity.execute(comp, retry_policy=infinite_backoff)
+            return Result.fail(reason=str(e))
+
+# Key properties:
+#  - Temporal persists workflow state to an event log; on crash it replays and resumes.
+#  - Every activity must be idempotent (because it may retry).
+#  - Compensations must be idempotent AND not allowed to fail forever
+#    (a failed compensation needs human intervention).
+</code></pre>
+<div class="callout"><strong>Compensation is not rollback.</strong> Rollback pretends nothing happened (DB undo log). Compensation is "do the reverse operation to reach an equivalent outcome." <em>A charge can be refunded, but a sent email is sent — compensation is "send a 'sorry, your order failed' follow-up."</em> This forces the business to accept "visible intermediate states" and is Saga's biggest semantic gap from ACID.</div>
+<div class="case">
+<strong>Real cases</strong>:
+<ul>
+<li><strong>Uber Cadence</strong>: <a href="https://www.uber.com/blog/announcing-cadence/">Cadence</a> ships a built-in <code>Saga</code> primitive; 1000+ services inside Uber use it, with Cadence 1.0 announced in 2024. Order fulfillment and driver dispatch run as saga workflows.</li>
+<li><strong>DoorDash</strong>: <a href="https://careersatdoordash.com/blog/building-reliable-workflows-cadence-as-a-fallback-for-event-driven-processing/">uses Cadence as a fallback for event-driven processing</a> (2024) — primary path is Kafka events, with Cadence saga as the recovery path.</li>
+<li><strong>Airbnb / Netflix / Coinbase / HashiCorp</strong>: use Temporal (the OSS evolution of Cadence) for payments, onboarding, content moderation, and other multi-step flows.</li>
+<li><strong>AWS Step Functions</strong>: managed orchestration with native saga support (see AWS Compute Blog "Implementing the saga pattern" 2021).</li>
+<li><strong>Chris Richardson — <a href="https://microservices.io/patterns/data/saga.html">microservices.io/patterns/data/saga.html</a></strong>: the industry-grade authoritative doc on saga, including orchestration vs choreography and examples.</li>
+</ul></div>
+
+<h3>3. Outbox Pattern: kill "dual write," demote distributed transactions to local ones</h3>
+<p><strong>Problem</strong>: a service must "write DB" + "publish Kafka event." The two are not in one transaction, so <em>there is always an inconsistency window</em>:</p>
+<ul>
+<li>DB succeeds, Kafka fails → downstream never receives → data loss</li>
+<li>Kafka succeeds, DB fails (power loss) → downstream receives an event for an order that doesn't exist → ghost orders</li>
+</ul>
+<p>This is the <strong>dual write problem</strong>, the most common transactional pitfall in microservices.</p>
+<p><strong>Outbox solution</strong>:</p>
+<ol>
+<li>The business table and the <code>outbox</code> table are written in <em>the same local DB transaction</em>. Local = ACID; both succeed or both fail.</li>
+<li>A separate <strong>relay process</strong> (Debezium-style CDC reading the WAL/binlog) asynchronously ships new outbox rows to Kafka.</li>
+<li>The relay tracks its own offset, delivers <em>at-least-once</em>; consumers dedupe on outbox row ID.</li>
+</ol>
+<pre class="mermaid">
+graph LR
+    App["Order Service"]
+    DB[("Postgres<br/>orders + outbox<br/><b>same local txn</b>")]
+    Debez["Debezium<br/><i>reads WAL</i>"]
+    K["Kafka<br/>order.events"]
+    Cons1["Inventory Consumer"]
+    Cons2["Analytics Consumer"]
+    Cons3["Notification Consumer"]
+
+    App -- "BEGIN<br/>INSERT orders<br/>INSERT outbox<br/>COMMIT" --> DB
+    DB -. WAL .-> Debez
+    Debez --> K
+    K --> Cons1
+    K --> Cons2
+    K --> Cons3
+</pre>
+<pre><code># Outbox in practice — Postgres + Debezium
+CREATE TABLE orders (id BIGSERIAL PK, user_id ..., amount ..., status ...);
+CREATE TABLE outbox (
+    id BIGSERIAL PK,
+    aggregate_id BIGINT,        -- order id (used as partition key)
+    event_type TEXT,            -- "order.created" / "order.cancelled"
+    payload JSONB,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Business code: write orders and outbox event in the same txn
+BEGIN;
+  INSERT INTO orders (...) VALUES (...) RETURNING id;
+  INSERT INTO outbox (aggregate_id, event_type, payload)
+       VALUES (42, 'order.created', '{"user":7,"amount":100}');
+COMMIT;        -- atomic: both succeed or neither does
+
+-- Debezium attaches to the Postgres replication slot,
+-- tails the WAL → watches outbox INSERTs → transforms → pushes Kafka.
+-- The business code doesn't need to know Kafka exists — fully decoupled.
+
+# Why not CDC on the business table directly?
+#  - Business schema changes often; downstreams become tightly coupled.
+#  - A single row change may correspond to 0 or many domain events
+#    (an order INSERT may emit "order.created" + "loyalty.points.eligible").
+#    Outbox lets business code control event granularity.
+
+# Why not just call Kafka producer in the same function?
+#  - Producer.send() is not in the DB transaction — dual write problem.
+#  - Even with Kafka transactions, you cannot span Postgres + Kafka.
+</code></pre>
+<div class="tradeoff">
+<strong>Outbox trade-offs</strong>:
+<ul>
+<li>✅ Demotes "distributed (DB + MQ) transaction" to "local (DB only) transaction" — a major engineering win.</li>
+<li>✅ Business code is non-invasive; the relay is independently scalable.</li>
+<li>⚠ Adds ~second-level latency (CDC is async). Strict-real-time needs <em>synchronous outbox with embedded relay</em> at the cost of throughput.</li>
+<li>⚠ The outbox table grows; you must archive/delete after X days.</li>
+<li>⚠ At-least-once delivery ⇒ consumers must be idempotent (combine with point 4 below).</li>
+</ul>
+</div>
+<div class="case">
+<strong>Real cases</strong>:
+<ul>
+<li><strong>Debezium blog — <a href="https://debezium.io/blog/2019/02/19/reliable-microservices-data-exchange-with-the-outbox-pattern/">"Reliable Microservices Data Exchange With the Outbox Pattern" (2019)</a></strong>: the industry-grade reference for outbox + CDC, with a Quarkus extension.</li>
+<li><strong>Shopify</strong>: their order system heavily uses outbox + Kafka to push cross-service consistency down into CDC.</li>
+<li><strong>LinkedIn Brooklin / Databus</strong>: early CDC pioneer; Brooklin pipes outbox-style streams to Kafka / Espresso as the company-wide event bus.</li>
+<li><strong>Eventuate Tram</strong> (Chris Richardson): an out-of-the-box Java framework for outbox + saga.</li>
+</ul></div>
+
+<h3>4. Idempotency: the last line of defense for distributed transactions</h3>
+<p><strong>Mechanism</strong>: in distributed systems every RPC, message, and callback is <em>at-least-once</em> — a network timeout can't distinguish "request lost" from "response lost," so retries are inevitable. <strong>Idempotency</strong> guarantees "executing the same operation N times has the same effect as executing it once" — it is the safety net for saga retries, outbox redelivery, and compensations.</p>
+<table>
+<thead><tr><th>Strategy</th><th>Mechanism</th><th>Best for</th></tr></thead>
+<tbody>
+<tr><td><strong>Naturally idempotent ops</strong></td><td>SET x=5, DELETE id=42 — same result if repeated</td><td>Express as set when possible</td></tr>
+<tr><td><strong>Idempotency key + dedup table</strong></td><td>Client generates a UUID; server stores (key → result); retries return cached result</td><td>Payments, orders, external callbacks (Stripe is the canonical example)</td></tr>
+<tr><td><strong>Optimistic locking / version</strong></td><td><code>UPDATE … WHERE version=X</code>, discard conflicts</td><td>Concurrent updates on the same resource</td></tr>
+<tr><td><strong>Consumer-side dedup</strong></td><td>When consuming Kafka, write event_id to dedup table; skip on duplicate</td><td>Outbox / event sourcing consumers</td></tr>
+</tbody></table>
+<pre><code># Stripe-style idempotency key, server-side (Postgres)
+# Reference: https://stripe.com/blog/idempotency
+
+CREATE TABLE idempotency (
+    key TEXT PRIMARY KEY,
+    request_hash TEXT NOT NULL,     -- detect key reuse with different bodies
+    response_code INT,
+    response_body JSONB,
+    status TEXT,                    -- 'in_progress' | 'completed'
+    locked_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+def handle(key, req):
+    h = hash(req.body)
+    row = db.fetch_for_update("SELECT * FROM idempotency WHERE key=%s", key)
+
+    if row and row.request_hash != h:
+        raise Conflict("idempotency key reused with different body")
+
+    if row and row.status == 'completed':
+        return row.response_body                # return cached response
+
+    if row and row.status == 'in_progress':
+        if now() - row.locked_at > LEASE:
+            pass                                # lease expired, retry ok
+        else:
+            raise Conflict("request in flight")
+
+    # claim
+    db.upsert("idempotency", key=key, request_hash=h,
+              status='in_progress', locked_at=now())
+
+    try:
+        resp = do_business(req)
+        db.update("idempotency", key=key,
+                  status='completed', response_code=200,
+                  response_body=resp)
+        return resp
+    except RetryableError:
+        # don't update; let client retry
+        raise
+    except FatalError as e:
+        db.update("idempotency", key=key,
+                  status='completed', response_code=500,
+                  response_body={"error": str(e)})
+        raise
+
+# Expiry policy: Stripe keeps keys for 24h, then prunes. Clients should
+# not assume keys live forever.
+</code></pre>
+<div class="case">
+<strong>Real cases</strong>:
+<ul>
+<li><strong>Stripe</strong>: <a href="https://stripe.com/blog/idempotency">"Designing robust and predictable APIs with idempotency" (2017)</a> + <a href="https://brandur.org/idempotency-keys">Brandur Leach's "Implementing Stripe-like idempotency keys in Postgres"</a>, the most detailed public engineering writeup including lease, expiry, and integration with retry backoff.</li>
+<li><strong>AWS SQS FIFO + content-based deduplication</strong>: 5-minute dedup window; beyond that you must dedupe yourself. Classic "infra handles 90%, you handle the last 10%."</li>
+<li><strong>Kafka transactions + idempotent producer</strong>: producer is idempotent per partition; cross-partition transactions (read-process-write) supported; consumers still need their own dedup.</li>
+<li><strong>PayPal / Square / Adyen</strong>: every charge / refund API requires an idempotency key, otherwise rejected. This is the payments industry's "default contract."</li>
+</ul></div>
+
+<h2>Extension &amp; Optimization</h2>
+<ul>
+<li><strong>Saga + workflow engine is the de facto standard</strong>: for cross-service flows of more than 3 steps, <em>do not hand-roll state machines</em>. Adopt Temporal / Cadence / AWS Step Functions / Azure Durable Functions — you get persistence, retry, visualization, and versioning for free.</li>
+<li><strong>Outbox alternatives</strong>: CockroachDB / TiDB <em>changefeeds</em> stream directly to Kafka, skipping Debezium; MongoDB / DynamoDB <em>change streams</em> do the same. For new projects, prefer databases with built-in CDC.</li>
+<li><strong>Semantic Locking</strong>: during a saga, data may be visible to other transactions (isolation violated). Chris Richardson proposes <em>semantic locks</em> — mark data with a business-level 'pending' flag; other transactions see pending and decide what to do (reject / wait / force).</li>
+<li><strong>Inbox pattern</strong> (outbox dual): the consumer keeps an inbox table of processed event IDs; "write business table + write inbox" is one local transaction. Consumer dedup becomes a local-transaction problem.</li>
+<li><strong>Transaction ID / trace propagation</strong>: propagate <em>saga_id / step_id</em> across services; combined with OpenTelemetry it gives full traceability — when a saga is stuck you locate the step in seconds.</li>
+<li><strong>The fundamental weapon against distributed transactions: domain boundaries.</strong> If 90% of flows cross the same two services, <em>they probably should be one service</em>. Wrong microservice boundaries are what force you into distributed transactions in the first place.</li>
+</ul>
+
+<h2>Common Pitfalls &amp; Interview Questions</h2>
+<div class="callout">
+<strong>1. Treating Saga as ACID — forgetting isolation is gone.</strong> During a saga, an order may sit in a "created-but-not-paid" intermediate state visible to readers, who may make decisions based on incorrect state. Either use semantic locks to mark pending, or have the business accept "visible intermediate states" with UX mitigations.</div>
+<div class="callout">
+<strong>2. Non-idempotent / failure-prone compensations.</strong> A failed compensation is worse than a failed forward step — compensation exists to save you. Compensations must be idempotent, and failures must escalate to DLQ / human action — <em>never an infinite retry loop</em>.</div>
+<div class="callout">
+<strong>3. Treating "send Kafka + write DB" as atomic.</strong> The most common junior trap. The interviewer expects you to immediately name "dual write problem" and "Outbox."</div>
+<div class="callout">
+<strong>4. Idempotency key as timestamp / auto-increment.</strong> Client retries must use <em>the same key</em>. If the client generates a new timestamp on each retry, dedup is broken — the key must be fixed <em>at request generation time</em> and reused on retries.</div>
+<div class="callout">
+<strong>5. Using 2PC across external APIs (Stripe / email / WeChat Pay).</strong> External APIs don't support XA. Such scenarios require the trio: saga + compensation + idempotency.</div>
+<p><strong>Interview follow-ups</strong>:</p>
+<ol>
+<li>Walk through 2PC blocking: coordinator dies after phase-1 ACK — what do participants do? How does 3PC improve and why is it still rare?</li>
+<li>How does Saga differ from ACID in isolation? Give a bug caused by Saga's visible intermediate state.</li>
+<li>Outbox vs Kafka transactions — why is Outbox preferred in production?</li>
+<li>Design "cross-service transfer": service A debits 100, service B credits 100. Give the saga + compensation flow and failure-mode analysis.</li>
+<li>What's the expiry policy for idempotency keys? What happens if a client reuses the same key after expiry? How do you avoid double charges?</li>
+<li>"Should microservices avoid distributed transactions?" — how do you answer? Give an example of "converting a distributed transaction into a domain redesign."</li>
+</ol>
+
+<h2>Deep Resources</h2>
+<ul>
+<li><strong>"Designing Data-Intensive Applications," Ch 7 §Transactions + Ch 9 §Atomic Commit and Two-Phase Commit</strong> (Kleppmann): the most complete industry-grade treatment of 2PC and the limits of distributed transactions.</li>
+<li><strong>Pat Helland — <a href="https://queue.acm.org/detail.cfm?id=3025012">"Life Beyond Distributed Transactions: An Apostate's Opinion" (ACM Queue 2017 / CIDR 2007)</a></strong>: the consensus-shaping paper. Established the saga / messaging / entity school.</li>
+<li><strong>Garcia-Molina &amp; Salem — <a href="https://dl.acm.org/doi/10.1145/38713.38742">"Sagas" (SIGMOD 1987)</a></strong>: the original saga paper, 14 pages. Reading it gives you a deeper grasp than any modern framework's docs.</li>
+<li><strong>Chris Richardson — <a href="https://microservices.io/patterns/data/saga.html">microservices.io: Saga Pattern</a></strong> + "Microservices Patterns" (Manning): includes orchestration / choreography comparison, semantic lock, saga versioning, and operational lessons.</li>
+<li><strong>Debezium — <a href="https://debezium.io/blog/2019/02/19/reliable-microservices-data-exchange-with-the-outbox-pattern/">"Reliable Microservices Data Exchange With the Outbox Pattern" (2019)</a></strong>: the canonical outbox + CDC reference.</li>
+<li><strong>Stripe — <a href="https://stripe.com/blog/idempotency">"Designing robust and predictable APIs with idempotency" (2017)</a></strong> + <a href="https://brandur.org/idempotency-keys">Brandur Leach's idempotency keys in Postgres</a>: best engineering references.</li>
+<li><strong>Uber Cadence — <a href="https://www.uber.com/blog/announcing-cadence/">"Announcing Cadence 1.0" (2024)</a></strong>; <strong>DoorDash — <a href="https://careersatdoordash.com/blog/building-reliable-workflows-cadence-as-a-fallback-for-event-driven-processing/">"Building Reliable Workflows with Cadence" (2024)</a></strong>: saga orchestration at hyperscale.</li>
+<li><strong>Temporal — <a href="https://temporal.io/blog/what-is-durable-execution">"The Definitive Guide to Durable Execution"</a></strong>: theory and practice for modern saga + durable workflow platforms.</li>
+</ul>
+
+<h2>Deep Reflection</h2>
+
+<details>
+<summary>1. Cross-service transfer: A debits 100, B credits 100. Design saga + failure-mode analysis. If B credits succeed but the saga orchestrator itself crashes, what happens?</summary>
+<div class="answer">
+<p>The classic saga interview question. The core issue is that the orchestrator's own failure must be recoverable — otherwise you've just moved the single point from 2PC's coordinator to your saga orchestrator, <em>without solving anything</em>.</p>
+<p><strong>Forward flow</strong>:</p>
+<ol>
+<li>T1: A.debit(100, idempKey=tx-42)</li>
+<li>T2: B.credit(100, idempKey=tx-42)</li>
+<li>completed</li>
+</ol>
+<p><strong>Compensation</strong>: T2 fails → C1: A.credit(100, idempKey=tx-42-comp) (not a refund, a reverse credit).</p>
+<p><strong>Critical failure modes</strong>:</p>
+<ul>
+<li><em>Orch crashes after T1 completes</em>: on recovery, replay from event log; see T1 done, resume T2. The prerequisite is that orch state is <strong>persisted at every step</strong> (Temporal's event-sourcing model).</li>
+<li><em>Orch crashes after sending T2, not knowing whether B succeeded</em>: on recovery, retry T2; B's idempotency key dedupes — if last time succeeded, return same result; if last time the request didn't arrive, process normally. <strong>This is exactly what idempotency keys are for.</strong></li>
+<li><em>T2 fails forever (B permanently unreachable)</em>: compensate with C1. But beware "compensation also fails" — what if A is down too? Industry practice: a failed compensation goes to a DLQ with alerting, and an on-call engineer intervenes; <em>do not let sagas retry forever</em>. Temporal has a default max-attempts policy.</li>
+<li><em>T1 succeeds but outbox not written</em>: impossible. If you use outbox, T1 = (UPDATE accounts; INSERT outbox) is one atomic transaction.</li>
+</ul>
+<p><strong>Deeper reflection</strong>: this example is often used to "prove" saga is weak. But in <em>real banking systems</em>, transfers don't rely on distributed transactions at all — they use <em>double-entry bookkeeping</em>: the ledger isn't "modify A, modify B," but "record a debit, record a credit"; the sum of both must be zero. Any imbalance is caught by end-of-day reconciliation. This is centuries-old financial engineering wisdom, long predating distributed databases. <em>Lesson: many "distributed-transaction needs" disappear when you change the data model.</em></p>
+</div>
+</details>
+
+<details>
+<summary>2. Saga drops isolation — give a real example where reading an intermediate state causes a bug. How do you solve it?</summary>
+<div class="answer">
+<p><strong>Scenario</strong>: an e-commerce saga has steps "deduct inventory → deduct balance → ship." User A triggers a saga; inventory deduction succeeds (stock -1), balance deduction not yet started. Another query endpoint is hit and <em>reads stock as -1</em>; the recommender concludes "low stock" and sends user B a "limited-time offer" push. Then A's saga fails balance deduction and compensates (stock +1).</p>
+<p>Result: user B got a marketing push based on <em>an inventory reduction that never actually happened</em>, and may immediately order only to find stock is fine — business logic disordered. This is the isolation violation caused by saga's "intermediate state leak." Under ACID, uncommitted transactions are invisible to others, so this <em>cannot happen</em>.</p>
+<p><strong>Solutions, from cheap to expensive</strong>:</p>
+<ol>
+<li><strong>Semantic Lock (Chris Richardson)</strong>: add a <code>pending</code> column on inventory. During the saga, mark <code>pending=true</code>; other readers know "this is a saga in-flight state" and decide accordingly (the recommender can ignore pending rows).</li>
+<li><strong>Commutative operations</strong>: change "deduct inventory" to "reserve +1, ship -1," making order irrelevant. Compensation is "reserve -1," leaving no ghost state.</li>
+<li><strong>Reorder steps</strong>: push irreversible / high-side-effect steps to the end. Reversible steps (DB writes) first; non-compensable steps (sending emails, calling external APIs) last.</li>
+<li><strong>Versioning</strong>: each saga write carries saga_id + version; readers decide visibility based on saga state (MVCC-style).</li>
+</ol>
+<p><strong>Underlying principle</strong>: Saga trades "eventual consistency + visible intermediate state" for "cross-service feasibility + high throughput." If the business cannot tolerate visible intermediate state, <em>that data should not cross services</em> — it should stay in one service with local transactions. Back to "draw the right domain boundary."</p>
+</div>
+</details>
+
+<details>
+<summary>3. Outbox introduces "second-level lag from DB to Kafka." If a business needs "the order is searchable immediately after writing," what do you do? Give 3 approaches.</summary>
+<div class="answer">
+<p>Real scenario: after placing an order, the user must immediately see it in "My Orders." If outbox + Debezium has 2s lag, the user wonders "where's my order?" This is the conflict between <em>synchronous requirements</em> and <em>async outbox</em>.</p>
+<p><strong>Approach 1: Dual-read (recommended, cheap)</strong></p>
+<ul>
+<li>"My Orders" reads the search index, plus an extra query against the primary DB for the last N minutes of orders, merged in the UI.</li>
+<li>Client / API gateway aggregates both sources.</li>
+<li>Cost: one more DB query, but limited to current user's recent orders (highly indexed, &lt; 5ms).</li>
+<li>UX: perfect read-your-writes; downstream search system has no "must be instant" pressure.</li>
+</ul>
+<p><strong>Approach 2: Dual-write + tolerate inconsistency (for "occasionally lose a bit" cases)</strong></p>
+<ul>
+<li>Business code writes DB and ES at the same time. Accept some inconsistency, fix via batch reconciliation.</li>
+<li>Cost: the dual-write problem returns — but if the business tolerates "search occasionally misses one row," acceptable.</li>
+<li>Never for financial scenarios.</li>
+</ul>
+<p><strong>Approach 3: Synchronous outbox (heavy, edge cases only)</strong></p>
+<ul>
+<li>After commit, <em>synchronously</em> call Kafka producer and wait for ACK before returning to the client. Outbox is the backup.</li>
+<li>Cost: write latency rises from 5ms to 30-100ms (Kafka cross-broker sync); Kafka failures stall the write path.</li>
+<li>Use when "writes must be readable within seconds" is mandatory (financial reconciliation, regulatory reports).</li>
+</ul>
+<p><strong>Deeper reflection</strong>: "instant consistency" is almost always <em>over-engineering</em>. Google's and Amazon's search both have index lag. <em>Ask the business: "really, not even 1 second?"</em> — 80% of the time the answer is "5 seconds is fine." For the remaining 20%, Approach 1 (dual-read) usually suffices. Treating "instant consistency" as default is a hidden tax on performance and availability.</p>
+</div>
+</details>
+
+<details>
+<summary>4. Cross-chapter: Day 6 (Consistency) says "pick consistency per data type"; today says "avoid distributed transactions." Combine both for the same e-commerce system: draw a "consistency + transaction strategy" map.</summary>
+<div class="answer">
+<p>This is the layered-decision skill required of architects. Each subdomain in one system should pick <em>both consistency and transaction strategy</em> independently.</p>
+<table>
+<thead><tr><th>Subdomain</th><th>Consistency (Day 6)</th><th>Transaction strategy (Day 7)</th><th>Implementation</th></tr></thead>
+<tbody>
+<tr><td>Inventory deduction</td><td>Linearizable</td><td>Single-DB local txn + row lock / CAS</td><td>Postgres SELECT FOR UPDATE or Spanner</td></tr>
+<tr><td>Checkout (across 5 services)</td><td>Eventual + compensation</td><td>Saga (Temporal orchestration)</td><td>Per-step local txn + reverse compensation + idempotency</td></tr>
+<tr><td>Payments (Stripe)</td><td>External, at-most-once charge</td><td>Idempotency key + retry + reconciliation</td><td>Stripe key = saga_id + end-of-day reconciliation</td></tr>
+<tr><td>Order status fanout (search, recs, msgs)</td><td>Eventual</td><td>Outbox + Kafka + at-least-once consumers</td><td>Debezium → Kafka → multiple consumers</td></tr>
+<tr><td>"My Orders" display</td><td>Read-your-writes</td><td>Primary DB + secondary-index dual read</td><td>Session token carries LSN + dual read</td></tr>
+<tr><td>User analytics / telemetry</td><td>Eventual + lossy ok</td><td>Fire-and-forget + batch</td><td>Local buffer → async Kafka push</td></tr>
+</tbody></table>
+<p><strong>Overall architecture</strong>:</p>
+<ul>
+<li>"Hard correctness" data (inventory, balance, order state) → local ACID inside one service.</li>
+<li>"Cross-service flow" → Saga + Outbox + Idempotency trio.</li>
+<li>"Downstream fanout" → Eventual via Kafka.</li>
+<li>"Display-layer consistency" → client tokens + dual read.</li>
+</ul>
+<p><strong>Anti-patterns</strong>:</p>
+<ol>
+<li>System-wide strong consistency ("to be safe"): Spanner everywhere; checkout P99 spikes; conversion drops.</li>
+<li>System-wide eventual ("to keep it simple"): oversells, double charges, support inferno.</li>
+<li>Distributed transactions everywhere: tight coupling, fault propagation; one service down brings everything down.</li>
+</ol>
+<p><strong>The architect's core skill</strong>: be able to draw this table in 5 minutes for a new business, with every row backed by numbers (QPS, SLO, cost of violation). That's the real boundary between "senior" and "architect."</p>
+</div>
+</details>
+
+<details>
+<summary>5. Counterintuitive: "the best distributed transaction is none at all" — give a real example of "killing a distributed transaction via domain redesign."</summary>
+<div class="answer">
+<p>This is the essence of Pat Helland's paper and the mark of microservice design maturity. When you find 90% of flows cross the same two services and saga compensations grow ever more complex, <em>your boundaries are wrong</em>.</p>
+<p><strong>Real case 1: e-commerce "order + inventory" used to be two services</strong></p>
+<ul>
+<li>Initial: order service, inventory service split. Every order requires a saga.</li>
+<li>Pain: 90% of requests cross both services; saga compensation accounts for 40% of code; failure rate climbs; ops cost soars.</li>
+<li>Refactor: merge into "order fulfillment service" (one DB, one team); order and inventory in the same local transaction — <em>SELECT FOR UPDATE on the inventory row + INSERT order</em>, done in 5ms. The saga disappears entirely.</li>
+<li>Lesson: "more microservices = better" is a myth. <strong>Boundaries should follow "independent evolution + independent scaling + independent failure," not code module boundaries.</strong></li>
+</ul>
+<p><strong>Real case 2: banking transfers replace distributed transactions with double-entry bookkeeping</strong></p>
+<ul>
+<li>Common-wrong design: account-A service, account-B service; transfers require distributed transactions.</li>
+<li>Better design: all accounts in one "ledger service"; the ledger table is INSERT-only; every transaction writes two rows (debit / credit); sum == 0 means correct.</li>
+<li>Reading balance = SUM(credits) - SUM(debits) (with snapshots for speed).</li>
+<li>"Cross-account transfer" reduces to two INSERTs in one service's local transaction — distributed transaction eliminated. This is the core design of Stripe Ledger, Square, and real-world ledger systems.</li>
+</ul>
+<p><strong>Real case 3: event sourcing collapses multi-service state into a single source of truth</strong></p>
+<ul>
+<li>Each service has its own state → cross-service consistency issues sprout endlessly.</li>
+<li>Switch to event sourcing: every service writes events to a central event store (Kafka / EventStoreDB); each service materializes its own view from the stream.</li>
+<li>"Cross-service transaction" becomes "append an event" — a local op. View inconsistency is handled by consumers.</li>
+<li>Examples: parts of Netflix, parts of LinkedIn, most modern fintech.</li>
+</ul>
+<p><strong>Philosophical takeaway</strong>: complexity in distributed systems never disappears, only moves. Saga moves "coordinator complexity" to "compensation complexity"; double-entry moves "cross-service transaction" to "data-model design"; event sourcing moves "cross-service consistency" to "event schema evolution."</p>
+<p><strong>Mark of a mature architect</strong>: identify where complexity hides and put it where <em>it is easiest to understand and evolve</em>. <em>Not eliminate complexity, but place it well.</em> This principle applies to all design decisions — fundamentally the same thinking as "push inconsistency to the UX layer, keep consistency at the DB layer."</p>
+</div>
+</details>
+
+</div></body></html>
