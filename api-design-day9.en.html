@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 9 · API Design — System Design Bi-daily</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"SF Pro Display","Noto Sans SC",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
+.container{max-width:820px;margin:0 auto;padding:24px 20px 60px}
+header{padding:40px 0 28px;border-bottom:1px solid rgba(100,200,255,0.15);margin-bottom:32px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem}
+.tag{padding:3px 10px;border-radius:4px;background:rgba(100,200,255,0.12);color:#64c8ff;border:1px solid rgba(100,200,255,0.25)}
+.tag.diff{background:rgba(94,234,212,0.1);color:#5eead4;border-color:rgba(94,234,212,0.3)}
+.tag.day{background:rgba(255,180,80,0.1);color:#ffb450;border-color:rgba(255,180,80,0.25)}
+h1{font-size:1.75rem;font-weight:800;background:linear-gradient(135deg,#64c8ff 0%,#5eead4 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:0.5px;line-height:1.3}
+h1 .en{display:block;font-size:1rem;color:#7a8590;-webkit-text-fill-color:#7a8590;margin-top:6px;font-weight:500}
+h2{font-size:1.2rem;color:#5eead4;margin:36px 0 14px;padding-left:12px;border-left:3px solid #5eead4}
+h3{font-size:1rem;color:#64c8ff;margin:20px 0 10px;font-weight:600}
+p{margin:10px 0;color:#c8cfd6}
+ul,ol{margin:10px 0 10px 22px;color:#c8cfd6}
+li{margin:6px 0}
+strong{color:#e8eef5;font-weight:600}
+em{color:#5eead4;font-style:normal;font-weight:500}
+code{font-family:"SF Mono",Menlo,Consolas,monospace;background:rgba(100,200,255,0.1);color:#5eead4;padding:1px 6px;border-radius:3px;font-size:0.88em}
+pre{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:14px 16px;overflow-x:auto;margin:12px 0;font-family:"SF Mono",Menlo,Consolas,monospace;font-size:0.84rem;line-height:1.55;color:#c8cfd6}
+pre code{background:none;color:inherit;padding:0;font-size:1em}
+.mermaid{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:18px;margin:14px 0;text-align:center;overflow-x:auto;cursor:zoom-in;transition:border-color 0.15s}
+.mermaid:hover{border-color:rgba(100,200,255,0.4)}
+.mermaid svg{width:100%;max-width:100%;height:auto;min-height:280px}
+.lightbox{position:fixed;inset:0;background:rgba(8,12,18,0.96);z-index:9999;display:none;align-items:center;justify-content:center;padding:24px;cursor:grab;backdrop-filter:blur(4px);overflow:hidden}
+.lightbox.open{display:flex}
+.lightbox.dragging{cursor:grabbing}
+.lightbox svg{width:auto;height:auto;max-width:96vw;max-height:92vh;transform-origin:center center;will-change:transform}
+.lightbox .hint{position:fixed;top:16px;right:20px;font-size:0.78rem;color:#7a8590;font-family:"SF Mono",Menlo,monospace;pointer-events:none}
+.callout{background:rgba(255,180,80,0.06);border-left:3px solid #ffb450;padding:12px 14px;margin:14px 0;border-radius:4px;font-size:0.94rem}
+.callout strong{color:#ffb450}
+.tradeoff{background:rgba(100,200,255,0.05);border:1px solid rgba(100,200,255,0.2);border-radius:6px;padding:12px 14px;margin:12px 0;font-size:0.94rem}
+.case{background:rgba(94,234,212,0.05);border-left:3px solid #5eead4;padding:12px 14px;margin:12px 0;border-radius:4px;font-size:0.94rem}
+.case strong{color:#5eead4}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:0.9rem}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid rgba(100,200,255,0.15)}
+th{color:#64c8ff;font-weight:600;background:rgba(100,200,255,0.05)}
+details{background:rgba(100,200,255,0.04);border:1px solid rgba(100,200,255,0.18);border-radius:6px;padding:12px 16px;margin:10px 0;transition:all 0.15s}
+details:hover{border-color:rgba(100,200,255,0.35)}
+details[open]{background:rgba(94,234,212,0.05);border-color:rgba(94,234,212,0.3)}
+details summary{font-weight:600;color:#e8eef5;list-style:none;outline:none;cursor:pointer;display:flex;align-items:flex-start;gap:10px;font-size:0.96rem}
+details summary::-webkit-details-marker{display:none}
+details summary::before{content:'▶';color:#64c8ff;font-size:0.75em;transition:transform 0.2s;flex-shrink:0;margin-top:5px}
+details[open] summary::before{transform:rotate(90deg);color:#5eead4}
+details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
+details .answer ul,details .answer ol{margin:6px 0 6px 22px}
+@media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+</style>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({startOnLoad:true,theme:'base',flowchart:{useMaxWidth:true,htmlLabels:true,nodeSpacing:50,rankSpacing:60},themeVariables:{primaryColor:'#1a2530',primaryTextColor:'#e8eef5',primaryBorderColor:'#64c8ff',lineColor:'#5eead4',secondaryColor:'#0e1419',tertiaryColor:'#0a0f14',background:'#0a0f14',mainBkg:'#1a2530',secondBkg:'#0e1419',textColor:'#d4dae0',fontFamily:'-apple-system,"SF Pro Display",sans-serif',fontSize:'16px'}});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const lb=document.createElement('div');lb.className='lightbox';
+  lb.innerHTML='<span class="hint">scroll = zoom · drag = pan · Esc / click bg = close</span>';
+  document.body.appendChild(lb);
+  let scale=1,panX=0,panY=0,dragging=false,moved=false,lx=0,ly=0;
+  const apply=()=>{const s=lb.querySelector('svg');if(s)s.style.transform=`translate(${panX}px,${panY}px) scale(${scale})`};
+  const reset=()=>{scale=1;panX=0;panY=0};
+  const close=()=>{lb.classList.remove('open');const s=lb.querySelector('svg');if(s)s.remove();reset()};
+  document.addEventListener('click',e=>{
+    if(e.target.closest('.lightbox')){if(moved){moved=false;return}close();return}
+    const w=e.target.closest('.mermaid');if(!w)return;
+    const svg=w.querySelector('svg');if(!svg)return;
+    const c=svg.cloneNode(true);c.removeAttribute('style');
+    c.style.maxWidth='96vw';c.style.maxHeight='92vh';
+    lb.appendChild(c);lb.classList.add('open');reset();apply();
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+  lb.addEventListener('wheel',e=>{
+    if(!lb.classList.contains('open'))return;
+    e.preventDefault();
+    const svg=lb.querySelector('svg');if(!svg)return;
+    const ns=Math.max(0.3,Math.min(10,scale*(1-e.deltaY*0.002)));
+    const r=svg.getBoundingClientRect();
+    const cx=e.clientX-(r.left+r.width/2),cy=e.clientY-(r.top+r.height/2);
+    const k=ns/scale-1;panX-=cx*k;panY-=cy*k;scale=ns;apply();
+  },{passive:false});
+  lb.addEventListener('mousedown',e=>{
+    if(!lb.classList.contains('open'))return;
+    dragging=true;moved=false;lx=e.clientX;ly=e.clientY;lb.classList.add('dragging');e.preventDefault();
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    const dx=e.clientX-lx,dy=e.clientY-ly;
+    if(Math.abs(dx)+Math.abs(dy)>3)moved=true;
+    panX+=dx;panY+=dy;lx=e.clientX;ly=e.clientY;apply();
+  });
+  document.addEventListener('mouseup',()=>{dragging=false;lb.classList.remove('dragging')});
+});
+</script>
+</head><body><div class="container">
+
+<header>
+<div class="meta">
+<span class="tag day">Day 9</span>
+<span class="tag diff">Medium</span>
+<span class="tag">API Design</span>
+<span class="tag">REST / GraphQL / gRPC</span>
+<span class="tag">Pagination · Versioning</span>
+</div>
+<h1>API Design — Once a Contract Is Public, Breaking It Costs Every Caller<span class="en">REST vs GraphQL vs gRPC · Pagination · Versioning · Rate Limiting</span></h1>
+</header>
+
+<h2>Scenario &amp; Constraints</h2>
+<p>Design the <strong>public API of a developer platform</strong> (think GitHub / Stripe), serving your own iOS/Android/Web apps <em>and</em> external integrations. The hard part isn't writing endpoints — it's that <em>once a contract is public, breaking it costs every caller</em>. An integration may run untouched for 5 years; delete one field and it dies.</p>
+<ul>
+<li><strong>Scale</strong>: 100k+ third-party integrations, <strong>1B+</strong> API calls/day, read/write ratio ~50:1.</li>
+<li><strong>Heterogeneous clients</strong>: mobile wants minimal bytes (selected fields), Web wants one aggregated call, internal services want strongly-typed high throughput. One protocol rarely fits all.</li>
+<li><strong>Never break</strong>: a published contract is assumed <em>permanent</em>. Breaking it = mass integration errors, support storms, front-page outages.</li>
+<li><strong>Stable pagination</strong>: while listing charges / issues, data keeps being written — paging must <em>never skip, never duplicate</em>.</li>
+<li><strong>Abuse protection</strong>: one key can't crush the shared backend — needs fair limiting plus a <em>predictable, developer-friendly</em> 429.</li>
+</ul>
+<p>Today: <em>protocol choice, pagination, versioning, and the rate-limit contract</em> — the four parts of API design most likely to bite in production and get probed in interviews.</p>
+
+<h2>High-Level Architecture</h2>
+<div class="mermaid">
+graph LR
+    subgraph Clients["Clients"]
+        M["Mobile<br/><i>minimize bytes</i>"]
+        W["Web"]
+        T["3rd-party<br/><i>may not update for 5y</i>"]
+    end
+    GW["API Gateway<br/><i>auth · rate limit · version routing</i>"]
+    REST["REST /v1<br/><i>resources · HTTP-cacheable</i>"]
+    GQL["GraphQL<br/><i>field selection · one round trip</i>"]
+    subgraph Internal["Internal (gRPC mesh)"]
+        S1["Order svc"]
+        S2["User svc"]
+        S3["Billing svc"]
+    end
+    DB[("DB / Cache")]
+    M --> GW
+    W --> GW
+    T --> GW
+    GW --> REST
+    GW --> GQL
+    REST -->|gRPC| S1
+    GQL -->|gRPC| S2
+    S1 --> S3
+    S1 --> DB
+    classDef gw fill:#2a1530,stroke:#ff7ab6,color:#e8eef5
+    classDef edge fill:#0e2030,stroke:#5eead4,color:#e8eef5
+    class GW gw
+    class REST,GQL edge
+</div>
+<p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px"><strong>Core idea</strong>: one <em>Gateway</em> centralizes auth, rate limiting, and version routing; <em>externally</em> expose REST + GraphQL (web-friendly, evolvable, cacheable); <em>internally</em> services speak gRPC (strongly-typed, high throughput). Different protocols on each side of the trust boundary is the default shape of nearly every large platform.</p>
+
+<h2>Key Technical Points</h2>
+
+<h3>1. Protocol Choice: REST vs GraphQL vs gRPC</h3>
+<p style="color:#5eead4">Core trade-off: <strong>cacheable simplicity of a resource model</strong> vs <strong>client-driven field selection</strong> vs <strong>internal strongly-typed performance</strong>.</p>
+<p><strong>Principle</strong>: three abstractions. <strong>REST</strong> models the world as <em>resources + HTTP verbs</em> — stateless, cacheable by URL via CDN/browser, but prone to <em>over-fetching (extra fields)</em> or <em>under-fetching (a view needs multiple round trips)</em>. <strong>GraphQL</strong> lets the client <em>declare exactly which fields it wants</em> in one query — one round trip, no over/under-fetch — at the cost of harder caching and rate limiting (everything is POST /graphql, so URL is no longer a cache key). <strong>gRPC</strong> runs on HTTP/2 + Protobuf — binary, strongly-typed IDL, bidirectional streaming, best latency/throughput — but browsers can't use it directly and it's hard to debug, so it's natively a <em>service-to-service</em> protocol.</p>
+<table>
+<thead><tr><th>Dimension</th><th>REST</th><th>GraphQL</th><th>gRPC</th></tr></thead>
+<tbody>
+<tr><td>Fetching</td><td>fixed resources (over/under-fetch)</td><td>per-field, one shot</td><td>fixed RPC methods</td></tr>
+<tr><td>HTTP caching</td><td>✅ native (GET+URL)</td><td>❌ hard (POST)</td><td>❌ n/a</td></tr>
+<tr><td>Typing/contract</td><td>weak (OpenAPI bolt-on)</td><td>✅ schema-typed</td><td>✅ Protobuf-typed</td></tr>
+<tr><td>Performance</td><td>medium (JSON text)</td><td>medium</td><td>✅ high (binary+stream)</td></tr>
+<tr><td>Browser direct</td><td>✅</td><td>✅</td><td>❌ (needs gRPC-Web)</td></tr>
+<tr><td>Best fit</td><td>public cacheable resources</td><td>multi-client aggregation, variable fields</td><td>internal microservices, low latency</td></tr>
+</tbody></table>
+<pre><code># REST: rendering one PR page needs several round trips (under-fetch + N+1)
+GET /repos/o/r/pulls/42          -> PR body (with many unused fields, over-fetch)
+GET /repos/o/r/pulls/42/commits  -> commit list
+GET /repos/o/r/pulls/42/reviews  -> reviews
+GET /users/alice                 -> author info (one per author, N+1)
+
+# GraphQL: one round trip, only the fields you ask for
+query {
+  repository(owner:"o", name:"r") {
+    pullRequest(number:42) {
+      title
+      author { login avatarUrl }
+      commits(last:5) { nodes { oid } }
+      reviews(last:10) { nodes { state } }
+    }
+  }
+}</code></pre>
+<div class="tradeoff">
+<strong>How to choose</strong>:
+<ul>
+<li><strong>Public, resource-shaped, strongly cacheable, wildly varied callers</strong> → REST (lowest cognitive bar, CDN-friendly).</li>
+<li><strong>Multi-client UIs, variable field needs, want to kill round trips</strong> → GraphQL (but you <em>must</em> add query-cost limits, or one nested query crushes the backend).</li>
+<li><strong>Internal, low-latency, strong contract, streaming</strong> → gRPC. <em>Almost nobody ships gRPC as a public API.</em></li>
+</ul>
+</div>
+<div class="case">
+<strong>Real-world cases:</strong>
+<ul>
+<li><strong>GitHub</strong>: after years of REST v3, shipped a <a href="https://github.blog/developer-skills/github/the-github-graphql-api/">GraphQL API v4</a>, publicly citing that REST "needed 2-3 calls for one resource, sending too much and too little at once" as the main motivation.</li>
+<li><strong>Netflix</strong>: evolved from a monolithic GraphQL server to a <a href="https://netflixtechblog.com/how-netflix-scales-its-api-with-graphql-federation-part-1-ae3557c187e2">Federated GraphQL supergraph</a>, letting dozens of backend teams each own a subgraph and deploy independently, ending the "One Graph" deploy traffic jam.</li>
+<li><strong>gRPC</strong>: descended from Google's internal Stubby, widely used for service-to-service traffic at Uber, Square, Netflix and others — while still exposing REST/GraphQL externally.</li>
+</ul>
+</div>
+
+<h3>2. Pagination: Offset vs Cursor (Keyset)</h3>
+<p style="color:#5eead4">Core trade-off: <strong>offset's random page-jumping simplicity</strong> vs <strong>cursor's stability and efficiency on large, high-write datasets</strong>.</p>
+<p><strong>Principle</strong>: <strong>Offset pagination</strong> (<code>LIMIT 20 OFFSET 100000</code>) is simple and can jump to any page, but has two flaws: (1) <em>deep pages are slow</em> — the DB scans and discards the first 100000 rows, O(offset); (2) <em>data drift</em> — inserts/deletes during paging shift the window, causing <em>skips or duplicates</em>. <strong>Cursor / Keyset pagination</strong> uses an ordered anchor from the last row of the previous page (<code>WHERE id &gt; last_seen ORDER BY id</code>), seeks via index in O(log n), and newly inserted rows don't affect already-paged windows — stable. The cost: <em>no page jumping, no total count</em>.</p>
+<table>
+<thead><tr><th></th><th>Offset</th><th>Cursor (Keyset)</th></tr></thead>
+<tbody>
+<tr><td>Deep-page perf</td><td>poor O(offset)</td><td>✅ O(log n) via index</td></tr>
+<tr><td>Consistency under writes</td><td>❌ drift/skip/dup</td><td>✅ stable</td></tr>
+<tr><td>Jump to page N</td><td>✅ yes</td><td>❌ sequential only</td></tr>
+<tr><td>Total count/pages</td><td>✅ available</td><td>❌ usually not</td></tr>
+<tr><td>Fits</td><td>small sets, admin panels</td><td>large sets, public APIs, infinite scroll</td></tr>
+</tbody></table>
+<pre><code>-- Offset: deep page scans+discards OFFSET rows; inserts during paging misalign
+SELECT * FROM events ORDER BY id LIMIT 20 OFFSET 100000;
+
+-- Keyset/cursor: anchor on previous page's last id, seek the primary-key index
+SELECT * FROM events
+WHERE id > :last_seen_id          -- decoded from the opaque cursor
+ORDER BY id LIMIT 20;
+-- next_cursor = encode(last row's id); new inserts don't disturb paged windows</code></pre>
+<div class="case">
+<strong>Real-world cases:</strong>
+<ul>
+<li><strong>Slack</strong>: <a href="https://slack.engineering/evolving-api-pagination-at-slack/">Evolving API Pagination at Slack</a> documents the journey "no pagination → offset → cursor" — under high-write channel messages, offset re-returns newly inserted messages; only cursors stay stable.</li>
+<li><strong>Google API standard</strong>: <a href="https://google.aip.dev/158">AIP-158</a> mandates an <em>opaque (non-parseable) page_token</em> — hiding pagination internals inside the token so the underlying implementation can change without breaking callers.</li>
+</ul>
+</div>
+
+<h3>3. Versioning: Making the Contract "Never Break"</h3>
+<p style="color:#5eead4">Core trade-off: <strong>explicit versions (/v2) and the freedom to break</strong> vs <strong>date-based versions + a compatibility layer: zero breakage, perpetual maintenance cost</strong>.</p>
+<p><strong>Principle</strong>: first define <em>what a breaking change is</em> — <em>adding</em> a field/endpoint is <strong>backward-compatible</strong> (old clients ignore new fields); <em>removing</em> a field, <em>changing</em> a type/semantics/default is <strong>breaking</strong>. Three strategies: (1) <em>URL path</em> (<code>/v1</code>/<code>/v2</code>) — intuitive, but each major version means maintaining a whole parallel codebase; (2) <em>header negotiation</em> — clean URLs, but invisible and easily dropped by proxies/caches; (3) <em>date-based + compatibility layer</em> (the Stripe way) — an account is <em>pinned</em> to its signup-time version, core logic only writes the latest, and responses pass through a <em>backward transform chain</em> that downgrades to the client's pinned shape. New and old clients never break; the cost is a compatibility layer that accretes year over year.</p>
+<div class="mermaid">
+graph LR
+    REQ["request<br/>API-Version: 2018-02-28<br/><i>account pinned to old version</i>"]
+    CORE["core logic<br/><i>only knows latest schema</i>"]
+    T1["transform<br/>2020 → 2019"]
+    T2["transform<br/>2019 → 2018"]
+    RESP["response<br/><i>downgraded to 2018 shape</i>"]
+    REQ --> CORE
+    CORE -->|latest shape| T1 --> T2 --> RESP
+    classDef c fill:#2a1530,stroke:#ff7ab6,color:#e8eef5
+    class CORE c
+</div>
+<pre><code># Core logic only emits the latest response; the compat layer downgrades
+# step by step to the account's pinned version
+def respond(account, payload_latest):
+    v = account.api_version                    # e.g. "2018-02-28"
+    for change in breaking_changes_after(v):   # applied newest-first
+        payload_latest = change.downgrade(payload_latest)
+    return payload_latest
+# adding a field = backward-compatible, not in the chain
+# removing a field / changing a type = breaking, needs a downgrade()</code></pre>
+<div class="tradeoff">
+<strong>The trade-off</strong>: URL versions are <em>simple and visible but explode in count</em> (one codebase per /vN, a maintenance nightmare); date-based versions mean <em>zero breakage for callers</em>, but every breaking change requires a permanently-living downgrade function — <em>shifting complexity from the client to the platform</em>. The more "developer-friendly" the platform, the heavier its own compatibility burden.
+</div>
+<div class="case">
+<strong>Real-world cases:</strong>
+<ul>
+<li><strong>Stripe</strong>: <a href="https://stripe.com/blog/api-versioning">APIs as infrastructure: future-proofing Stripe with versioning</a> details date-based versions + a response compatibility layer — engineers write only the latest code, while requests/responses are transformed both ways at the boundary per account version, so a 10-year-old integration still runs today.</li>
+<li><strong>Google AIP / GitHub</strong>: favor <em>additive evolution</em> (add, don't remove), deferring deletions to rare major versions to maximize the backward-compatible window.</li>
+</ul>
+</div>
+
+<h3>4. The Rate-Limit Contract: 429 Is a Protocol, Not Just a Refusal</h3>
+<p style="color:#5eead4">Core trade-off: <strong>silent drop / bare 429</strong> vs <strong>cooperative limiting with Retry-After + quota headers + idempotency keys</strong>. (Algorithm internals — token bucket / sliding window / distributed limiting — are Day 10.)</p>
+<p><strong>Principle</strong>: at the API-design level, rate limiting is a <em>contract</em>, not pure defense. It should tell the client <em>how much quota is left, when to retry, and how to retry safely</em>: (1) on limit, return <code>429</code> + <code>Retry-After</code> (exactly how long to wait); (2) every response carries <code>X-RateLimit-Remaining / Reset</code>, so clients slow down proactively instead of hitting a wall; (3) per-key <em>quota tiers</em> (free/paid); (4) write requests carry an <em>Idempotency-Key</em>, so a rate-limited retry <em>doesn't double-charge</em> (see Day 7). The cardinal sin is a bare 429 — clients can only retry blindly and immediately, creating a retry storm that knocks the backend over a second time.</p>
+<pre><code># Rate limiting is a contract: client reads Retry-After; idempotency key makes retry safe
+resp = POST("/v1/charges", body,
+            headers={"Idempotency-Key": key})   # server dedupes on same key
+if resp.status == 429:
+    wait = resp.headers.get("Retry-After")       # server tells you how long (seconds)
+    sleep(wait + jitter())                        # add jitter to avoid a retry storm
+    retry()                                       # same key -> no double charge
+# also read X-RateLimit-Remaining to slow down before hitting 429</code></pre>
+<div class="case">
+<strong>Real-world cases:</strong>
+<ul>
+<li><strong>GitHub</strong>: the REST API attaches <code>X-RateLimit-Remaining / Reset</code> to every response and returns 403/429 with the reset time on overage — the de facto standard for public-API rate-limit headers.</li>
+<li><strong>Stripe</strong>: rate limiting + <a href="https://stripe.com/blog/api-versioning">Idempotency-Key</a> together — retries triggered by network blips or limiting are deduplicated by the idempotency key, guaranteeing "charge at most once."</li>
+</ul>
+</div>
+
+<h2>Scaling &amp; Optimization</h2>
+<ul>
+<li><strong>GraphQL governance</strong>: add <em>persisted queries</em> (client sends only a query hash, can use GET → regains HTTP caching) + <em>query cost / depth limits</em> (weight each field, reject over threshold, blocking deep-nesting DoS).</li>
+<li><strong>REST caching &amp; concurrency</strong>: <code>ETag</code> + <code>If-None-Match</code> for conditional requests (304 saves bandwidth), <code>If-Match</code> for optimistic concurrency (prevents lost updates); put cacheable GETs behind a CDN.</li>
+<li><strong>gRPC for browsers</strong>: use gRPC-Web or do gRPC↔JSON transcoding at the gateway — internal traffic enjoys gRPC, external stays JSON.</li>
+<li><strong>GraphQL → Federation</strong>: when the monolithic graph becomes a deploy bottleneck, split into per-team subgraphs composed by a gateway supergraph.</li>
+<li><strong>Push capabilities into the Gateway</strong>: auth, rate limiting, observability, version routing centralized; business services focus on logic.</li>
+</ul>
+
+<h2>Pitfalls &amp; Interview Questions</h2>
+<div class="callout">
+<strong>1. Offset pagination on a public API.</strong> Deep pages are slow and data drift causes skips/dups. Large, high-write datasets demand cursors with opaque tokens that hide the implementation.</div>
+<div class="callout">
+<strong>2. Exposing internal fields / DB schema directly as the API.</strong> That turns your database structure into a public contract — any schema change now breaks the API. APIs need an independent DTO boundary.</div>
+<div class="callout">
+<strong>3. GraphQL with no query cost / depth limit.</strong> A deeply nested query (<code>posts { comments { author { posts ... } } }</code>) can force exponential joins — a classic DoS vector.</div>
+<div class="callout">
+<strong>4. Treating "adding a field" as a breaking change worthy of a new version.</strong> Adding fields is backward-compatible; old clients ignore them. Misjudging this explodes version count and maintenance cost.</div>
+<div class="callout">
+<strong>5. Returning a bare 429.</strong> Without Retry-After / X-RateLimit, clients can only retry blindly → a retry storm that knocks the backend over again. Rate limiting is a contract — make it cooperative.</div>
+<p><strong>Likely interview follow-ups:</strong></p>
+<ol>
+<li>What fundamentally separates REST, GraphQL, and gRPC? When is GraphQL essential, when should you reach for gRPC?</li>
+<li>Why is GraphQL hard to cache over HTTP? How do persisted queries partially recover it?</li>
+<li>Why use an opaque cursor token instead of a raw id? What capability does it give up?</li>
+<li>What counts as breaking vs not? Where's the cost of date-based versions + a compat layer vs /v2?</li>
+<li>A third party keeps hitting 429 and retrying hard — how do you make it "back off politely" at the contract level?</li>
+<li>How does GraphQL's N+1 arise, and how does DataLoader solve it?</li>
+</ol>
+
+<h2>Deeper Resources</h2>
+<ul>
+<li><strong>Designing Data-Intensive Applications, Ch 4 §Encoding &amp; Evolution</strong> (Kleppmann): backward/forward compatibility and schema evolution — the theoretical root of API versioning.</li>
+<li><strong>Stripe — <a href="https://stripe.com/blog/api-versioning">APIs as infrastructure: future-proofing Stripe with versioning</a></strong>: the authoritative take on date-based versions + compatibility layers.</li>
+<li><strong>Slack — <a href="https://slack.engineering/evolving-api-pagination-at-slack/">Evolving API Pagination at Slack</a></strong>: the real offset → cursor evolution and its pitfalls.</li>
+<li><strong>Google — <a href="https://google.aip.dev/158">AIP-158: Pagination</a></strong>: the spec for opaque page_token and standard List methods.</li>
+<li><strong>GitHub — <a href="https://github.blog/developer-skills/github/the-github-graphql-api/">The GitHub GraphQL API</a></strong> / <strong>Netflix — <a href="https://netflixtechblog.com/how-netflix-scales-its-api-with-graphql-federation-part-1-ae3557c187e2">GraphQL Federation</a></strong>: industrial motivations for REST→GraphQL and federated supergraphs.</li>
+</ul>
+
+<h2>Going Deeper</h2>
+
+<details>
+<summary>1. GraphQL kills over/under-fetching but throws away REST's native HTTP/CDN caching advantage. Why? How do persisted queries partially recover it?</summary>
+<div class="answer">
+<p><strong>Why caching is lost</strong>: HTTP caches key on <em>URL + method</em> and only cache idempotent GETs. REST's <code>GET /users/42</code> is naturally a stable cache key. GraphQL sends everything as <code>POST /graphql</code> with the query in the body — one URL maps to infinitely many queries, so intermediaries can't cache by URL, and POST isn't cached by default. Caching responsibility moves from "free HTTP infrastructure" to "the application layer itself" (e.g., Apollo's normalized client cache).</p>
+<p><strong>How persisted queries help</strong>: the client pre-registers a query with the server for a hash; at runtime it sends only the hash + variables. Because the body is small and deterministic, you can <em>switch to <code>GET /graphql?sha256=...</code></em> — the URL becomes a stable cache key again, and CDN/rate limiting work once more. Bonus: the server accepts only whitelisted queries, automatically blocking malicious arbitrary ones. The cost is an extra registration step and reduced flexibility for dynamically assembled queries.</p>
+</div>
+</details>
+
+<details>
+<summary>2. If date-based versions + a compat layer let a contract "never break," why doesn't everyone do it? What's the second-order cost?</summary>
+<div class="answer">
+<p>It looks perfect on the surface: zero breakage for callers, engineers write only the latest code. But the cost is <em>hidden and compounds yearly</em>:</p>
+<ul>
+<li><strong>The compat layer lives forever</strong>: each breaking change needs a downgrade that can <em>never be deleted</em> (as long as one account is pinned to that old version). Over years that's hundreds of transforms whose interactions explode the test matrix.</li>
+<li><strong>Debugging gets harder</strong>: a bug may surface only when "some old version passes through some transform chain" — reproducing it means first restoring the client's pinned version.</li>
+<li><strong>Needs infrastructure to back it</strong>: automated tests across all versions, version replay, a transform DSL. Teams without this get dragged down by the compat layer.</li>
+</ul>
+<p>So it suits a company like Stripe — <em>"API as product, vast and uncontrollable caller base"</em> — where paying a perpetual maintenance tax for stability pays off. For internal scenarios where you can push client upgrades, a simple /v2 + deprecation window is more economical. <strong>The essence: shift the pain of breakage from all callers onto the platform itself; whether it's worth it depends on how many and how uncontrollable the callers are.</strong></p>
+</div>
+</details>
+
+<details>
+<summary>3. Why insist on an opaque (non-parseable) cursor token instead of exposing last_id directly? What new constraints does this introduce?</summary>
+<div class="answer">
+<p><strong>Why opaque</strong>: if the cursor is a bare <code>last_id=12345</code>, clients start <em>depending</em> on its structure — guessing, hand-crafting, skipping around. The moment you want to change the implementation (from a single-column id to a <code>(created_at, id)</code> composite anchor for time-ordering, or adding shard routing), every client that relied on the raw structure breaks. Encoding it as an opaque string (base64 of an internal struct) <em>excludes pagination internals from the public contract</em> — exactly AIP-158's point: <em>what can be parsed will be depended on, and what's depended on can't be changed</em>.</p>
+<p><strong>New constraints</strong>: (1) <em>cursors expire</em> — the pinned sort key/snapshot point can't be valid forever, so clients must handle "cursor expired" and restart from the top; (2) <em>no page jumps, no totals</em>, clashing with "show page N of M"; (3) the cursor <em>carries no authorization</em> — you must re-authorize every request, or someone with another's cursor could page across their data; (4) the sort key must be <em>unique and ordered</em>, or boundary rows skip/duplicate (use a <code>(timestamp, id)</code> composite to break ties).</p>
+</div>
+</details>
+
+<details>
+<summary>4. Public APIs are almost universally REST/GraphQL; gRPC stays internal. What would you pay to force gRPC as a public API?</summary>
+<div class="answer">
+<ul>
+<li><strong>Browsers can't connect directly</strong>: gRPC relies on low-level HTTP/2 features (trailers) that browser fetch can't access, requiring a gRPC-Web + proxy layer — extra infra friction for third parties.</li>
+<li><strong>Hard to debug</strong>: binary Protobuf isn't <code>curl</code>-able and human-readable like JSON, raising debugging cost for outside developers; tooling support lags REST.</li>
+<li><strong>Tight IDL coupling</strong>: callers must obtain the <code>.proto</code> and generate stubs; coordinating proto upgrades is costly — you can't force thousands of third parties to sync.</li>
+<li><strong>No caching/CDN</strong>: with no URL semantics, HTTP caching infrastructure is unusable.</li>
+</ul>
+<p><strong>But these "drawbacks" are virtues internally</strong>: you control all services, can upgrade protos uniformly, want low latency and strong types over human readability, and east-west traffic needs no CDN. So protocol choice is fundamentally about <em>"are the callers controllable?"</em>: controllable (internal) → optimize machine efficiency, pick gRPC; uncontrollable (public) → optimize human reach and evolvability, pick REST/GraphQL.</p>
+</div>
+</details>
+
+<details>
+<summary>5. GraphQL's N+1 is more insidious than REST's — why? How does DataLoader solve it, and where are its "batch + cache" boundaries?</summary>
+<div class="answer">
+<p><strong>Why more insidious</strong>: REST's N+1 is visible to the client (you can count requests). GraphQL's N+1 hides in <em>server-side resolvers</em>: query <code>posts { author { name } }</code> and the framework calls the <code>author</code> resolver once per post — 100 posts means 100 <code>SELECT author WHERE id=?</code> queries. From outside it's "one query," yet the backend explodes into 1+100 DB hits that vary with query shape — invisible unless you watch metrics.</p>
+<p><strong>How DataLoader solves it</strong>: within a single request it does two things — (1) <em>batch</em>: instead of running each <code>load(id)</code> immediately, it collects all ids in the same tick and merges them into one <code>WHERE id IN (...)</code> at the end of the event loop, turning N into 1; (2) <em>per-request cache</em>: a repeated <code>load(same id)</code> in the same request returns from cache.</p>
+<p><strong>Boundaries</strong>: the cache is valid <em>only within the single request's lifecycle</em> (preventing cross-request stale reads, ensuring intra-query consistency), not global; it solves "fetch amplification," not "the query being too deep/complex" — the latter needs query-cost analysis. They're two orthogonal lines of defense.</p>
+</div>
+</details>
+
+</div></body></html>

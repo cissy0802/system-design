@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 9 · API 设计 (API Design) — System Design Bi-daily</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"SF Pro Display","Noto Sans SC",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
+.container{max-width:820px;margin:0 auto;padding:24px 20px 60px}
+header{padding:40px 0 28px;border-bottom:1px solid rgba(100,200,255,0.15);margin-bottom:32px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem}
+.tag{padding:3px 10px;border-radius:4px;background:rgba(100,200,255,0.12);color:#64c8ff;border:1px solid rgba(100,200,255,0.25)}
+.tag.diff{background:rgba(94,234,212,0.1);color:#5eead4;border-color:rgba(94,234,212,0.3)}
+.tag.day{background:rgba(255,180,80,0.1);color:#ffb450;border-color:rgba(255,180,80,0.25)}
+h1{font-size:1.75rem;font-weight:800;background:linear-gradient(135deg,#64c8ff 0%,#5eead4 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:0.5px;line-height:1.3}
+h1 .en{display:block;font-size:1rem;color:#7a8590;-webkit-text-fill-color:#7a8590;margin-top:6px;font-weight:500}
+h2{font-size:1.2rem;color:#5eead4;margin:36px 0 14px;padding-left:12px;border-left:3px solid #5eead4}
+h3{font-size:1rem;color:#64c8ff;margin:20px 0 10px;font-weight:600}
+p{margin:10px 0;color:#c8cfd6}
+ul,ol{margin:10px 0 10px 22px;color:#c8cfd6}
+li{margin:6px 0}
+strong{color:#e8eef5;font-weight:600}
+em{color:#5eead4;font-style:normal;font-weight:500}
+code{font-family:"SF Mono",Menlo,Consolas,monospace;background:rgba(100,200,255,0.1);color:#5eead4;padding:1px 6px;border-radius:3px;font-size:0.88em}
+pre{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:14px 16px;overflow-x:auto;margin:12px 0;font-family:"SF Mono",Menlo,Consolas,monospace;font-size:0.84rem;line-height:1.55;color:#c8cfd6}
+pre code{background:none;color:inherit;padding:0;font-size:1em}
+.mermaid{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:18px;margin:14px 0;text-align:center;overflow-x:auto;cursor:zoom-in;transition:border-color 0.15s}
+.mermaid:hover{border-color:rgba(100,200,255,0.4)}
+.mermaid svg{width:100%;max-width:100%;height:auto;min-height:280px}
+.lightbox{position:fixed;inset:0;background:rgba(8,12,18,0.96);z-index:9999;display:none;align-items:center;justify-content:center;padding:24px;cursor:grab;backdrop-filter:blur(4px);overflow:hidden}
+.lightbox.open{display:flex}
+.lightbox.dragging{cursor:grabbing}
+.lightbox svg{width:auto;height:auto;max-width:96vw;max-height:92vh;transform-origin:center center;will-change:transform}
+.lightbox .hint{position:fixed;top:16px;right:20px;font-size:0.78rem;color:#7a8590;font-family:"SF Mono",Menlo,monospace;pointer-events:none}
+.callout{background:rgba(255,180,80,0.06);border-left:3px solid #ffb450;padding:12px 14px;margin:14px 0;border-radius:4px;font-size:0.94rem}
+.callout strong{color:#ffb450}
+.tradeoff{background:rgba(100,200,255,0.05);border:1px solid rgba(100,200,255,0.2);border-radius:6px;padding:12px 14px;margin:12px 0;font-size:0.94rem}
+.case{background:rgba(94,234,212,0.05);border-left:3px solid #5eead4;padding:12px 14px;margin:12px 0;border-radius:4px;font-size:0.94rem}
+.case strong{color:#5eead4}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:0.9rem}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid rgba(100,200,255,0.15)}
+th{color:#64c8ff;font-weight:600;background:rgba(100,200,255,0.05)}
+details{background:rgba(100,200,255,0.04);border:1px solid rgba(100,200,255,0.18);border-radius:6px;padding:12px 16px;margin:10px 0;transition:all 0.15s}
+details:hover{border-color:rgba(100,200,255,0.35)}
+details[open]{background:rgba(94,234,212,0.05);border-color:rgba(94,234,212,0.3)}
+details summary{font-weight:600;color:#e8eef5;list-style:none;outline:none;cursor:pointer;display:flex;align-items:flex-start;gap:10px;font-size:0.96rem}
+details summary::-webkit-details-marker{display:none}
+details summary::before{content:'▶';color:#64c8ff;font-size:0.75em;transition:transform 0.2s;flex-shrink:0;margin-top:5px}
+details[open] summary::before{transform:rotate(90deg);color:#5eead4}
+details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
+details .answer ul,details .answer ol{margin:6px 0 6px 22px}
+@media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+</style>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({startOnLoad:true,theme:'base',flowchart:{useMaxWidth:true,htmlLabels:true,nodeSpacing:50,rankSpacing:60},themeVariables:{primaryColor:'#1a2530',primaryTextColor:'#e8eef5',primaryBorderColor:'#64c8ff',lineColor:'#5eead4',secondaryColor:'#0e1419',tertiaryColor:'#0a0f14',background:'#0a0f14',mainBkg:'#1a2530',secondBkg:'#0e1419',textColor:'#d4dae0',fontFamily:'-apple-system,"SF Pro Display",sans-serif',fontSize:'16px'}});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const lb=document.createElement('div');lb.className='lightbox';
+  lb.innerHTML='<span class="hint">scroll = zoom · drag = pan · Esc / click bg = close</span>';
+  document.body.appendChild(lb);
+  let scale=1,panX=0,panY=0,dragging=false,moved=false,lx=0,ly=0;
+  const apply=()=>{const s=lb.querySelector('svg');if(s)s.style.transform=`translate(${panX}px,${panY}px) scale(${scale})`};
+  const reset=()=>{scale=1;panX=0;panY=0};
+  const close=()=>{lb.classList.remove('open');const s=lb.querySelector('svg');if(s)s.remove();reset()};
+  document.addEventListener('click',e=>{
+    if(e.target.closest('.lightbox')){if(moved){moved=false;return}close();return}
+    const w=e.target.closest('.mermaid');if(!w)return;
+    const svg=w.querySelector('svg');if(!svg)return;
+    const c=svg.cloneNode(true);c.removeAttribute('style');
+    c.style.maxWidth='96vw';c.style.maxHeight='92vh';
+    lb.appendChild(c);lb.classList.add('open');reset();apply();
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+  lb.addEventListener('wheel',e=>{
+    if(!lb.classList.contains('open'))return;
+    e.preventDefault();
+    const svg=lb.querySelector('svg');if(!svg)return;
+    const ns=Math.max(0.3,Math.min(10,scale*(1-e.deltaY*0.002)));
+    const r=svg.getBoundingClientRect();
+    const cx=e.clientX-(r.left+r.width/2),cy=e.clientY-(r.top+r.height/2);
+    const k=ns/scale-1;panX-=cx*k;panY-=cy*k;scale=ns;apply();
+  },{passive:false});
+  lb.addEventListener('mousedown',e=>{
+    if(!lb.classList.contains('open'))return;
+    dragging=true;moved=false;lx=e.clientX;ly=e.clientY;lb.classList.add('dragging');e.preventDefault();
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    const dx=e.clientX-lx,dy=e.clientY-ly;
+    if(Math.abs(dx)+Math.abs(dy)>3)moved=true;
+    panX+=dx;panY+=dy;lx=e.clientX;ly=e.clientY;apply();
+  });
+  document.addEventListener('mouseup',()=>{dragging=false;lb.classList.remove('dragging')});
+});
+</script>
+</head><body><div class="container">
+
+<header>
+<div class="meta">
+<span class="tag day">Day 9</span>
+<span class="tag diff">Medium</span>
+<span class="tag">API Design</span>
+<span class="tag">REST / GraphQL / gRPC</span>
+<span class="tag">Pagination · Versioning</span>
+</div>
+<h1>API 设计 — 契约一旦公开，破坏它的代价由所有调用方承担<span class="en">REST vs GraphQL vs gRPC · Pagination · Versioning · Rate Limiting</span></h1>
+</header>
+
+<h2>问题场景与约束</h2>
+<p>设计一个<strong>面向第三方开发者的开放平台 API</strong>（想象 GitHub / Stripe 那种），同时要服务自家 iOS/Android/Web 与外部集成。难点不在写接口，在于<em>契约一旦公开，破坏它的代价由所有调用方承担</em>——一个不更新的第三方集成可能跑了 5 年，你删一个字段它就挂。</p>
+<ul>
+<li><strong>规模</strong>：10 万+ 第三方集成，日 API 调用 <strong>10 亿+</strong>，读写比约 50:1。</li>
+<li><strong>多端异构</strong>：移动端要省流量（按需取字段）、Web 要一次聚合多资源、内部服务要强类型高吞吐。一种协议很难同时最优。</li>
+<li><strong>永不破坏</strong>：公开契约发布后假设<em>永久存在</em>。破坏 = 大批集成报错、客服爆炸、上头条。</li>
+<li><strong>翻页稳定</strong>：列 charges / issues 时数据在持续写入，翻页<em>不能漏、不能重</em>。</li>
+<li><strong>防滥用</strong>：单个 key 不能打爆共享后端，要公平限流 + <em>可预测、对开发者友好</em>的 429。</li>
+</ul>
+<p>今天讲四件事：<em>协议选型、分页、版本管理、限流契约</em>——API 设计里最容易在生产里翻车、面试里被追问的四块。</p>
+
+<h2>高层架构</h2>
+<div class="mermaid">
+graph LR
+    subgraph Clients["客户端"]
+        M["移动端<br/><i>省流量</i>"]
+        W["Web"]
+        T["第三方集成<br/><i>可能 5 年不更新</i>"]
+    end
+    GW["API Gateway<br/><i>认证 · 限流 · 版本路由</i>"]
+    REST["REST /v1<br/><i>资源模型 · 可 HTTP 缓存</i>"]
+    GQL["GraphQL<br/><i>按需取数 · 单次往返</i>"]
+    subgraph Internal["内部 (gRPC mesh)"]
+        S1["订单服务"]
+        S2["用户服务"]
+        S3["计费服务"]
+    end
+    DB[("DB / Cache")]
+    M --> GW
+    W --> GW
+    T --> GW
+    GW --> REST
+    GW --> GQL
+    REST -->|gRPC| S1
+    GQL -->|gRPC| S2
+    S1 --> S3
+    S1 --> DB
+    classDef gw fill:#2a1530,stroke:#ff7ab6,color:#e8eef5
+    classDef edge fill:#0e2030,stroke:#5eead4,color:#e8eef5
+    class GW gw
+    class REST,GQL edge
+</div>
+<p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px"><strong>核心思路</strong>：一个 <em>Gateway</em> 收口认证、限流、版本路由；<em>对外</em>用 REST + GraphQL（web 友好、可演进、易缓存），<em>对内</em>服务间用 gRPC（强类型、高吞吐）。信任边界两侧用不同协议，是几乎所有大平台的默认形态。</p>
+
+<h2>关键技术点</h2>
+
+<h3>1. 协议选型：REST vs GraphQL vs gRPC</h3>
+<p style="color:#5eead4">核心 trade-off：<strong>资源模型可缓存的简单</strong> vs <strong>客户端按需取数的灵活</strong> vs <strong>内部强类型高性能</strong>。</p>
+<p><strong>原理</strong>：三种抽象。<strong>REST</strong> 把世界建模成<em>资源 + HTTP 动词</em>，无状态、可按 URL 被 CDN/浏览器缓存，但常<em>over-fetch（多给用不到的字段）</em>或 <em>under-fetch（一个视图要多次往返）</em>。<strong>GraphQL</strong> 让客户端<em>用一个查询声明要哪些字段</em>，一次取齐、消除 over/under-fetch，代价是缓存与限流变难（都走 POST /graphql，URL 不再是缓存键）。<strong>gRPC</strong> 基于 HTTP/2 + Protobuf，二进制、强类型 IDL、支持双向流，延迟吞吐最优，但浏览器不能直连、调试不直观——天生是<em>内部服务间</em>协议。</p>
+<table>
+<thead><tr><th>维度</th><th>REST</th><th>GraphQL</th><th>gRPC</th></tr></thead>
+<tbody>
+<tr><td>取数</td><td>固定资源（易 over/under-fetch）</td><td>按需字段，一次取齐</td><td>固定 RPC 方法</td></tr>
+<tr><td>HTTP 缓存</td><td>✅ 天然（GET+URL）</td><td>❌ 难（POST）</td><td>❌ 不适用</td></tr>
+<tr><td>类型/契约</td><td>弱（OpenAPI 补）</td><td>✅ schema 强类型</td><td>✅ Protobuf 强类型</td></tr>
+<tr><td>性能</td><td>中（JSON 文本）</td><td>中</td><td>✅ 高（二进制+流）</td></tr>
+<tr><td>浏览器直连</td><td>✅</td><td>✅</td><td>❌（需 gRPC-Web）</td></tr>
+<tr><td>最佳场景</td><td>公开资源 API、可缓存</td><td>多端聚合、字段多变</td><td>内部微服务、低延迟</td></tr>
+</tbody></table>
+<pre><code># REST: 渲染一个 PR 页面要多次往返 (under-fetch + N+1)
+GET /repos/o/r/pulls/42          -> PR 主体 (含一堆用不到字段, over-fetch)
+GET /repos/o/r/pulls/42/commits  -> 提交列表
+GET /repos/o/r/pulls/42/reviews  -> 评审
+GET /users/alice                 -> 作者信息 (每个作者一次, N+1)
+
+# GraphQL: 一次往返, 只取需要的字段
+query {
+  repository(owner:"o", name:"r") {
+    pullRequest(number:42) {
+      title
+      author { login avatarUrl }
+      commits(last:5) { nodes { oid } }
+      reviews(last:10) { nodes { state } }
+    }
+  }
+}</code></pre>
+<div class="tradeoff">
+<strong>怎么选</strong>：
+<ul>
+<li><strong>公开资源型、强缓存、调用方千差万别</strong> → REST（最低认知门槛，CDN 友好）。</li>
+<li><strong>多端 UI、字段需求多变、想消除往返</strong> → GraphQL（但必须配 query cost 限制，否则一个嵌套查询打爆后端）。</li>
+<li><strong>内部服务间、低延迟、强契约、流式</strong> → gRPC。<em>几乎没人把 gRPC 当公开 API</em>。</li>
+</ul>
+</div>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>GitHub</strong>：REST v3 用了多年后推出 <a href="https://github.blog/developer-skills/github/the-github-graphql-api/">GraphQL API v4</a>，公开承认 REST「一个资源要 2-3 次调用、又给太多又给不够」是迁移主因。</li>
+<li><strong>Netflix</strong>：从单体 GraphQL 演进到 <a href="https://netflixtechblog.com/how-netflix-scales-its-api-with-graphql-federation-part-1-ae3557c187e2">Federated GraphQL（联邦超图）</a>，让数十个后端团队各管一个 subgraph、独立部署，解决「One Graph」部署堵车。</li>
+<li><strong>gRPC</strong>：源自 Google 内部 Stubby，广泛用于服务间通信；Uber、Square、Netflix 等内部 mesh 大量采用，对外仍以 REST/GraphQL 暴露。</li>
+</ul>
+</div>
+
+<h3>2. 分页：Offset vs Cursor (Keyset)</h3>
+<p style="color:#5eead4">核心 trade-off：<strong>offset 可随机跳页的简单</strong> vs <strong>cursor 在大数据集 + 高频写下的稳定与高效</strong>。</p>
+<p><strong>原理</strong>：<strong>Offset 分页</strong>（<code>LIMIT 20 OFFSET 100000</code>）实现简单、能跳到任意页，但有两个硬伤：(1) <em>深翻页慢</em>——DB 要扫描并丢弃前 100000 行，O(offset)；(2) <em>数据漂移</em>——翻页过程中有人插入/删除，窗口错位，导致<em>漏读或重复</em>。<strong>Cursor / Keyset 分页</strong>用「上一页最后一行的有序锚点」做游标（<code>WHERE id &gt; last_seen ORDER BY id</code>），走索引 O(log n) 定位，且新插入的行不影响已翻过的页——稳定。代价是<em>不能跳页、不能显示总页数</em>。</p>
+<table>
+<thead><tr><th></th><th>Offset</th><th>Cursor (Keyset)</th></tr></thead>
+<tbody>
+<tr><td>深翻页性能</td><td>差 O(offset)</td><td>✅ O(log n) 走索引</td></tr>
+<tr><td>高频写下一致</td><td>❌ 漂移/漏/重</td><td>✅ 稳定</td></tr>
+<tr><td>跳到第 N 页</td><td>✅ 支持</td><td>❌ 只能顺序翻</td></tr>
+<tr><td>总数/总页</td><td>✅ 可给</td><td>❌ 通常不给</td></tr>
+<tr><td>适用</td><td>小数据集、管理后台</td><td>大数据集、公开 API、infinite scroll</td></tr>
+</tbody></table>
+<pre><code>-- Offset: 深翻页要扫描 OFFSET 行后丢弃, 慢且翻页中插入会错位
+SELECT * FROM events ORDER BY id LIMIT 20 OFFSET 100000;
+
+-- Keyset/cursor: 用上一页最后一个 id 作锚, 走主键索引
+SELECT * FROM events
+WHERE id > :last_seen_id          -- 由 opaque cursor 解码得到
+ORDER BY id LIMIT 20;
+-- next_cursor = encode(本页最后一行 id); 新插入行不影响已翻过的页</code></pre>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Slack</strong>：<a href="https://slack.engineering/evolving-api-pagination-at-slack/">Evolving API Pagination at Slack</a> 记录了从「无分页 → offset → cursor」的演进——频道消息高频写入下，offset 会重复返回新插入的消息，cursor 才稳定。</li>
+<li><strong>Google API 规范</strong>：<a href="https://google.aip.dev/158">AIP-158</a> 强制用 <em>opaque（不可解析）的 page_token</em>——把分页实现细节藏在 token 里，将来能换底层实现而不破坏调用方。</li>
+</ul>
+</div>
+
+<h3>3. 版本管理：让契约「永不破坏」</h3>
+<p style="color:#5eead4">核心 trade-off：<strong>显式版本（/v2）的破坏自由</strong> vs <strong>日期版本 + 兼容层的零破坏，但永久维护成本</strong>。</p>
+<p><strong>原理</strong>：先分清<em>什么是破坏性变更</em>——<em>加</em>字段/端点是<strong>向后兼容</strong>的（老客户端忽略新字段）；<em>删</em>字段、<em>改</em>类型/语义、<em>改</em>默认值才是 <strong>breaking</strong>。三种版本策略：(1) <em>URL 路径</em>（<code>/v1</code> /<code>/v2</code>）——直观，但每个大版本要并行维护整套代码；(2) <em>Header 协商</em>——URL 干净，但不可见、易被代理/缓存忽略；(3) <em>日期版本 + 兼容层</em>（Stripe 法）——账号<em>pin</em>在注册时的版本，核心逻辑<em>只写最新</em>，响应经一条<em>向后 transform 链</em>降级回客户端 pinned 的格式。新老客户端永远不破，代价是兼容层逐年累积。</p>
+<div class="mermaid">
+graph LR
+    REQ["请求<br/>API-Version: 2018-02-28<br/><i>账号 pinned 旧版本</i>"]
+    CORE["核心逻辑<br/><i>只认最新 schema</i>"]
+    T1["transform<br/>2020 → 2019"]
+    T2["transform<br/>2019 → 2018"]
+    RESP["响应<br/><i>降级回 2018 格式</i>"]
+    REQ --> CORE
+    CORE -->|最新格式| T1 --> T2 --> RESP
+    classDef c fill:#2a1530,stroke:#ff7ab6,color:#e8eef5
+    class CORE c
+</div>
+<pre><code># 核心逻辑只产出最新版响应; 兼容层按账号 pinned 版本逐级降级
+def respond(account, payload_latest):
+    v = account.api_version                    # e.g. "2018-02-28"
+    for change in breaking_changes_after(v):   # 按时间倒序应用
+        payload_latest = change.downgrade(payload_latest)
+    return payload_latest
+# 加字段 = 向后兼容, 不进 transform 链
+# 删字段/改类型 = breaking, 必须写一个对应的 downgrade()</code></pre>
+<div class="tradeoff">
+<strong>取舍</strong>：URL 版本<em>简单可见但版本爆炸</em>（每个 /vN 一套代码，维护噩梦）；日期版本<em>对调用方零破坏</em>，但每个 breaking change 都要写一段永久存活的 downgrade 逻辑，<em>把复杂度从客户端转移到平台方</em>。平台越想「对开发者好」，自己背的兼容包袱越重。
+</div>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Stripe</strong>：<a href="https://stripe.com/blog/api-versioning">APIs as infrastructure: future-proofing Stripe with versioning</a> 详述日期版本 + 响应兼容层——工程师只写最新代码，请求/响应在边界处按账号版本双向变换，让 10 年前的集成今天仍跑。</li>
+<li><strong>Google AIP / GitHub</strong>：倾向<em>加性演进</em>（只加不删），把删除推迟到极少的大版本里，最大化向后兼容窗口。</li>
+</ul>
+</div>
+
+<h3>4. 限流契约：429 不只是拒绝，是一份协议</h3>
+<p style="color:#5eead4">核心 trade-off：<strong>静默丢弃/裸 429</strong> vs <strong>带 Retry-After + 配额头 + 幂等键的可协作限流</strong>。（算法内部——token bucket / sliding window / 分布式限流——留 Day 10。）</p>
+<p><strong>原理</strong>：限流在 API 设计层是<em>契约</em>而非纯防御，要让客户端知道<em>还剩多少额度、何时能重试、怎样重试安全</em>：(1) 超限返回 <code>429</code> + <code>Retry-After</code>（明确等多久）；(2) 每个响应带 <code>X-RateLimit-Remaining / Reset</code>，客户端可主动减速而非撞墙；(3) 按 key 分<em>配额层级</em>（免费/付费）；(4) 写请求配 <em>Idempotency-Key</em>，让限流后的重试<em>不重复扣款</em>（见 Day 7）。最忌裸 429——客户端只能盲目立即重试，制造重试风暴二次打垮后端。</p>
+<pre><code># 限流是契约: 客户端读 Retry-After, 幂等键让重试安全
+resp = POST("/v1/charges", body,
+            headers={"Idempotency-Key": key})   # 同 key 服务端去重
+if resp.status == 429:
+    wait = resp.headers.get("Retry-After")       # 服务端告知等多久(秒)
+    sleep(wait + jitter())                        # 加抖动, 避免同时重试风暴
+    retry()                                       # 同一 key -> 不会重复扣款
+# 平时也读 X-RateLimit-Remaining 主动减速, 而不是撞到 429 才反应</code></pre>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>GitHub</strong>：REST API 每响应带 <code>X-RateLimit-Remaining / Reset</code>，超限返回 403/429 并告知重置时间，是公开 API 限流头的事实标准。</li>
+<li><strong>Stripe</strong>：限流 + <a href="https://stripe.com/blog/api-versioning">Idempotency-Key</a> 组合——网络抖动/限流触发的重试通过幂等键去重，保证「最多扣一次款」。</li>
+</ul>
+</div>
+
+<h2>扩展与优化</h2>
+<ul>
+<li><strong>GraphQL 治理</strong>：<em>persisted queries</em>（只传查询哈希、可走 GET 重获 HTTP 缓存）+ <em>query cost / depth limit</em>（字段算权重、超阈值拒绝，防深嵌套 DoS）。</li>
+<li><strong>REST 缓存与并发</strong>：<code>ETag</code> + <code>If-None-Match</code> 条件请求（304 省带宽），<code>If-Match</code> 乐观并发（防 lost update）；可缓存 GET 挂 CDN。</li>
+<li><strong>gRPC 给浏览器</strong>：gRPC-Web 或在 gateway 做 gRPC↔JSON transcoding，内部享受 gRPC、外部仍是 JSON。</li>
+<li><strong>GraphQL 演进到 Federation</strong>：单体 graph 成部署瓶颈时拆成 per-team subgraph，gateway 组合超图。</li>
+<li><strong>能力下沉 Gateway</strong>：认证、限流、observability、版本路由统一收口，业务服务专注逻辑。</li>
+</ul>
+
+<h2>常见陷阱与面试问题</h2>
+<div class="callout">
+<strong>1. 公开 API 用 offset 分页。</strong> 深翻页慢且数据漂移导致漏/重。大数据集、高频写场景必须用 cursor，并用 opaque token 藏实现细节。</div>
+<div class="callout">
+<strong>2. 把内部字段/DB schema 直接暴露成 API。</strong> 等于把数据库结构变成公开契约，以后改表就破坏 API。API 要有独立的 DTO 边界。</div>
+<div class="callout">
+<strong>3. GraphQL 不做 query cost / depth 限制。</strong> 一个深度嵌套查询（<code>posts { comments { author { posts ... } } }</code>）能让后端做指数级 join，是经典 DoS 入口。</div>
+<div class="callout">
+<strong>4. 把「加字段」当 breaking change 去发新版本。</strong> 加字段是向后兼容的，老客户端会忽略。误判会导致版本号爆炸、维护成本失控。</div>
+<div class="callout">
+<strong>5. 限流只返回裸 429。</strong> 不给 Retry-After / X-RateLimit，客户端只能盲目立即重试 → 重试风暴二次打垮后端。限流是契约，要可协作。</div>
+<p><strong>面试可能追问：</strong></p>
+<ol>
+<li>REST、GraphQL、gRPC 三者本质区别？什么场景非 GraphQL 不可、什么场景该用 gRPC？</li>
+<li>为什么 GraphQL 难做 HTTP 缓存？persisted query 怎么部分挽回？</li>
+<li>cursor 分页为什么用 opaque token 而不是裸 id？它放弃了什么能力？</li>
+<li>什么变更算 breaking、什么不算？日期版本 + 兼容层相比 /v2 的代价在哪？</li>
+<li>一个第三方反复触发 429 还在猛重试，怎么从 API 契约层面让它「文明退避」？</li>
+<li>GraphQL 的 N+1 问题怎么来、DataLoader 怎么解决？</li>
+</ol>
+
+<h2>深入资源</h2>
+<ul>
+<li><strong>《Designing Data-Intensive Applications》Ch 4 §Encoding &amp; Evolution</strong>（Kleppmann）：向后/向前兼容、schema 演进的本质讨论，API 版本管理的理论根。</li>
+<li><strong>Stripe — <a href="https://stripe.com/blog/api-versioning">APIs as infrastructure: future-proofing Stripe with versioning</a></strong>：日期版本 + 兼容层的权威实践。</li>
+<li><strong>Slack — <a href="https://slack.engineering/evolving-api-pagination-at-slack/">Evolving API Pagination at Slack</a></strong>：offset → cursor 的真实演进与踩坑。</li>
+<li><strong>Google — <a href="https://google.aip.dev/158">AIP-158: Pagination</a></strong>：opaque page_token 与标准 List 方法的规范。</li>
+<li><strong>GitHub — <a href="https://github.blog/developer-skills/github/the-github-graphql-api/">The GitHub GraphQL API</a></strong> / <strong>Netflix — <a href="https://netflixtechblog.com/how-netflix-scales-its-api-with-graphql-federation-part-1-ae3557c187e2">GraphQL Federation</a></strong>：REST→GraphQL 与联邦超图的工业级动机。</li>
+</ul>
+
+<h2>深入思考</h2>
+
+<details>
+<summary>1. GraphQL 消除了 over/under-fetching，却几乎丢掉了 REST 在 HTTP/CDN 缓存上的天然优势。为什么？persisted query 怎么部分挽回？</summary>
+<div class="answer">
+<p><strong>为什么丢缓存</strong>：HTTP 缓存以 <em>URL + 方法</em>为键，且只缓存幂等 GET。REST 的 <code>GET /users/42</code> 天然是稳定缓存键。而 GraphQL 所有查询都打 <code>POST /graphql</code>，查询体在 body——同一 URL 对应无数查询，中间层无法按 URL 缓存，POST 也默认不缓存。缓存责任从「免费的 HTTP 基础设施」被推给「应用层自己实现」（如 Apollo 归一化客户端缓存）。</p>
+<p><strong>persisted query 怎么补</strong>：客户端预先把查询注册到服务端换取哈希；运行时只发哈希 + 变量。请求体小而确定，就能<em>改用 <code>GET /graphql?sha256=...</code></em>——URL 重新变成稳定缓存键，CDN/限流又能工作。额外好处：服务端只接受白名单查询，自动挡掉恶意复杂查询。代价是多一步注册流程、动态拼查询的灵活性下降。</p>
+</div>
+</details>
+
+<details>
+<summary>2. 既然日期版本 + 兼容层能让契约「永不破坏」，为什么不是所有公司都这么做？它的二阶成本是什么？</summary>
+<div class="answer">
+<p>表面完美：调用方零破坏、工程师只写最新代码。但成本<em>隐蔽且逐年复利</em>：</p>
+<ul>
+<li><strong>兼容层永久存活</strong>：每个 breaking change 写一段 downgrade，且<em>永远不能删</em>（只要还有一个账号 pin 在老版本）。多年累积成几百段变换，相互作用使测试矩阵爆炸。</li>
+<li><strong>排障变难</strong>：一个 bug 可能只在「某老版本经过某条 transform 链」时出现，复现要先还原客户端 pinned 的版本。</li>
+<li><strong>需基建兜底</strong>：覆盖所有版本的自动化测试、版本回放、变换 DSL。中小团队没这套，硬上会被兼容层拖死。</li>
+</ul>
+<p>所以它适合 Stripe 这种<em>「API 即产品、调用方极多且不可控」</em>的公司——为稳定性付永久维护税划算。能推动客户端升级的内部场景，简单的 /v2 + 弃用窗口更经济。<strong>本质是把破坏的痛苦从所有调用方转移到平台方自己，值不值取决于调用方的数量与不可控程度。</strong></p>
+</div>
+</details>
+
+<details>
+<summary>3. cursor 分页为什么坚持用 opaque（不可解析）token，而不是直接把 last_id 暴露给客户端？这又引入了什么新约束？</summary>
+<div class="answer">
+<p><strong>为什么 opaque</strong>：若游标是裸的 <code>last_id=12345</code>，客户端会<em>依赖</em>它的结构——猜测、手工构造、跳着传。一旦你想换底层实现（从单列 id 改成 <code>(created_at, id)</code> 复合锚点以支持按时间排序，或加入分片路由），所有依赖裸结构的客户端就崩了。编码成不透明字符串（base64 一个内部结构体），等于<em>把分页实现排除在公开契约之外</em>——这正是 AIP-158 的核心：<em>能解析的就会被依赖，被依赖的就改不动</em>。</p>
+<p><strong>引入的新约束</strong>：(1) <em>游标会过期</em>——里面 pin 的排序键/快照点不能永久有效，客户端要能处理「游标失效」并从头翻；(2) <em>不能跳页、不能算总数</em>，与「显示共 N 页」冲突；(3) 游标<em>不能携带授权</em>——必须每次重新鉴权，否则拿到别人的游标就能越权；(4) 排序键必须<em>唯一且有序</em>，否则边界行漏/重（常用 <code>(timestamp, id)</code> 复合键打破并列）。</p>
+</div>
+</details>
+
+<details>
+<summary>4. 公开 API 几乎清一色 REST/GraphQL，gRPC 基本只在内部。如果硬把 gRPC 当公开 API，会付出哪些代价？</summary>
+<div class="answer">
+<ul>
+<li><strong>浏览器不能直连</strong>：gRPC 依赖 HTTP/2 的 trailer 等底层特性，浏览器 fetch 拿不到，必须经 gRPC-Web + 代理转换——给第三方平添一层基建门槛。</li>
+<li><strong>调试不直观</strong>：二进制 Protobuf 不能像 JSON 那样 <code>curl</code> 一下肉眼看懂，第三方开发者排障成本陡增；生态工具（Postman 类）支持也弱于 REST。</li>
+<li><strong>强 IDL 耦合</strong>：调用方要拿到 <code>.proto</code> 并生成 stub，升级 proto 的协调成本高；公开场景你无法强制成千上万第三方同步更新。</li>
+<li><strong>缓存/CDN 无从下手</strong>：没有 URL 语义，HTTP 缓存基础设施完全用不上。</li>
+</ul>
+<p><strong>但这些「缺点」在内部恰是优点</strong>：服务你自己控、能统一升级 proto、要的是低延迟强类型而非人类可读、东西向流量不需要 CDN。所以协议选择本质是<em>「调用方是否可控」</em>：可控（内部）→ 优化机器效率选 gRPC；不可控（公开）→ 优化人类可达性与演进性选 REST/GraphQL。</p>
+</div>
+</details>
+
+<details>
+<summary>5. GraphQL 的 N+1 问题比 REST 更隐蔽——为什么？DataLoader 是怎么解决的，它的「批 + 缓存」边界在哪？</summary>
+<div class="answer">
+<p><strong>为什么更隐蔽</strong>：REST 的 N+1 在客户端可见（你能数请求次数）。GraphQL 的 N+1 藏在<em>服务端 resolver 里</em>：查 <code>posts { author { name } }</code>，框架对每个 post 的 <code>author</code> 独立调一次 resolver——100 个 post 就是 100 次 <code>SELECT author WHERE id=?</code>。外面看只是「一个查询」，后端却炸出 1+100 次 DB 访问，且随查询形状动态变化，不盯监控发现不了。</p>
+<p><strong>DataLoader 怎么解</strong>：单次请求内做两件事——(1) <em>batch</em>：不立即执行每个 <code>load(id)</code>，把同一 tick 内的所有 id 攒成一批，事件循环结束时合并成一次 <code>WHERE id IN (...)</code>，N 次降为 1 次；(2) <em>per-request cache</em>：同请求里重复 <code>load(同 id)</code> 直接返缓存。</p>
+<p><strong>边界</strong>：缓存<em>只在单请求生命周期内</em>有效（防跨请求脏读、保证一次查询内一致），非全局缓存；它解决「取数放大」，不解决「查询本身过深/过复杂」——后者要靠 query cost 分析另行限制。两者是正交的两道防线。</p>
+</div>
+</details>
+
+</div></body></html>
