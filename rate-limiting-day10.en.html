@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 10 · Rate Limiting — System Design Bi-daily</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"SF Pro Display","Noto Sans SC",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
+.container{max-width:820px;margin:0 auto;padding:24px 20px 60px}
+header{padding:40px 0 28px;border-bottom:1px solid rgba(100,200,255,0.15);margin-bottom:32px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem}
+.tag{padding:3px 10px;border-radius:4px;background:rgba(100,200,255,0.12);color:#64c8ff;border:1px solid rgba(100,200,255,0.25)}
+.tag.diff{background:rgba(94,234,212,0.1);color:#5eead4;border-color:rgba(94,234,212,0.3)}
+.tag.day{background:rgba(255,180,80,0.1);color:#ffb450;border-color:rgba(255,180,80,0.25)}
+h1{font-size:1.75rem;font-weight:800;background:linear-gradient(135deg,#64c8ff 0%,#5eead4 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:0.5px;line-height:1.3}
+h1 .en{display:block;font-size:1rem;color:#7a8590;-webkit-text-fill-color:#7a8590;margin-top:6px;font-weight:500}
+h2{font-size:1.2rem;color:#5eead4;margin:36px 0 14px;padding-left:12px;border-left:3px solid #5eead4}
+h3{font-size:1rem;color:#64c8ff;margin:20px 0 10px;font-weight:600}
+p{margin:10px 0;color:#c8cfd6}
+ul,ol{margin:10px 0 10px 22px;color:#c8cfd6}
+li{margin:6px 0}
+strong{color:#e8eef5;font-weight:600}
+em{color:#5eead4;font-style:normal;font-weight:500}
+code{font-family:"SF Mono",Menlo,Consolas,monospace;background:rgba(100,200,255,0.1);color:#5eead4;padding:1px 6px;border-radius:3px;font-size:0.88em}
+pre{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:14px 16px;overflow-x:auto;margin:12px 0;font-family:"SF Mono",Menlo,Consolas,monospace;font-size:0.84rem;line-height:1.55;color:#c8cfd6}
+pre code{background:none;color:inherit;padding:0;font-size:1em}
+.mermaid{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:18px;margin:14px 0;text-align:center;overflow-x:auto;cursor:zoom-in;transition:border-color 0.15s}
+.mermaid:hover{border-color:rgba(100,200,255,0.4)}
+.mermaid svg{width:100%;max-width:100%;height:auto;min-height:280px}
+.lightbox{position:fixed;inset:0;background:rgba(8,12,18,0.96);z-index:9999;display:none;align-items:center;justify-content:center;padding:24px;cursor:grab;backdrop-filter:blur(4px);overflow:hidden}
+.lightbox.open{display:flex}
+.lightbox.dragging{cursor:grabbing}
+.lightbox svg{width:auto;height:auto;max-width:96vw;max-height:92vh;transform-origin:center center;will-change:transform}
+.lightbox .hint{position:fixed;top:16px;right:20px;font-size:0.78rem;color:#7a8590;font-family:"SF Mono",Menlo,monospace;pointer-events:none}
+.callout{background:rgba(255,180,80,0.06);border-left:3px solid #ffb450;padding:12px 14px;margin:14px 0;border-radius:4px;font-size:0.94rem}
+.callout strong{color:#ffb450}
+.tradeoff{background:rgba(100,200,255,0.05);border:1px solid rgba(100,200,255,0.2);border-radius:6px;padding:12px 14px;margin:12px 0;font-size:0.94rem}
+.case{background:rgba(94,234,212,0.05);border-left:3px solid #5eead4;padding:12px 14px;margin:12px 0;border-radius:4px;font-size:0.94rem}
+.case strong{color:#5eead4}
+.nav{margin-top:50px;padding-top:24px;border-top:1px solid rgba(100,200,255,0.15);text-align:center}
+.nav a{color:#64c8ff;text-decoration:none;font-size:0.92rem;padding:8px 16px;border:1px solid rgba(100,200,255,0.3);border-radius:4px;transition:all 0.15s}
+.nav a:hover{background:rgba(100,200,255,0.1)}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:0.9rem}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid rgba(100,200,255,0.15)}
+th{color:#64c8ff;font-weight:600;background:rgba(100,200,255,0.05)}
+details{background:rgba(100,200,255,0.04);border:1px solid rgba(100,200,255,0.18);border-radius:6px;padding:12px 16px;margin:10px 0;transition:all 0.15s}
+details:hover{border-color:rgba(100,200,255,0.35)}
+details[open]{background:rgba(94,234,212,0.05);border-color:rgba(94,234,212,0.3)}
+details summary{font-weight:600;color:#e8eef5;list-style:none;outline:none;cursor:pointer;display:flex;align-items:flex-start;gap:10px;font-size:0.96rem}
+details summary::-webkit-details-marker{display:none}
+details summary::before{content:'▶';color:#64c8ff;font-size:0.75em;transition:transform 0.2s;flex-shrink:0;margin-top:5px}
+details[open] summary::before{transform:rotate(90deg);color:#5eead4}
+details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
+details .answer ul,details .answer ol{margin:6px 0 6px 22px}
+@media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+</style>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({startOnLoad:true,theme:'base',flowchart:{useMaxWidth:true,htmlLabels:true,nodeSpacing:50,rankSpacing:60},themeVariables:{primaryColor:'#1a2530',primaryTextColor:'#e8eef5',primaryBorderColor:'#64c8ff',lineColor:'#5eead4',secondaryColor:'#0e1419',tertiaryColor:'#0a0f14',background:'#0a0f14',mainBkg:'#1a2530',secondBkg:'#0e1419',textColor:'#d4dae0',fontFamily:'-apple-system,"SF Pro Display",sans-serif',fontSize:'16px'}});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const lb=document.createElement('div');lb.className='lightbox';
+  lb.innerHTML='<span class="hint">scroll = zoom · drag = pan · Esc / click bg = close</span>';
+  document.body.appendChild(lb);
+  let scale=1,panX=0,panY=0,dragging=false,moved=false,lx=0,ly=0;
+  const apply=()=>{const s=lb.querySelector('svg');if(s)s.style.transform=`translate(${panX}px,${panY}px) scale(${scale})`};
+  const reset=()=>{scale=1;panX=0;panY=0};
+  const close=()=>{lb.classList.remove('open');const s=lb.querySelector('svg');if(s)s.remove();reset()};
+  document.addEventListener('click',e=>{
+    if(e.target.closest('.lightbox')){if(moved){moved=false;return}close();return}
+    const w=e.target.closest('.mermaid');if(!w)return;
+    const svg=w.querySelector('svg');if(!svg)return;
+    const c=svg.cloneNode(true);c.removeAttribute('style');
+    c.style.maxWidth='96vw';c.style.maxHeight='92vh';
+    lb.appendChild(c);lb.classList.add('open');reset();apply();
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+  lb.addEventListener('wheel',e=>{
+    if(!lb.classList.contains('open'))return;
+    e.preventDefault();
+    const svg=lb.querySelector('svg');if(!svg)return;
+    const ns=Math.max(0.3,Math.min(10,scale*(1-e.deltaY*0.002)));
+    const r=svg.getBoundingClientRect();
+    const cx=e.clientX-(r.left+r.width/2),cy=e.clientY-(r.top+r.height/2);
+    const k=ns/scale-1;panX-=cx*k;panY-=cy*k;scale=ns;apply();
+  },{passive:false});
+  lb.addEventListener('mousedown',e=>{
+    if(!lb.classList.contains('open'))return;
+    dragging=true;moved=false;lx=e.clientX;ly=e.clientY;lb.classList.add('dragging');e.preventDefault();
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    const dx=e.clientX-lx,dy=e.clientY-ly;
+    if(Math.abs(dx)+Math.abs(dy)>3)moved=true;
+    panX+=dx;panY+=dy;lx=e.clientX;ly=e.clientY;apply();
+  });
+  document.addEventListener('mouseup',()=>{dragging=false;lb.classList.remove('dragging')});
+});
+</script>
+</head><body><div class="container">
+
+<header>
+<div class="meta">
+<span class="tag day">Day 10</span>
+<span class="tag diff">Medium</span>
+<span class="tag">Rate Limiting</span>
+<span class="tag">Token Bucket / GCRA</span>
+<span class="tag">Distributed Counters</span>
+</div>
+<h1>Rate Limiting — Not Just "100 Requests Per Second"<span class="en">Token Bucket vs Leaky Bucket vs Sliding Window · Distributed Counters · The 429 Contract</span></h1>
+</header>
+
+<h2>Scenario &amp; Constraints</h2>
+<p>Design the rate-limiting system for a public API platform (think Stripe / GitHub). <strong>100k+ third-party integrations</strong>, <strong>peak 1M QPS</strong>, per-key limit 100 req/s, total platform capacity 500k QPS. One runaway script can saturate every worker and starve out paying-customer charge requests — which is why <em>rate limiting is a survival baseline</em>, not an anti-scraper add-on.</p>
+<ul>
+<li><strong>Fairness</strong>: a misbehaving key must not drag down the others; high-priority calls (create charge) must not be starved by low-priority ones (export report).</li>
+<li><strong>Precision</strong>: a 100 req/s limit cannot legally allow 200 requests crammed into the millisecond around a second boundary.</li>
+<li><strong>Low overhead</strong>: the limiter latency must be far below the business latency — target p99 &lt; 1 ms.</li>
+<li><strong>Multi-dimensional</strong>: limit per user / IP / endpoint / org separately, and compose them (the tightest layer wins).</li>
+<li><strong>Caller-friendly</strong>: 429 must be machine-retriable — <code>Retry-After</code> must be present and accurate.</li>
+<li><strong>Limiter failure cannot become business failure</strong>: when Redis is down, <em>letting traffic through</em> (fail-open) beats taking down the whole site.</li>
+</ul>
+<p>Today: <em>algorithm choice, distributed implementation, accuracy vs performance, and the 429 contract</em>.</p>
+
+<h2>High-Level Architecture</h2>
+<pre class="mermaid">
+graph LR
+    C["Client / 3rd-party app"]
+    GW["API Gateway<br/>(Envoy / Kong / homegrown)"]
+    L1["Local token bucket<br/>(per worker)"]
+    L2["Central counter<br/>Redis + Lua"]
+    SHED["Load Shedder<br/>(priority drop)"]
+    APP["Business service"]
+
+    C -->|"req + API key"| GW
+    GW -->|"① fast path: 90% deny/allow"| L1
+    L1 -->|"② slow path: periodic sync"| L2
+    GW -.overload.-> SHED
+    GW -->|✓| APP
+    GW -.->|"✗ 429 + Retry-After"| C
+
+    classDef edge fill:#0e2030,stroke:#64c8ff,color:#e8eef5
+    classDef store fill:#1a1a30,stroke:#ffb450,color:#e8eef5
+    classDef origin fill:#2a1530,stroke:#ff7ab6,color:#e8eef5
+    class GW,L1 edge
+    class L2 store
+    class APP,SHED origin
+</pre>
+<p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">Gateway uses local token bucket for the fast path; Redis is the central source of truth. Decisions return in under 1 ms.</p>
+
+<h2>Key Technical Points</h2>
+
+<h3>1. Algorithm choice: Token Bucket vs Leaky Bucket vs Sliding Window vs GCRA</h3>
+<p><strong>Principle</strong>: the four algorithms answer different questions — <em>are bursts allowed? is output smoothed? how does the window roll?</em></p>
+<table>
+<thead><tr><th>Algorithm</th><th>Core idea</th><th>Allows burst</th><th>Output rate</th><th>Complexity</th></tr></thead>
+<tbody>
+<tr><td><strong>Fixed Window</strong></td><td>Reset counter every second</td><td>No</td><td>Bumpy</td><td>Trivial</td></tr>
+<tr><td><strong>Sliding Window Log</strong></td><td>Store every request timestamp</td><td>—</td><td>Exact</td><td>High (memory)</td></tr>
+<tr><td><strong>Sliding Window Counter</strong></td><td>Current + prior window pro-rated</td><td>—</td><td>Approximate</td><td>Low</td></tr>
+<tr><td><strong>Token Bucket</strong></td><td>Bucket of tokens, can be saved up</td><td>✓ Natively</td><td>Bursty</td><td>Low</td></tr>
+<tr><td><strong>Leaky Bucket</strong></td><td>Queue requests, drain at fixed rate</td><td>Smoothed via queue</td><td>Strictly even</td><td>Medium</td></tr>
+<tr><td><strong>GCRA</strong></td><td>Leaky bucket expressed as a single "next allowed time"</td><td>Tunable</td><td>Rolling, smooth</td><td>Medium (no queue)</td></tr>
+</tbody></table>
+<div class="tradeoff">
+<strong>Trade-off:</strong>
+<ul>
+<li><strong>Fixed Window</strong>: ✅ one counter; ❌ boundary double-burst (100 at t=0.999s, 100 at t=1.001s — 200 requests in 2ms all admitted).</li>
+<li><strong>Sliding Window Log</strong>: ✅ exact; ❌ stores N timestamps per key — 1M keys × 100 reqs = 100M entries, Redis memory explodes.</li>
+<li><strong>Token Bucket</strong>: ✅ naturally supports bursts (save tokens); ❌ does not enforce smoothing — a saved-up burst can still flood downstream. Stripe picks it precisely to allow legitimate bursts.</li>
+<li><strong>Leaky Bucket</strong>: ✅ downstream sees a flat rate; ❌ needs a queue; a pure form introduces latency even when the queue is short but no token is ready.</li>
+<li><strong>GCRA</strong>: ✅ single-variable state (TAT — Theoretical Arrival Time), O(1) memory, rolling window, configurable burst; ❌ math is not intuitive. Redis module <code>redis-cell</code> and many Cloudflare workflows use it.</li>
+</ul></div>
+<pre><code># Token bucket core (Python pseudo-code)
+def allow(key, capacity, refill_rate):
+    now = time.time()
+    tokens, last = state.get(key, (capacity, now))
+    # lazy refill: top up by elapsed time when we look
+    tokens = min(capacity, tokens + (now - last) * refill_rate)
+    if tokens &gt;= 1:
+        state[key] = (tokens - 1, now)
+        return True
+    state[key] = (tokens, now)
+    return False   # deny, retry_after = (1 - tokens) / refill_rate
+</code></pre>
+<div class="case">
+<strong>Real-world cases:</strong>
+<ul>
+<li><strong>Stripe</strong>: combines four limiter classes (request rate, concurrent requests, fleet-wide load shedder, worker-utilization load shedder), all backed by token bucket + Redis Lua. See their engineering post <em>"Scaling your API with rate limiters"</em>.</li>
+<li><strong>Cloudflare</strong>: distributed rate limiting across 300+ PoPs — local short-window decision, async aggregation between nodes (see Cloudflare's post <em>"How we built rate limiting capable of scaling to millions of domains"</em>).</li>
+<li><strong>GitHub API</strong>: authenticated users get 5000 req/h (hourly token bucket); the Search API has its own much tighter bucket.</li>
+<li><strong>Redis official</strong>: the <code>redis-cell</code> module implements GCRA — a single <code>CL.THROTTLE</code> command does it all.</li>
+</ul></div>
+
+<h3>2. Distributed limiting: central Redis vs local share vs async aggregation</h3>
+<p><strong>Principle</strong>: a token bucket on one machine is trivial. The hard problem is coordinating <em>a global quota shared across the fleet</em>.</p>
+<div class="tradeoff">
+<strong>Trade-off:</strong>
+<ul>
+<li><strong>Central Redis (single instance)</strong>: ✅ globally exact, simple (atomic Lua); ❌ single-instance ceiling (~300-500k QPS), the network RTT dominates limiter latency, Redis failure = business failure (must fail-open).</li>
+<li><strong>Local share (static slice)</strong>: each gateway gets <code>total_limit / N</code>. ✅ no dependency, low latency; ❌ skewed traffic leaves some nodes saturated while others idle, overall utilization drops; quota drifts as the fleet scales.</li>
+<li><strong>Local decision + async aggregation</strong>: each node runs a local bucket and pushes consumption to a coordinator every 100ms-1s, which redistributes quota. Cloudflare uses a gossip-like variant. ✅ low latency and near-exact; ❌ complex; allows brief over-admit windows (~20% over budget for one period).</li>
+<li><strong>Tiered (local quick-deny + central slow path)</strong>: obvious over-limit denied locally, the rest is verified in Redis. ✅ shields 99% of hot-key traffic from Redis; ❌ requires heartbeat sync of "currently blacklisted" state.</li>
+</ul></div>
+<pre><code>-- Atomic token bucket in Redis (Lua, Stripe-style)
+-- KEYS[1]=bucket key  ARGV={capacity, refill_rate, now, cost}
+local cap, rate, now, cost = tonumber(ARGV[1]), tonumber(ARGV[2]),
+                              tonumber(ARGV[3]), tonumber(ARGV[4])
+local data = redis.call('HMGET', KEYS[1], 'tokens', 'ts')
+local tokens = tonumber(data[1]) or cap
+local last = tonumber(data[2]) or now
+tokens = math.min(cap, tokens + (now - last) * rate)
+local allowed = tokens &gt;= cost and 1 or 0
+if allowed == 1 then tokens = tokens - cost end
+redis.call('HMSET', KEYS[1], 'tokens', tokens, 'ts', now)
+redis.call('EXPIRE', KEYS[1], math.ceil(cap / rate) * 2)
+return {allowed, tokens}     -- atomic, no race
+</code></pre>
+<div class="case">
+<strong>Real-world cases:</strong>
+<ul>
+<li><strong>Stripe</strong>: central Redis Lua counters, with <em>"if Redis is unavailable, let the request through"</em> as an explicit principle in their engineering post.</li>
+<li><strong>Cloudflare edge</strong>: local short-window decisions with gossip-style async aggregation across edge nodes — see the Cloudflare engineering post linked above.</li>
+<li><strong>AWS API Gateway</strong>: per-region token buckets; <em>rate</em> and <em>burst</em> map directly to refill rate and bucket capacity.</li>
+</ul></div>
+
+<h3>3. Multi-dimensional limiting and priority shedding</h3>
+<p><strong>Principle</strong>: a single dimension cannot contain real traffic. One key may be fine, but the sum of all keys saturates an endpoint; an endpoint may be fine, but its downstream DB is dying. Check <em>multiple dimensions independently, tightest wins</em>.</p>
+<div class="tradeoff">
+<strong>Typical stack (each layer is an independent bucket; all must pass):</strong>
+<ul>
+<li><strong>L1 — per API key</strong>: tenant fairness (100/s);</li>
+<li><strong>L2 — per IP</strong>: anti-anonymous-scrape (10/s);</li>
+<li><strong>L3 — per endpoint × key</strong>: protect heavy endpoints (/export 0.1/s);</li>
+<li><strong>L4 — global concurrency</strong>: protect downstream DB connection pool (in-flight &lt; 5000);</li>
+<li><strong>L5 — priority shedding</strong>: under overload, <em>drop low-priority first</em> (export → list → create-payment is dropped last).</li>
+</ul></div>
+<pre><code># Multi-dimensional composition (pseudo-code)
+def admit(req):
+    keys = [
+        ("key", req.api_key, 100, 1),
+        ("ip", req.ip, 10, 1),
+        ("ep", f"{req.api_key}:{req.path}", endpoint_limit(req.path), 1),
+    ]
+    for kind, k, cap, cost in keys:
+        if not bucket_allow(f"{kind}:{k}", cap, refill_for(cap), cost):
+            return reject(retry_after_from(cap, k), reason=kind)
+    if global_inflight() &gt; SHED_THRESHOLD and priority(req) &lt; HIGH:
+        return reject(retry_after=30, reason="overload")
+    return ALLOW
+</code></pre>
+<div class="case">
+<strong>Real-world cases:</strong>
+<ul>
+<li><strong>Stripe</strong>: splits traffic into <em>critical (create charge)</em> and <em>non-critical (reporting / analytics)</em>; during overload, non-critical is shed first. This "protect the money path" priority shedding is called out explicitly in their engineering post.</li>
+<li><strong>GitHub</strong>: REST has one bucket, GraphQL another (charged by query complexity), and Search has a stricter small bucket — same token, multiple dimensions.</li>
+<li><strong>Twitter/X API</strong>: each endpoint has its own bucket with very different limits; the response header <code>X-Rate-Limit-Resource</code> tells you which bucket was triggered.</li>
+</ul></div>
+
+<h3>4. The 429 contract: let callers back off gracefully</h3>
+<p><strong>Principle</strong>: a limiter is not just a "deny" — it is <em>a machine-readable backoff instruction</em> for the caller. Without it, clients spin in a tight retry loop and pile on a second time.</p>
+<div class="tradeoff">
+<strong>Standard headers:</strong>
+<ul>
+<li><code>Retry-After: 30</code> — required, seconds or HTTP-date. RFC 9110.</li>
+<li><code>X-RateLimit-Limit: 100</code> — the quota.</li>
+<li><code>X-RateLimit-Remaining: 0</code> — how many left.</li>
+<li><code>X-RateLimit-Reset: 1735689600</code> — reset epoch.</li>
+<li><code>X-RateLimit-Resource: search</code> — which bucket triggered (critical when there are many).</li>
+<li>Body: JSON with <code>error_code</code> and <code>doc_url</code> so the caller can self-serve.</li>
+</ul></div>
+<div class="callout">
+<strong>Crucial pitfall: clients must jitter.</strong> If 1000 callers all receive <code>Retry-After: 30</code>, 30 seconds later they all hit you again — thundering herd reborn. Either the server returns <em>a jittered value</em> (30 ± 5s), or the client adds jitter itself (Stripe SDK and AWS SDK both bake in exponential backoff + jitter).
+</div>
+<div class="case">
+<strong>Real-world cases:</strong>
+<ul>
+<li><strong>Stripe</strong>: 429 always includes <code>Retry-After</code>; the official SDK bundles idempotency keys + exponential backoff for auto-retry.</li>
+<li><strong>GitHub</strong>: over-limit returns 403 with <code>X-RateLimit-Reset</code> (epoch); the docs explicitly say "wait until reset, otherwise keep getting 403".</li>
+<li><strong>AWS</strong>: in addition to 429, you may see <code>ThrottlingException</code>; every official SDK auto-retries with jitter.</li>
+</ul></div>
+
+<h2>Extensions &amp; Optimization</h2>
+<ul>
+<li><strong>Hot key beyond a single Redis node</strong>: shard one high-traffic key across multiple Redis shards (<code>key:0..15</code>), each with a fractional quota, client hashes to shard. Cost: precision loss (local over-admit).</li>
+<li><strong>From hard limits to adaptive limiting</strong>: drive the limit from downstream latency / error rate (Netflix concurrency-limits, Google SRE adaptive throttling) — "let more through when healthy, fewer when sick".</li>
+<li><strong>Cross-region global quota</strong>: per-region local quota plus per-second async cross-region reconciliation. A strongly-consistent global quota costs too much and rarely earns its keep.</li>
+<li><strong>Cost-weighted requests</strong>: not every request is "one token" — weight by endpoint CPU cost (GraphQL query complexity = points charged, CPU-heavy endpoints charge 10).</li>
+<li><strong>Fail-open vs fail-close</strong>: when the limiter itself dies, <em>let traffic through</em> (a limiter failure should not become a business failure), but downstream is suddenly exposed — pair with a circuit breaker.</li>
+</ul>
+
+<h2>Common Pitfalls / Interview Follow-ups</h2>
+<ol>
+<li><strong>"Why not sliding window log?"</strong> — Memory. 1M users × 100 reqs = 100M timestamps, several GB. Counter approximations get to &lt; 5% error.</li>
+<li><strong>"What if Redis goes down?"</strong> — Fail-open and circuit-break; Stripe states this as an iron rule.</li>
+<li><strong>"Same user, multiple processes — how do they share a local token bucket?"</strong> — Per-process buckets don't; you need Redis, or "local sub-quota + async reconciliation".</li>
+<li><strong>"429 vs 503 — when each?"</strong> — 429 = <em>caller over its quota</em> (the caller's problem); 503 = <em>service overloaded</em> (your problem). Confusing them breaks the caller's retry strategy.</li>
+<li><strong>"How do you compute Retry-After?"</strong> — With a token bucket: <code>(1 - tokens) / refill_rate</code>. With a sliding window: milliseconds until the next second tick. And the server must add jitter.</li>
+<li><strong>"Why is token bucket more popular than leaky bucket?"</strong> — Public-API callers naturally arrive in bursts (a cron firing 50 requests at once); token bucket allows that legitimate burst. Strict leaky-bucket smoothing punishes normal users.</li>
+</ol>
+
+<h2>Deep Resources</h2>
+<ul>
+<li><strong>Stripe Engineering Blog — <em>"Scaling your API with rate limiters"</em></strong> (Paul Tarjan): four limiter classes, Redis Lua, the fail-open principle. The companion GitHub gist has runnable Ruby code.</li>
+<li><strong>Cloudflare Engineering Blog — <em>"How we built rate limiting capable of scaling to millions of domains"</em></strong>: distributed limiting at the edge — local decision plus async aggregation.</li>
+<li><strong>Brandur Leach — <em>"Rate Limiting, Cells, and GCRA"</em> (brandur.org)</strong>: the clearest explainer of GCRA, with a Redis implementation.</li>
+<li><strong>Google SRE Book — Ch 21 "Handling Overload"</strong>: adaptive throttling, priority shedding, client-side retry budgets.</li>
+<li><strong>Marc Brooker's distributed systems essays</strong>: the right intuition for fail-open and backpressure as system properties.</li>
+</ul>
+
+<h2>Deeper Questions (click to expand)</h2>
+
+<details>
+<summary>1. How do you relate token-bucket capacity and refill rate? Is capacity = refill reasonable?</summary>
+<div class="answer">
+<p>Common mistake: "100 req/s, so cap=100 and rate=100." But cap=100 means the user can save 100 tokens and <em>instantly</em> fire 100 requests — 1 ms of peak QPS at 100,000, which flattens downstream.</p>
+<p><strong>The right framing</strong>: cap is <em>the allowed burst size</em>, rate is <em>the long-run average</em>. They are independent:</p>
+<ul>
+<li>How big a burst can downstream absorb? → choose cap. Common cap = rate × 1–3 (1–3 seconds of burst).</li>
+<li>What's the daily allowance per user? → choose rate.</li>
+</ul>
+<p>Stripe's posture is <em>"rate is the contract, cap is the mercy"</em> — cap is slightly above rate so normal bursts don't error, but not so big that downstream crashes. For extreme cases (financial reconciliation) cap = rate forces strict smoothing — effectively a leaky bucket.</p>
+</div>
+</details>
+
+<details>
+<summary>2. 1M QPS won't fit through one Redis node (~300k QPS ceiling). How do you squeeze 1M limit decisions per second through it?</summary>
+<div class="answer">
+<p>Stack three ideas:</p>
+<ul>
+<li><strong>Local quick-deny</strong>: each gateway keeps a local list of "recently over-limit keys" with 100 ms TTL. Over-limit keys 429 without touching Redis. 99% of hot-key traffic is shielded locally.</li>
+<li><strong>Local sub-quota</strong>: at startup, each gateway claims <code>N seconds of quota</code> (say 100 tokens) from Redis and spends it locally. When empty, claim the next batch. Redis QPS drops from 1M to 1M / 100 = 10k. Cost: uneven distribution across gateways; quota drifts during scale-in/out.</li>
+<li><strong>Redis Cluster shards</strong>: hash by user_id to different shards; each shard absorbs 300k QPS. Cost: a single global quota cannot be expressed as one Redis key.</li>
+</ul>
+<p>In production the combo <em>local quick-deny + local sub-quota + Redis Cluster</em> typically lands Redis at 50–100k QPS.</p>
+</div>
+</details>
+
+<details>
+<summary>3. Clients all receive 429 + Retry-After=30s, then retry simultaneously — second wave overload. What can the server do?</summary>
+<div class="answer">
+<ul>
+<li><strong>Server returns jittered Retry-After</strong>: not a fixed 30 but <code>30 + uniform(0, 30)</code> — spreads retries over an interval. Cost: some clients wait longer.</li>
+<li><strong>Stagger window resets per client</strong>: anchor the bucket's expiry to <code>hash(api_key)</code> so different users' window boundaries are naturally offset.</li>
+<li><strong>Force backoff + jitter in the SDK</strong>: the official SDK does <code>retry_after × random(0.5, 1.5)</code>, covering all callers. Stripe, AWS, Google all do this.</li>
+<li><strong>Soft signals in normal responses</strong>: while <code>X-RateLimit-Remaining</code> is approaching 0, well-built SDKs proactively slow down — don't wait for 429 to react.</li>
+<li><strong>Continuous-recovery semantics</strong>: don't have everyone go from 0 to full quota at the same reset instant; GCRA's continuous rolling refill naturally staggers retry timing.</li>
+</ul>
+</div>
+</details>
+
+<details>
+<summary>4. The limiter itself crashes — fail-open or fail-close? Which kind of business goes which way?</summary>
+<div class="answer">
+<p><strong>Default fail-open</strong>: the reasoning is <em>"limiting is protective; a limiter failure should not become a business failure"</em>. Stripe and AWS both do this. Fail-open means attack traffic flows straight to the backend the moment the limiter dies — pair it with a circuit breaker so downstream can defend itself.</p>
+<p><strong>When fail-close is the right call</strong>:</p>
+<ul>
+<li><strong>Paid quota / billing quota</strong>: going over budget = you lose money (e.g., a free tier of 1000 calls / month). Better to deny than admit.</li>
+<li><strong>Irreversible downstream effects</strong>: SMS sends, debit operations — blind admit can fan out into a bulk mistake.</li>
+<li><strong>Regulatory constraints</strong>: some financial / healthcare limits are mandated; if you can't enforce, you must stop.</li>
+</ul>
+<p>The pragmatic shape: <em>DDoS layer fail-open (save the site), billing-quota layer fail-close (save the money)</em>, deployed as separate components.</p>
+</div>
+</details>
+
+<details>
+<summary>5. A single GraphQL query can consume 100× the CPU. How do you define "one request" for rate-limiting?</summary>
+<div class="answer">
+<p>REST's hidden assumption — "all requests cost about the same" — falls apart under GraphQL. One nested query can scan tens of thousands of rows and run a dozen joins.</p>
+<p><strong>The answer is cost weighting</strong>:</p>
+<ul>
+<li><strong>Static cost</strong>: analyze the query at submit time, summing per-field cost (list field × an assumed 100 rows), and charge the bucket that many tokens up front. GitHub's GraphQL API does exactly this — 5000 "points" per hour, not 5000 requests.</li>
+<li><strong>Dynamic cost</strong>: after execution, reconcile tokens by actual time / rows scanned. Cost: charge is retroactive, so a malicious query has already burned the CPU.</li>
+<li><strong>Hard depth / field caps</strong>: before the limiter, reject queries with depth &gt; 10 or &gt; 1000 fields at the parsing stage. Apollo has built-in support.</li>
+<li><strong>Persisted queries</strong>: only allow pre-reviewed query hashes; dynamic queries can't even reach your gateway. Facebook and Shopify run this at scale.</li>
+</ul>
+<p>The same shape applies elsewhere: bulk APIs (one call with 100 IDs), file uploads (charge per byte), AI inference (charge per token). Any time a single request's cost can vary by &gt; 10×, you need weights.</p>
+</div>
+</details>
+
+<div class="nav"><a href="index.en.html">← Back to Index</a></div>
+</div></body></html>

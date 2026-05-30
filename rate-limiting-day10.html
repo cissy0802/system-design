@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 10 · Rate Limiting — System Design Bi-daily</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"SF Pro Display","Noto Sans SC",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
+.container{max-width:820px;margin:0 auto;padding:24px 20px 60px}
+header{padding:40px 0 28px;border-bottom:1px solid rgba(100,200,255,0.15);margin-bottom:32px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem}
+.tag{padding:3px 10px;border-radius:4px;background:rgba(100,200,255,0.12);color:#64c8ff;border:1px solid rgba(100,200,255,0.25)}
+.tag.diff{background:rgba(94,234,212,0.1);color:#5eead4;border-color:rgba(94,234,212,0.3)}
+.tag.day{background:rgba(255,180,80,0.1);color:#ffb450;border-color:rgba(255,180,80,0.25)}
+h1{font-size:1.75rem;font-weight:800;background:linear-gradient(135deg,#64c8ff 0%,#5eead4 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:0.5px;line-height:1.3}
+h1 .en{display:block;font-size:1rem;color:#7a8590;-webkit-text-fill-color:#7a8590;margin-top:6px;font-weight:500}
+h2{font-size:1.2rem;color:#5eead4;margin:36px 0 14px;padding-left:12px;border-left:3px solid #5eead4}
+h3{font-size:1rem;color:#64c8ff;margin:20px 0 10px;font-weight:600}
+p{margin:10px 0;color:#c8cfd6}
+ul,ol{margin:10px 0 10px 22px;color:#c8cfd6}
+li{margin:6px 0}
+strong{color:#e8eef5;font-weight:600}
+em{color:#5eead4;font-style:normal;font-weight:500}
+code{font-family:"SF Mono",Menlo,Consolas,monospace;background:rgba(100,200,255,0.1);color:#5eead4;padding:1px 6px;border-radius:3px;font-size:0.88em}
+pre{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:14px 16px;overflow-x:auto;margin:12px 0;font-family:"SF Mono",Menlo,Consolas,monospace;font-size:0.84rem;line-height:1.55;color:#c8cfd6}
+pre code{background:none;color:inherit;padding:0;font-size:1em}
+.mermaid{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:18px;margin:14px 0;text-align:center;overflow-x:auto;cursor:zoom-in;transition:border-color 0.15s}
+.mermaid:hover{border-color:rgba(100,200,255,0.4)}
+.mermaid svg{width:100%;max-width:100%;height:auto;min-height:280px}
+.lightbox{position:fixed;inset:0;background:rgba(8,12,18,0.96);z-index:9999;display:none;align-items:center;justify-content:center;padding:24px;cursor:grab;backdrop-filter:blur(4px);overflow:hidden}
+.lightbox.open{display:flex}
+.lightbox.dragging{cursor:grabbing}
+.lightbox svg{width:auto;height:auto;max-width:96vw;max-height:92vh;transform-origin:center center;will-change:transform}
+.lightbox .hint{position:fixed;top:16px;right:20px;font-size:0.78rem;color:#7a8590;font-family:"SF Mono",Menlo,monospace;pointer-events:none}
+.callout{background:rgba(255,180,80,0.06);border-left:3px solid #ffb450;padding:12px 14px;margin:14px 0;border-radius:4px;font-size:0.94rem}
+.callout strong{color:#ffb450}
+.tradeoff{background:rgba(100,200,255,0.05);border:1px solid rgba(100,200,255,0.2);border-radius:6px;padding:12px 14px;margin:12px 0;font-size:0.94rem}
+.case{background:rgba(94,234,212,0.05);border-left:3px solid #5eead4;padding:12px 14px;margin:12px 0;border-radius:4px;font-size:0.94rem}
+.case strong{color:#5eead4}
+.nav{margin-top:50px;padding-top:24px;border-top:1px solid rgba(100,200,255,0.15);text-align:center}
+.nav a{color:#64c8ff;text-decoration:none;font-size:0.92rem;padding:8px 16px;border:1px solid rgba(100,200,255,0.3);border-radius:4px;transition:all 0.15s}
+.nav a:hover{background:rgba(100,200,255,0.1)}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:0.9rem}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid rgba(100,200,255,0.15)}
+th{color:#64c8ff;font-weight:600;background:rgba(100,200,255,0.05)}
+details{background:rgba(100,200,255,0.04);border:1px solid rgba(100,200,255,0.18);border-radius:6px;padding:12px 16px;margin:10px 0;transition:all 0.15s}
+details:hover{border-color:rgba(100,200,255,0.35)}
+details[open]{background:rgba(94,234,212,0.05);border-color:rgba(94,234,212,0.3)}
+details summary{font-weight:600;color:#e8eef5;list-style:none;outline:none;cursor:pointer;display:flex;align-items:flex-start;gap:10px;font-size:0.96rem}
+details summary::-webkit-details-marker{display:none}
+details summary::before{content:'▶';color:#64c8ff;font-size:0.75em;transition:transform 0.2s;flex-shrink:0;margin-top:5px}
+details[open] summary::before{transform:rotate(90deg);color:#5eead4}
+details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
+details .answer ul,details .answer ol{margin:6px 0 6px 22px}
+@media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+</style>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({startOnLoad:true,theme:'base',flowchart:{useMaxWidth:true,htmlLabels:true,nodeSpacing:50,rankSpacing:60},themeVariables:{primaryColor:'#1a2530',primaryTextColor:'#e8eef5',primaryBorderColor:'#64c8ff',lineColor:'#5eead4',secondaryColor:'#0e1419',tertiaryColor:'#0a0f14',background:'#0a0f14',mainBkg:'#1a2530',secondBkg:'#0e1419',textColor:'#d4dae0',fontFamily:'-apple-system,"SF Pro Display",sans-serif',fontSize:'16px'}});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const lb=document.createElement('div');lb.className='lightbox';
+  lb.innerHTML='<span class="hint">scroll = zoom · drag = pan · Esc / click bg = close</span>';
+  document.body.appendChild(lb);
+  let scale=1,panX=0,panY=0,dragging=false,moved=false,lx=0,ly=0;
+  const apply=()=>{const s=lb.querySelector('svg');if(s)s.style.transform=`translate(${panX}px,${panY}px) scale(${scale})`};
+  const reset=()=>{scale=1;panX=0;panY=0};
+  const close=()=>{lb.classList.remove('open');const s=lb.querySelector('svg');if(s)s.remove();reset()};
+  document.addEventListener('click',e=>{
+    if(e.target.closest('.lightbox')){if(moved){moved=false;return}close();return}
+    const w=e.target.closest('.mermaid');if(!w)return;
+    const svg=w.querySelector('svg');if(!svg)return;
+    const c=svg.cloneNode(true);c.removeAttribute('style');
+    c.style.maxWidth='96vw';c.style.maxHeight='92vh';
+    lb.appendChild(c);lb.classList.add('open');reset();apply();
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+  lb.addEventListener('wheel',e=>{
+    if(!lb.classList.contains('open'))return;
+    e.preventDefault();
+    const svg=lb.querySelector('svg');if(!svg)return;
+    const ns=Math.max(0.3,Math.min(10,scale*(1-e.deltaY*0.002)));
+    const r=svg.getBoundingClientRect();
+    const cx=e.clientX-(r.left+r.width/2),cy=e.clientY-(r.top+r.height/2);
+    const k=ns/scale-1;panX-=cx*k;panY-=cy*k;scale=ns;apply();
+  },{passive:false});
+  lb.addEventListener('mousedown',e=>{
+    if(!lb.classList.contains('open'))return;
+    dragging=true;moved=false;lx=e.clientX;ly=e.clientY;lb.classList.add('dragging');e.preventDefault();
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    const dx=e.clientX-lx,dy=e.clientY-ly;
+    if(Math.abs(dx)+Math.abs(dy)>3)moved=true;
+    panX+=dx;panY+=dy;lx=e.clientX;ly=e.clientY;apply();
+  });
+  document.addEventListener('mouseup',()=>{dragging=false;lb.classList.remove('dragging')});
+});
+</script>
+</head><body><div class="container">
+
+<header>
+<div class="meta">
+<span class="tag day">Day 10</span>
+<span class="tag diff">Medium</span>
+<span class="tag">Rate Limiting</span>
+<span class="tag">Token Bucket / GCRA</span>
+<span class="tag">Distributed Counters</span>
+</div>
+<h1>Rate Limiting — 不只是「每秒 100 次」<span class="en">Token Bucket vs Leaky Bucket vs Sliding Window · Distributed Counters · The 429 Contract</span></h1>
+</header>
+
+<h2>问题场景与约束</h2>
+<p>设计一个公开 API 平台的限流系统（参考 Stripe / GitHub）。全网 <strong>10 万+ 第三方集成方</strong>、<strong>峰值 1M QPS</strong>、单 key 上限 100 req/s、平台总容量 500k QPS。一次糟糕的脚本可以瞬间占满所有 worker，把付钱的请求挤掉——这就是为什么 <em>限流是保命底线</em>，不是「防爬虫」附加功能。</p>
+<ul>
+<li><strong>公平性</strong>：一个 key 失控不能拖垮其他 key；高优请求（创建支付）不能被低优请求（导出报表）饿死。</li>
+<li><strong>精确性</strong>：100 req/s 的限制，秒边界不能让用户在 0.999s 和 1.001s 之间「合法地」发出 200 个请求。</li>
+<li><strong>低开销</strong>：限流本身的延迟必须远低于业务延迟，目标 p99 &lt; 1ms。</li>
+<li><strong>多维度</strong>：按 user / IP / endpoint / org 分别限流，且可组合（最严的那一层生效）。</li>
+<li><strong>对 caller 友好</strong>：429 必须可被自动重试 —— <code>Retry-After</code> 头要存在且准确。</li>
+<li><strong>限流挂了不能挂业务</strong>：Redis 不可用时<em>放行</em>（fail-open）比挂全站好。</li>
+</ul>
+<p>今天讲四件事：<em>算法选型、分布式实现、精度 vs 性能、429 契约</em>。</p>
+
+<h2>高层架构</h2>
+<pre class="mermaid">
+graph LR
+    C["Client / 第三方应用"]
+    GW["API Gateway<br/>(Envoy / Kong / 自研)"]
+    L1["本地令牌桶<br/>(per worker)"]
+    L2["集中计数<br/>Redis + Lua"]
+    SHED["Load Shedder<br/>(优先级丢弃)"]
+    APP["业务服务"]
+
+    C -->|"req + API key"| GW
+    GW -->|"①快路径: 90% 拒绝/放行"| L1
+    L1 -->|"②慢路径: 周期同步"| L2
+    GW -.过载.-> SHED
+    GW -->|✓| APP
+    GW -.->|"✗ 429 + Retry-After"| C
+
+    classDef edge fill:#0e2030,stroke:#64c8ff,color:#e8eef5
+    classDef store fill:#1a1a30,stroke:#ffb450,color:#e8eef5
+    classDef origin fill:#2a1530,stroke:#ff7ab6,color:#e8eef5
+    class GW,L1 edge
+    class L2 store
+    class APP,SHED origin
+</pre>
+<p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">网关用本地令牌桶扛快路径，Redis 做集中真值，决策永远在 1ms 内返回</p>
+
+<h2>关键技术点</h2>
+
+<h3>1. 算法选型：Token Bucket vs Leaky Bucket vs Sliding Window vs GCRA</h3>
+<p><strong>原理</strong>：四种算法各自回答一个不同的问题——<em>允许突发吗？输出能匀速吗？窗口怎么滚？</em></p>
+<table>
+<thead><tr><th>算法</th><th>核心思想</th><th>允许突发</th><th>输出速率</th><th>实现复杂度</th></tr></thead>
+<tbody>
+<tr><td><strong>Fixed Window</strong></td><td>每秒清零计数</td><td>否</td><td>不平滑</td><td>极低</td></tr>
+<tr><td><strong>Sliding Window Log</strong></td><td>存所有时间戳精确滚动</td><td>—</td><td>精确</td><td>高（内存大）</td></tr>
+<tr><td><strong>Sliding Window Counter</strong></td><td>当前窗口 + 上窗口按比例外推</td><td>—</td><td>近似</td><td>低</td></tr>
+<tr><td><strong>Token Bucket</strong></td><td>桶里放令牌，攒着可短时爆发</td><td>✓ 自然支持</td><td>有突发</td><td>低</td></tr>
+<tr><td><strong>Leaky Bucket</strong></td><td>请求入队、按固定速率漏出</td><td>排队后匀速</td><td>严格匀速</td><td>中</td></tr>
+<tr><td><strong>GCRA</strong></td><td>用「下一次允许时刻」单变量表达 leaky bucket</td><td>可配置</td><td>滚动平滑</td><td>中（无队列）</td></tr>
+</tbody></table>
+<div class="tradeoff">
+<strong>Trade-off：</strong>
+<ul>
+<li><strong>Fixed Window</strong>：✅ 一个计数器搞定；❌ 边界双倍突发（在第 0.999s 发 100 个，1.001s 又发 100 个，1ms 内 200 个全过）。</li>
+<li><strong>Sliding Window Log</strong>：✅ 精确；❌ 每个 key 要存 N 个时间戳，1M key × 100 req = 1 亿条记录，Redis 内存爆炸。</li>
+<li><strong>Token Bucket</strong>：✅ 天然支持突发（攒令牌）；❌ 不强制匀速，下游可能被「攒久了的爆发」打爆。Stripe 用它就是为了允许合理 burst。</li>
+<li><strong>Leaky Bucket</strong>：✅ 下游永远收到匀速流；❌ 要维护队列；纯粹的实现会因「队列没满但没令牌」产生不必要的延迟。</li>
+<li><strong>GCRA</strong>：✅ 单变量（TAT — 理论到达时间）状态，O(1) 内存、滚动窗口、可配 burst；❌ 数学不直观，文档难写。Redis 模块 <code>redis-cell</code>、Cloudflare 工作流多用它。</li>
+</ul></div>
+<pre><code># Token Bucket 核心 (Python 伪代码)
+def allow(key, capacity, refill_rate):
+    now = time.time()
+    tokens, last = state.get(key, (capacity, now))
+    # 懒计算：本次取令牌时,按经过时间补充
+    tokens = min(capacity, tokens + (now - last) * refill_rate)
+    if tokens &gt;= 1:
+        state[key] = (tokens - 1, now)
+        return True
+    state[key] = (tokens, now)
+    return False   # 拒绝, retry_after = (1 - tokens) / refill_rate
+</code></pre>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Stripe</strong>：四类限流器组合（请求速率、并发数、车队级负载抛弃、worker 负载抛弃），底层全是 token bucket + Redis Lua。详见其工程博客 <em>「Scaling your API with rate limiters」</em>。</li>
+<li><strong>Cloudflare</strong>：在 300+ 个 PoP 上跑分布式限流，本地短窗口决策、节点间异步同步聚合计数（见 Cloudflare 工程博客 <em>「How we built rate limiting capable of scaling to millions of domains」</em>）。</li>
+<li><strong>GitHub API</strong>：authenticated 用户 5000 req/h（hourly token bucket），Search API 单独一个更小的 bucket。</li>
+<li><strong>Redis 官方</strong>：<code>redis-cell</code> 模块直接实现 GCRA，一条 <code>CL.THROTTLE</code> 命令搞定。</li>
+</ul></div>
+
+<h3>2. 分布式限流：Redis 中心化 vs 本地分摊 vs 异步聚合</h3>
+<p><strong>原理</strong>：在一台机器上 token bucket 是平凡的；问题在于<em>全网共享同一个 key 的配额</em>时怎么协调。</p>
+<div class="tradeoff">
+<strong>Trade-off：</strong>
+<ul>
+<li><strong>中心化 Redis（单实例）</strong>：✅ 全局精确、实现简单（Lua 脚本原子操作）；❌ 单点性能瓶颈（30-50w QPS 顶天）、网络 RTT 占限流总开销 80%、Redis 挂 = 业务挂（必须 fail-open）。</li>
+<li><strong>本地分摊（粗略分配）</strong>：每台网关分到 <code>总限额 / N</code>。✅ 零依赖、低延迟；❌ 流量倾斜时 A 节点已满、B 节点空闲，整体利用率低；扩缩容时分配漂移。</li>
+<li><strong>本地决策 + 异步聚合</strong>：每台机本地 token bucket + 周期（100ms-1s）把消耗汇报给协调器，协调器再下发新配额。Cloudflare 用类似 gossip 的方法。✅ 低延迟 + 接近精确；❌ 实现复杂、有「超额窗口」（1s 内可能超发 20%）。</li>
+<li><strong>分层（本地 quick deny + 中心慢路径）</strong>：明显超限的本地直接拒，不超限的走 Redis 校验。✅ 把热点 key 99% 流量挡在本地；❌ 需要心跳同步状态。</li>
+</ul></div>
+<pre><code>-- Redis 原子 token bucket (Lua, Stripe 风格)
+-- KEYS[1]=桶 key  ARGV={capacity, refill_rate, now, cost}
+local cap, rate, now, cost = tonumber(ARGV[1]), tonumber(ARGV[2]),
+                              tonumber(ARGV[3]), tonumber(ARGV[4])
+local data = redis.call('HMGET', KEYS[1], 'tokens', 'ts')
+local tokens = tonumber(data[1]) or cap
+local last = tonumber(data[2]) or now
+tokens = math.min(cap, tokens + (now - last) * rate)
+local allowed = tokens &gt;= cost and 1 or 0
+if allowed == 1 then tokens = tokens - cost end
+redis.call('HMSET', KEYS[1], 'tokens', tokens, 'ts', now)
+redis.call('EXPIRE', KEYS[1], math.ceil(cap / rate) * 2)
+return {allowed, tokens}     -- 原子,无 race
+</code></pre>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Stripe</strong>：Redis Lua 集中计数；用 <em>「Redis 故障时放行」</em> 兜底（fail-open 是明确写在他们工程博客里的原则）。</li>
+<li><strong>Cloudflare 边缘限流</strong>：本地短窗口决策，边缘节点间用类 gossip 的异步通道聚合大窗口计数，详见上方提到的 Cloudflare 工程博客。</li>
+<li><strong>AWS API Gateway</strong>：region 内令牌桶；rate + burst 两个参数对应 refill rate 与 bucket capacity。</li>
+</ul></div>
+
+<h3>3. 多维度限流与优先级抛弃</h3>
+<p><strong>原理</strong>：单一维度限不住真实流量。一个 key 可能正常，但所有 key 加起来打爆 endpoint；某 endpoint 正常但下游 DB 挂了。要按 <em>多个维度同时检查、最严的胜出</em>。</p>
+<div class="tradeoff">
+<strong>典型维度组合（每层独立桶，全过才放行）：</strong>
+<ul>
+<li><strong>L1 - per API key</strong>：保护单租户公平（100/s）；</li>
+<li><strong>L2 - per IP</strong>：防匿名爬虫（10/s）；</li>
+<li><strong>L3 - per endpoint × key</strong>：保护重端点（/export 0.1/s）；</li>
+<li><strong>L4 - 全局并发数</strong>：保护下游 DB 连接池（&lt; 5000 in-flight）；</li>
+<li><strong>L5 - 优先级抛弃</strong>：触发熔断时按 <em>低优先级先丢</em>（导出 → 列表 → 创建支付永远最后丢）。</li>
+</ul></div>
+<pre><code># 多维度组合 (伪代码)
+def admit(req):
+    keys = [
+        ("key", req.api_key, 100, 1),
+        ("ip", req.ip, 10, 1),
+        ("ep", f"{req.api_key}:{req.path}", endpoint_limit(req.path), 1),
+    ]
+    for kind, k, cap, cost in keys:
+        if not bucket_allow(f"{kind}:{k}", cap, refill_for(cap), cost):
+            return reject(retry_after_from(cap, k), reason=kind)
+    if global_inflight() &gt; SHED_THRESHOLD and priority(req) &lt; HIGH:
+        return reject(retry_after=30, reason="overload")
+    return ALLOW
+</code></pre>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Stripe</strong>：把流量分为 <em>关键（创建 charge）</em> 与 <em>非关键（reporting / analytics）</em>，过载时先丢非关键。这种「保支付」的优先级抛弃是其工程博客明确强调的设计。</li>
+<li><strong>GitHub</strong>：REST 一个桶、GraphQL 一个桶（按 query 复杂度扣不同分）、Search 一个更严格的小桶——同 token 多维。</li>
+<li><strong>Twitter/X API</strong>：每个 endpoint 一个独立 bucket（不同 endpoint 限额完全不同），<code>X-Rate-Limit-Resource</code> 头表明哪个桶在管。</li>
+</ul></div>
+
+<h3>4. 429 响应契约：让 caller 优雅退避</h3>
+<p><strong>原理</strong>：限流不只是「拒绝」，是<em>给 caller 一个机器可读的退避说明书</em>。否则客户端只能死循环重试，把你二次打爆。</p>
+<div class="tradeoff">
+<strong>标准响应头：</strong>
+<ul>
+<li><code>Retry-After: 30</code> — 必填，秒数或 HTTP-date。RFC 9110 标准。</li>
+<li><code>X-RateLimit-Limit: 100</code> — 配额。</li>
+<li><code>X-RateLimit-Remaining: 0</code> — 剩余。</li>
+<li><code>X-RateLimit-Reset: 1735689600</code> — 重置时间戳。</li>
+<li><code>X-RateLimit-Resource: search</code> — 触发哪个桶（多桶时关键）。</li>
+<li>body：JSON 含 <code>error_code</code> + <code>doc_url</code>，让用户直接查文档。</li>
+</ul></div>
+<div class="callout">
+<strong>关键陷阱：客户端必须做 jitter。</strong>1000 个客户端都收到 <code>Retry-After: 30</code>，30 秒后又同时打过来 —— thundering herd 重演。服务端应该返回<em>带随机抖动的值</em>（30 ± 5s），或客户端自己加 jitter（Stripe SDK、AWS SDK 都内置 exponential backoff + jitter）。
+</div>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Stripe</strong>：429 始终含 <code>Retry-After</code>；官方 SDK 内置 idempotency key + exponential backoff 自动重试。</li>
+<li><strong>GitHub</strong>：超限返回 403 + <code>X-RateLimit-Reset</code>（用 epoch），文档明示「等 reset 后重试，否则继续 403」。</li>
+<li><strong>AWS</strong>：除了 429，还可能 <code>ThrottlingException</code>，所有官方 SDK 自动 retry with jitter。</li>
+</ul></div>
+
+<h2>扩展与优化</h2>
+<ul>
+<li><strong>热 key 突破 Redis 单节点</strong>：把单个高流量 key 在多个 Redis shard 上分散（<code>key:0..15</code>），每 shard 一份子配额，client 哈希落 shard。代价：精度损失（局部超额）。</li>
+<li><strong>从硬限流到自适应限流</strong>：用下游 latency / 错误率作信号动态调整（Netflix concurrency-limits、Google SRE 中的 adaptive throttling）—— 「健康时多放、生病时少放」。</li>
+<li><strong>跨区域全局配额</strong>：每区一份本地配额 + 跨区每秒一次异步对账。多区强一致全局配额代价巨大且没必要。</li>
+<li><strong>计算成本权重</strong>：不是每个请求都「一个令牌」，按 endpoint CPU 成本扣不同分（GraphQL query complexity = 扣的分；CPU-heavy endpoint 扣 10 分）。</li>
+<li><strong>Fail-open vs fail-close</strong>：限流系统挂了应该<em>放行</em>（避免限流故障变业务故障），但下游会瞬间暴露。配合 circuit breaker。</li>
+</ul>
+
+<h2>常见陷阱 / 面试追问</h2>
+<ol>
+<li><strong>「为什么不用 sliding window log？」</strong> — 内存代价。1M user × 100 req = 1 亿条 timestamp ≈ 几 GB；用 counter 近似就够，误差 &lt; 5%。</li>
+<li><strong>「Redis 挂了怎么办？」</strong> — fail-open + circuit breaker；Stripe 工程博客明确把这作为铁律。</li>
+<li><strong>「同一 user 多个进程并发请求，本地 token bucket 怎么共享？」</strong> — 进程内桶不行，必须用 Redis；或用「本地子配额 + 异步对账」。</li>
+<li><strong>「429 vs 503，何时用哪个？」</strong> — 429 = <em>客户端超限</em>（用户自己的问题）；503 = <em>服务过载</em>（你的问题）。错用会让客户端的重试策略错。</li>
+<li><strong>「Retry-After 怎么算？」</strong> — token bucket 下 = <code>(1 - tokens) / refill_rate</code>；sliding window 下 = 到下一秒还有几毫秒；并且服务端必须加 jitter。</li>
+<li><strong>「为什么 token bucket 比 leaky bucket 更主流？」</strong> — 公开 API 客户端往往天然「攒着发」（cron job 一次发 50 个），token bucket 允许这种合理 burst；leaky bucket 严格匀速反而对正常用户不友好。</li>
+</ol>
+
+<h2>深入资源</h2>
+<ul>
+<li><strong>Stripe Engineering Blog — <em>「Scaling your API with rate limiters」</em></strong>（Paul Tarjan）：四类限流器、Redis Lua 实现、fail-open 原则，配套 GitHub gist 有可跑 Ruby 代码。</li>
+<li><strong>Cloudflare Engineering Blog — <em>「How we built rate limiting capable of scaling to millions of domains」</em></strong>：边缘节点分布式限流，本地决策 + 异步聚合。</li>
+<li><strong>Brandur Leach — <em>「Rate Limiting, Cells, and GCRA」</em>（brandur.org）</strong>：GCRA 算法最易懂的讲解，配 Redis 实现。</li>
+<li><strong>Google SRE Book — Ch 21 「Handling Overload」</strong>：自适应限流、优先级抛弃、客户端侧的 retry budget。</li>
+<li><strong>Marc Brooker — <em>「Caution: Decreasing TCP MSS Doesn't Help」</em> 系列分布式文章</strong>：理解 fail-open 与 backpressure 的本质思考。</li>
+</ul>
+
+<h2>深入思考（点击展开思路）</h2>
+
+<details>
+<summary>1. Token bucket 的 capacity 与 refill rate 设成什么关系？capacity = refill 是否合理？</summary>
+<div class="answer">
+<p>常见误解：「100 req/s 就设 cap=100, rate=100」。但 cap=100 意味着用户可以攒到 100 个令牌后<em>瞬间</em>发 100 个请求 —— 1ms 内的瞬时 QPS 就是 100,000，把下游打爆。</p>
+<p><strong>正确思考</strong>：cap 是 <em>允许的突发大小</em>，rate 是 <em>长期平均速率</em>。两者解耦：</p>
+<ul>
+<li>下游能扛多大瞬时 burst？→ 决定 cap。常见 cap = rate × 1~3（允许 1-3 秒的突发）。</li>
+<li>给用户的「日均配额」是多少？→ 决定 rate。</li>
+</ul>
+<p>Stripe 的做法是 <em>「rate 是合同，cap 是仁慈」</em> —— cap 略大于 rate 让正常用户的偶尔 burst 不报错，但不至于让下游崩溃。极端场景（金融对账）甚至 cap = rate 让其严格匀速，等价 leaky bucket。</p>
+</div>
+</details>
+
+<details>
+<summary>2. 1M QPS 全过 Redis 不可行。如果只用 1 个 Redis 节点（约 30 万 QPS），怎么把每秒 100 万限流决策塞进去？</summary>
+<div class="answer">
+<p>三层思路叠加：</p>
+<ul>
+<li><strong>本地快速拒绝</strong>：每个网关节点本地存一份「最近超限的 key」黑名单（TTL 100ms），超限 key 不去 Redis 直接 429。热点 key 99% 流量挡在本地。</li>
+<li><strong>本地子配额</strong>：每个网关启动时向 Redis 一次性申请 <code>N 秒额度</code>（如 100 个令牌），本地消耗。用完后再申请下一批。Redis QPS 从 100w 降到 100w / 100 = 1w。代价：网关间分配不均、扩缩容时配额漂移。</li>
+<li><strong>Redis Cluster 分片</strong>：按 user_id hash 到不同 shard，每个 shard 承担 30w QPS。代价：跨 shard 的全局总配额不能用单 key 表达。</li>
+</ul>
+<p>实战：<em>本地黑名单 + 本地子配额 + Redis Cluster</em> 三件套，Redis QPS 通常能压到 5-10 万。</p>
+</div>
+</details>
+
+<details>
+<summary>3. 客户端集体收到 429 + Retry-After=30s 后同时重试，造成二次过载。服务端可以怎么做避免？</summary>
+<div class="answer">
+<ul>
+<li><strong>服务端返回 jittered Retry-After</strong>：不是固定 30，而是 <code>30 + uniform(0, 30)</code>，把重试时刻打散成一个区间。代价：客户端有时等更久。</li>
+<li><strong>不同客户端给不同 reset 时刻</strong>：bucket 的过期时间锚定到 <code>hash(api_key)</code>，不同 user 的窗口边界天然错开。</li>
+<li><strong>客户端 SDK 强制 backoff + jitter</strong>：官方 SDK 内置 <code>retry_after × random(0.5, 1.5)</code>，覆盖所有 caller。Stripe、AWS、Google SDK 都这么做。</li>
+<li><strong>限流回包带「软提示」</strong>：在还没真触发 429 时，<code>X-RateLimit-Remaining</code> 已经接近 0，客户端 SDK 看到就主动放慢；不要等到 429 才反应。</li>
+<li><strong>令牌的「逐渐恢复」语义</strong>：不要让所有 user 在 reset 那一刻同时恢复满血，而是 GCRA 那种连续滚动，重试时刻天然打散。</li>
+</ul>
+</div>
+</details>
+
+<details>
+<summary>4. 限流系统自己挂了：fail-open 放行还是 fail-close 拒绝？哪种业务该走哪条？</summary>
+<div class="answer">
+<p><strong>默认 fail-open</strong>：理由是 <em>「限流是保护性措施，不应让限流故障变业务故障」</em>。Stripe、AWS 都这么做。但 fail-open 意味着限流挂的瞬间，攻击流量直通后端 —— 必须搭配 circuit breaker 让下游能自我保护。</p>
+<p><strong>该走 fail-close 的场景</strong>：</p>
+<ul>
+<li><strong>付费配额 / 计费配额</strong>：超额 = 公司亏钱（如「免费层每月 1000 调用」），宁可拒也不能放。</li>
+<li><strong>下游有不可逆操作</strong>：如发短信 / 扣款，无脑放行可能引发批量误操作。</li>
+<li><strong>合规要求</strong>：金融、医疗的某些限流是监管硬要求，挂掉必须停服。</li>
+</ul>
+<p>实战分层：<em>抗 DDoS 层 fail-open（保命）；计费配额层 fail-close（保钱）</em>。两层独立部署。</p>
+</div>
+</details>
+
+<details>
+<summary>5. GraphQL 一次 query 可能消耗 100 倍的 CPU，怎么定义「一次请求」用于限流？</summary>
+<div class="answer">
+<p>REST 的隐藏假设 —— 「每次请求成本差不多」 —— 在 GraphQL 下崩了。一个 nested query 可能扫几万行、跑十几次 join。</p>
+<p><strong>解法是「成本权重」</strong>：</p>
+<ul>
+<li><strong>静态成本</strong>：query 提交时静态分析每个字段的 cost（list 字段 × 假设返回 100 条），算出总分，token bucket 一次扣这么多分。GitHub GraphQL API 就这么做，每小时 5000 「点数」而不是 5000 请求。</li>
+<li><strong>动态成本</strong>：请求执行完后按实际耗时 / 行数补扣令牌。代价：扣分滞后，恶意 query 已经把 CPU 烧完了。</li>
+<li><strong>query 深度 / 字段数硬限</strong>：在限流之前先在 query 解析阶段拒绝超过 depth 10 / 字段 1000 的查询。Apollo 自带支持。</li>
+<li><strong>持久化 query（persisted queries）</strong>：只允许预审过的 query hash 通过，把不可控的动态 query 拒之门外。Facebook、Shopify 大规模这样做。</li>
+</ul>
+<p>同理适用于：批量 API（一次传 100 个 id）、文件上传（按字节扣）、AI inference（按 token 扣）—— 凡是「单请求成本差距 &gt; 10 倍」的场景都需要权重。</p>
+</div>
+</details>
+
+<div class="nav"><a href="index.html">← 回到 index</a></div>
+</div></body></html>
