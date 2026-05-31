@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 11 · 唯一 ID 生成 — System Design Bi-daily</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"SF Pro Display","Noto Sans SC",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
+.container{max-width:820px;margin:0 auto;padding:24px 20px 60px}
+header{padding:40px 0 28px;border-bottom:1px solid rgba(100,200,255,0.15);margin-bottom:32px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem}
+.tag{padding:3px 10px;border-radius:4px;background:rgba(100,200,255,0.12);color:#64c8ff;border:1px solid rgba(100,200,255,0.25)}
+.tag.diff{background:rgba(94,234,212,0.1);color:#5eead4;border-color:rgba(94,234,212,0.3)}
+.tag.day{background:rgba(255,180,80,0.1);color:#ffb450;border-color:rgba(255,180,80,0.25)}
+h1{font-size:1.75rem;font-weight:800;background:linear-gradient(135deg,#64c8ff 0%,#5eead4 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:0.5px;line-height:1.3}
+h1 .en{display:block;font-size:1rem;color:#7a8590;-webkit-text-fill-color:#7a8590;margin-top:6px;font-weight:500}
+h2{font-size:1.2rem;color:#5eead4;margin:36px 0 14px;padding-left:12px;border-left:3px solid #5eead4}
+h3{font-size:1rem;color:#64c8ff;margin:20px 0 10px;font-weight:600}
+p{margin:10px 0;color:#c8cfd6}
+ul,ol{margin:10px 0 10px 22px;color:#c8cfd6}
+li{margin:6px 0}
+strong{color:#e8eef5;font-weight:600}
+em{color:#5eead4;font-style:normal;font-weight:500}
+code{font-family:"SF Mono",Menlo,Consolas,monospace;background:rgba(100,200,255,0.1);color:#5eead4;padding:1px 6px;border-radius:3px;font-size:0.88em}
+pre{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:14px 16px;overflow-x:auto;margin:12px 0;font-family:"SF Mono",Menlo,Consolas,monospace;font-size:0.84rem;line-height:1.55;color:#c8cfd6}
+pre code{background:none;color:inherit;padding:0;font-size:1em}
+.mermaid{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:18px;margin:14px 0;text-align:center;overflow-x:auto;cursor:zoom-in;transition:border-color 0.15s}
+.mermaid:hover{border-color:rgba(100,200,255,0.4)}
+.mermaid svg{width:100%;max-width:100%;height:auto;min-height:280px}
+.lightbox{position:fixed;inset:0;background:rgba(8,12,18,0.96);z-index:9999;display:none;align-items:center;justify-content:center;padding:24px;cursor:grab;backdrop-filter:blur(4px);overflow:hidden}
+.lightbox.open{display:flex}
+.lightbox.dragging{cursor:grabbing}
+.lightbox svg{width:auto;height:auto;max-width:96vw;max-height:92vh;transform-origin:center center;will-change:transform}
+.lightbox .hint{position:fixed;top:16px;right:20px;font-size:0.78rem;color:#7a8590;font-family:"SF Mono",Menlo,monospace;pointer-events:none}
+.callout{background:rgba(255,180,80,0.06);border-left:3px solid #ffb450;padding:12px 14px;margin:14px 0;border-radius:4px;font-size:0.94rem}
+.callout strong{color:#ffb450}
+.tradeoff{background:rgba(100,200,255,0.05);border:1px solid rgba(100,200,255,0.2);border-radius:6px;padding:12px 14px;margin:12px 0;font-size:0.94rem}
+.case{background:rgba(94,234,212,0.05);border-left:3px solid #5eead4;padding:12px 14px;margin:12px 0;border-radius:4px;font-size:0.94rem}
+.case strong{color:#5eead4}
+.case a{color:#5eead4;text-decoration:underline;text-decoration-style:dotted}
+.nav{margin-top:50px;padding-top:24px;border-top:1px solid rgba(100,200,255,0.15);text-align:center}
+.nav a{color:#64c8ff;text-decoration:none;font-size:0.92rem;padding:8px 16px;border:1px solid rgba(100,200,255,0.3);border-radius:4px;transition:all 0.15s}
+.nav a:hover{background:rgba(100,200,255,0.1)}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:0.9rem}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid rgba(100,200,255,0.15);vertical-align:top}
+th{color:#64c8ff;font-weight:600;background:rgba(100,200,255,0.05)}
+details{background:rgba(100,200,255,0.04);border:1px solid rgba(100,200,255,0.18);border-radius:6px;padding:12px 16px;margin:10px 0;transition:all 0.15s}
+details:hover{border-color:rgba(100,200,255,0.35)}
+details[open]{background:rgba(94,234,212,0.05);border-color:rgba(94,234,212,0.3)}
+details summary{font-weight:600;color:#e8eef5;list-style:none;outline:none;cursor:pointer;display:flex;align-items:flex-start;gap:10px;font-size:0.96rem}
+details summary::-webkit-details-marker{display:none}
+details summary::before{content:'▶';color:#64c8ff;font-size:0.75em;transition:transform 0.2s;flex-shrink:0;margin-top:5px}
+details[open] summary::before{transform:rotate(90deg);color:#5eead4}
+details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
+details .answer ul,details .answer ol{margin:6px 0 6px 22px}
+.resources{background:rgba(100,200,255,0.04);border:1px solid rgba(100,200,255,0.18);border-radius:6px;padding:14px 18px;margin:14px 0}
+.resources a{color:#64c8ff;text-decoration:none;border-bottom:1px dashed rgba(100,200,255,0.4)}
+.resources a:hover{color:#5eead4}
+@media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+</style>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({startOnLoad:true,theme:'base',flowchart:{useMaxWidth:true,htmlLabels:true,nodeSpacing:50,rankSpacing:60},themeVariables:{primaryColor:'#1a2530',primaryTextColor:'#e8eef5',primaryBorderColor:'#64c8ff',lineColor:'#5eead4',secondaryColor:'#0e1419',tertiaryColor:'#0a0f14',background:'#0a0f14',mainBkg:'#1a2530',secondBkg:'#0e1419',textColor:'#d4dae0',fontFamily:'-apple-system,"SF Pro Display",sans-serif',fontSize:'16px'}});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const lb=document.createElement('div');lb.className='lightbox';
+  lb.innerHTML='<span class="hint">scroll = zoom · drag = pan · Esc / click bg = close</span>';
+  document.body.appendChild(lb);
+  let scale=1,panX=0,panY=0,dragging=false,moved=false,lx=0,ly=0;
+  const apply=()=>{const s=lb.querySelector('svg');if(s)s.style.transform=`translate(${panX}px,${panY}px) scale(${scale})`};
+  const reset=()=>{scale=1;panX=0;panY=0};
+  const close=()=>{lb.classList.remove('open');const s=lb.querySelector('svg');if(s)s.remove();reset()};
+  document.addEventListener('click',e=>{
+    if(e.target.closest('.lightbox')){if(moved){moved=false;return}close();return}
+    const w=e.target.closest('.mermaid');if(!w)return;
+    const svg=w.querySelector('svg');if(!svg)return;
+    const c=svg.cloneNode(true);c.removeAttribute('style');
+    c.style.maxWidth='96vw';c.style.maxHeight='92vh';
+    lb.appendChild(c);lb.classList.add('open');reset();apply();
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+  lb.addEventListener('wheel',e=>{
+    if(!lb.classList.contains('open'))return;
+    e.preventDefault();
+    const svg=lb.querySelector('svg');if(!svg)return;
+    const ns=Math.max(0.3,Math.min(10,scale*(1-e.deltaY*0.002)));
+    const r=svg.getBoundingClientRect();
+    const cx=e.clientX-(r.left+r.width/2),cy=e.clientY-(r.top+r.height/2);
+    const k=ns/scale-1;panX-=cx*k;panY-=cy*k;scale=ns;apply();
+  },{passive:false});
+  lb.addEventListener('mousedown',e=>{
+    if(!lb.classList.contains('open'))return;
+    dragging=true;moved=false;lx=e.clientX;ly=e.clientY;lb.classList.add('dragging');e.preventDefault();
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    const dx=e.clientX-lx,dy=e.clientY-ly;
+    if(Math.abs(dx)+Math.abs(dy)>3)moved=true;
+    panX+=dx;panY+=dy;lx=e.clientX;ly=e.clientY;apply();
+  });
+  document.addEventListener('mouseup',()=>{dragging=false;lb.classList.remove('dragging')});
+});
+</script>
+</head><body><div class="container">
+
+<header>
+<div class="meta">
+<span class="tag day">Day 11</span>
+<span class="tag diff">Medium</span>
+<span class="tag">Unique ID</span>
+<span class="tag">Snowflake</span>
+<span class="tag">UUIDv7</span>
+<span class="tag">KSUID/ULID</span>
+</div>
+<h1>唯一 ID 生成 — 时间、随机与索引的三角博弈<span class="en">Unique ID Generation: UUID, Snowflake, KSUID, ULID</span></h1>
+</header>
+
+<h2>问题场景 + 需求约束</h2>
+<p>设计一个全球聊天产品的消息 ID（参考 Discord / Slack / WhatsApp）。规模假设：<strong>3 亿 DAU、峰值 100w 消息/秒、消息按 channel 分片到上百个 Cassandra 节点</strong>。每条消息要分配一个 ID，决定它在 DB 中的物理位置、在客户端的排序、在 URL 里的样子。</p>
+<p>关键需求：</p>
+<ul>
+<li><strong>全局唯一</strong>：跨数据中心，峰值 100w/s 不能冲突。</li>
+<li><strong>大致时间序</strong>：按 channel 拉历史消息，<code>WHERE id &lt; cursor</code> 翻页要走索引。</li>
+<li><strong>紧凑</strong>：每条消息一个 ID，128-bit vs 64-bit 一年下来差几十 TB（带宽 + 存储 + 索引）。</li>
+<li><strong>无中心瓶颈</strong>：不能让一个 ID 服务挂掉就全站不能发消息。</li>
+<li><strong>不泄露业务量</strong>：自增 ID 让对手通过 <code>id_today - id_yesterday</code> 算出日活，是早期 Twitter 的隐私事故。</li>
+<li><strong>客户端可生成</strong>：离线发消息时本地先生成 ID，上线后服务端不重新分配，保证幂等。</li>
+</ul>
+
+<h2>高层架构</h2>
+<pre class="mermaid">
+graph TD
+    ZK["ZooKeeper / etcd<br/><i>worker_id 分配</i>"]
+    NTP["NTP / PTP 时钟同步<br/><i>检测回拨</i>"]
+    APP1["App 实例 #1<br/>嵌入 ID lib<br/>worker_id=42"]
+    APP2["App 实例 #2<br/>嵌入 ID lib<br/>worker_id=43"]
+    APPN["App 实例 #N<br/>worker_id=...<br/>(最多 2¹⁰=1024)"]
+    CLIENT["移动客户端<br/><i>UUIDv7 本地生成<br/>离线消息</i>"]
+    CASS[("Cassandra<br/><i>partition by channel<br/>cluster by id DESC</i>")]
+
+    ZK -.分配.-> APP1 & APP2 & APPN
+    NTP -.同步.-> APP1 & APP2 & APPN
+    APP1 & APP2 & APPN --> CASS
+    CLIENT -->|带 client_id| APP1
+
+    classDef coord fill:#0e2030,stroke:#5eead4,color:#e8eef5
+    classDef app fill:#1a2530,stroke:#64c8ff,color:#e8eef5
+    classDef client fill:#1a1a30,stroke:#ffb450,color:#e8eef5
+    classDef store fill:#2a1530,stroke:#ff7ab6,color:#e8eef5
+    class ZK,NTP coord
+    class APP1,APP2,APPN app
+    class CLIENT client
+    class CASS store
+</pre>
+<p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">ID 生成是 <em>library 模式</em>，没有独立服务可挂；ZK 只在启动时分配 worker_id，运行时无依赖</p>
+<p><strong>组件职责</strong>：ZooKeeper 启动时给每个 app 实例分一个 worker_id（10 bit = 1024 个槽），重启时归还。NTP 保证机器时钟不漂移（一般 &lt; 10ms 误差），<strong>时钟回拨是 Snowflake 系命门</strong>。App 嵌入 ID lib 直接出 ID，无网络调用。客户端离线场景用 UUIDv7 本地生成，服务端原样接受（保证发送幂等）。</p>
+
+<h2>关键技术点</h2>
+
+<h3>1. UUID 各版本：v4 随机 vs v7 时间序</h3>
+<p><strong>原理</strong>：UUID 是 128-bit。<em>v4</em> 122 bit 全随机，冲突概率 ~2⁻¹²²，无需协调，但<strong>对 B-tree 索引是灾难</strong>——每次插入打在随机叶子页，page split + cache miss 暴增。<em>v7</em>（<a href="https://www.rfc-editor.org/rfc/rfc9562.html">RFC 9562</a> 2024 年定稿）前 48 bit 是毫秒级 Unix 时间戳，后 74 bit 随机/单调，<strong>字典序 = 时间序</strong>，新插入永远在 B-tree 右侧，page split 几乎为零。</p>
+<div class="tradeoff">
+<strong>Trade-off：</strong>
+<ul>
+<li><strong>v4</strong>：✅ 无中心、客户端可生成；❌ Postgres / MySQL 主键用 v4 时，插入吞吐随表增大快速下降（buffer pool 装不下整个索引就崩）；占 16 字节存储，char(36) 形式 36 字节，是 BIGINT 的 2-4 倍。</li>
+<li><strong>v7</strong>：✅ 索引友好（B-tree 顺序插入）、保留 UUID 生态（128-bit、字符串 API 不变）、跨语言库就绪；❌ 时间戳<em>暴露生成时间</em>，私密场景慎用；时钟回拨需自己处理。</li>
+<li><strong>v1</strong>（MAC + 时间）：基本不用——泄露 MAC 地址、且时间戳排在低位，仍是随机插入。</li>
+</ul></div>
+<pre><code># UUIDv7 极简生成 (Python，RFC 9562)
+import os, time
+def uuid7() -&gt; bytes:
+    ts_ms = int(time.time() * 1000)          # 48 bit
+    rand_a = int.from_bytes(os.urandom(2), 'big') &amp; 0x0FFF  # 12 bit
+    rand_b = int.from_bytes(os.urandom(8), 'big') &amp; ((1&lt;&lt;62)-1)  # 62 bit
+    # 组装: ts(48) | ver=7(4) | rand_a(12) | var=10(2) | rand_b(62)
+    n = (ts_ms &lt;&lt; 80) | (0x7 &lt;&lt; 76) | (rand_a &lt;&lt; 64) | (0b10 &lt;&lt; 62) | rand_b
+    return n.to_bytes(16, 'big')
+
+# Postgres 17+ 原生支持: gen_random_uuid() 仍是 v4, 但社区有 uuidv7() 扩展
+</code></pre>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Postgres 社区 benchmark</strong>：同表千万行插入，UUIDv4 比 UUIDv7 慢 3-10 倍（v7 顺序写、v4 随机写）；BRIN 索引在 v7 上能用，v4 上完全无效。</li>
+<li><strong>Stripe API 对象 ID</strong>：用 <code>ch_</code>/<code>pi_</code> 前缀 + 16+ 字节随机，是 v4 风格（KV 存储不怕随机插入，且要求强抗猜测）。</li>
+<li><strong>OpenJDK</strong>：<a href="https://bugs.openjdk.org/browse/JDK-8334015">JEP 已支持 UUIDv7</a>，标志 v7 正式进入主流。</li>
+</ul></div>
+
+<h3>2. Snowflake 类 ID：64-bit 三段式</h3>
+<p><strong>原理</strong>：Twitter <a href="https://blog.twitter.com/engineering/en_us/a/2010/announcing-snowflake">2010 年开源 Snowflake</a>，64 bit = 1 符号位 + 41 bit 毫秒时间戳（自定 epoch，可用 ~69 年）+ 10 bit worker_id（1024 台机器）+ 12 bit 序列号（同毫秒同机器最多 4096 个）。<strong>4096 × 1024 = 419 万 ID/ms = 41 亿/秒</strong>，远超任何单一系统需求。比 UUID 省一半空间，且天然<em>大致时间序</em>。</p>
+<div class="tradeoff">
+<strong>Trade-off：vs UUIDv7 / vs DB sequence</strong>
+<table>
+<thead><tr><th>方案</th><th>位宽</th><th>峰值/秒</th><th>需要协调</th><th>致命问题</th></tr></thead>
+<tbody>
+<tr><td>DB auto_increment</td><td>BIGINT 64</td><td>单实例 ~10w</td><td>无</td><td>单点、泄露业务量</td></tr>
+<tr><td>UUIDv4</td><td>128</td><td>无上限</td><td>无</td><td>索引插入慢</td></tr>
+<tr><td>Snowflake</td><td>64</td><td>41 亿</td><td>worker_id 分配 + 时钟</td><td>时钟回拨</td></tr>
+<tr><td>UUIDv7</td><td>128</td><td>无上限</td><td>无</td><td>占空间 2 倍</td></tr>
+<tr><td>DB segment（号段）</td><td>64</td><td>取决于段长</td><td>DB 一次拿 1000 个</td><td>重启浪费段</td></tr>
+</tbody></table>
+</div>
+<pre><code># Snowflake 核心 (Python 伪代码)
+class Snowflake:
+    EPOCH = 1672531200000  # 2023-01-01 自定起点
+    def __init__(self, worker_id):
+        assert 0 &lt;= worker_id &lt; 1024
+        self.worker_id = worker_id
+        self.seq = 0
+        self.last_ts = -1
+    def next_id(self):
+        ts = int(time.time() * 1000)
+        if ts &lt; self.last_ts:
+            raise ClockBackwardError(self.last_ts - ts)  # 见下一节
+        if ts == self.last_ts:
+            self.seq = (self.seq + 1) &amp; 0xFFF
+            if self.seq == 0:
+                ts = self._wait_next_ms(self.last_ts)  # 等下一毫秒
+        else:
+            self.seq = 0
+        self.last_ts = ts
+        return ((ts - self.EPOCH) &lt;&lt; 22) | (self.worker_id &lt;&lt; 12) | self.seq
+</code></pre>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Twitter</strong>：原始版本，2010-09-21 上线，所有 tweet ID 从此非连续；2014 后切到内嵌库模式。</li>
+<li><strong>Discord</strong>：<a href="https://discord.com/blog/how-discord-stores-trillions-of-messages">每个 message/user/channel 都是 Snowflake</a>，bit 分配略调；前端从 ID 直接解出创建时间（不用查 DB）。</li>
+<li><strong>Instagram</strong>：<a href="https://instagram-engineering.com/sharding-ids-at-instagram-1cf5a71e5a5c">41 bit 时间 + 13 bit shard_id + 10 bit seq</a>，在 Postgres 内用 stored procedure 生成，不依赖外部服务——『把 Snowflake 写进数据库』的经典范式。</li>
+<li><strong>Sony Sonyflake</strong>：39 bit 10ms 精度时间戳 + 8 bit seq + 16 bit machine_id，换来 174 年寿命 + 65536 台机器，适合机器多但 QPS 不极端的场景。</li>
+</ul></div>
+
+<h3>3. 时钟回拨：Snowflake 的命门</h3>
+<p><strong>原理</strong>：Snowflake 的唯一性<em>完全依赖时间戳单调递增</em>。NTP 一次回拨 100ms，机器在这 100ms 内生成的 ID 就可能<strong>和过去重复</strong>。leap second（闰秒）、虚拟机暂停恢复、运维误操作改时间，都触发过生产事故。</p>
+<div class="tradeoff">
+<strong>三种主流解法：</strong>
+<ul>
+<li><strong>① 等待回到原时刻</strong>（最简单）：<code>if ts &lt; last_ts: sleep(last_ts - ts)</code>。代价：回拨大时阻塞 ID 生成 = 阻塞写入，超过 5ms 就直接抛错让上层降级。Twitter 原版做法。</li>
+<li><strong>② 用『逻辑时间』代替系统时间</strong>：内存里维护 <code>logical_ts = max(system_ts, last_ts + 1)</code>，永不回退。代价：与真实时间逐渐漂移；适合短暂回拨。</li>
+<li><strong>③ 借 worker_id 做逃生</strong>（Sonyflake / Baidu UidGenerator）：检测到回拨直接<em>换一个 worker_id</em> 启动（ZK 还有空闲槽），旧 worker_id 等冷却。代价：worker_id 池要预留。</li>
+<li><strong>④ 关 NTP 的 step 模式，只允许 slew</strong>（运维方案）：NTP 用 <code>-x</code> 参数让时间『慢慢追』而不是『跳』，物理上消除回拨。<em>生产标配</em>，但仍需代码兜底。</li>
+</ul></div>
+<pre><code># 处理回拨的鲁棒版本
+def next_id(self):
+    ts = now_ms()
+    delta = self.last_ts - ts
+    if delta &gt; 0:
+        if delta &lt;= 5:          # 小回拨，等
+            time.sleep(delta / 1000)
+            ts = now_ms()
+        elif delta &lt;= 2000:     # 中回拨，用逻辑时钟
+            ts = self.last_ts + 1
+        else:                   # 大回拨，拒绝服务
+            raise ClockBackwardError(delta)
+    # ... 正常分配 seq
+</code></pre>
+<div class="callout"><strong>真实事故模式：</strong>VM 从 snapshot 恢复后时间倒退几小时；某次 NTP 配错指向有问题的源，全集群同时倒退 30 秒，生成的 ID 与历史 ID 重复，引发主键冲突写入失败——这种情况只能<em>下线该实例 + 等到真实时间超过 last_ts</em>。</div>
+
+<h3>4. ULID / KSUID / UUIDv7 三剑客对比</h3>
+<p><strong>原理</strong>：三者都想解决『字典序 = 时间序 + 全分布式 + 无中心』。差别在 bit 数、编码、是否单调严格。</p>
+<table>
+<thead><tr><th></th><th>UUIDv7</th><th>ULID</th><th>KSUID</th></tr></thead>
+<tbody>
+<tr><td><strong>位宽</strong></td><td>128</td><td>128</td><td>160</td></tr>
+<tr><td><strong>时间精度</strong></td><td>毫秒</td><td>毫秒</td><td>秒</td></tr>
+<tr><td><strong>随机位</strong></td><td>74 bit</td><td>80 bit</td><td>128 bit</td></tr>
+<tr><td><strong>文本编码</strong></td><td>hex+横线 (36 字符)</td><td>Crockford Base32 (26 字符)</td><td>Base62 (27 字符)</td></tr>
+<tr><td><strong>单调保证</strong></td><td>同毫秒内可选</td><td>同毫秒严格单调（spec 要求）</td><td>无（秒级）</td></tr>
+<tr><td><strong>标准化</strong></td><td>IETF RFC 9562</td><td>社区 spec（GitHub）</td><td>Segment 开源</td></tr>
+<tr><td><strong>典型场景</strong></td><td>替换数据库 PK</td><td>面向用户的短 ID</td><td>事件流、日志</td></tr>
+</tbody></table>
+<div class="tradeoff">
+<strong>怎么选：</strong>
+<ul>
+<li><strong>新项目 DB 主键</strong>：UUIDv7（标准化、生态、PK 友好）。</li>
+<li><strong>需要在 URL / UI 出现</strong>：ULID（26 个字符，Base32 无 I/L/O/U 不易看错）或 KSUID（27 字符 Base62）。</li>
+<li><strong>每秒只有几百到几千 ID</strong>：KSUID 简单够用，秒级时间戳无回拨敏感。</li>
+<li><strong>峰值 100w/s、严格单调</strong>：选 Snowflake（64 bit 省 50% 空间）或 ULID（spec 保证同毫秒递增）。</li>
+</ul></div>
+<pre><code># 三种格式的字符串样例
+UUIDv4:  6ba7b810-9dad-11d1-80b4-00c04fd430c8   ← 36 字符
+UUIDv7:  018f1c2e-a31b-7c12-9a4b-3e1c2d4f5a6b   ← 36 字符, 前 48 bit 是时间
+ULID:    01HXY8K5T4ZNQ9P2M3RVW6S0BC             ← 26 字符
+KSUID:   2QqRwSdEf8VnT1bAaCpYlGmHkXjZ           ← 27 字符
+Snowflake: 1773294523890106368                  ← 19 位十进制数字
+</code></pre>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Segment</strong>：<a href="https://github.com/segmentio/ksuid">KSUID 开源仓库</a>声明在事件管道中产生数万亿个 KSUID；20 字节布局（4 字节时间戳 + 16 字节随机），秒级精度刚好够事件去重。</li>
+<li><strong>ULID</strong>：<a href="https://github.com/ulid/spec">canonical spec</a> 强制要求同毫秒内 ID 单调递增（实现要用 monotonic factory）；MongoDB ObjectID 是类似思路（12 字节 = 4 时间 + 5 random + 3 counter）。</li>
+<li><strong>Stripe</strong>：用<em>带类型前缀</em>的随机字符串（<code>cus_</code>, <code>ch_</code>），不属任何标准，但展示了『可读性 + 类型安全 + 抗猜测』的产品级 ID 设计。</li>
+</ul></div>
+
+<h2>扩展与优化</h2>
+<ul>
+<li><strong>worker_id 不够用</strong>：10 bit = 1024 上限，容器化时代很快撞墙。Discord / Sonyflake 通过<em>缩短时间戳精度</em>（10ms 一格）省下 bit 给 worker_id。</li>
+<li><strong>多区部署</strong>：bit 拆分为 <code>region(3) + dc(3) + worker(4)</code>，让 ID 也能定位物理位置。Twitter 内部就是这样。</li>
+<li><strong>client_id 段</strong>：移动端离线生成 ID 时，用本地 UUIDv7 + 客户端 token 做幂等，服务端不重新分配。WhatsApp 用这种方案保证发送失败重试不重复。</li>
+<li><strong>从 UUIDv4 迁移到 UUIDv7</strong>：直接换生成函数，旧数据保留——v7 的版本号 4 bit 与 v4 不同，类型不冲突；索引性能会随新数据占比慢慢恢复。</li>
+<li><strong>监控信号</strong>：每秒生成数（是否接近 4096/ms/worker 上限）、时钟漂移、worker_id 冲突告警。</li>
+</ul>
+
+<h2>常见陷阱 + 面试问题</h2>
+<div class="callout"><strong>陷阱 1：把 UUIDv4 当 PK 用在大表</strong>。"UUID 反正全球唯一" 听起来安全，但 B-tree 插入性能崩塌往往要写到 5000 万行才发现，那时已经晚了。新项目直接 v7。</div>
+<div class="callout"><strong>陷阱 2：以为 Snowflake 一定全局递增</strong>。它只是<em>大致时间序</em>——同毫秒内不同 worker 生成的 ID 大小由 worker_id 决定，不是真单调。代码不能依赖『新 ID 一定 &gt; 旧 ID』。</div>
+<div class="callout"><strong>陷阱 3：把 ID 当时间戳用</strong>。从 Snowflake 解出来的时间是<em>生成时间</em>，不是<em>事件时间</em>；客户端离线时事件时间和生成时间可能差几天。</div>
+<div class="callout"><strong>陷阱 4：worker_id 被复用</strong>。机器漂移、容器调度让两个进程拿到同一个 worker_id → 必产生重复 ID。ZooKeeper 临时节点 + 心跳是标配。</div>
+<div class="callout"><strong>陷阱 5：泄露业务量</strong>。自增 ID 让对手算出『今天发了多少条消息』。早期 Twitter 因此暴露增长数据。任何对外可见的 ID 都要至少加随机段。</div>
+
+<p><strong>面试可能追问：</strong></p>
+<ol>
+<li>峰值 1000w/s，64-bit Snowflake 够不够？bit 分配怎么改？</li>
+<li>跨数据中心生成 ID 怎么避免冲突？datacenter_id 占几位？</li>
+<li>UUIDv4 用作 MySQL 主键有什么问题？v7 怎么解？给出实测数字量级。</li>
+<li>时钟回拨发生时，你设计的系统怎么响应？多大回拨需要熔断？</li>
+<li>客户端能不能本地生成 ID？要满足什么前提？</li>
+</ol>
+
+<h2>深入资源</h2>
+<div class="resources">
+<ul>
+<li><a href="https://blog.twitter.com/engineering/en_us/a/2010/announcing-snowflake">Twitter Engineering: Announcing Snowflake (2010)</a> — 原始论证，看『为什么 ZooKeeper + 64 bit + 时间戳』</li>
+<li><a href="https://instagram-engineering.com/sharding-ids-at-instagram-1cf5a71e5a5c">Instagram Engineering: Sharding &amp; IDs at Instagram</a> — 把 ID 生成做进 Postgres 的范式，工程极简主义</li>
+<li><a href="https://discord.com/blog/how-discord-stores-trillions-of-messages">Discord: How Discord Stores Trillions of Messages</a> — Snowflake ID 如何与 Cassandra 分片协同</li>
+<li><a href="https://www.rfc-editor.org/rfc/rfc9562.html">RFC 9562: Universally Unique IDentifiers (UUIDs)</a> — 2024 年新版，包含 v6/v7/v8 三种时间序变体</li>
+<li><a href="https://github.com/ulid/spec">ULID spec</a> &amp; <a href="https://github.com/segmentio/ksuid">Segment KSUID</a> — 两套 sortable ID 的 reference 实现</li>
+</ul>
+</div>
+
+<h2>深入思考</h2>
+
+<details>
+<summary>1. UUIDv4 做 MySQL 主键插入性能崩，根本原因不是『随机』本身。到底慢在哪？为什么 UUIDv7 能解？</summary>
+<div class="answer">
+<p><strong>不是 CPU 慢、不是磁盘带宽不够，是 buffer pool 命中率崩</strong>。InnoDB 是聚簇索引——主键决定数据在磁盘上的物理位置。</p>
+<ul>
+<li><strong>顺序主键</strong>（自增 / UUIDv7）：新插入永远在 B-tree 最右叶子页，只要这一页在 buffer pool 里就 0 磁盘 IO，page split 几乎不发生。</li>
+<li><strong>随机主键</strong>（UUIDv4）：插入位置随机分布到全表的叶子页。表一旦超过 buffer pool（比如表 100GB、buffer pool 16GB），每次插入都<em>大概率</em> miss → 必须先从磁盘读那一页再写 → 写放大 + IOPS 打满。</li>
+<li><strong>Page split 加剧</strong>：随机插入会频繁触发叶子页满了要分裂，分裂导致索引碎片化，b-tree 高度增加，进一步降低 buffer pool 利用率。</li>
+</ul>
+<p><strong>UUIDv7 怎么解</strong>：前 48 bit 是时间戳，<em>近期生成的 ID 字典序都很接近</em>，全部插入到 B-tree 右侧少数几个叶子页——这些页一直热，buffer pool 几乎永远命中。Percona / EnterpriseDB 的 benchmark 数据显示，亿级行的表 v7 比 v4 插入快 5-10 倍，写放大降一个数量级。</p>
+<p><em>含义</em>：用 v4 + 单独的 BIGINT 自增 PK + UUID 是 unique key，是历史上的折中方案；现在直接 v7 更干净。</p>
+</div>
+</details>
+
+<details>
+<summary>2. Snowflake 的 12 bit 序列号支持 4096/ms = 410w/s。但生产中常见的『单进程 30w/s 就开始抛错』，为什么？</summary>
+<div class="answer">
+<p><strong>瓶颈不在 4096 上限，在『等下一毫秒』的实现</strong>。同毫秒内序列号用完（4096 个），代码要 <code>sleep until next ms</code>。但：</p>
+<ul>
+<li><strong>线程竞争</strong>：单 Snowflake 实例被多线程共享，<code>last_ts + seq</code> 要加锁 / CAS。30w/s 下锁争抢成瓶颈，远在 410w/s 之前。</li>
+<li><strong>系统调用开销</strong>：<code>gettimeofday()</code> 在 Linux 上虽快（vDSO），但每次 next_id 都调用，30w/s = 3μs/次，CPU 已经吃满。</li>
+<li><strong>burst 而非平均</strong>：实际流量是脉冲式，<em>某一毫秒</em>瞬间打满 4096 后阻塞，下一毫秒又空闲——平均看 30w/s，瞬时已饱和。</li>
+</ul>
+<p><strong>工程解法</strong>：</p>
+<ul>
+<li>每个线程独立一个 Snowflake 实例（worker_id 进一步细分给线程），消除锁。</li>
+<li>批量预生成：一次 next_batch(1000) 拿一段连续 ID 回客户端用，摊薄系统调用。</li>
+<li>缓存时间戳：业务线程读上一次的 ts，单独一个 ticker 协程每毫秒更新，省 syscall。</li>
+</ul>
+<p>Discord、Baidu UidGenerator、美团 Leaf 都在这个量级做过专门优化。</p>
+</div>
+</details>
+
+<details>
+<summary>3. 系统里同时存在两种 ID（老的 BIGINT 自增 + 新的 Snowflake），如何无停机迁移？</summary>
+<div class="answer">
+<p>这是『数据库主键演进』的经典难题。直接换主键 = 改表锁 + 改索引 + 改所有外键，停机几小时。无停机方案：</p>
+<ul>
+<li><strong>阶段 1：双写</strong>。新增 <code>snowflake_id BIGINT UNIQUE</code> 列，新写入两个 ID 都生成；老数据后台批量回填（按 PK 范围分批）。</li>
+<li><strong>阶段 2：双读</strong>。代码改为<em>优先按 snowflake_id 读</em>，按老 ID 读时内部转换。外部 API 接受两种 ID 格式（前缀区分或位数区分）。</li>
+<li><strong>阶段 3：迁移外键</strong>。把所有引用老 ID 的外键表，加 <code>parent_snowflake_id</code> 列、回填、切读、删老外键。这一步最痛苦，影响所有 JOIN。</li>
+<li><strong>阶段 4：下线老 ID</strong>。监控老 ID 的访问归零后，删列、改 PK。<em>主键替换</em>用 <code>pt-online-schema-change</code> / <code>gh-ost</code> 影子表方式做，避免锁表。</li>
+</ul>
+<p><strong>关键陷阱</strong>：</p>
+<ul>
+<li>缓存里存的还是老 ID → 双写后要清相关 cache。</li>
+<li>客户端 / 第三方系统持有老 ID → 给一个永久 redirect API（<code>GET /v1/legacy_id/123 → snowflake</code>）。</li>
+<li>分析 / BI 系统按老 ID 做 JOIN → 数仓也要同步迁移。</li>
+</ul>
+<p>整个过程通常 3-6 个月，关键是<em>不要急于删老 ID</em>——保留双写 1-2 个月观察。</p>
+</div>
+</details>
+
+<details>
+<summary>4. 设计聊天系统时，发送方客户端在飞机上离线生成 ID 一周后上线发送，会发生什么？怎么处理？</summary>
+<div class="answer">
+<p><strong>核心问题</strong>：客户端本地生成的 UUIDv7 时间戳是<em>一周前</em>，到服务端时，按 ID 排序会把这条消息插入到一周前的位置，channel 历史里『过去突然冒出新消息』，UI 看不到。</p>
+<p><strong>解法分层</strong>：</p>
+<ul>
+<li><strong>双时间戳模型</strong>：消息 schema 同时存 <code>client_id</code>（客户端生成、用于幂等去重）+ <code>server_ts</code>（服务端收到的时间，决定排序）。<em>排序按 server_ts，去重按 client_id</em>。</li>
+<li><strong>消息体内 created_at</strong>：UI 显示『发送时间』用客户端的 created_at（让用户看到是『一周前写的』），但消息在 channel 列表的位置按 server_ts。WhatsApp、iMessage 都是这套。</li>
+<li><strong>幂等保证</strong>：服务端用 <code>(channel_id, client_id)</code> 做 upsert，客户端发 3 次同一条只成功一次。</li>
+<li><strong>冲突边界</strong>：极端情况两个客户端同时离线、同一 channel、同一毫秒生成相同 UUIDv7 概率仍 ~2⁻⁷⁴ ≈ 不可能。</li>
+</ul>
+<p><strong>更深的设计哲学</strong>：永远不要让一个字段同时承担『唯一标识』『时间排序』『因果排序』三件事——三者的时间语义不同（生成时间 / 接收时间 / 事件发生时间）。Slack 的 <code>ts</code> 字段是 server_ts、<code>client_msg_id</code> 是 UUID，分得很清楚。</p>
+</div>
+</details>
+
+<details>
+<summary>5. 如果让你重新设计一个『面向用户可见』的 ID（出现在 URL、收据、support 工单），UUIDv7 / ULID / 自定义 Base62 怎么选？</summary>
+<div class="answer">
+<p>用户可见 ID 的需求和后端主键<em>完全不同</em>，关键看 5 维：</p>
+<ul>
+<li><strong>抗猜测</strong>：URL 上的 <code>order/123</code> 可被遍历查别人订单。用户可见 ID 必须有足够随机位（&gt;= 64 bit）。UUIDv7 后 74 bit 随机够用，但前 48 bit 时间戳<em>暴露下单时间</em>——金融场景不可接受。</li>
+<li><strong>抗输入错误</strong>：客户念给客服时 O/0、I/1 必须分清。Crockford Base32（ULID 用）专为此设计，去掉了 I L O U；Base62 没有这个保障。</li>
+<li><strong>长度</strong>：URL / 收据要短。UUIDv7 36 字符太长；ULID 26 字符可接受；Stripe 风格 <code>cus_</code> + 14 随机字符是最佳折中。</li>
+<li><strong>类型可识别</strong>：用前缀（<code>ord_</code>, <code>inv_</code>）让支持人员一眼看出 ID 类型，避免把 invoice ID 当 order ID 查。这是<em>Stripe 最被低估的工程决策</em>。</li>
+<li><strong>是否暴露时间</strong>：B2B 场景可暴露（客户希望看到时间）；B2C 隐私场景不能。</li>
+</ul>
+<p><strong>推荐：Stripe 模式</strong>——<code>{type_prefix}_{base62(随机)}</code>，22-30 字符。后端主键用 UUIDv7 / Snowflake，对外永远不暴露后端 ID，加一层映射。代价是要存映射表（或者把 prefix + random 直接作为主键），但获得了 API 演进自由度。</p>
+<p>反例：早期 Twitter URL 里的 tweet ID 是自增 + 后改 Snowflake，<em>暴露了发推量</em>；现在虽然换了 Snowflake 但仍能反推时间——产品发布时的时间戳设计要慎重。</p>
+</div>
+</details>
+
+<div class="nav"><a href="index.html">← 回到 index</a></div>
+</div></body></html>

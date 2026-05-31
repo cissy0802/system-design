@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 11 · Unique ID Generation — System Design Bi-daily</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"SF Pro Display","Noto Sans SC",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
+.container{max-width:820px;margin:0 auto;padding:24px 20px 60px}
+header{padding:40px 0 28px;border-bottom:1px solid rgba(100,200,255,0.15);margin-bottom:32px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem}
+.tag{padding:3px 10px;border-radius:4px;background:rgba(100,200,255,0.12);color:#64c8ff;border:1px solid rgba(100,200,255,0.25)}
+.tag.diff{background:rgba(94,234,212,0.1);color:#5eead4;border-color:rgba(94,234,212,0.3)}
+.tag.day{background:rgba(255,180,80,0.1);color:#ffb450;border-color:rgba(255,180,80,0.25)}
+h1{font-size:1.75rem;font-weight:800;background:linear-gradient(135deg,#64c8ff 0%,#5eead4 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:0.5px;line-height:1.3}
+h1 .en{display:block;font-size:1rem;color:#7a8590;-webkit-text-fill-color:#7a8590;margin-top:6px;font-weight:500}
+h2{font-size:1.2rem;color:#5eead4;margin:36px 0 14px;padding-left:12px;border-left:3px solid #5eead4}
+h3{font-size:1rem;color:#64c8ff;margin:20px 0 10px;font-weight:600}
+p{margin:10px 0;color:#c8cfd6}
+ul,ol{margin:10px 0 10px 22px;color:#c8cfd6}
+li{margin:6px 0}
+strong{color:#e8eef5;font-weight:600}
+em{color:#5eead4;font-style:normal;font-weight:500}
+code{font-family:"SF Mono",Menlo,Consolas,monospace;background:rgba(100,200,255,0.1);color:#5eead4;padding:1px 6px;border-radius:3px;font-size:0.88em}
+pre{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:14px 16px;overflow-x:auto;margin:12px 0;font-family:"SF Mono",Menlo,Consolas,monospace;font-size:0.84rem;line-height:1.55;color:#c8cfd6}
+pre code{background:none;color:inherit;padding:0;font-size:1em}
+.mermaid{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:18px;margin:14px 0;text-align:center;overflow-x:auto;cursor:zoom-in;transition:border-color 0.15s}
+.mermaid:hover{border-color:rgba(100,200,255,0.4)}
+.mermaid svg{width:100%;max-width:100%;height:auto;min-height:280px}
+.lightbox{position:fixed;inset:0;background:rgba(8,12,18,0.96);z-index:9999;display:none;align-items:center;justify-content:center;padding:24px;cursor:grab;backdrop-filter:blur(4px);overflow:hidden}
+.lightbox.open{display:flex}
+.lightbox.dragging{cursor:grabbing}
+.lightbox svg{width:auto;height:auto;max-width:96vw;max-height:92vh;transform-origin:center center;will-change:transform}
+.lightbox .hint{position:fixed;top:16px;right:20px;font-size:0.78rem;color:#7a8590;font-family:"SF Mono",Menlo,monospace;pointer-events:none}
+.callout{background:rgba(255,180,80,0.06);border-left:3px solid #ffb450;padding:12px 14px;margin:14px 0;border-radius:4px;font-size:0.94rem}
+.callout strong{color:#ffb450}
+.tradeoff{background:rgba(100,200,255,0.05);border:1px solid rgba(100,200,255,0.2);border-radius:6px;padding:12px 14px;margin:12px 0;font-size:0.94rem}
+.case{background:rgba(94,234,212,0.05);border-left:3px solid #5eead4;padding:12px 14px;margin:12px 0;border-radius:4px;font-size:0.94rem}
+.case strong{color:#5eead4}
+.case a{color:#5eead4;text-decoration:underline;text-decoration-style:dotted}
+.nav{margin-top:50px;padding-top:24px;border-top:1px solid rgba(100,200,255,0.15);text-align:center}
+.nav a{color:#64c8ff;text-decoration:none;font-size:0.92rem;padding:8px 16px;border:1px solid rgba(100,200,255,0.3);border-radius:4px;transition:all 0.15s}
+.nav a:hover{background:rgba(100,200,255,0.1)}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:0.9rem}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid rgba(100,200,255,0.15);vertical-align:top}
+th{color:#64c8ff;font-weight:600;background:rgba(100,200,255,0.05)}
+details{background:rgba(100,200,255,0.04);border:1px solid rgba(100,200,255,0.18);border-radius:6px;padding:12px 16px;margin:10px 0;transition:all 0.15s}
+details:hover{border-color:rgba(100,200,255,0.35)}
+details[open]{background:rgba(94,234,212,0.05);border-color:rgba(94,234,212,0.3)}
+details summary{font-weight:600;color:#e8eef5;list-style:none;outline:none;cursor:pointer;display:flex;align-items:flex-start;gap:10px;font-size:0.96rem}
+details summary::-webkit-details-marker{display:none}
+details summary::before{content:'▶';color:#64c8ff;font-size:0.75em;transition:transform 0.2s;flex-shrink:0;margin-top:5px}
+details[open] summary::before{transform:rotate(90deg);color:#5eead4}
+details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
+details .answer ul,details .answer ol{margin:6px 0 6px 22px}
+.resources{background:rgba(100,200,255,0.04);border:1px solid rgba(100,200,255,0.18);border-radius:6px;padding:14px 18px;margin:14px 0}
+.resources a{color:#64c8ff;text-decoration:none;border-bottom:1px dashed rgba(100,200,255,0.4)}
+.resources a:hover{color:#5eead4}
+@media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+</style>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({startOnLoad:true,theme:'base',flowchart:{useMaxWidth:true,htmlLabels:true,nodeSpacing:50,rankSpacing:60},themeVariables:{primaryColor:'#1a2530',primaryTextColor:'#e8eef5',primaryBorderColor:'#64c8ff',lineColor:'#5eead4',secondaryColor:'#0e1419',tertiaryColor:'#0a0f14',background:'#0a0f14',mainBkg:'#1a2530',secondBkg:'#0e1419',textColor:'#d4dae0',fontFamily:'-apple-system,"SF Pro Display",sans-serif',fontSize:'16px'}});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const lb=document.createElement('div');lb.className='lightbox';
+  lb.innerHTML='<span class="hint">scroll = zoom · drag = pan · Esc / click bg = close</span>';
+  document.body.appendChild(lb);
+  let scale=1,panX=0,panY=0,dragging=false,moved=false,lx=0,ly=0;
+  const apply=()=>{const s=lb.querySelector('svg');if(s)s.style.transform=`translate(${panX}px,${panY}px) scale(${scale})`};
+  const reset=()=>{scale=1;panX=0;panY=0};
+  const close=()=>{lb.classList.remove('open');const s=lb.querySelector('svg');if(s)s.remove();reset()};
+  document.addEventListener('click',e=>{
+    if(e.target.closest('.lightbox')){if(moved){moved=false;return}close();return}
+    const w=e.target.closest('.mermaid');if(!w)return;
+    const svg=w.querySelector('svg');if(!svg)return;
+    const c=svg.cloneNode(true);c.removeAttribute('style');
+    c.style.maxWidth='96vw';c.style.maxHeight='92vh';
+    lb.appendChild(c);lb.classList.add('open');reset();apply();
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+  lb.addEventListener('wheel',e=>{
+    if(!lb.classList.contains('open'))return;
+    e.preventDefault();
+    const svg=lb.querySelector('svg');if(!svg)return;
+    const ns=Math.max(0.3,Math.min(10,scale*(1-e.deltaY*0.002)));
+    const r=svg.getBoundingClientRect();
+    const cx=e.clientX-(r.left+r.width/2),cy=e.clientY-(r.top+r.height/2);
+    const k=ns/scale-1;panX-=cx*k;panY-=cy*k;scale=ns;apply();
+  },{passive:false});
+  lb.addEventListener('mousedown',e=>{
+    if(!lb.classList.contains('open'))return;
+    dragging=true;moved=false;lx=e.clientX;ly=e.clientY;lb.classList.add('dragging');e.preventDefault();
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    const dx=e.clientX-lx,dy=e.clientY-ly;
+    if(Math.abs(dx)+Math.abs(dy)>3)moved=true;
+    panX+=dx;panY+=dy;lx=e.clientX;ly=e.clientY;apply();
+  });
+  document.addEventListener('mouseup',()=>{dragging=false;lb.classList.remove('dragging')});
+});
+</script>
+</head><body><div class="container">
+
+<header>
+<div class="meta">
+<span class="tag day">Day 11</span>
+<span class="tag diff">Medium</span>
+<span class="tag">Unique ID</span>
+<span class="tag">Snowflake</span>
+<span class="tag">UUIDv7</span>
+<span class="tag">KSUID/ULID</span>
+</div>
+<h1>Unique ID Generation — The Triangle of Time, Randomness, and Index<span class="en">UUID, Snowflake, KSUID, ULID</span></h1>
+</header>
+
+<h2>Problem &amp; Requirements</h2>
+<p>Design a message ID scheme for a global chat product (think Discord / Slack / WhatsApp). Scale: <strong>300M DAU, peak 1M messages/sec, messages sharded across hundreds of Cassandra nodes by channel</strong>. Each message needs an ID that determines its physical placement in the DB, its sort order on the client, and how it looks in URLs.</p>
+<p>Key requirements:</p>
+<ul>
+<li><strong>Globally unique</strong>: across data centers, no collisions at 1M/sec peak.</li>
+<li><strong>Roughly time-ordered</strong>: paginating channel history with <code>WHERE id &lt; cursor</code> must hit an index.</li>
+<li><strong>Compact</strong>: one ID per message — 128-bit vs 64-bit is tens of TB/year in bandwidth + storage + index.</li>
+<li><strong>No central bottleneck</strong>: a single ID service going down cannot block all writes.</li>
+<li><strong>No business-volume leak</strong>: auto-increment IDs let competitors compute <code>id_today - id_yesterday</code> for DAU — a real Twitter early-days privacy incident.</li>
+<li><strong>Client-generable</strong>: offline messages get an ID locally; server accepts it as-is for idempotent send.</li>
+</ul>
+
+<h2>High-Level Architecture</h2>
+<pre class="mermaid">
+graph TD
+    ZK["ZooKeeper / etcd<br/><i>assigns worker_id</i>"]
+    NTP["NTP / PTP clock sync<br/><i>detects backward jumps</i>"]
+    APP1["App instance #1<br/>embedded ID lib<br/>worker_id=42"]
+    APP2["App instance #2<br/>embedded ID lib<br/>worker_id=43"]
+    APPN["App instance #N<br/>worker_id=...<br/>(max 2¹⁰=1024)"]
+    CLIENT["Mobile client<br/><i>UUIDv7 generated locally<br/>for offline messages</i>"]
+    CASS[("Cassandra<br/><i>partition by channel<br/>cluster by id DESC</i>")]
+
+    ZK -.assigns.-> APP1 & APP2 & APPN
+    NTP -.syncs.-> APP1 & APP2 & APPN
+    APP1 & APP2 & APPN --> CASS
+    CLIENT -->|with client_id| APP1
+
+    classDef coord fill:#0e2030,stroke:#5eead4,color:#e8eef5
+    classDef app fill:#1a2530,stroke:#64c8ff,color:#e8eef5
+    classDef client fill:#1a1a30,stroke:#ffb450,color:#e8eef5
+    classDef store fill:#2a1530,stroke:#ff7ab6,color:#e8eef5
+    class ZK,NTP coord
+    class APP1,APP2,APPN app
+    class CLIENT client
+    class CASS store
+</pre>
+<p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">ID generation is in <em>library mode</em> — no standalone service that can die; ZK is only touched at startup</p>
+<p><strong>Components</strong>: ZooKeeper assigns a worker_id (10 bits = 1024 slots) per app instance at boot; the slot is returned on shutdown. NTP keeps clocks aligned (typically &lt; 10ms drift) — <strong>clock skew is the Achilles heel of Snowflake-style schemes</strong>. The ID lib runs in-process, zero network hop. Mobile clients generate UUIDv7 locally for offline sends and the server accepts the client-supplied ID (idempotent send).</p>
+
+<h2>Key Techniques</h2>
+
+<h3>1. UUID Versions: v4 Random vs v7 Time-Ordered</h3>
+<p><strong>Principle</strong>: UUID is 128 bits. <em>v4</em> is 122 bits of pure randomness — collision probability ~2⁻¹²², zero coordination, but <strong>disastrous for B-tree indexes</strong>: inserts hit random leaf pages, causing page splits and buffer-pool misses. <em>v7</em> (<a href="https://www.rfc-editor.org/rfc/rfc9562.html">RFC 9562</a>, finalized 2024) puts a 48-bit millisecond Unix timestamp in the prefix, with 74 bits of randomness/monotonic counter after. <strong>Lexicographic order equals time order</strong>: new inserts land on the right edge of the B-tree, page splits go nearly to zero.</p>
+<div class="tradeoff">
+<strong>Trade-off:</strong>
+<ul>
+<li><strong>v4</strong>: ✅ no coordination, client-generable; ❌ in Postgres / MySQL with v4 as PK, insert throughput collapses as the table grows past buffer pool capacity; 16 bytes binary or 36 bytes as char — 2-4× a BIGINT.</li>
+<li><strong>v7</strong>: ✅ index-friendly (sequential B-tree inserts), keeps UUID ecosystem (128-bit, same string APIs), language libraries already shipping; ❌ <em>leaks the creation time</em>, careful in privacy-sensitive contexts; clock backward still needs handling.</li>
+<li><strong>v1</strong> (MAC + time): basically dead — leaks MAC, and the timestamp is in the low bits, so still effectively random for insertion.</li>
+</ul></div>
+<pre><code># Minimal UUIDv7 generator (Python, RFC 9562)
+import os, time
+def uuid7() -&gt; bytes:
+    ts_ms = int(time.time() * 1000)          # 48 bits
+    rand_a = int.from_bytes(os.urandom(2), 'big') &amp; 0x0FFF  # 12 bits
+    rand_b = int.from_bytes(os.urandom(8), 'big') &amp; ((1&lt;&lt;62)-1)  # 62 bits
+    # Layout: ts(48) | ver=7(4) | rand_a(12) | var=10(2) | rand_b(62)
+    n = (ts_ms &lt;&lt; 80) | (0x7 &lt;&lt; 76) | (rand_a &lt;&lt; 64) | (0b10 &lt;&lt; 62) | rand_b
+    return n.to_bytes(16, 'big')
+
+# Postgres 17+ native gen_random_uuid() is still v4; community uuidv7() extensions exist
+</code></pre>
+<div class="case">
+<strong>Real-world cases:</strong>
+<ul>
+<li><strong>Postgres community benchmarks</strong>: inserting 10M+ rows into the same table, UUIDv4 runs 3-10× slower than UUIDv7 (v7 is sequential write, v4 is random write); BRIN indexes work well on v7 and are useless on v4.</li>
+<li><strong>Stripe API object IDs</strong>: use <code>ch_</code>/<code>pi_</code> prefixes + 16+ bytes of randomness — v4-style (KV stores don't suffer from random insertion, and strong unguessability is required).</li>
+<li><strong>OpenJDK</strong>: <a href="https://bugs.openjdk.org/browse/JDK-8334015">JEP added UUIDv7 support</a>, marking v7's entry into mainstream.</li>
+</ul></div>
+
+<h3>2. Snowflake: 64-bit Three-Segment Layout</h3>
+<p><strong>Principle</strong>: Twitter <a href="https://blog.twitter.com/engineering/en_us/a/2010/announcing-snowflake">open-sourced Snowflake in 2010</a>. 64 bits = 1 sign + 41-bit millisecond timestamp (custom epoch, ~69-year span) + 10-bit worker_id (1024 machines) + 12-bit sequence (4096 IDs per worker per ms). <strong>4096 × 1024 = 4.19M IDs/ms = 4.19B/sec</strong> — far beyond any realistic single system. Half the bytes of UUID, naturally <em>roughly time-ordered</em>.</p>
+<div class="tradeoff">
+<strong>Trade-off vs UUIDv7 / DB sequence:</strong>
+<table>
+<thead><tr><th>Scheme</th><th>Width</th><th>Peak/sec</th><th>Coordination</th><th>Fatal Flaw</th></tr></thead>
+<tbody>
+<tr><td>DB auto_increment</td><td>BIGINT 64</td><td>~100k/instance</td><td>None</td><td>Single point + leaks volume</td></tr>
+<tr><td>UUIDv4</td><td>128</td><td>Unlimited</td><td>None</td><td>Slow PK inserts</td></tr>
+<tr><td>Snowflake</td><td>64</td><td>4.19B</td><td>worker_id + clock</td><td>Clock skew</td></tr>
+<tr><td>UUIDv7</td><td>128</td><td>Unlimited</td><td>None</td><td>2× the space</td></tr>
+<tr><td>DB segment (batch)</td><td>64</td><td>Depends on batch</td><td>DB grants 1000 at a time</td><td>Restart wastes segment</td></tr>
+</tbody></table>
+</div>
+<pre><code># Core Snowflake (Python pseudocode)
+class Snowflake:
+    EPOCH = 1672531200000  # 2023-01-01 custom epoch
+    def __init__(self, worker_id):
+        assert 0 &lt;= worker_id &lt; 1024
+        self.worker_id = worker_id
+        self.seq = 0
+        self.last_ts = -1
+    def next_id(self):
+        ts = int(time.time() * 1000)
+        if ts &lt; self.last_ts:
+            raise ClockBackwardError(self.last_ts - ts)  # see next section
+        if ts == self.last_ts:
+            self.seq = (self.seq + 1) &amp; 0xFFF
+            if self.seq == 0:
+                ts = self._wait_next_ms(self.last_ts)  # wait next millisecond
+        else:
+            self.seq = 0
+        self.last_ts = ts
+        return ((ts - self.EPOCH) &lt;&lt; 22) | (self.worker_id &lt;&lt; 12) | self.seq
+</code></pre>
+<div class="case">
+<strong>Real-world cases:</strong>
+<ul>
+<li><strong>Twitter</strong>: original version, went live on 2010-09-21, all tweet IDs became non-sequential; switched to embedded-library mode after 2014.</li>
+<li><strong>Discord</strong>: <a href="https://discord.com/blog/how-discord-stores-trillions-of-messages">every message/user/channel is a Snowflake</a>, with slightly different bit allocation; the front end decodes the creation timestamp directly from the ID (no DB lookup needed).</li>
+<li><strong>Instagram</strong>: <a href="https://instagram-engineering.com/sharding-ids-at-instagram-1cf5a71e5a5c">41-bit time + 13-bit shard_id + 10-bit seq</a>, generated inside Postgres via stored procedure — no external service dependency. The canonical "Snowflake inside the database" pattern.</li>
+<li><strong>Sony's Sonyflake</strong>: 39-bit 10-ms-precision timestamp + 8-bit seq + 16-bit machine_id — trades QPS for 174-year lifespan and 65536 machines, ideal when machine count is high but per-machine QPS is modest.</li>
+</ul></div>
+
+<h3>3. Clock Skew: The Snowflake Killer</h3>
+<p><strong>Principle</strong>: Snowflake's uniqueness <em>depends entirely on monotonic timestamps</em>. A 100ms NTP backward jump means IDs generated in that window can <strong>collide with IDs from the past</strong>. Leap seconds, VM pause-and-resume, ops typos when setting the clock — all have caused production incidents.</p>
+<div class="tradeoff">
+<strong>Three mainstream remedies:</strong>
+<ul>
+<li><strong>① Wait for time to catch up</strong> (simplest): <code>if ts &lt; last_ts: sleep(last_ts - ts)</code>. Cost: large skew blocks ID generation = blocks writes; throw an error above ~5ms so the upper layer can degrade. Twitter's original approach.</li>
+<li><strong>② "Logical time" instead of system time</strong>: keep <code>logical_ts = max(system_ts, last_ts + 1)</code> in memory, never goes backward. Cost: drifts from real time; good for short skews.</li>
+<li><strong>③ Burn worker_id to escape</strong> (Sonyflake / Baidu UidGenerator): on detected skew, restart with a <em>new worker_id</em> (ZK has free slots), let the old worker_id cool down. Cost: reserve worker_id pool capacity.</li>
+<li><strong>④ Disable NTP step, allow only slew</strong> (ops mitigation): use <code>-x</code> so NTP "drifts time slowly" instead of "jumping" — physically eliminates backward skew. <em>Production standard</em>, but code must still defend.</li>
+</ul></div>
+<pre><code># Robust handler for clock skew
+def next_id(self):
+    ts = now_ms()
+    delta = self.last_ts - ts
+    if delta &gt; 0:
+        if delta &lt;= 5:          # small skew — wait
+            time.sleep(delta / 1000)
+            ts = now_ms()
+        elif delta &lt;= 2000:     # medium — logical clock
+            ts = self.last_ts + 1
+        else:                   # large — refuse service
+            raise ClockBackwardError(delta)
+    # ... normal seq allocation
+</code></pre>
+<div class="callout"><strong>Real incident patterns:</strong> VM restored from snapshot jumps hours back; one misconfigured NTP source rolls the entire fleet back 30 seconds simultaneously, generating IDs that collide with historical ones — the only fix is <em>take the instance out + wait until real time exceeds last_ts</em>.</div>
+
+<h3>4. ULID / KSUID / UUIDv7 Comparison</h3>
+<p><strong>Principle</strong>: all three aim at "lexicographic = time order, fully distributed, no coordinator." They differ in width, encoding, and strictness of monotonicity.</p>
+<table>
+<thead><tr><th></th><th>UUIDv7</th><th>ULID</th><th>KSUID</th></tr></thead>
+<tbody>
+<tr><td><strong>Width</strong></td><td>128</td><td>128</td><td>160</td></tr>
+<tr><td><strong>Time precision</strong></td><td>ms</td><td>ms</td><td>sec</td></tr>
+<tr><td><strong>Random bits</strong></td><td>74</td><td>80</td><td>128</td></tr>
+<tr><td><strong>Text encoding</strong></td><td>hex+dashes (36 chars)</td><td>Crockford Base32 (26 chars)</td><td>Base62 (27 chars)</td></tr>
+<tr><td><strong>Monotonicity</strong></td><td>Within-ms optional</td><td>Within-ms strict (spec)</td><td>None (sec granularity)</td></tr>
+<tr><td><strong>Standardization</strong></td><td>IETF RFC 9562</td><td>Community spec (GitHub)</td><td>Segment open source</td></tr>
+<tr><td><strong>Best for</strong></td><td>DB primary keys</td><td>User-facing short IDs</td><td>Event streams, logs</td></tr>
+</tbody></table>
+<div class="tradeoff">
+<strong>How to choose:</strong>
+<ul>
+<li><strong>Greenfield DB PK</strong>: UUIDv7 (standardized, ecosystem, index-friendly).</li>
+<li><strong>Visible in URL / UI</strong>: ULID (26 chars, Base32 without I/L/O/U avoids confusion) or KSUID (27 chars Base62).</li>
+<li><strong>Hundreds to thousands of IDs/sec</strong>: KSUID is plenty; second-level granularity sidesteps clock-skew sensitivity.</li>
+<li><strong>Peak 1M/sec, strict monotonic</strong>: Snowflake (64 bits, 50% storage savings) or ULID (spec guarantees within-ms monotonicity).</li>
+</ul></div>
+<pre><code># String forms of each
+UUIDv4:    6ba7b810-9dad-11d1-80b4-00c04fd430c8   ← 36 chars
+UUIDv7:    018f1c2e-a31b-7c12-9a4b-3e1c2d4f5a6b   ← 36 chars, first 48 bits are time
+ULID:      01HXY8K5T4ZNQ9P2M3RVW6S0BC             ← 26 chars
+KSUID:     2QqRwSdEf8VnT1bAaCpYlGmHkXjZ           ← 27 chars
+Snowflake: 1773294523890106368                    ← 19 decimal digits
+</code></pre>
+<div class="case">
+<strong>Real-world cases:</strong>
+<ul>
+<li><strong>Segment</strong>: the <a href="https://github.com/segmentio/ksuid">KSUID repo</a> states trillions of KSUIDs in their event pipeline; 20-byte layout (4 bytes timestamp + 16 bytes random), second precision is enough for event dedup.</li>
+<li><strong>ULID</strong>: the <a href="https://github.com/ulid/spec">canonical spec</a> mandates within-ms monotonicity (implementations must use a monotonic factory); MongoDB's ObjectID is a similar idea (12 bytes = 4 time + 5 random + 3 counter).</li>
+<li><strong>Stripe</strong>: <em>type-prefixed</em> random strings (<code>cus_</code>, <code>ch_</code>) — not any standard, but the gold reference for "readable + type-safe + unguessable" product-grade IDs.</li>
+</ul></div>
+
+<h2>Extensions &amp; Optimizations</h2>
+<ul>
+<li><strong>Running out of worker_id</strong>: 10 bits = 1024 limit, hit fast in container era. Discord / Sonyflake <em>reduce timestamp precision</em> (10ms granularity) to free bits for worker_id.</li>
+<li><strong>Multi-region</strong>: split bits as <code>region(3) + dc(3) + worker(4)</code>, letting the ID also encode physical location. Twitter does this internally.</li>
+<li><strong>client_id segment</strong>: for offline-generated IDs on mobile, use local UUIDv7 + a client token for idempotency; server doesn't re-allocate. WhatsApp uses this so retries don't dup.</li>
+<li><strong>Migrating UUIDv4 → UUIDv7</strong>: swap the generator, keep old data — v7's version nibble differs from v4 so no type clash; index performance gradually recovers as v7 proportion grows.</li>
+<li><strong>Monitoring</strong>: IDs/sec (approaching 4096/ms/worker?), clock drift, worker_id collision alerts.</li>
+</ul>
+
+<h2>Common Pitfalls + Interview Questions</h2>
+<div class="callout"><strong>Pitfall 1: UUIDv4 as PK on large tables</strong>. "UUID is globally unique, must be safe" — sounds reasonable, but B-tree insert collapse usually only surfaces past 50M rows, by which time it's late. New projects: just use v7.</div>
+<div class="callout"><strong>Pitfall 2: Assuming Snowflake is globally monotonic</strong>. It's only <em>roughly time-ordered</em> — within the same millisecond, IDs from different workers are ordered by worker_id, not by anything real. Don't write code that depends on "newer ID &gt; older ID."</div>
+<div class="callout"><strong>Pitfall 3: Treating the ID as a timestamp</strong>. The time embedded in a Snowflake is the <em>generation time</em>, not the <em>event time</em>; for offline clients these can differ by days.</div>
+<div class="callout"><strong>Pitfall 4: worker_id reuse</strong>. Machine drift or container scheduling can give two processes the same worker_id → guaranteed dup IDs. ZK ephemeral nodes + heartbeat is the standard fix.</div>
+<div class="callout"><strong>Pitfall 5: Leaking business volume</strong>. Auto-increment IDs let competitors compute "how many messages sent today." Early Twitter exposed growth numbers this way. Any externally visible ID needs at least a random segment.</div>
+
+<p><strong>Likely interview follow-ups:</strong></p>
+<ol>
+<li>Peak 10M/sec — is 64-bit Snowflake enough? How would you re-allocate bits?</li>
+<li>Generating IDs across data centers — how do you avoid collisions? How many bits for datacenter_id?</li>
+<li>What's wrong with UUIDv4 as a MySQL primary key? How does v7 fix it? Give an order-of-magnitude benchmark.</li>
+<li>When clock skew occurs, how does your system respond? At what skew size do you fail open?</li>
+<li>Can clients generate IDs locally? What preconditions must hold?</li>
+</ol>
+
+<h2>Further Reading</h2>
+<div class="resources">
+<ul>
+<li><a href="https://blog.twitter.com/engineering/en_us/a/2010/announcing-snowflake">Twitter Engineering: Announcing Snowflake (2010)</a> — original rationale: why ZooKeeper + 64-bit + timestamp.</li>
+<li><a href="https://instagram-engineering.com/sharding-ids-at-instagram-1cf5a71e5a5c">Instagram Engineering: Sharding &amp; IDs at Instagram</a> — pushing ID generation into Postgres, the engineering minimalism pattern.</li>
+<li><a href="https://discord.com/blog/how-discord-stores-trillions-of-messages">Discord: How Discord Stores Trillions of Messages</a> — how Snowflake IDs interplay with Cassandra sharding.</li>
+<li><a href="https://www.rfc-editor.org/rfc/rfc9562.html">RFC 9562: Universally Unique IDentifiers (UUIDs)</a> — 2024 update, defines v6/v7/v8 time-ordered variants.</li>
+<li><a href="https://github.com/ulid/spec">ULID spec</a> &amp; <a href="https://github.com/segmentio/ksuid">Segment KSUID</a> — reference implementations of both sortable ID schemes.</li>
+</ul>
+</div>
+
+<h2>Deep Dive Questions</h2>
+
+<details>
+<summary>1. UUIDv4 as a MySQL PK collapses insert throughput. The root cause isn't "randomness" itself. Where exactly does it slow down, and how does UUIDv7 fix it?</summary>
+<div class="answer">
+<p><strong>It's not CPU, not raw disk bandwidth — it's buffer pool hit rate collapse</strong>. InnoDB uses a clustered index — the PK determines the physical position of the row.</p>
+<ul>
+<li><strong>Sequential PK</strong> (auto-inc / UUIDv7): new inserts always land on the rightmost leaf page; as long as that page is in the buffer pool, zero disk IO and page splits are rare.</li>
+<li><strong>Random PK</strong> (UUIDv4): inserts hit random leaf pages across the entire table. Once the table exceeds buffer pool (e.g. 100GB table, 16GB buffer pool), nearly every insert misses → read the page from disk first, then write → write amplification + IOPS saturation.</li>
+<li><strong>Page splits compound</strong>: random inserts frequently trigger leaf-page splits, fragmenting the index, growing B-tree height, further hurting buffer pool utilization.</li>
+</ul>
+<p><strong>How v7 fixes it</strong>: the first 48 bits are a timestamp, so <em>recently generated IDs are lexicographically close</em>, all landing in a handful of right-side leaf pages — these stay hot, buffer pool essentially always hits. Percona / EnterpriseDB benchmarks at the billion-row scale show v7 inserts 5-10× faster than v4, with an order of magnitude less write amplification.</p>
+<p><em>Implication</em>: "v4 + a separate BIGINT auto-inc PK + UUID as unique key" was a historical compromise; with v7 you can go clean.</p>
+</div>
+</details>
+
+<details>
+<summary>2. Snowflake's 12-bit sequence supports 4096/ms = 4.1M/sec. But in production "single process throws errors above 300k/sec" is common. Why?</summary>
+<div class="answer">
+<p><strong>The bottleneck isn't the 4096 ceiling, it's the "wait until next ms" path</strong>. When the sequence runs out within a millisecond, the code has to <code>sleep until next ms</code>. But:</p>
+<ul>
+<li><strong>Thread contention</strong>: one Snowflake instance shared across threads needs to lock / CAS on <code>last_ts + seq</code>. Lock contention bites long before 4.1M/sec — typically around 300k/sec.</li>
+<li><strong>Syscall overhead</strong>: <code>gettimeofday()</code> on Linux is fast (vDSO), but per next_id call adds up — at 300k/sec it's already eating significant CPU.</li>
+<li><strong>Burst vs average</strong>: real traffic is spiky; <em>one specific millisecond</em> can saturate 4096 and block, with the next millisecond empty — average looks like 300k/sec but the burst already saturated.</li>
+</ul>
+<p><strong>Engineering fixes</strong>:</p>
+<ul>
+<li>Per-thread Snowflake instance (further subdivide worker_id across threads) — eliminates the lock.</li>
+<li>Batch pre-generation: <code>next_batch(1000)</code> returns a contiguous chunk to the caller, amortizing syscalls.</li>
+<li>Cache the timestamp: business threads read the last ts; a dedicated ticker coroutine updates it every ms, saving syscalls.</li>
+</ul>
+<p>Discord, Baidu's UidGenerator, and Meituan's Leaf have all done these optimizations at this scale.</p>
+</div>
+</details>
+
+<details>
+<summary>3. A system has both ID schemes coexisting (old BIGINT auto-inc + new Snowflake). How do you migrate without downtime?</summary>
+<div class="answer">
+<p>The classic "primary-key evolution" problem. A direct PK swap = ALTER TABLE lock + index rebuild + every foreign key updated — hours of downtime. Zero-downtime path:</p>
+<ul>
+<li><strong>Phase 1: dual write</strong>. Add <code>snowflake_id BIGINT UNIQUE</code>; new writes populate both IDs. Backfill old rows in batches (by PK range) offline.</li>
+<li><strong>Phase 2: dual read</strong>. Code prefers reading by snowflake_id; reads by old ID translate internally. External APIs accept either format (distinguish by prefix or width).</li>
+<li><strong>Phase 3: migrate foreign keys</strong>. Every table referencing the old ID grows a <code>parent_snowflake_id</code> column, backfills, switches reads, drops the old FK. Most painful step — touches every JOIN.</li>
+<li><strong>Phase 4: retire old ID</strong>. After old-ID access drops to zero, drop the column and swap the PK. <em>PK swap</em> via <code>pt-online-schema-change</code> / <code>gh-ost</code> shadow tables avoids table locks.</li>
+</ul>
+<p><strong>Key pitfalls</strong>:</p>
+<ul>
+<li>Caches still hold old IDs → clear related cache after dual write begins.</li>
+<li>Clients / third parties still hold old IDs → publish a permanent redirect API (<code>GET /v1/legacy_id/123 → snowflake</code>).</li>
+<li>BI / analytics joins on old ID → the data warehouse must migrate too.</li>
+</ul>
+<p>The whole process typically takes 3-6 months; the key discipline is <em>not rushing to drop the old ID</em> — keep dual writes 1-2 months to observe.</p>
+</div>
+</details>
+
+<details>
+<summary>4. In a chat system, what happens when the sender's client generates an ID on a plane, comes online a week later, and sends? How do you handle it?</summary>
+<div class="answer">
+<p><strong>Core problem</strong>: the client's UUIDv7 timestamp is <em>a week ago</em>; when the message reaches the server, sorting by ID places it a week back in channel history — the UI never shows it.</p>
+<p><strong>Layered solution</strong>:</p>
+<ul>
+<li><strong>Dual-timestamp model</strong>: the message schema stores both <code>client_id</code> (client-generated, for idempotent dedup) and <code>server_ts</code> (server receipt time, for ordering). <em>Sort by server_ts, dedup by client_id</em>.</li>
+<li><strong>created_at in the message body</strong>: UI shows "send time" using the client's created_at (so the user sees "written a week ago"), but the message's position in the channel list uses server_ts. WhatsApp, iMessage both do this.</li>
+<li><strong>Idempotency</strong>: server upserts on <code>(channel_id, client_id)</code>; the client sending three retries of the same message succeeds only once.</li>
+<li><strong>Collision boundary</strong>: even if two clients are offline at the same time, same channel, same millisecond, UUIDv7 collision probability is still ~2⁻⁷⁴ — effectively zero.</li>
+</ul>
+<p><strong>Deeper design wisdom</strong>: never let a single field carry "unique identifier," "time order," and "causal order" simultaneously — their semantics differ (generation time / arrival time / event time). Slack's <code>ts</code> field is the server_ts, <code>client_msg_id</code> is a UUID — clearly separated.</p>
+</div>
+</details>
+
+<details>
+<summary>5. To design a "user-visible" ID (in URLs, receipts, support tickets), how would you choose between UUIDv7, ULID, or a custom Base62?</summary>
+<div class="answer">
+<p>User-visible IDs have <em>completely different</em> requirements from backend PKs. Five dimensions matter:</p>
+<ul>
+<li><strong>Unguessability</strong>: <code>/order/123</code> in the URL lets anyone enumerate others' orders. Visible IDs need ≥ 64 bits of randomness. UUIDv7's 74 random bits are sufficient, but the 48-bit timestamp prefix <em>leaks order time</em> — unacceptable for some financial scenarios.</li>
+<li><strong>Resistance to input errors</strong>: when a customer reads an ID to support, O/0 and I/1 must be distinguishable. Crockford Base32 (used by ULID) was designed for this — drops I, L, O, U; Base62 doesn't have this property.</li>
+<li><strong>Length</strong>: URLs and receipts want short. UUIDv7's 36 chars is too long; ULID's 26 chars is acceptable; Stripe-style <code>cus_</code> + 14 random chars hits the sweet spot.</li>
+<li><strong>Type identifiability</strong>: prefixes (<code>ord_</code>, <code>inv_</code>) let support staff identify the ID type at a glance, avoiding "invoice ID looked up as order ID" mistakes. This is <em>Stripe's most underrated engineering decision</em>.</li>
+<li><strong>Time leak</strong>: B2B scenarios may want time exposed; B2C privacy scenarios cannot.</li>
+</ul>
+<p><strong>Recommended: Stripe model</strong> — <code>{type_prefix}_{base62(random)}</code>, 22-30 chars. Backend PK is UUIDv7 / Snowflake, never exposed externally; add a mapping layer. The cost is a mapping table (or use the prefix + random directly as the PK), in exchange for API evolution freedom.</p>
+<p>Counter-example: early Twitter URLs containing tweet IDs were auto-inc then Snowflake — <em>exposed tweet volume</em>; the timestamp is still extractable today. Product launch identifier design deserves caution.</p>
+</div>
+</details>
+
+<div class="nav"><a href="index.html">← Back to index</a></div>
+</div></body></html>
