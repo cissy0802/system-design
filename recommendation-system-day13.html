@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 13 · 推荐系统 (Recommendation Systems) — System Design Bi-daily</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"SF Pro Display","Noto Sans SC",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
+.container{max-width:820px;margin:0 auto;padding:24px 20px 60px}
+header{padding:40px 0 28px;border-bottom:1px solid rgba(100,200,255,0.15);margin-bottom:32px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem}
+.tag{padding:3px 10px;border-radius:4px;background:rgba(100,200,255,0.12);color:#64c8ff;border:1px solid rgba(100,200,255,0.25)}
+.tag.diff{background:rgba(94,234,212,0.1);color:#5eead4;border-color:rgba(94,234,212,0.3)}
+.tag.day{background:rgba(255,180,80,0.1);color:#ffb450;border-color:rgba(255,180,80,0.25)}
+h1{font-size:1.75rem;font-weight:800;background:linear-gradient(135deg,#64c8ff 0%,#5eead4 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:0.5px;line-height:1.3}
+h1 .en{display:block;font-size:1rem;color:#7a8590;-webkit-text-fill-color:#7a8590;margin-top:6px;font-weight:500}
+h2{font-size:1.2rem;color:#5eead4;margin:36px 0 14px;padding-left:12px;border-left:3px solid #5eead4}
+h3{font-size:1rem;color:#64c8ff;margin:20px 0 10px;font-weight:600}
+p{margin:10px 0;color:#c8cfd6}
+ul,ol{margin:10px 0 10px 22px;color:#c8cfd6}
+li{margin:6px 0}
+strong{color:#e8eef5;font-weight:600}
+em{color:#5eead4;font-style:normal;font-weight:500}
+code{font-family:"SF Mono",Menlo,Consolas,monospace;background:rgba(100,200,255,0.1);color:#5eead4;padding:1px 6px;border-radius:3px;font-size:0.88em}
+pre{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:14px 16px;overflow-x:auto;margin:12px 0;font-family:"SF Mono",Menlo,Consolas,monospace;font-size:0.84rem;line-height:1.55;color:#c8cfd6}
+pre code{background:none;color:inherit;padding:0;font-size:1em}
+.mermaid{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:18px;margin:14px 0;text-align:center;overflow-x:auto;cursor:zoom-in;transition:border-color 0.15s}
+.mermaid:hover{border-color:rgba(100,200,255,0.4)}
+.mermaid svg{width:100%;max-width:100%;height:auto;min-height:280px}
+.lightbox{position:fixed;inset:0;background:rgba(8,12,18,0.96);z-index:9999;display:none;align-items:center;justify-content:center;padding:24px;cursor:grab;backdrop-filter:blur(4px);overflow:hidden}
+.lightbox.open{display:flex}
+.lightbox.dragging{cursor:grabbing}
+.lightbox svg{width:auto;height:auto;max-width:96vw;max-height:92vh;transform-origin:center center;will-change:transform}
+.lightbox .hint{position:fixed;top:16px;right:20px;font-size:0.78rem;color:#7a8590;font-family:"SF Mono",Menlo,monospace;pointer-events:none}
+.callout{background:rgba(255,180,80,0.06);border-left:3px solid #ffb450;padding:12px 14px;margin:14px 0;border-radius:4px;font-size:0.94rem}
+.callout strong{color:#ffb450}
+.tradeoff{background:rgba(100,200,255,0.05);border:1px solid rgba(100,200,255,0.2);border-radius:6px;padding:12px 14px;margin:12px 0;font-size:0.94rem}
+.case{background:rgba(94,234,212,0.05);border-left:3px solid #5eead4;padding:12px 14px;margin:12px 0;border-radius:4px;font-size:0.94rem}
+.case strong{color:#5eead4}
+.nav{margin-top:50px;padding-top:24px;border-top:1px solid rgba(100,200,255,0.15);text-align:center}
+.nav a{color:#64c8ff;text-decoration:none;font-size:0.92rem;padding:8px 16px;border:1px solid rgba(100,200,255,0.3);border-radius:4px;transition:all 0.15s}
+.nav a:hover{background:rgba(100,200,255,0.1)}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:0.9rem}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid rgba(100,200,255,0.15)}
+th{color:#64c8ff;font-weight:600;background:rgba(100,200,255,0.05)}
+details{background:rgba(100,200,255,0.04);border:1px solid rgba(100,200,255,0.18);border-radius:6px;padding:12px 16px;margin:10px 0;transition:all 0.15s}
+details:hover{border-color:rgba(100,200,255,0.35)}
+details[open]{background:rgba(94,234,212,0.05);border-color:rgba(94,234,212,0.3)}
+details summary{font-weight:600;color:#e8eef5;list-style:none;outline:none;cursor:pointer;display:flex;align-items:flex-start;gap:10px;font-size:0.96rem}
+details summary::-webkit-details-marker{display:none}
+details summary::before{content:'▶';color:#64c8ff;font-size:0.75em;transition:transform 0.2s;flex-shrink:0;margin-top:5px}
+details[open] summary::before{transform:rotate(90deg);color:#5eead4}
+details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
+details .answer ul,details .answer ol{margin:6px 0 6px 22px}
+@media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+</style>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({startOnLoad:true,theme:'base',flowchart:{useMaxWidth:true,htmlLabels:true,nodeSpacing:50,rankSpacing:60},themeVariables:{primaryColor:'#1a2530',primaryTextColor:'#e8eef5',primaryBorderColor:'#64c8ff',lineColor:'#5eead4',secondaryColor:'#0e1419',tertiaryColor:'#0a0f14',background:'#0a0f14',mainBkg:'#1a2530',secondBkg:'#0e1419',textColor:'#d4dae0',fontFamily:'-apple-system,"SF Pro Display",sans-serif',fontSize:'16px'}});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const lb=document.createElement('div');lb.className='lightbox';
+  lb.innerHTML='<span class="hint">scroll = zoom · drag = pan · Esc / click bg = close</span>';
+  document.body.appendChild(lb);
+  let scale=1,panX=0,panY=0,dragging=false,moved=false,lx=0,ly=0;
+  const apply=()=>{const s=lb.querySelector('svg');if(s)s.style.transform=`translate(${panX}px,${panY}px) scale(${scale})`};
+  const reset=()=>{scale=1;panX=0;panY=0};
+  const close=()=>{lb.classList.remove('open');const s=lb.querySelector('svg');if(s)s.remove();reset()};
+  document.addEventListener('click',e=>{
+    if(e.target.closest('.lightbox')){if(moved){moved=false;return}close();return}
+    const w=e.target.closest('.mermaid');if(!w)return;
+    const svg=w.querySelector('svg');if(!svg)return;
+    const c=svg.cloneNode(true);c.removeAttribute('style');
+    c.style.maxWidth='96vw';c.style.maxHeight='92vh';
+    lb.appendChild(c);lb.classList.add('open');reset();apply();
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+  lb.addEventListener('wheel',e=>{
+    if(!lb.classList.contains('open'))return;
+    e.preventDefault();
+    const svg=lb.querySelector('svg');if(!svg)return;
+    const ns=Math.max(0.3,Math.min(10,scale*(1-e.deltaY*0.002)));
+    const r=svg.getBoundingClientRect();
+    const cx=e.clientX-(r.left+r.width/2),cy=e.clientY-(r.top+r.height/2);
+    const k=ns/scale-1;panX-=cx*k;panY-=cy*k;scale=ns;apply();
+  },{passive:false});
+  lb.addEventListener('mousedown',e=>{
+    if(!lb.classList.contains('open'))return;
+    dragging=true;moved=false;lx=e.clientX;ly=e.clientY;lb.classList.add('dragging');e.preventDefault();
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    const dx=e.clientX-lx,dy=e.clientY-ly;
+    if(Math.abs(dx)+Math.abs(dy)>3)moved=true;
+    panX+=dx;panY+=dy;lx=e.clientX;ly=e.clientY;apply();
+  });
+  document.addEventListener('mouseup',()=>{dragging=false;lb.classList.remove('dragging')});
+});
+</script>
+</head><body><div class="container">
+
+<header>
+<div class="meta">
+<span class="tag day">Day 13</span>
+<span class="tag diff">Hard</span>
+<span class="tag">Recommendation</span>
+<span class="tag">Two-Tower</span>
+<span class="tag">Multi-stage Ranking</span>
+<span class="tag">Cold Start</span>
+</div>
+<h1>推荐系统 — 从十亿候选到二十条的漏斗<span class="en">Recommendation Systems: Retrieval, Multi-stage Ranking, Cold Start, Generative Rec</span></h1>
+</header>
+
+<h2>问题场景 + 需求约束</h2>
+<p>给一个 <strong>2 亿 DAU 的短视频 / 电商 discovery feed</strong>（抖音的「推荐」流、Instagram Explore、淘宝「猜你喜欢」）设计后端：用户每次下拉刷新，要从 <strong>10 亿量级的 item 库</strong>里挑出最可能让 ta 停留的 20 条，端到端 <strong>&lt; 100ms</strong>。难点不是「训个 CTR 模型」，而是<em>算力与延迟的漏斗</em>——你不可能给 10 亿候选每个都跑一遍重模型。</p>
+<ul>
+<li><strong>规模</strong>：corpus 10 亿 item、2 亿 DAU，刷新峰值几十万 QPS。</li>
+<li><strong>延迟预算</strong>：端到端 &lt; 100ms，意味着<em>精排模型只能跑几百个候选</em>，召回必须毫秒级从十亿里捞出几千。</li>
+<li><strong>多目标</strong>：不只点击率（CTR），还要完播率、停留时长、转化、以及多样性——单目标会把人推进信息茧房。</li>
+<li><strong>冷启动</strong>：每天新增百万级 item、新用户没有历史，怎么不让它们「沉底」。</li>
+<li><strong>反馈不可靠</strong>：曝光未点击≠不喜欢（可能没看到）；转化反馈可能几天后才回（<em>延迟反馈</em>）。</li>
+</ul>
+
+<h2>高层架构（多阶段漏斗）</h2>
+<pre class="mermaid">
+graph LR
+    U["用户请求<br/><i>user features</i>"] --> RT["实时特征<br/><i>近期行为</i>"]
+    RT --> REC["召回 Retrieval<br/><i>双塔+ANN / CF / 规则</i><br/>10亿 → 数千"]
+    REC --> PRE["粗排 Pre-rank<br/><i>轻量蒸馏模型</i><br/>数千 → 数百"]
+    PRE --> RANK["精排 Ranking<br/><i>重模型·多目标</i><br/>数百 → 数十"]
+    RANK --> RR["重排 Re-rank<br/><i>多样性·打散·业务规则</i>"]
+    RR --> OUT["Top-20 feed"]
+    FS[("Feature Store<br/>embedding / 统计特征")] -.-> REC
+    FS -.-> PRE
+    FS -.-> RANK
+
+    classDef u fill:#1a2530,stroke:#64c8ff,color:#e8eef5
+    classDef stage fill:#1a1a30,stroke:#ffb450,color:#e8eef5
+    classDef store fill:#2a1530,stroke:#ff7ab6,color:#e8eef5
+    class U,RT,OUT u
+    class REC,PRE,RANK,RR stage
+    class FS store
+</pre>
+<p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">每一级把候选量砍一个数量级，模型越往后越重、特征越精细</p>
+<p><strong>组件职责</strong>：<em>召回</em>用极廉价的方式（向量点积+ANN、协同过滤、运营规则）从十亿粗筛几千，要<em>高召回率</em>非精确；<em>粗排</em>用轻量模型把几千砍到几百，是召回与精排间的算力缓冲；<em>精排</em>跑最贵的多目标深度模型逐个精打；<em>重排</em>处理精排管不了的全局约束——多样性、同作者打散、广告插入。Feature Store 统一供给 embedding 和统计特征，保证训练与服务用同一份。</p>
+
+<h2>关键技术点</h2>
+
+<h3>1. 召回：协同过滤 vs 内容 vs 双塔</h3>
+<p><strong>一句话 trade-off</strong>：用「能否泛化到没共现过的 item / 冷启 item」换「能否离线预计算 + ANN 加速」。</p>
+<p><strong>原理</strong>：召回要在十亿里毫秒级捞几千，核心是把用户和 item 都映射成<em>同一空间的向量</em>，相关 = 距离近，再用 ANN（HNSW，见 Day 12）检索。三类做法：<em>协同过滤</em>（CF / 矩阵分解）靠「看了 A 的人也看了 B」的共现，纯 ID、无内容特征；<em>内容召回</em>用 item 的文本/图像/类目特征，天然能召回冷启 item；<em>双塔（two-tower）</em>是工业主流——user tower 和 item tower 各自吃任意特征生成向量，<strong>训练时拉近正样本、推开负样本，serving 时 item 向量离线灌进 ANN 索引，user 向量在线算一次点积</strong>。</p>
+<table>
+<thead><tr><th>方法</th><th>泛化/冷启</th><th>特征</th><th>serving</th><th>典型</th></tr></thead>
+<tbody>
+<tr><td><strong>item-CF / MF</strong></td><td>差（要共现）</td><td>纯 ID</td><td>预算相似度</td><td>Amazon「买了还买」</td></tr>
+<tr><td><strong>内容召回</strong></td><td>好（冷启友好）</td><td>内容特征</td><td>向量 ANN</td><td>新 item 兜底</td></tr>
+<tr><td><strong>双塔</strong></td><td>好</td><td>任意特征</td><td>离线 item 向量 + ANN</td><td>YouTube / Instagram</td></tr>
+</tbody>
+</table>
+<div class="tradeoff">
+<strong>Trade-off：</strong>
+<ul>
+<li><strong>双塔的硬约束</strong>：user 和 item 塔在打分前<em>不能交叉特征</em>（否则无法离线预计算 item 向量）。这丢失了「这个用户对这个 item 的具体交互」信号——所以双塔只配做召回，精排才做 cross feature。</li>
+<li><strong>负样本是命门</strong>：只拿「曝光未点击」当负样本会有<em>样本选择偏差</em>（这些已是召回筛过的简单负例）。主流用 <em>in-batch negatives</em>（同 batch 别人的正样本当我的负样本）+ 全库随机负样本，并做<strong>采样偏差纠正</strong>（热门 item 当负样本概率高，要按频率打折）。</li>
+<li><strong>多路召回</strong>：没有单一通道能覆盖所有意图，生产是<em>几十路召回并集</em>（双塔 + CF + 热门 + 关注 + 地理…），各管一种召回意图。</li>
+</ul></div>
+<pre><code># 双塔 in-batch softmax 召回（PyTorch 风格 pseudo-code）
+u = user_tower(user_feats)        # [B, d]
+v = item_tower(item_feats)        # [B, d]  batch 内 B 个正样本 item
+logits = u @ v.T / temperature    # [B, B] 对角线是正样本对
+logits -= log_item_freq           # ⚠️ 采样偏差纠正：热门 item 当负样本要打折
+loss = cross_entropy(logits, labels=arange(B))  # 把同 batch 其余当负样本
+# serving: item_tower 离线算好所有 item 向量 → 灌 HNSW；
+#          线上只算一次 user_tower，ANN 取 top-k</code></pre>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>YouTube</strong>：《Deep Neural Networks for YouTube Recommendations》(RecSys 2016) 把推荐拆成 candidate generation + ranking 两段，召回是把观看历史平均成 embedding 喂前馈网络——奠定了双塔召回范式。</li>
+<li><strong>Google / YouTube</strong>：《Sampling-Bias-Corrected Neural Modeling》(Yi et al, RecSys 2019) 系统讲了双塔 in-batch 负样本的采样偏差纠正，是双塔召回的经典参考。</li>
+<li><strong>Instagram Explore</strong>：用双塔做候选生成（account embeddings + IGQL），user/item 向量可缓存让推断极廉价（Meta 工程博客 2023）。</li>
+<li><strong>Airbnb</strong>：《Real-time Personalization using Embeddings》(KDD 2018) 用 session 学 listing embedding，把房源压成 32 维向量做实时个性化。</li>
+</ul></div>
+
+<h3>2. 多阶段漏斗：为什么不能一个模型搞定</h3>
+<p><strong>一句话 trade-off</strong>：每一级都在「模型精度」和「能处理的候选量」之间选点，逐级收窄。</p>
+<p><strong>原理</strong>：精排模型动辄几百万参数、吃几百个特征还做 user×item 的 <em>target attention</em>，单个候选打分要毫秒级——给 10 亿候选打分是 10⁶ 倍预算，绝无可能。所以分级：召回用<em>点积</em>（O(1) 近似检索）从十亿到数千；精排用<em>重模型</em>从数百到数十；中间夹一个<em>粗排</em>缓冲——它通常是精排的<strong>蒸馏小模型</strong>，精度介于召回与精排之间，把数千砍到数百，避免召回直接灌爆精排。漏斗每级的目标函数也不同：召回求<em>不漏</em>（高 recall），精排求<em>排得准</em>（高 AUC / 校准的 pCTR）。</p>
+<div class="tradeoff">
+<strong>Trade-off：</strong>
+<ul>
+<li><strong>少分一级</strong>：召回直连精排 → 精排被几千候选打爆，延迟超时或被迫砍模型复杂度，精度下降。</li>
+<li><strong>多分一级</strong>：每多一级多一次 RPC 和模型维护成本，且<em>各级目标不一致会「打架」</em>——召回觉得好的精排嫌弃，漏斗效率掉。需要让粗排向精排对齐（蒸馏）。</li>
+<li><strong>校准（calibration）</strong>：精排输出要当真实概率用（乘出价、混多目标），必须做 pCTR 校准；多目标用 MMoE 多任务融合，权重本身是产品决策。</li>
+</ul></div>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>YouTube</strong>：candidate generation → ranking 的两段式是行业模板；ranking 阶段直接优化<em>期望观看时长</em>而非 CTR，避免标题党。</li>
+<li><strong>Pinterest</strong>：PinSage（KDD 2018）用图卷积在 30 亿节点图上生成 pin embedding 做召回，再接排序，是 GNN 召回的标杆。</li>
+<li><strong>Instagram Explore</strong>：明确分 candidate generation + ranking，并用蒸馏让轻量召回逼近重排序模型（Meta 工程博客）。</li>
+</ul></div>
+
+<h3>3. Cold Start：新用户与新 item 的双向冷启</h3>
+<p><strong>一句话 trade-off</strong>：用「探索新内容的短期体验损失」换「积累反馈数据的长期收益」。</p>
+<p><strong>原理</strong>：CF 类方法对没有交互的 item/user 束手无策——这是<em>结构性缺陷</em>。两个方向：<em>item 冷启</em>靠内容特征（双塔的 item 塔吃文本/图像/类目，新 item 也能算向量进召回），但光有 embedding 不够，还得给曝光机会去<strong>采集反馈</strong>；<em>user 冷启</em>靠 onboarding 选兴趣、人口属性、设备/地理等旁路特征，外加快速试探。核心是 <strong>explore-exploit</strong>：纯 exploit（只推已知高分）会让新内容永远拿不到数据、新用户被推爆款。用 <em>multi-armed bandit</em>（如 Thompson sampling / UCB）按「不确定性」分配探索预算——对估计方差大的 item 多给曝光。</p>
+<pre><code># Thompson sampling 给新 item 分配探索（pseudo-code）
+# 每个 item 维护 Beta(α, β)：α=点击数+1, β=未点击数+1
+def pick(items):
+    return max(items, key=lambda it: beta_sample(it.alpha, it.beta))
+# 新 item α=β=1（先验均匀）→ 采样方差大 → 有机会被选中探索；
+# 拿到反馈后更新 α/β，估计收敛，自然从 explore 过渡到 exploit</code></pre>
+<div class="tradeoff">
+<strong>Trade-off：</strong>
+<ul>
+<li><strong>探索太猛</strong>：用户被一堆不相关内容打扰，短期留存掉。</li>
+<li><strong>探索太保守</strong>：新内容/创作者拿不到流量，供给侧枯萎（双边市场的死亡螺旋）；推荐退化成「越热越推」。</li>
+<li><strong>ε-greedy vs bandit</strong>：ε-greedy 简单但盲目探索；contextual bandit 按上下文定向探索，效率高但工程复杂。</li>
+</ul></div>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Spotify</strong>：用 contextual bandit（其方法常以 BaRT「Bandits for Recommendations as Treatments」被引用）平衡熟悉与新发现，给冷启歌曲/播客曝光。</li>
+<li><strong>Airbnb</strong>：新房源没有交互历史，靠 listing 内容特征 embedding 进入召回，再用真实预订反馈迭代（KDD 2018）。</li>
+<li><strong>YouTube / TikTok 类</strong>：新视频先小流量试探，CTR/完播达标再逐步放量，本质是分层 explore。</li>
+</ul></div>
+
+<h3>4. 生成式推荐：Semantic ID 与 LLM</h3>
+<p><strong>一句话 trade-off</strong>：用「生成式的新范式与冷启泛化」换「成熟双塔+ANN 的工程确定性与低延迟」。</p>
+<p><strong>原理</strong>：传统召回是「学 embedding → ANN 查最近邻」。<em>生成式检索</em>换个思路：给每个 item 一个 <strong>Semantic ID</strong>——把内容 embedding 用 RQ-VAE 量化成一串语义 token（语义相近的 item 共享前缀 token），然后训一个 Transformer <em>自回归地「生成」下一个该推荐 item 的 Semantic ID</em>，把检索变成序列生成，Transformer 本身就是索引。好处：语义相近 item 共享 token，<strong>对冷启和长尾 item 天然友好</strong>（新 item 只要内容相似就落到邻近 token 空间）。另一支是把 <em>LLM 当排序器/特征提取器</em>，用其世界知识理解 item 语义、做可解释推荐。</p>
+<div class="tradeoff">
+<strong>Trade-off：</strong>
+<ul>
+<li><strong>生成式 vs 双塔+ANN</strong>：✅ 端到端、冷启泛化好、检索与排序可统一；❌ 自回归解码延迟比一次 ANN 查询高，十亿 item 工业落地仍在早期，可控性/多样性需调。</li>
+<li><strong>LLM as ranker</strong>：✅ 强语义理解、能解释；❌ 推理成本与延迟是数量级问题，难直接进 100ms 在线链路，多用于离线特征生成或小候选集重排。</li>
+<li><strong>务实路线</strong>：用大模型<em>离线</em>产出更好的 item embedding 喂回双塔召回——拿语义增益、不付在线延迟。</li>
+</ul></div>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Google TIGER</strong>：《Recommender Systems with Generative Retrieval》(NeurIPS 2023) 提出 Semantic ID + 自回归生成检索，论文显示对冷启和长尾 item 召回更好。</li>
+<li><strong>YouTube / Google</strong>：在生产推荐中探索 Semantic ID，把内容语义注入大规模推荐模型。</li>
+</ul></div>
+
+<h2>扩展与优化</h2>
+<ul>
+<li><strong>实时特征</strong>：用户最近 N 次交互对 CTR 极关键，用 Kafka（Day 8）+ Flink 把行为秒级写进 Feature Store，召回/精排实时读。</li>
+<li><strong>训练-服务一致</strong>：训练和在线必须用同一份特征逻辑，否则 <em>training-serving skew</em> 让线上效果远低于离线——Feature Store 的核心价值就在统一这份。</li>
+<li><strong>embedding 更新</strong>：item 库每天变，item 塔向量要定期重算 + 增量灌 ANN；user embedding 可在线近实时更新。</li>
+<li><strong>多任务（MMoE）</strong>：CTR/完播/转化共享底层、各自塔头，避免每目标训一套，缓解目标冲突。</li>
+<li><strong>在线学习</strong>：高时效场景（新闻、短视频）用近实时更新精排，跟上分布漂移。</li>
+</ul>
+
+<h2>常见陷阱 + 面试问题</h2>
+<ul>
+<li><strong>陷阱：只用「曝光未点击」做负样本。</strong> 这些是召回已筛过的<em>困难负例</em>，分布偏。召回训练必须掺全库随机负样本并做采样偏差纠正，否则线上召回质量崩。</li>
+<li><strong>陷阱：忽略 position bias。</strong> 用户点第 1 位多只因它在第 1 位，不是更相关。直接拿点击当 label 会自我固化，要做 position 去偏（position 当特征训练、serving 置零）。</li>
+<li><strong>陷阱：单目标优化 CTR。</strong> 会催生标题党、停留虚高而满意度下降。YouTube 早年从 CTR 转向观看时长正是为此。</li>
+<li><strong>陷阱：反馈回路（echo chamber）。</strong> 模型只推它推过的，数据越来越窄，多样性塌缩。要靠探索 + 重排多样性主动破。</li>
+<li><strong>面试题：</strong>为什么双塔在打分前不能做 user×item 交叉特征？（答：要离线预计算 item 向量灌 ANN，交叉就无法解耦两塔。）</li>
+<li><strong>面试题：</strong>召回、粗排、精排的目标函数和评估指标分别是什么？为什么不能合并？</li>
+<li><strong>面试题：</strong>新 item 怎么冷启？explore-exploit 如何量化分配探索预算？</li>
+<li><strong>面试题：</strong>延迟反馈（转化几天后才回）怎么处理 label？（答：等待窗口、负样本修正、importance weighting。）</li>
+</ul>
+
+<h2>深入资源</h2>
+<ul>
+<li><strong>YouTube</strong>：《Deep Neural Networks for YouTube Recommendations》(Covington et al, RecSys 2016)——两阶段召回+排序的奠基论文。</li>
+<li><strong>Google</strong>：《Sampling-Bias-Corrected Neural Modeling for Large Corpus Item Recommendations》(Yi et al, RecSys 2019)——双塔召回与负采样偏差纠正。</li>
+<li><strong>Pinterest</strong>：《Graph Convolutional Neural Networks for Web-Scale Recommender Systems》(PinSage, KDD 2018)——工业级 GNN 召回。</li>
+<li><strong>Meta 工程博客</strong>：<em>Scaling the Instagram Explore recommendations system</em> (2023)——多阶段召回+排序+蒸馏的工程全景。</li>
+<li><strong>Google</strong>：《Recommender Systems with Generative Retrieval》(TIGER, NeurIPS 2023)——Semantic ID 与生成式检索。</li>
+</ul>
+
+<h2>深入思考（点击展开答案）</h2>
+
+<details>
+<summary>1. 双塔召回为什么不能在打分前做 user×item 交叉特征？这个限制的根源是什么？精排为什么能？</summary>
+<div class="answer">
+<p><strong>根源是 serving 的预计算需求</strong>。双塔之所以能从十亿 item 里毫秒级召回，是因为 <em>item 向量可以离线全部算好、灌进 ANN 索引</em>，线上只算一次 user 向量再做最近邻查询。一旦在打分前引入 user×item 交叉特征（比如「该用户对该 item 类目的历史点击率」），item 向量就<em>依赖于具体 user</em>，无法离线独立计算——十亿 item 你得为每个 user 实时重算，预算爆炸，ANN 也用不了（ANN 要求 item 向量固定）。</p>
+<p><strong>精排能做交叉</strong>，是因为它只面对几百个候选——可以承受为每个 (user, item) 对实时拼特征、跑 target attention。这正是漏斗分级的意义：<em>把昂贵的交叉计算留到候选足够少的阶段</em>。「双塔召回、cross 模型精排」是算力约束推导出的必然结构，不是习惯。</p>
+</div>
+</details>
+
+<details>
+<summary>2. 召回模型的负样本怎么选？为什么「曝光未点击」是个陷阱？in-batch negative 又有什么坑？</summary>
+<div class="answer">
+<p><strong>「曝光未点击」的陷阱</strong>：召回训练的目标是「从全库十亿里区分相关 vs 不相关」，但曝光未点击的 item 是<em>已经被整条召回→排序漏斗筛选过</em>的——它们都是「还不错但没被点」的困难负例，分布跟「全库随机一个 item」天差地别。只用它们训练，模型学到的是「在好 item 里挑」，到线上面对十亿真随机 item 时判别力崩塌（<em>样本选择偏差</em>）。</p>
+<p><strong>正解</strong>：以全库随机/in-batch 负样本为主（模拟真实召回分布），少量困难负例提精度。<strong>in-batch negative 的坑</strong>：<em>热门 item 出现在 batch 的概率高</em>，被反复当负样本压制而低估。修正就是 Yi et al 2019 的采样偏差纠正——logits 减 <code>log(item 采样频率)</code>，按热度打折，还原无偏估计。</p>
+</div>
+</details>
+
+<details>
+<summary>3. 用点击当 label 训精排，会被 position bias 自我固化。怎么纠？为什么置之不理会越来越糟？</summary>
+<div class="answer">
+<p><strong>机制</strong>：用户点第 1 位，部分原因只是它<em>在第 1 位</em>（更容易被看到），不代表它最相关。若直接把点击当「相关」label，模型学到的是「排在前面的会被点」的同义反复。上线后它把这些 item 排得更靠前 → 拿到更多点击 → 下一轮训练更确信 → <strong>正反馈固化</strong>，相关但曾排后的 item 永无翻身，多样性和长期满意度持续下滑。</p>
+<p><strong>纠偏</strong>：① <em>position as feature</em>——训练把展示位置当特征，serving 置成固定值（如 0），让模型输出「与位置无关的相关性」；② <em>IPS</em>——按位置检视概率给样本加权，越靠后点击权重越高；③ 随机化流量打散位置采集无偏数据。核心心智：点击是<em>相关性 × 检视概率</em>的混合，必须剥掉检视那部分。</p>
+</div>
+</details>
+
+<details>
+<summary>4. 估算：10 亿 item、双塔 64 维 embedding，item 向量索引要多大内存？这对架构意味着什么？</summary>
+<div class="answer">
+<p><strong>数量级估算（别背精确值）</strong>：10⁹ item × 64 维 × 4 字节（float32）≈ <strong>256GB</strong> 仅原始向量。HNSW 还要存图的邻接结构，通常再叠 1.5~3 倍 → <strong>0.5~1TB 量级</strong>。单机内存放不下，意味着 ANN 索引必须<em>分片</em>（按 item 哈希切到多个检索节点，scatter-gather，呼应 Day 12 搜索）。</p>
+<p><strong>架构含义</strong>：① 维度不是越高越好——128 维比 64 维内存翻倍、ANN 变慢，要权衡；② 省内存就上<em>量化</em>（PQ，Day 12 的 IVF-PQ），精度换内存；③ 索引要支持增量插入 + 周期重建；④ 这也解释了<em>生成式检索（TIGER）</em>的吸引力——Semantic ID 用离散 token 表示 item，潜在绕开「十亿稠密向量全驻内存」的成本墙。</p>
+</div>
+</details>
+
+<details>
+<summary>5. 推荐系统的反馈回路会制造信息茧房。这个二阶效应具体怎么发生？为什么纯优化离线指标会加剧它？怎么破？</summary>
+<div class="answer">
+<p><strong>怎么发生</strong>：模型只能从<em>它自己推过</em>的内容上学到反馈——没推过的 item 永远没有点击数据。于是高分 item 拿到更多曝光、更多正反馈、下轮更高分；冷门/新内容拿不到曝光、永远是「未知」、被当低分。数据分布越来越窄，用户被锁进越来越同质的内容，创作者侧（双边市场）则只有头部能活，供给枯萎。</p>
+<p><strong>为什么离线指标加剧</strong>：离线评估用的是<em>历史日志</em>，而日志本身就是旧模型的产物、带着旧模型的偏好。一个「更激进 exploit 历史热门」的模型在离线 AUC 上往往更高——因为它和生成日志的逻辑更一致——但它恰恰是茧房的加速器。离线指标好 ≠ 线上长期生态健康。</p>
+<p><strong>怎么破</strong>：① 主动<em>探索</em>（bandit）给低置信内容曝光预算，持续补充多样数据；② 重排显式注入<em>多样性约束</em>（MMR、DPP、同作者打散）；③ 用<em>线上 A/B</em> 的长期留存、多样性、创作者基尼系数等生态指标兜底，而非只看单次 CTR；④ off-policy 评估估计「换个策略会怎样」，跳出旧日志的自证循环。</p>
+</div>
+</details>
+
+<div class="nav"><a href="index.html">← 回到 index</a></div>
+</div>
+</body></html>
