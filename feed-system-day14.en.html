@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 14 · Feed System — System Design Bi-daily</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"SF Pro Display","Noto Sans SC",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
+.container{max-width:820px;margin:0 auto;padding:24px 20px 60px}
+header{padding:40px 0 28px;border-bottom:1px solid rgba(100,200,255,0.15);margin-bottom:32px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem}
+.tag{padding:3px 10px;border-radius:4px;background:rgba(100,200,255,0.12);color:#64c8ff;border:1px solid rgba(100,200,255,0.25)}
+.tag.diff{background:rgba(94,234,212,0.1);color:#5eead4;border-color:rgba(94,234,212,0.3)}
+.tag.day{background:rgba(255,180,80,0.1);color:#ffb450;border-color:rgba(255,180,80,0.25)}
+h1{font-size:1.75rem;font-weight:800;background:linear-gradient(135deg,#64c8ff 0%,#5eead4 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:0.5px;line-height:1.3}
+h1 .en{display:block;font-size:1rem;color:#7a8590;-webkit-text-fill-color:#7a8590;margin-top:6px;font-weight:500}
+h2{font-size:1.2rem;color:#5eead4;margin:36px 0 14px;padding-left:12px;border-left:3px solid #5eead4}
+h3{font-size:1rem;color:#64c8ff;margin:20px 0 10px;font-weight:600}
+p{margin:10px 0;color:#c8cfd6}
+ul,ol{margin:10px 0 10px 22px;color:#c8cfd6}
+li{margin:6px 0}
+strong{color:#e8eef5;font-weight:600}
+em{color:#5eead4;font-style:normal;font-weight:500}
+code{font-family:"SF Mono",Menlo,Consolas,monospace;background:rgba(100,200,255,0.1);color:#5eead4;padding:1px 6px;border-radius:3px;font-size:0.88em}
+pre{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:14px 16px;overflow-x:auto;margin:12px 0;font-family:"SF Mono",Menlo,Consolas,monospace;font-size:0.84rem;line-height:1.55;color:#c8cfd6}
+pre code{background:none;color:inherit;padding:0;font-size:1em}
+.mermaid{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:18px;margin:14px 0;text-align:center;overflow-x:auto;cursor:zoom-in;transition:border-color 0.15s}
+.mermaid:hover{border-color:rgba(100,200,255,0.4)}
+.mermaid svg{width:100%;max-width:100%;height:auto;min-height:280px}
+.lightbox{position:fixed;inset:0;background:rgba(8,12,18,0.96);z-index:9999;display:none;align-items:center;justify-content:center;padding:24px;cursor:grab;backdrop-filter:blur(4px);overflow:hidden}
+.lightbox.open{display:flex}
+.lightbox.dragging{cursor:grabbing}
+.lightbox svg{width:auto;height:auto;max-width:96vw;max-height:92vh;transform-origin:center center;will-change:transform}
+.lightbox .hint{position:fixed;top:16px;right:20px;font-size:0.78rem;color:#7a8590;font-family:"SF Mono",Menlo,monospace;pointer-events:none}
+.callout{background:rgba(255,180,80,0.06);border-left:3px solid #ffb450;padding:12px 14px;margin:14px 0;border-radius:4px;font-size:0.94rem}
+.callout strong{color:#ffb450}
+.tradeoff{background:rgba(100,200,255,0.05);border:1px solid rgba(100,200,255,0.2);border-radius:6px;padding:12px 14px;margin:12px 0;font-size:0.94rem}
+.case{background:rgba(94,234,212,0.05);border-left:3px solid #5eead4;padding:12px 14px;margin:12px 0;border-radius:4px;font-size:0.94rem}
+.case strong{color:#5eead4}
+.nav{margin-top:50px;padding-top:24px;border-top:1px solid rgba(100,200,255,0.15);text-align:center}
+.nav a{color:#64c8ff;text-decoration:none;font-size:0.92rem;padding:8px 16px;border:1px solid rgba(100,200,255,0.3);border-radius:4px;transition:all 0.15s}
+.nav a:hover{background:rgba(100,200,255,0.1)}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:0.9rem}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid rgba(100,200,255,0.15)}
+th{color:#64c8ff;font-weight:600;background:rgba(100,200,255,0.05)}
+details{background:rgba(100,200,255,0.04);border:1px solid rgba(100,200,255,0.18);border-radius:6px;padding:12px 16px;margin:10px 0;transition:all 0.15s}
+details:hover{border-color:rgba(100,200,255,0.35)}
+details[open]{background:rgba(94,234,212,0.05);border-color:rgba(94,234,212,0.3)}
+details summary{font-weight:600;color:#e8eef5;list-style:none;outline:none;cursor:pointer;display:flex;align-items:flex-start;gap:10px;font-size:0.96rem}
+details summary::-webkit-details-marker{display:none}
+details summary::before{content:'▶';color:#64c8ff;font-size:0.75em;transition:transform 0.2s;flex-shrink:0;margin-top:5px}
+details[open] summary::before{transform:rotate(90deg);color:#5eead4}
+details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
+details .answer ul,details .answer ol{margin:6px 0 6px 22px}
+@media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+</style>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({startOnLoad:true,theme:'base',flowchart:{useMaxWidth:true,htmlLabels:true,nodeSpacing:50,rankSpacing:60},themeVariables:{primaryColor:'#1a2530',primaryTextColor:'#e8eef5',primaryBorderColor:'#64c8ff',lineColor:'#5eead4',secondaryColor:'#0e1419',tertiaryColor:'#0a0f14',background:'#0a0f14',mainBkg:'#1a2530',secondBkg:'#0e1419',textColor:'#d4dae0',fontFamily:'-apple-system,"SF Pro Display",sans-serif',fontSize:'16px'}});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const lb=document.createElement('div');lb.className='lightbox';
+  lb.innerHTML='<span class="hint">scroll = zoom · drag = pan · Esc / click bg = close</span>';
+  document.body.appendChild(lb);
+  let scale=1,panX=0,panY=0,dragging=false,moved=false,lx=0,ly=0;
+  const apply=()=>{const s=lb.querySelector('svg');if(s)s.style.transform=`translate(${panX}px,${panY}px) scale(${scale})`};
+  const reset=()=>{scale=1;panX=0;panY=0};
+  const close=()=>{lb.classList.remove('open');const s=lb.querySelector('svg');if(s)s.remove();reset()};
+  document.addEventListener('click',e=>{
+    if(e.target.closest('.lightbox')){if(moved){moved=false;return}close();return}
+    const w=e.target.closest('.mermaid');if(!w)return;
+    const svg=w.querySelector('svg');if(!svg)return;
+    const c=svg.cloneNode(true);c.removeAttribute('style');
+    c.style.maxWidth='96vw';c.style.maxHeight='92vh';
+    lb.appendChild(c);lb.classList.add('open');reset();apply();
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+  lb.addEventListener('wheel',e=>{
+    if(!lb.classList.contains('open'))return;
+    e.preventDefault();
+    const svg=lb.querySelector('svg');if(!svg)return;
+    const ns=Math.max(0.3,Math.min(10,scale*(1-e.deltaY*0.002)));
+    const r=svg.getBoundingClientRect();
+    const cx=e.clientX-(r.left+r.width/2),cy=e.clientY-(r.top+r.height/2);
+    const k=ns/scale-1;panX-=cx*k;panY-=cy*k;scale=ns;apply();
+  },{passive:false});
+  lb.addEventListener('mousedown',e=>{
+    if(!lb.classList.contains('open'))return;
+    dragging=true;moved=false;lx=e.clientX;ly=e.clientY;lb.classList.add('dragging');e.preventDefault();
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    const dx=e.clientX-lx,dy=e.clientY-ly;
+    if(Math.abs(dx)+Math.abs(dy)>3)moved=true;
+    panX+=dx;panY+=dy;lx=e.clientX;ly=e.clientY;apply();
+  });
+  document.addEventListener('mouseup',()=>{dragging=false;lb.classList.remove('dragging')});
+});
+</script>
+</head><body><div class="container">
+
+<header>
+<div class="meta">
+<span class="tag day">Day 14</span>
+<span class="tag diff">Hard</span>
+<span class="tag">Feed System</span>
+<span class="tag">Push/Pull/Hybrid</span>
+<span class="tag">Fanout</span>
+<span class="tag">Ranking</span>
+</div>
+<h1>Feed System — The Fanout Art of a 100M-DAU Following Timeline<span class="en">Push vs Pull vs Hybrid, Fanout-on-write Limits, Timeline Storage, Ranking Pipeline</span></h1>
+</header>
+
+<h2>Problem & Constraints</h2>
+<p>Design the backend for a <strong>100M-DAU following timeline</strong> (Twitter/X Home, Instagram Feed, Weibo following stream): you follow a few hundred accounts, and pull-to-refresh must return their newest, sorted posts within <strong>p99 &lt; 200ms</strong>. The hard part isn't storing posts — it's the <em>read/write amplification asymmetry</em>: one post must reach millions of followers, while one refresh must aggregate and sort across hundreds of followees. The first question: <strong>do you do the merge work at write time or read time?</strong></p>
+<ul>
+<li><strong>Scale</strong>: 100M DAU, hundreds of followees each, post peak a few thousand~10K QPS, timeline read peak hundreds of thousands of QPS (Twitter has publicly cited ~<strong>300K QPS</strong> of timeline reads).</li>
+<li><strong>Read:write ratio</strong>: heavily read-skewed, <em>read:write ≈ 100:1</em> — the root motivation for "do more work on write, save on read".</li>
+<li><strong>Latency SLO</strong>: refresh p99 &lt; 200ms; new-post "visibility delay" in seconds (Twitter targeted delivery within 5s).</li>
+<li><strong>Uneven fanout</strong>: a normal user has hundreds of followers, a celebrity tens of millions — <em>one fanout strategy can't serve both ends</em>.</li>
+<li><strong>Ranking</strong>: pure chronological or ML-ranked? The latter must score hundreds of candidates after aggregation, on a tight budget.</li>
+</ul>
+
+<h2>High-Level Architecture (Hybrid Fanout)</h2>
+<pre class="mermaid">
+graph TD
+    POST["Post / Write API"] --> TW[("Tweet Store<br/>source of truth")]
+    POST --> FO["Fanout service<br/><i>look up social graph</i>"]
+    FO -->|normal: push| TLC[("Home Timeline Cache<br/>Redis · one bounded list/user")]
+    FO -.celeb: skip fanout.-> CEL[("Celebrity posts<br/>pulled at read time")]
+
+    READ["Refresh / Read API"] --> MIX["Timeline mixing service"]
+    MIX -->|① read pre-materialized| TLC
+    MIX -->|② pull celeb latest| CEL
+    MIX --> RANK["Rank + diversity"]
+    RANK --> HYDRATE["Hydrate<br/><i>fetch post bodies by id</i>"]
+    HYDRATE --> TW
+    HYDRATE --> OUT["Return 20-post feed"]
+
+    classDef w fill:#1a2530,stroke:#64c8ff,color:#e8eef5
+    classDef cache fill:#1a1a30,stroke:#ffb450,color:#e8eef5
+    classDef store fill:#2a1530,stroke:#ff7ab6,color:#e8eef5
+    class POST,READ,FO,MIX,RANK,HYDRATE,OUT w
+    class TLC,CEL cache
+    class TW store
+</pre>
+<p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">Write path pre-materializes normal users' timelines; read path merges "pre-materialized" + "celebrity real-time pull" then ranks</p>
+<p><strong>Component roles</strong>: <em>Tweet Store</em> is the source of truth for posts (a KV sharded by tweet_id). The <em>Fanout service</em>, on each post, looks up the social graph and <strong>pushes</strong> the tweet_id into every follower's Home Timeline Cache — that's "do more on write". Celebrities are the exception: fanout cost is too high, so their posts aren't pre-materialized and are <strong>pulled</strong> at read time. The <em>mixing service</em> is the crux: at read time it merges the pre-materialized timeline with celebrities' latest posts, ranks them, then <em>hydrates</em> only the top-N (timelines store only ids; bodies are fetched from Tweet Store to save memory).</p>
+
+<h2>Key Technical Points</h2>
+
+<h3>1. Push vs Pull vs Hybrid: merge at write time or read time</h3>
+<p><strong>One-line trade-off</strong>: trade "write amplification at post time" for "read amplification at refresh time" — you can only save on one end, and celebrities force you to manage both.</p>
+<p><strong>Principle</strong>: <em>Push (fanout-on-write)</em> writes the post id into every follower's timeline at post time, read takes it out in one shot — read O(1), write O(followers). <em>Pull (fanout-on-read)</em> precomputes nothing; on refresh it queries all your followees' recent posts and merge-sorts them — write O(1), read O(followees × per-query). <strong>The choice depends on read:write ratio and fanout distribution</strong>: read-heavy (100:1) with most users having few followers → push amortizes cost onto the sparse writes, a win; but a celebrity with tens of millions of followers triggers tens of millions of writes per post, and push collapses. So industry is almost always <em>Hybrid</em>: push for normal users, pull for celebrities, merge at read time.</p>
+<table>
+<thead><tr><th></th><th>Push (write fanout)</th><th>Pull (read fanout)</th><th>Hybrid</th></tr></thead>
+<tbody>
+<tr><td><strong>Post cost</strong></td><td>high (O followers)</td><td>low (one write)</td><td>normal high / celeb low</td></tr>
+<tr><td><strong>Refresh cost</strong></td><td>low (read one list)</td><td>high (merge N sources)</td><td>read 1 list + pull few celebs</td></tr>
+<tr><td><strong>New-post delay</strong></td><td>after fanout done</td><td>real-time</td><td>normal lag / celeb real-time</td></tr>
+<tr><td><strong>Failure mode</strong></td><td>celebrity write blowup</td><td>active-user read blowup</td><td>merge logic complexity</td></tr>
+</tbody>
+</table>
+<div class="tradeoff">
+<strong>Trade-off:</strong>
+<ul>
+<li><strong>Pure push</strong>: ✅ very fast reads, ranking can be precomputed offline; ❌ celebrity write amplification is fatal; inactive users get materialized too (<em>computing timelines for dormant accounts is pure waste</em>).</li>
+<li><strong>Pure pull</strong>: ✅ cheap writes, less storage, always real-time; ❌ every refresh redoes the merge-sort, peak read QPS overwhelms the backend, p99 jitters.</li>
+<li><strong>Hybrid difficulty</strong>: where to set the <em>celebrity threshold</em> (follower count? activity?), and how to keep ordering consistent and dedup when merging two sources at read time.</li>
+</ul></div>
+<div class="case">
+<strong>Real-world cases:</strong>
+<ul>
+<li><strong>Twitter</strong>: push-dominant (Redis pre-materialized home timelines), celebrities go hybrid — their posts skip fanout and merge at read time. Raffi Krikorian's <em>Timelines at Scale</em> is the classic material.</li>
+<li><strong>Facebook News Feed (Multifeed)</strong>: a <em>pull</em> design — aggregators fan out at read time to a set of leaf nodes for friends' recent actions, then rank/filter and return (Meta engineering blog, 2015).</li>
+<li><strong>LinkedIn FollowFeed</strong>: also pull — the broker (followfeed-query) queries multiple storage nodes' activity timelines in parallel at read time, then merges (LinkedIn engineering blog).</li>
+</ul></div>
+
+<h3>2. Fanout-on-write amplification and the celebrity problem</h3>
+<p><strong>One-line trade-off</strong>: push converts read cost into write cost, and write cost <em>explodes linearly with follower count</em> — unsustainable at celebrity scale.</p>
+<p><strong>Principle</strong>: the fanout write count for one post = the author's follower count. A normal person triggers a few hundred cache writes, easily absorbed; but an account with 50M followers triggers 50M Redis writes per post — even at 100µs each, serial is hours, and it instantly saturates cache-cluster bandwidth. Worse is <em>thundering-herd overlap</em>: celebrities have many online followers at once, so fanout storm and read storm collide. The fix is a <strong>fanout threshold</strong>: accounts above it join a "celebrity list", their posts <em>skip fanout</em> and are pulled and merged into each reader's timeline at read time. The cost is one extra "pull celeb latest + merge" on the read path, but it avoids the write-side avalanche.</p>
+<pre><code># Hybrid fanout: split by threshold at post time (pseudo-code)
+FANOUT_THRESHOLD = 100_000  # followers above this -> read-time pull
+
+def on_post(author_id, tweet_id, ts):
+    tweet_store.put(tweet_id, ...)          # always write source of truth first
+    n = social_graph.follower_count(author_id)
+    if n > FANOUT_THRESHOLD:
+        celeb_recent.zadd(author_id, ts, tweet_id)  # celeb latest, pulled at read
+        return                                # no fanout
+    # normal user: async fanout, batched pipeline, don't block the post
+    for batch in chunks(social_graph.followers(author_id), 1000):
+        pipe = redis.pipeline()
+        for fid in batch:
+            pipe.zadd(f"tl:{fid}", ts, tweet_id)
+            pipe.zremrangebyrank(f"tl:{fid}", 0, -801)  # bounded: keep newest 800
+        pipe.execute()
+</code></pre>
+<div class="tradeoff">
+<strong>Trade-off:</strong>
+<ul>
+<li><strong>Threshold too high</strong>: a few big accounts still push, occasional write storms; upside is a simpler read path (fewer celebs to merge).</li>
+<li><strong>Threshold too low</strong>: many mid-tier accounts become pull, the read-time celeb merge list grows, read amplification rises.</li>
+<li><strong>Activity-aware</strong>: an advanced move is to fanout only to <em>active followers</em> (logged in within 30 days), materializing the rest on demand — cutting wasted writes to dormant accounts.</li>
+</ul></div>
+<div class="case">
+<strong>Real-world cases:</strong>
+<ul>
+<li><strong>Twitter</strong>: high-follower accounts are explicitly listed as "celebrity" to bypass fanout and merge at read; the home timeline in Redis is <em>bounded</em> (public material mentions a ~800-entry cap), older entries truncated.</li>
+<li><strong>Instagram</strong>: uses Cassandra to asynchronously pre-materialize feeds for non-celebrities; celebrities (millions of followers) are <em>not</em> pre-materialized, since fanning out to all followers is too compute/I/O intensive (Instagram engineering material).</li>
+</ul></div>
+
+<h3>3. Timeline storage: bounded list, store ids not bodies</h3>
+<p><strong>One-line trade-off</strong>: trade "one extra hydrate to fetch bodies at read time" for "shrinking the timeline cache memory by one or two orders of magnitude".</p>
+<p><strong>Principle</strong>: the home timeline is an ordered structure in Redis (a sorted set / list scored by time), one per user, storing <strong>only tweet_ids, not bodies</strong>. Why: ① a body is a few KB; storing 100M users × 800 entries of full bodies is a TB-scale memory disaster, while 8-byte ids shrink it 100×; ② posts can be edited/deleted, and a body redundantly copied into every timeline would need to be re-fanned-out on update. At read time you take the top-N ids and batch-<em>hydrate</em> bodies from Tweet Store (one MGET), filtering out deleted/blocked ones. The timeline must also be <strong>bounded</strong> — keep only the newest few hundred, truncate older, or an active big account's followers' timelines grow unboundedly. Cold data (scrolling far back) falls back to pull.</p>
+<pre><code># Read path: merge + hydrate (pseudo-code)
+def get_home_timeline(uid, limit=20):
+    ids = redis.zrevrange(f"tl:{uid}", 0, 400)        # ① pre-materialized part
+    for cid in following_celebs(uid):                  # ② pull celeb live
+        ids += celeb_recent.zrevrange(cid, 0, 50)
+    ids = dedup(ids)
+    ranked = rank(uid, ids)[:limit]                    # ③ rank, take top-N only
+    tweets = tweet_store.mget(ranked)                  # ④ hydrate only top-N
+    return [t for t in tweets if visible(uid, t)]      # ⑤ filter deleted/blocked
+</code></pre>
+<div class="tradeoff">
+<strong>Trade-off:</strong>
+<ul>
+<li><strong>Store ids (recommended)</strong>: ✅ 100× less memory, edit/delete changes one place; ❌ one extra hydrate RTT, Tweet Store becomes a read hotspot (needs its own cache layer).</li>
+<li><strong>Store bodies redundantly</strong>: ✅ zero re-fetch on read, single return; ❌ memory blowup, delete/edit requires full re-fanout — almost nobody does this.</li>
+<li><strong>Unbounded list</strong>: skip truncation for convenience → big accounts' followers' timelines bloat, both Redis memory and single-key size go out of control.</li>
+</ul></div>
+<div class="case">
+<strong>Real-world cases:</strong>
+<ul>
+<li><strong>Twitter</strong>: home timelines live in a Redis cluster, bounded (~800 entries), each entry id-level data, with async pipelined writes to optimize throughput (Krikorian material).</li>
+<li><strong>Instagram</strong>: migrated feed/activity data from Redis to Cassandra (then to in-house Rocksandra storage engine) to push down GC stalls and p99 — showing timeline storage choices evolve with scale (Instagram engineering blog).</li>
+</ul></div>
+
+<h3>4. Ranking Pipeline: from chronological to ML ranking</h3>
+<p><strong>One-line trade-off</strong>: trade "engagement uplift" for "real-time, explainability, and compute budget" — the ranking model can only run on the small candidate set after aggregation.</p>
+<p><strong>Principle</strong>: early feeds were <em>pure reverse-chronological</em> — simple, real-time, predictable. After information overload, the shift was to <strong>ML ranking</strong>: after aggregating candidates (push-materialized + pull-celebs, a few hundred), a model predicts multiple engagement signals per post (like/comment/reshare/dwell probability), weighted into a score. This echoes Day 13's multi-stage funnel — the difference is feed candidates come from the <em>follow graph</em> not full-corpus retrieval, so the candidate set is far smaller (hundreds vs billions), allowing a fairly heavy ranking model directly. After ranking comes <strong>re-ranking</strong> to inject diversity (spread same-author, avoid a single-topic streak) and business rules (ad insertion, recency boosts).</p>
+<div class="tradeoff">
+<strong>Trade-off:</strong>
+<ul>
+<li><strong>Chronological</strong>: ✅ real-time, explainable, zero model cost, no confusion about "why am I seeing this"; ❌ high miss rate (good content buried while you slept), lower engagement than a ranked feed.</li>
+<li><strong>ML ranking</strong>: ✅ higher engagement, rescues "posted early but high quality"; ❌ compute-expensive, poor explainability, prone to <em>echo chambers</em> and "why didn't I see their post" complaints; needs pCTR calibration and multi-objective fusion.</li>
+<li><strong>Push + offline ranking conflict</strong>: if the timeline is sorted at pre-materialization time, new posts and ranking-model updates can't be reflected live — so re-ranking usually lives <em>at read time</em>, with push only responsible for stuffing candidates in.</li>
+</ul></div>
+<div class="case">
+<strong>Real-world cases:</strong>
+<ul>
+<li><strong>Facebook News Feed</strong>: Multifeed's aggregator ranks and filters the leaf-fetched candidates at read time before returning — ranking is part of the read path (Meta engineering blog).</li>
+<li><strong>LinkedIn</strong>: one of FollowFeed's goals was to support "more computationally complex scoring and ranking" without sacrificing real-time, with the broker ranking after read-time merge (LinkedIn engineering blog).</li>
+</ul></div>
+
+<h2>Scaling & Optimization</h2>
+<ul>
+<li><strong>Activity-aware fanout</strong>: pre-materialize only for recently active followers; generate on demand for dormant ones, cutting huge amounts of wasted writes.</li>
+<li><strong>Tiered timeline</strong>: hot (recent few hundred) in Redis, warm/cold falls back to Cassandra/disk for on-demand pull, controlling memory cost.</li>
+<li><strong>Multi-region</strong>: deploy timeline caches near the user's home region; cross-region fanout on post via async replication (echoes Day 5).</li>
+<li><strong>Decouple ranking from retrieval</strong>: split "fill candidates" and "ranking" into separate services so the ranking model can iterate and canary independently (Day 13 funnel thinking).</li>
+<li><strong>Bottleneck spotting</strong>: monitor fanout latency p99, single-key timeline size, hydrate re-fetch QPS, celeb-merge time — celeb merge is often the root of read-path tail latency.</li>
+</ul>
+
+<h2>Common Pitfalls + Interview Questions</h2>
+<div class="callout"><strong>1. Agonizing over push vs pull from the start.</strong> The right answer is almost always <em>hybrid</em>. The interviewer wants the threshold thinking ("split by follower count/activity") and how to merge two sources at read time — not a binary choice.</div>
+<div class="callout"><strong>2. Stuffing bodies into every timeline.</strong> Memory blowup + delete/edit needs full re-fanout. Timelines store only ids, hydrate at read.</div>
+<div class="callout"><strong>3. Forgetting timelines must be bounded.</strong> Without truncating old entries, a big account's followers' single keys bloat unboundedly, and a Redis big-key drags down the whole shard.</div>
+<div class="callout"><strong>4. Ranking at write time.</strong> Fixing order at push means new posts and model updates can't reflect live; re-ranking belongs on the read path.</div>
+<div class="callout"><strong>5. Ignoring visibility filtering.</strong> If blocked/deleted/private posts aren't filtered at read, deleted content gets served — you must filter after hydrate.</div>
+<p><strong>Likely follow-ups</strong>: ① A celebrity with tens of millions of followers posts — how do you avoid blowing up the system? ② How do you set the push/pull threshold, on what metric? ③ When I newly follow someone, how do their historical posts enter my timeline (backfill)? ④ How do you budget the end-to-end post-to-visible latency? ⑤ Chronological vs ranked feed — what does each sacrifice, and which product should pick which?</p>
+
+<h2>Deep Resources</h2>
+<ul>
+<li><strong>Raffi Krikorian, <em>Timelines at Scale</em></strong> (QCon/InfoQ) + High Scalability's breakdown of Twitter's timeline architecture: firsthand material on fanout, Redis materialization, celebrity hybrid.</li>
+<li><strong>Meta engineering blog, <em>Serving Facebook Multifeed</em></strong> (2015): the pull-style aggregator-leaf architecture and read-time ranking in practice.</li>
+<li><strong>LinkedIn engineering blog, <em>FollowFeed: LinkedIn's Feed Made Faster and Smarter</em></strong>: the trade-offs of pull/read-time merge + complex ranking.</li>
+<li><strong><em>Designing Data-Intensive Applications</em>, Ch. 1</strong> (Kleppmann): uses Twitter's timeline write-fanout vs read-fanout as the opening "describing load" case study.</li>
+</ul>
+
+<h2>Deep Thinking (click to expand)</h2>
+
+<details>
+<summary>1. Push's write amplification grows linearly with follower count, pull's read amplification grows linearly with followee count. Can you write an inequality to estimate the "push or pull" crossover?</summary>
+<div class="answer">
+<p><strong>Modeling</strong>: for a single account, push is worthwhile roughly when "the number of times it's <em>read</em> ≫ the number of fanout writes its posts trigger" — the crossover is essentially the <strong>marginal benefit of a fanout write</strong>: when one fanout write saves less expected read cost than the write itself costs, switch to pull.</p>
+<p><strong>Intuition</strong>: a normal person posts rarely and is refreshed repeatedly → reads ≫ writes → push (write once, save countless reads). A celebrity's follower count both raises write cost and, because their posts get buried by ranking with low per-person exposure, lowers write benefit — squeezed from both ends, they land in the pull region. This is the theoretical basis for the hybrid threshold.</p>
+</div>
+</details>
+
+<details>
+<summary>2. User A just followed big-V B (5M followers). Should B's historical posts appear in A's timeline immediately? How to backfill without stepping on landmines?</summary>
+<div class="answer">
+<p><strong>Crux</strong>: B is a celebrity served by pull and isn't pre-materialized — so "at follow time" you actually <em>don't</em> need to write historical posts into A's timeline; A's next refresh will auto-merge B's latest. This is a hidden benefit of hybrid: <strong>following a celebrity needs no backfill</strong>.</p>
+<p><strong>If B is a normal account (push)</strong>: B's historical posts aren't in A's pre-materialized timeline. Options: pull B's recent posts and merge at read time on first refresh (simple, common), or async zadd them into A's timeline in the background. <strong>Pitfall</strong>: don't backfill inside the synchronous "follow" request — if A follows a batch at once (contacts import), synchronous backfill amplifies into a mini fanout storm; it must be async, rate-limited, and respect the bounded truncation.</p>
+</div>
+</details>
+
+<details>
+<summary>3. Timelines store ids in a Redis sorted set. If a Redis shard goes down, that batch of users' timelines is gone. Is this data loss?</summary>
+<div class="answer">
+<p><strong>Key insight</strong>: the home timeline is <em>derived data</em>, not the source of truth — the real posts are in Tweet Store. Losing the timeline cache isn't "data loss", it's a "materialized view invalidation" that can be <strong>rebuilt</strong>.</p>
+<p><strong>Recovery</strong>: ① short-term <em>degrade to pull</em> — that shard's users refresh by live-merging their followees' latest, slow but usable, buying time for rebuild; ② background <em>re-fanout rebuild</em>, at the cost of a degraded read path + a write storm (rate-limit it). This also explains why timelines must be <em>bounded</em> — rebuild only needs to backfill the recent few hundred, not full history. <strong>Counter-lesson</strong>: if you'd made the timeline the only store (no Tweet Store), this would be true data loss — a derived layer must never be authoritative.</p>
+</div>
+</details>
+
+<details>
+<summary>4. Switching from chronological to ML ranking, DAU engagement rose, but "why didn't I see friend X's post" complaints surged. How does this second-order effect arise? How to mitigate?</summary>
+<div class="answer">
+<p><strong>How it arises</strong>: under chronological, "follow = guaranteed delivery", users have a stable mental model. After switching to ranking, the model filters/downranks by predicted engagement, and <em>low-interaction friends' posts get buried</em>; users don't know ranking exists and just feel "I followed them but didn't see it". This is the inherent cost of a ranked feed: <strong>trading individual predictability and trust for aggregate engagement uplift</strong>.</p>
+<p><strong>Mitigation</strong>: ① give strong-tie/explicit subscriptions a guaranteed exposure slot; ② offer a <em>"Latest" chronological view</em> as a switchable tab (Twitter/Instagram both did this); ③ add <em>diversity and coverage</em> constraints in ranking so top-interaction accounts don't dominate; ④ clearly label "For You vs Latest". Fundamentally it's admitting offline engagement metrics ≠ user trust, needing ecosystem-side metrics as a backstop (echoes Day 13's echo-chamber discussion).</p>
+</div>
+</details>
+
+<details>
+<summary>5. Estimate: 100M users, 800-entry bounded timelines each, 8 bytes per tweet_id. How much memory just for the timeline cache? What does this tell you architecturally?</summary>
+<div class="answer">
+<p><strong>Naive estimate</strong>: 1e8 users × 800 entries × 8 bytes ≈ <strong>640 GB</strong> of raw id data alone. But a Redis sorted set element also stores a score (8-byte double) plus skiplist/dict pointer overhead, so realistically <em>50~100 bytes per element</em>, bloating the total to <strong>several TB</strong>.</p>
+<p><strong>Architectural implications</strong>: ① one machine can't hold it → the timeline cache must be <em>sharded</em> (hash by uid, echoes Day 4); ② this is just ids — <strong>thankfully no bodies</strong>, or 800 × few KB × 1e8 = PB-scale, the hard constraint behind "store ids + hydrate"; ③ memory is too expensive → <em>activity-aware</em> materialization and <em>tiering</em> (hot in memory, cold to Cassandra) are necessities not optimizations; ④ it also explains why the bounded 800 matters — it directly sets the cache tier's total memory budget; double the cap, double the cost.</p>
+</div>
+</details>
+
+<div class="nav"><a href="index.en.html">← Back to index</a></div>
+</div>
+</body></html>

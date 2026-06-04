@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 14 · Feed 系统 (Feed System) — System Design Bi-daily</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"SF Pro Display","Noto Sans SC",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
+.container{max-width:820px;margin:0 auto;padding:24px 20px 60px}
+header{padding:40px 0 28px;border-bottom:1px solid rgba(100,200,255,0.15);margin-bottom:32px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem}
+.tag{padding:3px 10px;border-radius:4px;background:rgba(100,200,255,0.12);color:#64c8ff;border:1px solid rgba(100,200,255,0.25)}
+.tag.diff{background:rgba(94,234,212,0.1);color:#5eead4;border-color:rgba(94,234,212,0.3)}
+.tag.day{background:rgba(255,180,80,0.1);color:#ffb450;border-color:rgba(255,180,80,0.25)}
+h1{font-size:1.75rem;font-weight:800;background:linear-gradient(135deg,#64c8ff 0%,#5eead4 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:0.5px;line-height:1.3}
+h1 .en{display:block;font-size:1rem;color:#7a8590;-webkit-text-fill-color:#7a8590;margin-top:6px;font-weight:500}
+h2{font-size:1.2rem;color:#5eead4;margin:36px 0 14px;padding-left:12px;border-left:3px solid #5eead4}
+h3{font-size:1rem;color:#64c8ff;margin:20px 0 10px;font-weight:600}
+p{margin:10px 0;color:#c8cfd6}
+ul,ol{margin:10px 0 10px 22px;color:#c8cfd6}
+li{margin:6px 0}
+strong{color:#e8eef5;font-weight:600}
+em{color:#5eead4;font-style:normal;font-weight:500}
+code{font-family:"SF Mono",Menlo,Consolas,monospace;background:rgba(100,200,255,0.1);color:#5eead4;padding:1px 6px;border-radius:3px;font-size:0.88em}
+pre{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:14px 16px;overflow-x:auto;margin:12px 0;font-family:"SF Mono",Menlo,Consolas,monospace;font-size:0.84rem;line-height:1.55;color:#c8cfd6}
+pre code{background:none;color:inherit;padding:0;font-size:1em}
+.mermaid{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:18px;margin:14px 0;text-align:center;overflow-x:auto;cursor:zoom-in;transition:border-color 0.15s}
+.mermaid:hover{border-color:rgba(100,200,255,0.4)}
+.mermaid svg{width:100%;max-width:100%;height:auto;min-height:280px}
+.lightbox{position:fixed;inset:0;background:rgba(8,12,18,0.96);z-index:9999;display:none;align-items:center;justify-content:center;padding:24px;cursor:grab;backdrop-filter:blur(4px);overflow:hidden}
+.lightbox.open{display:flex}
+.lightbox.dragging{cursor:grabbing}
+.lightbox svg{width:auto;height:auto;max-width:96vw;max-height:92vh;transform-origin:center center;will-change:transform}
+.lightbox .hint{position:fixed;top:16px;right:20px;font-size:0.78rem;color:#7a8590;font-family:"SF Mono",Menlo,monospace;pointer-events:none}
+.callout{background:rgba(255,180,80,0.06);border-left:3px solid #ffb450;padding:12px 14px;margin:14px 0;border-radius:4px;font-size:0.94rem}
+.callout strong{color:#ffb450}
+.tradeoff{background:rgba(100,200,255,0.05);border:1px solid rgba(100,200,255,0.2);border-radius:6px;padding:12px 14px;margin:12px 0;font-size:0.94rem}
+.case{background:rgba(94,234,212,0.05);border-left:3px solid #5eead4;padding:12px 14px;margin:12px 0;border-radius:4px;font-size:0.94rem}
+.case strong{color:#5eead4}
+.nav{margin-top:50px;padding-top:24px;border-top:1px solid rgba(100,200,255,0.15);text-align:center}
+.nav a{color:#64c8ff;text-decoration:none;font-size:0.92rem;padding:8px 16px;border:1px solid rgba(100,200,255,0.3);border-radius:4px;transition:all 0.15s}
+.nav a:hover{background:rgba(100,200,255,0.1)}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:0.9rem}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid rgba(100,200,255,0.15)}
+th{color:#64c8ff;font-weight:600;background:rgba(100,200,255,0.05)}
+details{background:rgba(100,200,255,0.04);border:1px solid rgba(100,200,255,0.18);border-radius:6px;padding:12px 16px;margin:10px 0;transition:all 0.15s}
+details:hover{border-color:rgba(100,200,255,0.35)}
+details[open]{background:rgba(94,234,212,0.05);border-color:rgba(94,234,212,0.3)}
+details summary{font-weight:600;color:#e8eef5;list-style:none;outline:none;cursor:pointer;display:flex;align-items:flex-start;gap:10px;font-size:0.96rem}
+details summary::-webkit-details-marker{display:none}
+details summary::before{content:'▶';color:#64c8ff;font-size:0.75em;transition:transform 0.2s;flex-shrink:0;margin-top:5px}
+details[open] summary::before{transform:rotate(90deg);color:#5eead4}
+details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
+details .answer ul,details .answer ol{margin:6px 0 6px 22px}
+@media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+</style>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({startOnLoad:true,theme:'base',flowchart:{useMaxWidth:true,htmlLabels:true,nodeSpacing:50,rankSpacing:60},themeVariables:{primaryColor:'#1a2530',primaryTextColor:'#e8eef5',primaryBorderColor:'#64c8ff',lineColor:'#5eead4',secondaryColor:'#0e1419',tertiaryColor:'#0a0f14',background:'#0a0f14',mainBkg:'#1a2530',secondBkg:'#0e1419',textColor:'#d4dae0',fontFamily:'-apple-system,"SF Pro Display",sans-serif',fontSize:'16px'}});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const lb=document.createElement('div');lb.className='lightbox';
+  lb.innerHTML='<span class="hint">scroll = zoom · drag = pan · Esc / click bg = close</span>';
+  document.body.appendChild(lb);
+  let scale=1,panX=0,panY=0,dragging=false,moved=false,lx=0,ly=0;
+  const apply=()=>{const s=lb.querySelector('svg');if(s)s.style.transform=`translate(${panX}px,${panY}px) scale(${scale})`};
+  const reset=()=>{scale=1;panX=0;panY=0};
+  const close=()=>{lb.classList.remove('open');const s=lb.querySelector('svg');if(s)s.remove();reset()};
+  document.addEventListener('click',e=>{
+    if(e.target.closest('.lightbox')){if(moved){moved=false;return}close();return}
+    const w=e.target.closest('.mermaid');if(!w)return;
+    const svg=w.querySelector('svg');if(!svg)return;
+    const c=svg.cloneNode(true);c.removeAttribute('style');
+    c.style.maxWidth='96vw';c.style.maxHeight='92vh';
+    lb.appendChild(c);lb.classList.add('open');reset();apply();
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+  lb.addEventListener('wheel',e=>{
+    if(!lb.classList.contains('open'))return;
+    e.preventDefault();
+    const svg=lb.querySelector('svg');if(!svg)return;
+    const ns=Math.max(0.3,Math.min(10,scale*(1-e.deltaY*0.002)));
+    const r=svg.getBoundingClientRect();
+    const cx=e.clientX-(r.left+r.width/2),cy=e.clientY-(r.top+r.height/2);
+    const k=ns/scale-1;panX-=cx*k;panY-=cy*k;scale=ns;apply();
+  },{passive:false});
+  lb.addEventListener('mousedown',e=>{
+    if(!lb.classList.contains('open'))return;
+    dragging=true;moved=false;lx=e.clientX;ly=e.clientY;lb.classList.add('dragging');e.preventDefault();
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    const dx=e.clientX-lx,dy=e.clientY-ly;
+    if(Math.abs(dx)+Math.abs(dy)>3)moved=true;
+    panX+=dx;panY+=dy;lx=e.clientX;ly=e.clientY;apply();
+  });
+  document.addEventListener('mouseup',()=>{dragging=false;lb.classList.remove('dragging')});
+});
+</script>
+</head><body><div class="container">
+
+<header>
+<div class="meta">
+<span class="tag day">Day 14</span>
+<span class="tag diff">Hard</span>
+<span class="tag">Feed System</span>
+<span class="tag">Push/Pull/Hybrid</span>
+<span class="tag">Fanout</span>
+<span class="tag">Ranking</span>
+</div>
+<h1>Feed 系统 — 1 亿 DAU 关注流的 fanout 艺术<span class="en">Feed System: Push vs Pull vs Hybrid, Fanout-on-write Limits, Timeline Storage, Ranking Pipeline</span></h1>
+</header>
+
+<h2>问题场景 + 需求约束</h2>
+<p>给一个 <strong>1 亿 DAU 的关注式 timeline</strong>（Twitter/X 的 Home、微博关注流、Instagram Feed）设计后端：你关注了几百个账号，下拉刷新要在 <strong>p99 &lt; 200ms</strong> 内拿到这些账号最新的、排好序的帖子。难点不是「存帖子」，而是<em>读写放大的不对称</em>——一次发帖要让几百万关注者「看到」，一次刷新要从几百个关注对象里聚合排序。先想清楚：<strong>这份合并工作放在写时做，还是读时做？</strong></p>
+<ul>
+<li><strong>规模</strong>：1 亿 DAU，平均关注数几百，发帖峰值几千~万 QPS，timeline 读峰值数十万 QPS（Twitter 公开过约 <strong>300K QPS</strong> 的 timeline 读）。</li>
+<li><strong>读写比</strong>：极度读多写少，<em>读:写 ≈ 100:1</em>——这是「写时多干活、读时省力」策略的根本动机。</li>
+<li><strong>延迟 SLO</strong>：刷新 p99 &lt; 200ms；新帖「可见延迟」秒级（Twitter 目标发推 5s 内到达关注者）。</li>
+<li><strong>不均匀的扇出</strong>：普通人几百关注者，名人几千万——<em>同一套 fanout 不可能同时服务这两端</em>。</li>
+<li><strong>排序</strong>：纯时间序还是 ML 排序？后者要在聚合后对几百候选打分，预算紧张。</li>
+</ul>
+
+<h2>高层架构（混合 fanout）</h2>
+<pre class="mermaid">
+graph TD
+    POST["发帖 Write API"] --> TW[("Tweet Store<br/>权威帖子库")]
+    POST --> FO["Fanout 服务<br/><i>查社交图</i>"]
+    FO -->|普通用户:推| TLC[("Home Timeline Cache<br/>Redis · 每人一条有界 list")]
+    FO -.名人:跳过 fanout.-> CEL[("名人帖子<br/>读时拉取")]
+
+    READ["刷新 Read API"] --> MIX["Timeline 混合服务"]
+    MIX -->|① 读预物化| TLC
+    MIX -->|② 拉名人最新| CEL
+    MIX --> RANK["排序 + 多样性"]
+    RANK --> HYDRATE["Hydrate<br/><i>用 id 取帖子正文</i>"]
+    HYDRATE --> TW
+    HYDRATE --> OUT["返回 20 条 feed"]
+
+    classDef w fill:#1a2530,stroke:#64c8ff,color:#e8eef5
+    classDef cache fill:#1a1a30,stroke:#ffb450,color:#e8eef5
+    classDef store fill:#2a1530,stroke:#ff7ab6,color:#e8eef5
+    class POST,READ,FO,MIX,RANK,HYDRATE,OUT w
+    class TLC,CEL cache
+    class TW store
+</pre>
+<p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">写路径预物化普通用户 timeline；读路径合并「预物化」+「名人实时拉取」再排序</p>
+<p><strong>组件职责</strong>：<em>Tweet Store</em> 是帖子的 source of truth（按 tweet_id 分片的 KV）。<em>Fanout 服务</em>在发帖时查社交图，把 tweet_id <strong>推</strong>进每个关注者的 Home Timeline Cache——这是「写时多干活」。名人例外：扇出代价太大，其帖子不预物化，留待读时<strong>拉</strong>。<em>混合服务</em>是关键：读时把预物化的 timeline 与名人最新帖 merge，排序后只对 top-N <em>hydrate</em>（timeline 里只存 id，正文回 Tweet Store 取，省内存）。</p>
+
+<h2>关键技术点</h2>
+
+<h3>1. Push vs Pull vs Hybrid：合并工作放写时还是读时</h3>
+<p><strong>一句话 trade-off</strong>：用「发帖时的写放大」换「刷新时的读放大」——两者只能选一头省，名人逼你两头都得管。</p>
+<p><strong>原理</strong>：<em>Push（fanout-on-write）</em>发帖时把帖子 id 写进每个关注者的 timeline，读时一次性取出——读 O(1)、写 O(关注者数)。<em>Pull（fanout-on-read）</em>什么都不预算，刷新时现查你关注的所有人最近帖子再归并排序——写 O(1)、读 O(关注数×每人查询)。<strong>选择取决于读写比和扇出分布</strong>：读多写少（100:1）且大多数人关注者不多 → push 把成本摊到稀疏的写上，划算；但遇到千万粉丝的名人，一条帖子触发千万次写，push 直接崩。所以工业界几乎全是 <em>Hybrid</em>：普通用户 push、名人 pull，读时合并。</p>
+<table>
+<thead><tr><th></th><th>Push（写扇出）</th><th>Pull（读扇出）</th><th>Hybrid</th></tr></thead>
+<tbody>
+<tr><td><strong>发帖成本</strong></td><td>高（O 关注者）</td><td>低（一次写）</td><td>普通高 / 名人低</td></tr>
+<tr><td><strong>刷新成本</strong></td><td>低（读一条 list）</td><td>高（归并 N 路）</td><td>读 1 条 + 拉几个名人</td></tr>
+<tr><td><strong>新帖延迟</strong></td><td>扇出完才可见</td><td>实时</td><td>普通有延迟 / 名人实时</td></tr>
+<tr><td><strong>死穴</strong></td><td>名人写爆</td><td>活跃用户读爆</td><td>合并逻辑复杂</td></tr>
+</tbody>
+</table>
+<div class="tradeoff">
+<strong>Trade-off：</strong>
+<ul>
+<li><strong>纯 Push</strong>：✅ 读极快、排序可离线预算；❌ 名人写放大致命；不活跃用户也被强行物化（<em>给僵尸粉算 timeline 是纯浪费</em>）。</li>
+<li><strong>纯 Pull</strong>：✅ 写便宜、存储省、永远实时；❌ 每次刷新都重做归并排序，热门时段读 QPS 把后端打爆，p99 抖。</li>
+<li><strong>Hybrid 的难点</strong>：名人 push/pull 的<em>阈值怎么定</em>（关注者数？活跃度？），以及读时合并两条来源时如何保持排序一致与去重。</li>
+</ul></div>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Twitter</strong>：以 push 为主（Redis 预物化 home timeline），名人走 hybrid——其帖子不 fanout，读时合并。Raffi Krikorian《Timelines at Scale》是经典材料。</li>
+<li><strong>Facebook News Feed（Multifeed）</strong>：走 <em>pull</em>——aggregator 在读时 fan-out 到一组 leaf 节点取好友近期动态，排序过滤后返回（Meta 工程博客 2015）。</li>
+<li><strong>LinkedIn FollowFeed</strong>：也是 pull 思路——broker（followfeed-query）读时并行查多个 storage 节点的活动 timeline 再归并（LinkedIn 工程博客）。</li>
+</ul></div>
+
+<h3>2. Fanout-on-write 的写放大与名人问题</h3>
+<p><strong>一句话 trade-off</strong>：push 把读成本转嫁成写成本，而写成本随<em>关注者数线性爆炸</em>，到名人量级就不可持续。</p>
+<p><strong>原理</strong>：一条帖子的 fanout 写次数 = 作者的关注者数。普通人几百次缓存写，缓存层轻松吸收；但 5000 万粉丝的账号发一条，就是 5000 万次 Redis 写——即便每次 100µs，串行也要小时级，还会瞬间打满缓存集群带宽。更糟的是<em>惊群叠加</em>：名人同时在线粉丝多，扇出风暴和读风暴撞一起。解法是给账号设<strong>扇出阈值</strong>：关注者超过阈值的进「名人名单」，其帖子<em>跳过 fanout</em>，改在读时拉取并入每个读者的 timeline。代价是读路径多一次「拉名人最新帖 + 合并」，但避免了写侧的雪崩。</p>
+<pre><code># Hybrid fanout：发帖时按阈值分流（pseudo-code）
+FANOUT_THRESHOLD = 100_000  # 关注者超此数 → 走读时 pull
+
+def on_post(author_id, tweet_id, ts):
+    tweet_store.put(tweet_id, ...)          # 永远先落权威库
+    n = social_graph.follower_count(author_id)
+    if n > FANOUT_THRESHOLD:
+        celeb_recent.zadd(author_id, ts, tweet_id)  # 名人最新帖，读时拉
+        return                                # ⚠️ 不 fanout
+    # 普通用户：异步扇出，分批 pipeline，避免阻塞发帖
+    for batch in chunks(social_graph.followers(author_id), 1000):
+        pipe = redis.pipeline()
+        for fid in batch:
+            pipe.zadd(f"tl:{fid}", ts, tweet_id)
+            pipe.zremrangebyrank(f"tl:{fid}", 0, -801)  # 有界：只留最新 800
+        pipe.execute()
+</code></pre>
+<div class="tradeoff">
+<strong>Trade-off：</strong>
+<ul>
+<li><strong>阈值定高</strong>：少数大 V 仍走 push，偶发写风暴；好处是读路径简单（要合并的名人少）。</li>
+<li><strong>阈值定低</strong>：很多中腰部账号变 pull，读时合并的名人列表变长、读放大上升。</li>
+<li><strong>活跃度感知</strong>：进阶做法是只给<em>活跃关注者</em> fanout（近 30 天登录过），其余读时按需物化——大幅削减给僵尸粉的无效写。</li>
+</ul></div>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Twitter</strong>：明确把高粉账号列入「celebrity」绕过 fanout，读时合并；home timeline 在 Redis 中是<em>有界</em>的（公开材料提到约 800 条上限），老条目截断。</li>
+<li><strong>Instagram</strong>：用 Cassandra 为非名人异步预物化 feed；名人（百万粉级）<em>不预物化</em>，因为对全部关注者扇出 I/O 代价过高（Instagram 工程材料）。</li>
+</ul></div>
+
+<h3>3. Timeline 存储：有界 list、存 id 不存正文</h3>
+<p><strong>一句话 trade-off</strong>：用「读时多一次 hydrate 取正文」换「timeline 缓存内存缩小一两个数量级」。</p>
+<p><strong>原理</strong>：Home timeline 用 Redis 的有序结构（按时间打分的 sorted set / list）实现，每人一条，<strong>只存 tweet_id 不存正文</strong>。理由：① 正文几 KB，1 亿用户 × 800 条全存正文是 TB 级内存灾难；存 8 字节 id 则缩小百倍；② 帖子可能被编辑/删除，正文若冗余进每个 timeline，更新要再扇出一遍。读时拿到 top-N 个 id，再批量回 Tweet Store <em>hydrate</em> 正文（一次 MGET），并过滤掉已删除/已拉黑的。timeline 还必须<strong>有界</strong>——只保留最新几百条，老的截断，否则活跃大账号的关注者 timeline 无限增长。冷数据（翻很旧的帖）回落到 pull。</p>
+<pre><code># 读路径：合并 + hydrate（pseudo-code）
+def get_home_timeline(uid, limit=20):
+    ids = redis.zrevrange(f"tl:{uid}", 0, 400)        # ① 预物化部分
+    for cid in following_celebs(uid):                  # ② 名人实时拉
+        ids += celeb_recent.zrevrange(cid, 0, 50)
+    ids = dedup(ids)
+    ranked = rank(uid, ids)[:limit]                    # ③ 排序后只取 top-N
+    tweets = tweet_store.mget(ranked)                  # ④ 仅对 top-N hydrate
+    return [t for t in tweets if visible(uid, t)]      # ⑤ 过滤删除/拉黑
+</code></pre>
+<div class="tradeoff">
+<strong>Trade-off：</strong>
+<ul>
+<li><strong>存 id（推荐）</strong>：✅ 内存省百倍、编辑/删除只改一处；❌ 读多一次 hydrate RTT、Tweet Store 成读热点（需自己再缓存一层）。</li>
+<li><strong>存正文冗余</strong>：✅ 读零回源、单次返回；❌ 内存爆炸、删除/编辑要全量重扇出，几乎没人这么做。</li>
+<li><strong>无界 list</strong>：图省事不截断 → 大账号关注者的 timeline 膨胀，Redis 内存与单 key 大小双失控。</li>
+</ul></div>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Twitter</strong>：home timeline 存于 Redis 集群、有界（~800 条）、每条仅 id 级数据，靠异步 pipeline 写入优化吞吐（Krikorian 材料）。</li>
+<li><strong>Instagram</strong>：feed/活动数据从 Redis 迁到 Cassandra（再到自研 Rocksandra 存储引擎），把 GC 卡顿和 p99 压下来——说明 timeline 存储选型随规模演进（Instagram 工程博客）。</li>
+</ul></div>
+
+<h3>4. Ranking Pipeline：从时间序到 ML 排序</h3>
+<p><strong>一句话 trade-off</strong>：用「用户参与度提升」换「实时性、可解释性与算力预算」——排序模型只能跑在聚合后的小候选集上。</p>
+<p><strong>原理</strong>：早期 feed 是<em>纯时间倒序</em>（reverse-chron），简单、实时、可预测。但信息过载后转向 <strong>ML 排序</strong>：聚合出候选（push 物化 + pull 名人，几百条）后，对每条用模型预测多个参与信号（点赞/评论/转发/停留概率），加权成分排序。这呼应 Day 13 的多阶段漏斗——区别是 feed 候选来自<em>关注图</em>而非全库召回，候选量小得多（几百 vs 十亿），所以可以直接上较重的排序模型。排序后还要<strong>重排</strong>注入多样性（同作者打散、避免连刷一个话题）和业务规则（广告插入、时效性提权）。</p>
+<div class="tradeoff">
+<strong>Trade-off：</strong>
+<ul>
+<li><strong>时间序</strong>：✅ 实时、可解释、零模型成本、用户对「为什么看到」无困惑；❌ 错过性高（睡一觉错过的好内容沉底）、参与度低于排序流。</li>
+<li><strong>ML 排序</strong>：✅ 参与度高、能救活「发得早但优质」的帖；❌ 算力贵、可解释性差、易制造<em>回音室</em>与「为什么我没看到 ta 的帖」投诉；需要 pCTR 校准与多目标融合。</li>
+<li><strong>push + 离线排序的冲突</strong>：若 timeline 预物化时就排好序，新帖与排序模型更新无法实时反映——所以重排序通常<em>放读时</em>，push 只负责把候选塞进来。</li>
+</ul></div>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Facebook News Feed</strong>：Multifeed 的 aggregator 在读时对 leaf 取回的候选做 ranking 与 filtering 再返回——排序是读路径的一部分（Meta 工程博客）。</li>
+<li><strong>LinkedIn</strong>：FollowFeed 当初的目标之一就是支撑「计算更复杂的打分与排序」而不牺牲实时性，broker 读时归并后排序（LinkedIn 工程博客）。</li>
+</ul></div>
+
+<h2>扩展与优化（增长后怎么办）</h2>
+<ul>
+<li><strong>活跃度感知 fanout</strong>：只给近期活跃的关注者预物化，僵尸粉读时按需生成，砍掉大量无效写。</li>
+<li><strong>分层 timeline</strong>：热（近几百条）放 Redis，温/冷回落到 Cassandra/磁盘按需 pull，控制内存成本。</li>
+<li><strong>多区域</strong>：timeline cache 按用户归属区就近部署，发帖跨区扇出用异步复制（呼应 Day 5 复制）。</li>
+<li><strong>排序与召回解耦</strong>：把「装候选」与「排序」拆成独立服务，排序模型可独立迭代、灰度（Day 13 漏斗思想）。</li>
+<li><strong>瓶颈识别</strong>：监控扇出延迟 p99、单 key timeline 大小、hydrate 回源 QPS、名人合并耗时——名人合并往往是读路径长尾的根因。</li>
+</ul>
+
+<h2>常见陷阱 + 面试问题</h2>
+<div class="callout"><strong>1. 一上来就纠结 push 还是 pull。</strong> 正确答案几乎永远是 <em>hybrid</em>。面试官想听的是「按关注者数/活跃度分流」的阈值思维，以及读时如何合并两条来源——而不是二选一。</div>
+<div class="callout"><strong>2. 把正文塞进每个 timeline。</strong> 内存爆炸 + 删除/编辑要全量重扇出。timeline 只存 id，读时 hydrate。</div>
+<div class="callout"><strong>3. 忘了 timeline 要有界。</strong> 不截断老条目，大账号关注者的单 key 无限膨胀，Redis 大 key 拖垮整个分片。</div>
+<div class="callout"><strong>4. 排序排在写时。</strong> push 时就定死顺序，新帖与模型更新无法实时反映；重排序应放读路径。</div>
+<div class="callout"><strong>5. 忽略可见性过滤。</strong> 拉黑/删除/隐私的帖子若不在读时过滤，会把已删内容推给用户——hydrate 后必须 filter。</div>
+<p><strong>高频追问</strong>：① 千万粉名人发帖，怎么不打爆系统？② push/pull 阈值怎么定，依据什么指标？③ 新关注一个人，ta 的历史帖怎么进我的 timeline（backfill）？④ 发帖到关注者可见的端到端延迟预算怎么拆？⑤ 时间序 vs 排序流，各自牺牲什么、什么产品该选哪个？</p>
+
+<h2>深入资源</h2>
+<ul>
+<li><strong>Raffi Krikorian《Timelines at Scale》</strong>（QCon/InfoQ）+ High Scalability 对 Twitter timeline 架构的拆解：fanout、Redis 物化、名人 hybrid 的一手材料。</li>
+<li><strong>Meta 工程博客《Serving Facebook Multifeed》</strong>（2015）：pull 式 aggregator-leaf 架构与读时排序的实战。</li>
+<li><strong>LinkedIn 工程博客《FollowFeed: LinkedIn's Feed Made Faster and Smarter》</strong>：pull/读时归并 + 复杂排序的取舍。</li>
+<li><strong>《Designing Data-Intensive Applications》第 1 章</strong>（Kleppmann）：正是用 Twitter timeline 的写扇出 vs 读扇出作为「负载描述」的开篇案例。</li>
+</ul>
+
+<h2>深入思考（点击展开答案）</h2>
+
+<details>
+<summary>1. push 的写放大随关注者数线性增长，pull 的读放大随关注数线性增长。能不能用一个不等式估算「该 push 还是 pull」的临界点？</summary>
+<div class="answer">
+<p><strong>建模</strong>：对单个账号，push 划算的条件大致是「该账号<em>被读的次数</em> ≫ <em>发帖触发的扇出次数</em>」——临界点本质是<strong>扇出写的边际收益</strong>：当一次 fanout 写在读侧省下的期望读成本 &lt; 这次写本身的成本时，就该 pull。</p>
+<p><strong>直觉化</strong>：普通人发帖少、被反复刷 → 读远多于写 → push（写一次省无数次读）。名人粉丝数既抬高写成本，其帖又因被排序埋掉而人均曝光低、降低写收益——两头夹击使其落到 pull 区。这正是 hybrid 阈值的理论依据。</p>
+</div>
+</details>
+
+<details>
+<summary>2. 用户 A 刚关注了大 V B（500 万粉）。A 的 timeline 里应不应该立刻出现 B 的历史帖？backfill 怎么做才不踩坑？</summary>
+<div class="answer">
+<p><strong>问题本质</strong>：B 走 pull 本就不预物化——「关注瞬间」其实<em>不需要</em>往 A 的 timeline 写历史帖，A 下次刷新时读路径会自动 merge B 的最新帖。这是 hybrid 的隐性好处：<strong>关注名人无需 backfill</strong>。</p>
+<p><strong>若 B 是普通账号（走 push）</strong>：B 历史帖不在 A 的预物化 timeline 里。做法：读时按需拉 B 近期帖合并（简单常用），或后台异步 zadd 进 A 的 timeline。<strong>坑</strong>：别在「关注」这个同步请求里回填——若 A 一次性关注一批人（导入通讯录），同步回填会放大成一场小型 fanout 风暴，必须异步且限速，并尊重有界截断。</p>
+</div>
+</details>
+
+<details>
+<summary>3. timeline 用 Redis sorted set 存 id。如果 Redis 某分片宕机，那批用户的 timeline 全没了，怎么办？这是数据丢失吗？</summary>
+<div class="answer">
+<p><strong>关键认知</strong>：home timeline 是<em>派生数据</em>，不是 source of truth——真正的帖子在 Tweet Store。timeline cache 丢了不是「数据丢失」，是「物化视图失效」，可以<strong>重建</strong>。</p>
+<p><strong>恢复策略</strong>：① 短期<em>降级到 pull</em>——该分片用户刷新时实时归并关注对象最新帖，慢但能用，给重建争取时间；② 后台<em>重新 fanout 重建</em>，代价是读路径退化 + 一波写风暴（要限速）。这也解释了 timeline 为何要<em>有界</em>——重建只需回填最近几百条而非全历史。<strong>反面教训</strong>：若把 timeline 当唯一存储（不存 Tweet Store），这就是真·数据丢失——派生层永远不能当权威。</p>
+</div>
+</details>
+
+<details>
+<summary>4. 从时间序切到 ML 排序流，DAU 参与度涨了，但客服收到「为什么我没看到好友 X 的帖」的投诉激增。这个二阶效应怎么来的？怎么缓解？</summary>
+<div class="answer">
+<p><strong>怎么来的</strong>：时间序下「关注即必达」，用户有稳定心智。切到排序流后，模型按预测参与度筛选/降权，<em>低互动好友的帖被埋掉</em>；用户不知排序存在，只觉「明明关注了却没看到」。这是排序流的固有代价：<strong>用整体参与度的提升，换个体可预测性与信任的下降</strong>。</p>
+<p><strong>缓解</strong>：① 给强关系/明确订阅保底曝光位；② 提供<em>「最新」时间序入口</em>作为可切换视图（Twitter/Instagram 都做了）；③ 排序加<em>多样性与覆盖率</em>约束，别让头部账号霸屏；④ 产品上明示「为你推荐 vs 最新」。本质是承认离线参与度指标 ≠ 用户信任，需生态侧指标兜底（呼应 Day 13 的茧房讨论）。</p>
+</div>
+</details>
+
+<details>
+<summary>5. 估算：1 亿用户、人均 800 条有界 timeline、每条存 8 字节 tweet_id。光 timeline cache 要多少内存？这个数字告诉你什么架构含义？</summary>
+<div class="answer">
+<p><strong>朴素估算</strong>：1e8 用户 × 800 条 × 8 字节 ≈ <strong>640 GB</strong> 仅 id 裸数据。但 Redis sorted set 每个元素还要存 score（8 字节 double）+ 跳表/字典的指针开销，实际<em>每元素 50~100 字节量级</em>，整体膨胀到 <strong>数 TB</strong>。</p>
+<p><strong>架构含义</strong>：① 单机放不下 → timeline cache 必须<em>分片</em>（按 uid 哈希，呼应 Day 4）；② 这还只是 id——<strong>幸好没存正文</strong>，否则 800 × 几 KB × 1e8 = PB 级，这就是「只存 id + hydrate」的硬约束来源；③ 内存太贵 → <em>活跃度感知</em>和<em>分层</em>（热放内存、冷回落 Cassandra）不是优化是必需；④ 也解释了有界 800 为何重要——它直接决定缓存层总内存预算，翻倍上限就翻倍成本。</p>
+</div>
+</details>
+
+<div class="nav"><a href="index.html">← 回到 index</a></div>
+</div>
+</body></html>
