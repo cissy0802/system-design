@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 16 · 视频流系统 (Video Streaming) — System Design Bi-daily</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"SF Pro Display","Noto Sans SC",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
+.container{max-width:820px;margin:0 auto;padding:24px 20px 60px}
+header{padding:40px 0 28px;border-bottom:1px solid rgba(100,200,255,0.15);margin-bottom:32px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem}
+.tag{padding:3px 10px;border-radius:4px;background:rgba(100,200,255,0.12);color:#64c8ff;border:1px solid rgba(100,200,255,0.25)}
+.tag.diff{background:rgba(94,234,212,0.1);color:#5eead4;border-color:rgba(94,234,212,0.3)}
+.tag.day{background:rgba(255,180,80,0.1);color:#ffb450;border-color:rgba(255,180,80,0.25)}
+h1{font-size:1.75rem;font-weight:800;background:linear-gradient(135deg,#64c8ff 0%,#5eead4 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:0.5px;line-height:1.3}
+h1 .en{display:block;font-size:1rem;color:#7a8590;-webkit-text-fill-color:#7a8590;margin-top:6px;font-weight:500}
+h2{font-size:1.2rem;color:#5eead4;margin:36px 0 14px;padding-left:12px;border-left:3px solid #5eead4}
+h3{font-size:1rem;color:#64c8ff;margin:20px 0 10px;font-weight:600}
+p{margin:10px 0;color:#c8cfd6}
+ul,ol{margin:10px 0 10px 22px;color:#c8cfd6}
+li{margin:6px 0}
+strong{color:#e8eef5;font-weight:600}
+em{color:#5eead4;font-style:normal;font-weight:500}
+code{font-family:"SF Mono",Menlo,Consolas,monospace;background:rgba(100,200,255,0.1);color:#5eead4;padding:1px 6px;border-radius:3px;font-size:0.88em}
+pre{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:14px 16px;overflow-x:auto;margin:12px 0;font-family:"SF Mono",Menlo,Consolas,monospace;font-size:0.84rem;line-height:1.55;color:#c8cfd6}
+pre code{background:none;color:inherit;padding:0;font-size:1em}
+.mermaid{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:18px;margin:14px 0;text-align:center;overflow-x:auto;cursor:zoom-in;transition:border-color 0.15s}
+.mermaid:hover{border-color:rgba(100,200,255,0.4)}
+.mermaid svg{width:100%;max-width:100%;height:auto;min-height:280px}
+.lightbox{position:fixed;inset:0;background:rgba(8,12,18,0.96);z-index:9999;display:none;align-items:center;justify-content:center;padding:24px;cursor:grab;backdrop-filter:blur(4px);overflow:hidden}
+.lightbox.open{display:flex}
+.lightbox.dragging{cursor:grabbing}
+.lightbox svg{width:auto;height:auto;max-width:96vw;max-height:92vh;transform-origin:center center;will-change:transform}
+.lightbox .hint{position:fixed;top:16px;right:20px;font-size:0.78rem;color:#7a8590;font-family:"SF Mono",Menlo,monospace;pointer-events:none}
+.callout{background:rgba(255,180,80,0.06);border-left:3px solid #ffb450;padding:12px 14px;margin:14px 0;border-radius:4px;font-size:0.94rem}
+.callout strong{color:#ffb450}
+.tradeoff{background:rgba(100,200,255,0.05);border:1px solid rgba(100,200,255,0.2);border-radius:6px;padding:12px 14px;margin:12px 0;font-size:0.94rem}
+.case{background:rgba(94,234,212,0.05);border-left:3px solid #5eead4;padding:12px 14px;margin:12px 0;border-radius:4px;font-size:0.94rem}
+.case strong{color:#5eead4}
+.nav{margin-top:50px;padding-top:24px;border-top:1px solid rgba(100,200,255,0.15);text-align:center}
+.nav a{color:#64c8ff;text-decoration:none;font-size:0.92rem;padding:8px 16px;border:1px solid rgba(100,200,255,0.3);border-radius:4px;transition:all 0.15s}
+.nav a:hover{background:rgba(100,200,255,0.1)}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:0.9rem}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid rgba(100,200,255,0.15)}
+th{color:#64c8ff;font-weight:600;background:rgba(100,200,255,0.05)}
+details{background:rgba(100,200,255,0.04);border:1px solid rgba(100,200,255,0.18);border-radius:6px;padding:12px 16px;margin:10px 0;transition:all 0.15s}
+details:hover{border-color:rgba(100,200,255,0.35)}
+details[open]{background:rgba(94,234,212,0.05);border-color:rgba(94,234,212,0.3)}
+details summary{font-weight:600;color:#e8eef5;list-style:none;outline:none;cursor:pointer;display:flex;align-items:flex-start;gap:10px;font-size:0.96rem}
+details summary::-webkit-details-marker{display:none}
+details summary::before{content:'▶';color:#64c8ff;font-size:0.75em;transition:transform 0.2s;flex-shrink:0;margin-top:5px}
+details[open] summary::before{transform:rotate(90deg);color:#5eead4}
+details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
+details .answer ul,details .answer ol{margin:6px 0 6px 22px}
+@media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+</style>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({startOnLoad:true,theme:'base',flowchart:{useMaxWidth:true,htmlLabels:true,nodeSpacing:50,rankSpacing:60},themeVariables:{primaryColor:'#1a2530',primaryTextColor:'#e8eef5',primaryBorderColor:'#64c8ff',lineColor:'#5eead4',secondaryColor:'#0e1419',tertiaryColor:'#0a0f14',background:'#0a0f14',mainBkg:'#1a2530',secondBkg:'#0e1419',textColor:'#d4dae0',fontFamily:'-apple-system,"SF Pro Display",sans-serif',fontSize:'16px'}});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const lb=document.createElement('div');lb.className='lightbox';
+  lb.innerHTML='<span class="hint">scroll = zoom · drag = pan · Esc / click bg = close</span>';
+  document.body.appendChild(lb);
+  let scale=1,panX=0,panY=0,dragging=false,moved=false,lx=0,ly=0;
+  const apply=()=>{const s=lb.querySelector('svg');if(s)s.style.transform=`translate(${panX}px,${panY}px) scale(${scale})`};
+  const reset=()=>{scale=1;panX=0;panY=0};
+  const close=()=>{lb.classList.remove('open');const s=lb.querySelector('svg');if(s)s.remove();reset()};
+  document.addEventListener('click',e=>{
+    if(e.target.closest('.lightbox')){if(moved){moved=false;return}close();return}
+    const w=e.target.closest('.mermaid');if(!w)return;
+    const svg=w.querySelector('svg');if(!svg)return;
+    const c=svg.cloneNode(true);c.removeAttribute('style');
+    c.style.maxWidth='96vw';c.style.maxHeight='92vh';
+    lb.appendChild(c);lb.classList.add('open');reset();apply();
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+  lb.addEventListener('wheel',e=>{
+    if(!lb.classList.contains('open'))return;
+    e.preventDefault();
+    const svg=lb.querySelector('svg');if(!svg)return;
+    const ns=Math.max(0.3,Math.min(10,scale*(1-e.deltaY*0.002)));
+    const r=svg.getBoundingClientRect();
+    const cx=e.clientX-(r.left+r.width/2),cy=e.clientY-(r.top+r.height/2);
+    const k=ns/scale-1;panX-=cx*k;panY-=cy*k;scale=ns;apply();
+  },{passive:false});
+  lb.addEventListener('mousedown',e=>{
+    if(!lb.classList.contains('open'))return;
+    dragging=true;moved=false;lx=e.clientX;ly=e.clientY;lb.classList.add('dragging');e.preventDefault();
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    const dx=e.clientX-lx,dy=e.clientY-ly;
+    if(Math.abs(dx)+Math.abs(dy)>3)moved=true;
+    panX+=dx;panY+=dy;lx=e.clientX;ly=e.clientY;apply();
+  });
+  document.addEventListener('mouseup',()=>{dragging=false;lb.classList.remove('dragging')});
+});
+</script>
+</head><body><div class="container">
+
+<header>
+<div class="meta">
+<span class="tag day">Day 16</span>
+<span class="tag diff">Hard</span>
+<span class="tag">Video Streaming</span>
+<span class="tag">HLS/DASH</span>
+<span class="tag">CDN</span>
+<span class="tag">Transcoding</span>
+</div>
+<h1>视频流系统 — 2 亿 DAU 的点播，起播 2 秒、卡顿率 0.5% 以下<span class="en">Video Streaming: Transcoding Pipeline, Adaptive Bitrate, CDN Design, Playback Optimization</span></h1>
+</header>
+
+<h2>问题场景 + 需求约束</h2>
+<p>给一个 <strong>2 亿 DAU、峰值千万级并发播放</strong>的点播平台（Netflix、YouTube、Disney+）设计后端。聊天（Day 15）是<em>连接放大</em>，Feed（Day 14）是<em>读放大</em>，视频流则是<strong>带宽放大 + 计算放大</strong>的双重难题：单条 4K 流稳态约 15–25 Mbps，千万并发就是 <strong>百 Tbps 级</strong>出口带宽——比所有公网骨干能扛的还大，<em>不可能从中心机房直接发</em>。同时一部 2 小时电影要转出几十个码率/分辨率/编码格式的版本，是重 CPU/GPU 作业。难点不在「存视频」，而在<strong>怎么把同一内容用最省带宽的方式，在用户网络波动下流畅地推到全球每块屏幕上</strong>。</p>
+<ul>
+<li><strong>规模</strong>：2 亿 DAU，峰值并发千万级；片库百万小时；每条片源转码后膨胀成几十个版本，存储 PB 级。</li>
+<li><strong>带宽</strong>：出口峰值 <strong>数十~上百 Tbps</strong>——这是核心约束，决定了必须自建/嵌入 CDN，而非中心发流。</li>
+<li><strong>体验 SLO</strong>：起播时间（startup / TTFF）p90 &lt; 2s；<strong>卡顿率（rebuffer ratio）&lt; 0.5%</strong>；播放失败率 &lt; 0.1%——卡顿和起播慢是流失头号原因。</li>
+<li><strong>异构</strong>：手机 / TV / Web / 老设备，编码（H.264/HEVC/AV1）、分辨率、网络（5G~弱网 1Mbps）全谱覆盖。</li>
+<li><strong>非目标</strong>：点播不要求超低延迟（几秒缓冲反而是优势）；直播才需把端到端压到 2–5s（见扩展）。</li></ul>
+
+<h2>高层架构</h2>
+<p>关键是<strong>把「上传转码」和「播放分发」两条路彻底分开</strong>。左侧是<em>离线/异步</em>的转码 pipeline：片源切成小块、并行编码成多码率梯队、打包成 HLS/DASH、写入对象存储——慢没关系，一次转码亿次播放。右侧是<em>在线</em>的播放路径：客户端先拿 manifest（清单），再按网络状况逐段拉 segment；99% 的字节由 <strong>CDN 边缘</strong>命中，<em>源站只在边缘 miss 时回源</em>。控制面（播放 API、DRM 发证、推荐）只传元数据，不碰视频字节。</p>
+<div class="mermaid">
+graph LR
+  UP[创作者/片方上传] --> ING[Ingest 接入]
+  ING --> PIPE[转码 Pipeline<br/>切块·并行编码·QC·打包]
+  PIPE --> OBJ[(对象存储 S3<br/>HLS/DASH segments)]
+  OBJ -->|预推热门| EDGE[CDN 边缘<br/>嵌入 ISP 机房]
+  subgraph 播放路径
+    CLI[播放器<br/>ABR 引擎] -->|1 取 manifest| API[播放 API]
+    CLI -->|2 逐段拉流| EDGE
+    EDGE -.miss 回源.-> OBJ
+    CLI -->|DRM 发证| DRM[License Server]
+  end
+  classDef off fill:#1a1a30,stroke:#ffb450,color:#e8eef5
+  classDef on fill:#0e2030,stroke:#5eead4,color:#e8eef5
+  classDef origin fill:#2a1530,stroke:#ff7ab6,color:#e8eef5
+  class ING,PIPE off
+  class CLI,API,EDGE,DRM on
+  class OBJ origin
+</div>
+<p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">左侧离线转码（一次），右侧在线播放（亿次）；带宽全压在 CDN 边缘，源站只兜底</p>
+
+<h2>关键技术点</h2>
+
+<h3>1. 转码 Pipeline 与码率梯队 — 固定梯队省 CPU，内容自适应省带宽</h3>
+<p><strong>原理</strong>：同一片源必须转出一组 <em>(分辨率, 码率, 编码)</em> 组合，称为<strong>码率梯队（bitrate ladder）</strong>，让播放器按网速挑。片源先按 <em>shot/GOP 边界</em>切成几秒一块的 chunk，扔到几百~几千台机器<strong>并行编码</strong>，再做质量校验（QC）和打包。关键洞察：<strong>不同内容的压缩难度天差地别</strong>——动画/纯色画面 1Mbps 就完美，体育/爆炸场面 8Mbps 还糊。用一刀切的固定梯队，简单内容浪费带宽、复杂内容质量不够。</p>
+<table>
+<thead><tr><th>方案</th><th>做法</th><th>代价</th><th>带宽收益</th></tr></thead>
+<tbody>
+<tr><td><strong>固定梯队</strong></td><td>所有片用同一组码率（如 235k→5800k 固定档）</td><td>简单、转码快</td><td>基线</td></tr>
+<tr><td><strong>Per-Title</strong></td><td>按整片复杂度选最优梯队（凸包 convex hull）</td><td>需先做复杂度分析</td><td>↓~20%+</td></tr>
+<tr><td><strong>Per-Shot</strong></td><td>逐镜头选分辨率/QP，VMAF 最优</td><td>编码单元×10，算力暴涨</td><td>↓~30%</td></tr>
+</tbody></table>
+<div class="tradeoff">
+<strong>Trade-off：</strong>带宽是视频平台最大成本，<em>转码算力是一次性、带宽是永久性</em>，所以「多花 CPU 换永久省带宽」几乎总是划算——这正是 per-title / per-shot 的逻辑。但代价是 pipeline 复杂度：per-shot 要先跑分析编码再跑正式编码，编码单元数量级上升，调度/重试/QC 全都更难。质量度量必须用 <strong>VMAF</strong>（感知质量，与人眼相关性 0.9+），而不是 PSNR，否则「省了码率但用户觉得糊」。</p></div>
+<pre><code># 并行分块转码（伪代码）
+chunks = split_by_shot(source)            # 按镜头/GOP 边界切，保证可独立解码
+ladder = per_title_ladder(source)         # 复杂度分析 → 凸包选码率档
+for c in chunks:                          # fan-out 到数百 worker
+    for rung in ladder:
+        enqueue(encode_task(c, rung))     # (chunk, 分辨率, 码率, codec)
+# 全部完成后 reduce：拼接 + QC(VMAF 抽检) + 打包 HLS/DASH
+assemble_and_package(wait_all())          # 任一 chunk 失败只需重跑那一块
+</code></pre>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Netflix Per-Title / Dynamic Optimizer</strong>：2015 推出 per-title，后演进到 per-shot「动态优化器」，公开数据 x264/VP9/x265 平均省 <strong>28%/38%/34%</strong> 码率（同质量）。</li>
+<li><strong>Netflix VMAF</strong>：自研感知质量指标并开源，成为行业转码质量事实标准。</li>
+<li><strong>YouTube</strong>：海量 UGC，上传即先转低分辨率快速可播，再后台补转高码率/AV1；热门视频才值得花 AV1 重编。</li>
+<li><strong>Netflix 微服务化 pipeline</strong>：把单体编码系统重构为微服务，提升弹性与可扩展（TechBlog「Rebuilding Netflix Video Processing Pipeline」）。</li>
+</ul></div>
+
+<h3>2. 自适应码率 ABR — 测带宽够快但抖，看缓冲稳但起播慢</h3>
+<p><strong>原理</strong>：网络时刻波动，播放器必须<strong>逐段决定下一段拉哪个码率</strong>，在「画质高」和「不卡顿」之间实时权衡。这是 <em>客户端</em> 的决策（服务端只提供多档 segment）。两大流派：<em>throughput-based</em> 用最近几段的下载速度预测下一段该选多高；<em>buffer-based</em>（如 BOLA）只看当前缓冲水位——缓冲多就升档、缓冲少就降档。现代播放器是<strong>混合</strong>：起播阶段缓冲空，靠 throughput 快速试探；稳态靠 buffer 抗抖动。</p>
+<div class="tradeoff">
+<strong>Trade-off：</strong>
+<ul>
+<li><strong>纯 throughput</strong>：✅ 反应快、起播快；❌ 带宽估计在共享网络下抖得厉害，容易频繁切档（画质忽高忽低，体验差）。</li>
+<li><strong>纯 buffer-based (BOLA)</strong>：✅ 稳、有理论最优保证；❌ 缓冲从 0 起的<em>起播阶段</em>没信息，决策保守、起播慢。</li>
+<li><strong>HLS vs DASH</strong>：HLS（Apple 生态、TS/CMAF）兼容性最好；DASH（codec 无关、开放标准）更灵活但 Apple 设备需绕。趋势是 <strong>CMAF</strong> 统一封装，一份 segment 同时喂 HLS 和 DASH，省一半存储。</li>
+</ul></div>
+<pre><code># 混合 ABR 选档（简化伪代码，每段决策一次）
+def pick_bitrate(buf_sec, recent_bw, ladder):
+    safe_bw = 0.85 * ema(recent_bw)          # 留安全余量，防抖
+    cap = max(r for r in ladder if r <= safe_bw)
+    if buf_sec < LOW:    return min(ladder)   # 缓冲告急 → 立刻保底，宁糊不卡
+    if buf_sec > HIGH:   return up_one(cap)   # 缓冲充足 → 大胆升档
+    return cap                                # 稳态跟随带宽
+</code></pre>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>dash.js / BOLA</strong>：BOLA（Lyapunov 优化）是参考实现的默认 ABR，纯靠缓冲水位做 Lyapunov 最优决策。</li>
+<li><strong>Netflix</strong>：客户端 ABR 结合网络预测与 per-title 梯队，目标最小化卡顿同时最大化 VMAF。</li>
+<li><strong>YouTube</strong>：默认 DASH，按设备/网络/省流量设置动态选档，移动端有「省流量」上限。</li>
+<li><strong>Twitch（直播）</strong>：低延迟模式下缩短 segment、收紧缓冲，牺牲一点抗抖换 2–5s 延迟。</li>
+</ul></div>
+
+<h3>3. CDN 设计 — 自建省钱但重投入，第三方快上但贵且不可控</h3>
+<p><strong>原理</strong>：视频 99%+ 的字节必须由<strong>离用户最近的边缘节点</strong>发出，源站只兜底。难点是<em>命中率</em>和<em>填充策略</em>：热门新剧上线，与其等用户 miss 再回源（瞬间打爆源站），不如<strong>提前 push 预热</strong>到边缘。冷门长尾内容则 pull-on-demand。Netflix 走到极致——把缓存服务器（Open Connect Appliance）<strong>直接放进 ISP 机房</strong>，视频根本不走公网骨干，ISP 和 Netflix 双赢（省 ISP 的 transit 费、给用户更快）。</p>
+<div class="tradeoff">
+<strong>Trade-off：</strong>
+<ul>
+<li><strong>第三方 CDN（Akamai/CloudFront/Fastly）</strong>：✅ 即开即用、全球覆盖；❌ 按 GB 计费在视频体量下<em>极贵</em>、缓存策略不可控、热剧首发易 miss。</li>
+<li><strong>自建 + 嵌入 ISP（Open Connect）</strong>：✅ 边际带宽成本趋近于零、完全可控、可预填充;❌ 巨额前期投入、要和数千 ISP 谈判部署、只有超大体量才回本。</li>
+<li><strong>Push 预热 vs Pull 回源</strong>：热门内容夜间低谷 push（已知会火，主动填）；长尾 pull（按需，省存储）。混合是标配。</li>
+</ul></div>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Netflix Open Connect</strong>：自建 CDN，把 OCA 部署进全球数千 ISP 与 IXP；分层为大容量 Storage Appliance（近全量片库）+ ISP 内 Edge（区域热门），夜间预填充。</li>
+<li><strong>YouTube（Google Global Cache）</strong>：同样把缓存节点放进 ISP，复用 Google 骨干网。</li>
+<li><strong>Disney+ / 多数厂商</strong>：用 multi-CDN（同时接多家），按实时质量/成本做 CDN 间调度切换。</li>
+<li><strong>Twitch</strong>：自建 PoP + 转推，直播对边缘 ingest 与转码就近性要求更高。</li>
+</ul></div>
+
+<h3>4. 播放与起播优化 — manifest 越全起播越慢，segment 越短切换越灵但开销越大</h3>
+<p><strong>原理</strong>：起播时间（TTFF）= DNS/TLS + 取 manifest + 拿 DRM 证 + 下载并解码<em>第一个 segment</em>。要压到 2s 内，每一步都要抠：连接预建（warm CDN connection）、manifest 瘦身、<strong>首段用低码率快速起播</strong>（先放出来再悄悄升档）、关键帧前置。<em>Segment 时长</em>是核心旋钮：短（2s）切换灵敏、起播快，但请求数多、编码效率低（关键帧密）；长（6–10s）效率高但 ABR 反应钝、起播慢。点播常用 <strong>4–6s</strong> 折中。</p>
+<div class="tradeoff">
+<strong>Trade-off：</strong>
+<ul>
+<li><strong>短 segment（2s）</strong>：✅ 起播快、ABR 灵敏、直播延迟低；❌ HTTP 请求翻几倍、关键帧多导致码率效率降。</li>
+<li><strong>长 segment（10s）</strong>：✅ 编码效率高、请求少；❌ 卡顿后恢复慢、ABR 切档迟钝。</li>
+<li><strong>起播保守 vs 激进</strong>：首段选最低档→起播最快但首屏糊；首段按估测带宽→首屏清晰但偶尔起播慢。多数选「先低再升」。</li>
+</ul></div>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Netflix</strong>：app 启动即预连 CDN、预取 manifest，点开瞬间首段已在路上；首段低码率秒开再升。</li>
+<li><strong>YouTube</strong>：预连接 + 首段优先，移动端起播常 &lt;1s；预测性预取下一个可能点击的视频。</li>
+<li><strong>Apple LL-HLS</strong>：用部分段（partial segment）+ 预加载提示把直播延迟压到 2s 级，同时保留 HLS ABR。</li>
+</ul></div>
+
+<h2>扩展与优化（增长后怎么办）</h2>
+<ul>
+<li><strong>直播（Live）</strong>：转码必须<em>实时</em>（编码慢于播放就崩），上 <strong>LL-HLS / 低延迟 DASH</strong>，靠 chunked CMAF + chunked transfer 把段内小块边编边发，端到端 2–5s。</li>
+<li><strong>新编码红利</strong>：H.264→HEVC→AV1 逐代省 ~30–50% 码率，但编码贵、老设备不支持解码——只对<em>高频热门</em>内容值得花 AV1 重编，长尾留 H.264。</li>
+<li><strong>多 CDN 调度</strong>：实时按各 CDN 的卡顿率/成本/可用性做请求级路由，单 CDN 故障自动切换。</li>
+<li><strong>QoE 闭环</strong>：客户端持续上报起播/卡顿/切档事件 → 实时大盘 → 反哺 ABR 调参与 CDN 调度，体验问题分钟级定位。</li>
+<li><strong>存储分层</strong>：热门版本留 SSD/边缘，冷门长尾沉到廉价对象存储甚至「按需转码」（首次播放才生成稀有版本）。</li>
+</ul>
+
+<h2>常见陷阱 + 面试问题</h2>
+<div class="callout"><strong>1. 用中心机房直接发流。</strong> 千万并发 × 几 Mbps = 百 Tbps，没有任何中心出口扛得住——<em>CDN/边缘不是优化，是前提</em>。面试不提 CDN 直接出局。</div>
+<div class="callout"><strong>2. ABR 放服务端。</strong> 只有客户端实时知道自己的缓冲水位和瞬时带宽，ABR 决策必须在播放器侧；服务端只负责提供多档 segment。</div>
+<div class="callout"><strong>3. 用一刀切固定码率梯队。</strong> 简单内容浪费带宽、复杂内容质量不够。资深答法要点出 per-title/per-shot + VMAF。</div>
+<div class="callout"><strong>4. 忽略起播与卡顿指标。</strong> 用户流失主因是「打不开/老转圈」，不是「不够清晰」。SLO 要锚定 TTFF 和 rebuffer ratio，而非平均码率。</div>
+<p><strong>高频追问：</strong>① 估算千万并发的出口带宽与一部电影的转码/存储成本量级。② 一段视频怎么从上传走到能在全球播放？画出 pipeline。③ ABR throughput-based 与 buffer-based 各自失效场景，怎么混合？④ 新剧首发如何避免回源风暴？⑤ 点播 vs 直播架构差异在哪（转码实时性、延迟、缓冲策略）？</p>
+
+<h2>深入资源</h2>
+<ul>
+<li><strong>Netflix TechBlog — <a href="https://netflixtechblog.com/per-title-encode-optimization-7e99442b62a2">Per-Title Encode Optimization</a></strong>：内容自适应梯队与凸包的开山之作。</li>
+<li><strong>Netflix TechBlog — <a href="https://netflixtechblog.com/dynamic-optimizer-a-perceptual-video-encoding-optimization-framework-e19f1e3a277f">Dynamic Optimizer（per-shot）</a></strong>：逐镜头编码优化框架。</li>
+<li><strong>Netflix TechBlog — <a href="https://netflixtechblog.com/toward-a-better-quality-metric-for-the-video-community-7ed94e752a30">VMAF 感知质量指标</a></strong>：为什么用 VMAF 而非 PSNR。</li>
+<li><strong>Netflix TechBlog — <a href="https://netflixtechblog.com/rebuilding-netflix-video-processing-pipeline-with-microservices-4e5e6310e359">Rebuilding Video Processing Pipeline with Microservices</a></strong>：转码 pipeline 工程化。</li>
+<li><strong>Netflix <a href="https://openconnect.netflix.com/">Open Connect</a></strong> + Apple <a href="https://developer.apple.com/streaming/">HTTP Live Streaming</a>：自建 CDN 与 HLS/LL-HLS 官方文档。</li>
+</ul>
+
+<h2>深入思考（点击展开答案）</h2>
+
+<details>
+<summary>1. 估算：1000 万并发、平均 4Mbps，需要多少出口带宽？为什么这个数字本身就排除了「中心机房发流」？</summary>
+<div class="answer">
+<p>1000 万 × 4 Mbps = <strong>4×10⁷ Mbps = 40 Tbps</strong>（峰值 4K 更多，可达上百 Tbps）。对比：单个超大数据中心的总出口通常也就几 Tbps 到十几 Tbps 量级；全球海缆某条干线也就 Tbps 级。40 Tbps 意味着你需要把流量<em>摊到全球成百上千个边缘点</em>，每个点扛几十~几百 Gbps，没有任何单一中心能聚合这么大出口。这就是为什么 CDN 是<strong>架构前提而非优化</strong>——而且按第三方 CDN 的 GB 单价，这个量级的带宽费会吞掉利润，逼出 Netflix 自建 Open Connect 的经济动机。算成本时记住：<em>转码是一次性 CPU，带宽是永久性月费</em>，所以宁可多花算力换永久带宽。</p>
+</div>
+</details>
+
+<details>
+<summary>2. Per-shot 编码把编码单元数量级抬高了，pipeline 复杂度暴涨。这笔账为什么 Netflix 划算，但对一个新创业公司可能不划算？</summary>
+<div class="answer">
+<p>关键是<strong>转码成本 vs 带宽节省的摊销比</strong>。Netflix 一部热剧会被播放上亿次，per-shot 省 30% 码率 = 永久省 30% 的海量带宽费，一次性多花的编码算力被亿次播放摊到可忽略。创业公司两点不同：① <em>播放量低</em>，省下的带宽绝对值小，摊不平额外编码成本；② <em>工程复杂度</em>——per-shot 要先跑分析编码、维护凸包、海量编码单元的调度/重试/QC，是个专门团队的活。所以理性顺序是：先固定梯队跑起来 → 量大了上 per-title（性价比拐点）→ 头部内容才上 per-shot。这也是典型的「<em>过早优化</em>」反例：在 PMF 之前烧钱做 per-shot，省的带宽还不够付工程师工资。</p>
+</div>
+</details>
+
+<details>
+<summary>3. 一个用户在地铁里网络从 50Mbps 骤降到 1Mbps，再恢复。纯 throughput ABR 和纯 buffer-based ABR 各会怎么表现？为什么混合更好？</summary>
+<div class="answer">
+<p><strong>纯 throughput</strong>：骤降瞬间它仍按「上一段 50M」选了高码率，这一段下不完→缓冲耗尽→<em>卡顿</em>；恢复后又激进升档，再遇抖动再卡，画质忽高忽低。<strong>纯 buffer-based（BOLA）</strong>：只看缓冲水位，骤降时缓冲开始掉它才反应、平滑降档，抗抖更好；但代价是<em>反应滞后</em>，且起播阶段缓冲从 0 起、没历史信息，决策保守、起播慢。<strong>混合</strong>取两者长：<em>起播阶段</em>缓冲空，用 throughput 快速试探把首屏拉起来；<em>稳态</em>切到 buffer-based 抗抖动；并对带宽估计留安全余量（如 ×0.85）防止贴边导致频繁卡。本质是「不同阶段信息量不同，用当下最可靠的信号」。</p>
+</div>
+</details>
+
+<details>
+<summary>4. 一部万众期待的新剧周五晚 8 点上线，瞬间几百万人点开。如果纯靠 pull-on-demand 会发生什么？怎么防？</summary>
+<div class="answer">
+<p>纯 pull：新剧的 segment 还没在任何边缘节点，几百万请求同时 miss → 全部<strong>回源</strong> → 源站和回源链路被瞬间打爆（这是缓存版的 thundering herd / 雪崩，见 Day 2）。结果：起播超时、大面积播放失败，正好在最该稳的时刻崩。<strong>防法</strong>：① <em>Push 预热</em>——已知会火，上线前夜间低谷把全部码率版本主动预填到全球边缘（Netflix Open Connect 的核心打法）；② 回源加 <em>single-flight</em>，同一 segment 只放一个回源请求，其余等待；③ 边缘<em>分层</em>，区域中间层先扛一道再到源站，收敛回源扇出；④ 上线<em>分批放量</em>或预告倒计时打散点击峰值。核心思想和缓存预热一致：<em>可预测的热点要主动填，别等 miss</em>。</p>
+</div>
+</details>
+
+<details>
+<summary>5. 点播追求「多缓冲更流畅」，直播追求「低延迟」，这对缓冲策略是直接矛盾的。LL-HLS 怎么在不放弃 HLS 的 ABR 与 CDN 兼容性的前提下压低延迟？</summary>
+<div class="answer">
+<p>矛盾在于：缓冲是抗抖动的弹药，但缓冲越深、离直播现场越远。传统 HLS 要等一个完整 segment（如 6s）生成并写入才能被拉取，光这一步就累积 segment 时长的延迟。<strong>LL-HLS 的破法</strong>：把 segment 再切成 <em>partial segment（部分段，几百毫秒）</em>，编码器边编边发、CDN 用 chunked transfer 边收边转发，播放器不必等整段完成就能拿到最新小块——延迟从「整段」降到「小块」级。同时用 <em>preload hint / blocking playlist reload</em> 让播放器精准预取下一小块、避免轮询空转。关键妙处是它仍是 <strong>HTTP + HLS 框架</strong>：复用现有 CDN 缓存、复用 ABR 多码率机制，不像 WebRTC 那样另起一套不可缓存的实时通道。代价是请求更频繁、对 CDN 的 chunked transfer 支持有要求，且缓冲薄了抗抖动余量变小——本质还是在「延迟 vs 流畅」上挪了个新平衡点，而非消灭矛盾。</p>
+</div>
+</details>
+
+<div class="nav"><a href="index.html">← 回到 index</a></div>
+</div>
+</body></html>

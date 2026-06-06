@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 16 · Video Streaming — System Design Bi-daily</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"SF Pro Display","Noto Sans SC",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
+.container{max-width:820px;margin:0 auto;padding:24px 20px 60px}
+header{padding:40px 0 28px;border-bottom:1px solid rgba(100,200,255,0.15);margin-bottom:32px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem}
+.tag{padding:3px 10px;border-radius:4px;background:rgba(100,200,255,0.12);color:#64c8ff;border:1px solid rgba(100,200,255,0.25)}
+.tag.diff{background:rgba(94,234,212,0.1);color:#5eead4;border-color:rgba(94,234,212,0.3)}
+.tag.day{background:rgba(255,180,80,0.1);color:#ffb450;border-color:rgba(255,180,80,0.25)}
+h1{font-size:1.75rem;font-weight:800;background:linear-gradient(135deg,#64c8ff 0%,#5eead4 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:0.5px;line-height:1.3}
+h1 .en{display:block;font-size:1rem;color:#7a8590;-webkit-text-fill-color:#7a8590;margin-top:6px;font-weight:500}
+h2{font-size:1.2rem;color:#5eead4;margin:36px 0 14px;padding-left:12px;border-left:3px solid #5eead4}
+h3{font-size:1rem;color:#64c8ff;margin:20px 0 10px;font-weight:600}
+p{margin:10px 0;color:#c8cfd6}
+ul,ol{margin:10px 0 10px 22px;color:#c8cfd6}
+li{margin:6px 0}
+strong{color:#e8eef5;font-weight:600}
+em{color:#5eead4;font-style:normal;font-weight:500}
+code{font-family:"SF Mono",Menlo,Consolas,monospace;background:rgba(100,200,255,0.1);color:#5eead4;padding:1px 6px;border-radius:3px;font-size:0.88em}
+pre{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:14px 16px;overflow-x:auto;margin:12px 0;font-family:"SF Mono",Menlo,Consolas,monospace;font-size:0.84rem;line-height:1.55;color:#c8cfd6}
+pre code{background:none;color:inherit;padding:0;font-size:1em}
+.mermaid{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:18px;margin:14px 0;text-align:center;overflow-x:auto;cursor:zoom-in;transition:border-color 0.15s}
+.mermaid:hover{border-color:rgba(100,200,255,0.4)}
+.mermaid svg{width:100%;max-width:100%;height:auto;min-height:280px}
+.lightbox{position:fixed;inset:0;background:rgba(8,12,18,0.96);z-index:9999;display:none;align-items:center;justify-content:center;padding:24px;cursor:grab;backdrop-filter:blur(4px);overflow:hidden}
+.lightbox.open{display:flex}
+.lightbox.dragging{cursor:grabbing}
+.lightbox svg{width:auto;height:auto;max-width:96vw;max-height:92vh;transform-origin:center center;will-change:transform}
+.lightbox .hint{position:fixed;top:16px;right:20px;font-size:0.78rem;color:#7a8590;font-family:"SF Mono",Menlo,monospace;pointer-events:none}
+.callout{background:rgba(255,180,80,0.06);border-left:3px solid #ffb450;padding:12px 14px;margin:14px 0;border-radius:4px;font-size:0.94rem}
+.callout strong{color:#ffb450}
+.tradeoff{background:rgba(100,200,255,0.05);border:1px solid rgba(100,200,255,0.2);border-radius:6px;padding:12px 14px;margin:12px 0;font-size:0.94rem}
+.case{background:rgba(94,234,212,0.05);border-left:3px solid #5eead4;padding:12px 14px;margin:12px 0;border-radius:4px;font-size:0.94rem}
+.case strong{color:#5eead4}
+.nav{margin-top:50px;padding-top:24px;border-top:1px solid rgba(100,200,255,0.15);text-align:center}
+.nav a{color:#64c8ff;text-decoration:none;font-size:0.92rem;padding:8px 16px;border:1px solid rgba(100,200,255,0.3);border-radius:4px;transition:all 0.15s}
+.nav a:hover{background:rgba(100,200,255,0.1)}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:0.9rem}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid rgba(100,200,255,0.15)}
+th{color:#64c8ff;font-weight:600;background:rgba(100,200,255,0.05)}
+details{background:rgba(100,200,255,0.04);border:1px solid rgba(100,200,255,0.18);border-radius:6px;padding:12px 16px;margin:10px 0;transition:all 0.15s}
+details:hover{border-color:rgba(100,200,255,0.35)}
+details[open]{background:rgba(94,234,212,0.05);border-color:rgba(94,234,212,0.3)}
+details summary{font-weight:600;color:#e8eef5;list-style:none;outline:none;cursor:pointer;display:flex;align-items:flex-start;gap:10px;font-size:0.96rem}
+details summary::-webkit-details-marker{display:none}
+details summary::before{content:'▶';color:#64c8ff;font-size:0.75em;transition:transform 0.2s;flex-shrink:0;margin-top:5px}
+details[open] summary::before{transform:rotate(90deg);color:#5eead4}
+details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
+details .answer ul,details .answer ol{margin:6px 0 6px 22px}
+@media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+</style>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({startOnLoad:true,theme:'base',flowchart:{useMaxWidth:true,htmlLabels:true,nodeSpacing:50,rankSpacing:60},themeVariables:{primaryColor:'#1a2530',primaryTextColor:'#e8eef5',primaryBorderColor:'#64c8ff',lineColor:'#5eead4',secondaryColor:'#0e1419',tertiaryColor:'#0a0f14',background:'#0a0f14',mainBkg:'#1a2530',secondBkg:'#0e1419',textColor:'#d4dae0',fontFamily:'-apple-system,"SF Pro Display",sans-serif',fontSize:'16px'}});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const lb=document.createElement('div');lb.className='lightbox';
+  lb.innerHTML='<span class="hint">scroll = zoom · drag = pan · Esc / click bg = close</span>';
+  document.body.appendChild(lb);
+  let scale=1,panX=0,panY=0,dragging=false,moved=false,lx=0,ly=0;
+  const apply=()=>{const s=lb.querySelector('svg');if(s)s.style.transform=`translate(${panX}px,${panY}px) scale(${scale})`};
+  const reset=()=>{scale=1;panX=0;panY=0};
+  const close=()=>{lb.classList.remove('open');const s=lb.querySelector('svg');if(s)s.remove();reset()};
+  document.addEventListener('click',e=>{
+    if(e.target.closest('.lightbox')){if(moved){moved=false;return}close();return}
+    const w=e.target.closest('.mermaid');if(!w)return;
+    const svg=w.querySelector('svg');if(!svg)return;
+    const c=svg.cloneNode(true);c.removeAttribute('style');
+    c.style.maxWidth='96vw';c.style.maxHeight='92vh';
+    lb.appendChild(c);lb.classList.add('open');reset();apply();
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+  lb.addEventListener('wheel',e=>{
+    if(!lb.classList.contains('open'))return;
+    e.preventDefault();
+    const svg=lb.querySelector('svg');if(!svg)return;
+    const ns=Math.max(0.3,Math.min(10,scale*(1-e.deltaY*0.002)));
+    const r=svg.getBoundingClientRect();
+    const cx=e.clientX-(r.left+r.width/2),cy=e.clientY-(r.top+r.height/2);
+    const k=ns/scale-1;panX-=cx*k;panY-=cy*k;scale=ns;apply();
+  },{passive:false});
+  lb.addEventListener('mousedown',e=>{
+    if(!lb.classList.contains('open'))return;
+    dragging=true;moved=false;lx=e.clientX;ly=e.clientY;lb.classList.add('dragging');e.preventDefault();
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    const dx=e.clientX-lx,dy=e.clientY-ly;
+    if(Math.abs(dx)+Math.abs(dy)>3)moved=true;
+    panX+=dx;panY+=dy;lx=e.clientX;ly=e.clientY;apply();
+  });
+  document.addEventListener('mouseup',()=>{dragging=false;lb.classList.remove('dragging')});
+});
+</script>
+</head><body><div class="container">
+
+<header>
+<div class="meta">
+<span class="tag day">Day 16</span>
+<span class="tag diff">Hard</span>
+<span class="tag">Video Streaming</span>
+<span class="tag">HLS/DASH</span>
+<span class="tag">CDN</span>
+<span class="tag">Transcoding</span>
+</div>
+<h1>Video Streaming — 200M DAU VOD, 2s Startup, &lt;0.5% Rebuffer<span class="en">Transcoding Pipeline, Adaptive Bitrate, CDN Design, Playback Optimization</span></h1>
+</header>
+
+<h2>Scenario + Requirements</h2>
+<p>Design the backend for a <strong>200M DAU video-on-demand platform with tens of millions of concurrent plays</strong> (Netflix, YouTube, Disney+). Chat (Day 15) is <em>connection amplification</em>; Feed (Day 14) is <em>read amplification</em>; video streaming is the double whammy of <strong>bandwidth + compute amplification</strong>: one steady 4K stream is ~15–25 Mbps, so ten million concurrent is <strong>hundreds of Tbps</strong> of egress — larger than any backbone can carry, so you <em>cannot serve it from a central data center</em>. Meanwhile a 2-hour movie must be transcoded into dozens of bitrate/resolution/codec variants — a heavy CPU/GPU job. The hard part isn't "storing video," it's <strong>pushing the same content to every screen worldwide, using the least bandwidth, smoothly, under fluctuating networks</strong>.</p>
+<ul>
+<li><strong>Scale</strong>: 200M DAU, tens of millions concurrent at peak; catalog of millions of hours; each source explodes into dozens of variants → PB-scale storage.</li>
+<li><strong>Bandwidth</strong>: peak egress <strong>tens to hundreds of Tbps</strong> — the core constraint, forcing self-built/embedded CDN rather than central serving.</li>
+<li><strong>Experience SLO</strong>: startup time (TTFF) p90 &lt; 2s; <strong>rebuffer ratio &lt; 0.5%</strong>; play failure &lt; 0.1% — buffering and slow startup are the #1 churn drivers.</li>
+<li><strong>Heterogeneity</strong>: phone / TV / Web / old devices; codecs (H.264/HEVC/AV1), resolutions, networks (5G down to 1 Mbps) — full spectrum.</li>
+<li><strong>Non-goal</strong>: VOD doesn't need ultra-low latency (a few seconds of buffer is an asset); only live needs to push end-to-end down to 2–5s (see Extensions).</li></ul>
+
+<h2>High-Level Architecture</h2>
+<p>The key is to <strong>fully separate "upload+transcode" from "playback+delivery."</strong> The left is the <em>offline/async</em> transcoding pipeline: chop the source into chunks, encode the bitrate ladder in parallel, package as HLS/DASH, write to object storage — slow is fine, transcode once, play a billion times. The right is the <em>online</em> playback path: the client fetches the manifest, then pulls segments according to network conditions; 99% of bytes are served by <strong>CDN edge</strong>, with <em>origin hit only on edge miss</em>. The control plane (playback API, DRM licensing, recommendations) carries metadata only, never video bytes.</p>
+<div class="mermaid">
+graph LR
+  UP[Creator/Studio upload] --> ING[Ingest]
+  ING --> PIPE[Transcode Pipeline<br/>chunk·parallel encode·QC·package]
+  PIPE --> OBJ[(Object store S3<br/>HLS/DASH segments)]
+  OBJ -->|prefill popular| EDGE[CDN Edge<br/>embedded in ISPs]
+  subgraph Playback Path
+    CLI[Player<br/>ABR engine] -->|1 get manifest| API[Playback API]
+    CLI -->|2 pull segments| EDGE
+    EDGE -.miss to origin.-> OBJ
+    CLI -->|DRM license| DRM[License Server]
+  end
+  classDef off fill:#1a1a30,stroke:#ffb450,color:#e8eef5
+  classDef on fill:#0e2030,stroke:#5eead4,color:#e8eef5
+  classDef origin fill:#2a1530,stroke:#ff7ab6,color:#e8eef5
+  class ING,PIPE off
+  class CLI,API,EDGE,DRM on
+  class OBJ origin
+</div>
+<p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">Left: offline transcode (once). Right: online playback (a billion times). All bandwidth on the CDN edge; origin only backstops.</p>
+
+<h2>Key Technical Points</h2>
+
+<h3>1. Transcoding Pipeline & Bitrate Ladder — fixed ladder saves CPU, content-adaptive saves bandwidth</h3>
+<p><strong>Principle</strong>: each source must be transcoded into a set of <em>(resolution, bitrate, codec)</em> combos — the <strong>bitrate ladder</strong> — so the player can pick by network speed. The source is split into multi-second chunks at <em>shot/GOP boundaries</em>, fanned out to hundreds–thousands of machines for <strong>parallel encoding</strong>, then quality-checked (QC) and packaged. Key insight: <strong>compression difficulty varies wildly by content</strong> — animation/flat scenes are perfect at 1 Mbps, sports/explosions are still mushy at 8 Mbps. A one-size-fits-all fixed ladder wastes bandwidth on easy content and under-delivers quality on hard content.</p>
+<table>
+<thead><tr><th>Approach</th><th>How</th><th>Cost</th><th>Bandwidth gain</th></tr></thead>
+<tbody>
+<tr><td><strong>Fixed ladder</strong></td><td>Same bitrates for all titles (e.g. fixed 235k→5800k rungs)</td><td>Simple, fast transcode</td><td>baseline</td></tr>
+<tr><td><strong>Per-Title</strong></td><td>Pick optimal ladder per title's complexity (convex hull)</td><td>Needs complexity analysis</td><td>↓~20%+</td></tr>
+<tr><td><strong>Per-Shot</strong></td><td>Per-shot resolution/QP, VMAF-optimal</td><td>Encode units ×10, compute explodes</td><td>↓~30%</td></tr>
+</tbody></table>
+<div class="tradeoff">
+<strong>Trade-off:</strong> bandwidth is a video platform's biggest cost, and <em>transcode compute is one-time while bandwidth is forever</em>, so "spend more CPU to permanently save bandwidth" is almost always worth it — exactly the per-title / per-shot logic. The cost is pipeline complexity: per-shot runs an analysis encode before the production encode, the number of encode units jumps an order of magnitude, and scheduling/retries/QC all get harder. Quality must be measured with <strong>VMAF</strong> (perceptual, ~0.9+ correlation with human eyes), not PSNR, or you "save bitrate but users see mush."</p></div>
+<pre><code># Parallel chunked transcode (pseudo-code)
+chunks = split_by_shot(source)            # split at shot/GOP boundaries → independently decodable
+ladder = per_title_ladder(source)         # complexity analysis → convex hull picks rungs
+for c in chunks:                          # fan-out to hundreds of workers
+    for rung in ladder:
+        enqueue(encode_task(c, rung))     # (chunk, resolution, bitrate, codec)
+# after all done, reduce: concat + QC (VMAF spot-check) + package HLS/DASH
+assemble_and_package(wait_all())          # any failed chunk only needs that one re-run
+</code></pre>
+<div class="case">
+<strong>Real-world:</strong>
+<ul>
+<li><strong>Netflix Per-Title / Dynamic Optimizer</strong>: per-title launched 2015, evolved to per-shot "Dynamic Optimizer"; published x264/VP9/x265 average savings of <strong>28%/38%/34%</strong> at equal quality.</li>
+<li><strong>Netflix VMAF</strong>: in-house perceptual quality metric, open-sourced, now the de-facto industry standard for transcode quality.</li>
+<li><strong>YouTube</strong>: massive UGC — on upload, quickly transcode a low-res playable version, then backfill higher bitrates/AV1; only popular videos are worth re-encoding to AV1.</li>
+<li><strong>Netflix microservices pipeline</strong>: refactored the monolithic encoding system into microservices for elasticity and scale (TechBlog "Rebuilding Netflix Video Processing Pipeline").</li>
+</ul></div>
+
+<h3>2. Adaptive Bitrate (ABR) — throughput reacts fast but jitters, buffer-based is stable but starts slow</h3>
+<p><strong>Principle</strong>: networks fluctuate constantly, so the player must <strong>decide per segment which bitrate to pull next</strong>, balancing "high quality" vs "no rebuffering" in real time. This is a <em>client-side</em> decision (the server only offers multiple segment rungs). Two schools: <em>throughput-based</em> uses recent download speeds to predict how high to go; <em>buffer-based</em> (e.g. BOLA) looks only at the current buffer level — more buffer → go up, less buffer → go down. Modern players are <strong>hybrid</strong>: at startup the buffer is empty, so probe with throughput; in steady state use buffer to resist jitter.</p>
+<div class="tradeoff">
+<strong>Trade-off:</strong>
+<ul>
+<li><strong>Pure throughput</strong>: ✅ fast reaction, fast startup; ❌ bandwidth estimates jitter badly on shared networks, causing frequent rung switches (quality oscillates, poor experience).</li>
+<li><strong>Pure buffer-based (BOLA)</strong>: ✅ stable, with theoretical optimality; ❌ at startup the buffer is at 0 with no signal, so it's conservative and slow to start.</li>
+<li><strong>HLS vs DASH</strong>: HLS (Apple ecosystem, TS/CMAF) has the best compatibility; DASH (codec-agnostic, open standard) is more flexible but needs workarounds on Apple devices. The trend is <strong>CMAF</strong> unifying packaging — one segment feeds both HLS and DASH, halving storage.</li>
+</ul></div>
+<pre><code># Hybrid ABR rung selection (simplified, one decision per segment)
+def pick_bitrate(buf_sec, recent_bw, ladder):
+    safe_bw = 0.85 * ema(recent_bw)          # safety margin against jitter
+    cap = max(r for r in ladder if r <= safe_bw)
+    if buf_sec < LOW:    return min(ladder)   # buffer critical → drop to floor, mush over stall
+    if buf_sec > HIGH:   return up_one(cap)   # buffer healthy → step up boldly
+    return cap                                # steady state follows bandwidth
+</code></pre>
+<div class="case">
+<strong>Real-world:</strong>
+<ul>
+<li><strong>dash.js / BOLA</strong>: BOLA (Lyapunov optimization) is the reference player's default ABR, making Lyapunov-optimal decisions purely from buffer level.</li>
+<li><strong>Netflix</strong>: client ABR combines network prediction with the per-title ladder, aiming to minimize rebuffering while maximizing VMAF.</li>
+<li><strong>YouTube</strong>: default DASH, selecting rungs dynamically by device/network/data-saver settings, with a mobile data-saver cap.</li>
+<li><strong>Twitch (live)</strong>: low-latency mode shortens segments and tightens buffer, trading some jitter resistance for 2–5s latency.</li>
+</ul></div>
+
+<h3>3. CDN Design — self-built is cheap but heavy investment, third-party is fast to launch but expensive and uncontrollable</h3>
+<p><strong>Principle</strong>: 99%+ of video bytes must be served from the <strong>edge node nearest the user</strong>, with origin only as backstop. The hard parts are <em>hit rate</em> and <em>fill strategy</em>: when a hot new show launches, rather than wait for users to miss and hammer the origin, you <strong>push-prefill (warm)</strong> it to edges in advance. Cold long-tail content is pulled on demand. Netflix takes this to the extreme — placing cache servers (Open Connect Appliances) <strong>directly inside ISP facilities</strong>, so video never traverses the public backbone; ISP and Netflix both win (saves ISP transit fees, faster for users).</p>
+<div class="tradeoff">
+<strong>Trade-off:</strong>
+<ul>
+<li><strong>Third-party CDN (Akamai/CloudFront/Fastly)</strong>: ✅ instant, global coverage; ❌ per-GB pricing is <em>brutally expensive</em> at video volume, cache policy is uncontrollable, hot premieres miss easily.</li>
+<li><strong>Self-built + embedded ISP (Open Connect)</strong>: ✅ marginal bandwidth cost → near zero, fully controllable, pre-fillable; ❌ huge upfront investment, must negotiate deployment with thousands of ISPs, only pays off at massive scale.</li>
+<li><strong>Push prefill vs Pull on origin miss</strong>: push popular content during off-peak nights (known to be hot, fill proactively); pull long-tail on demand (save storage). Hybrid is standard.</li>
+</ul></div>
+<div class="case">
+<strong>Real-world:</strong>
+<ul>
+<li><strong>Netflix Open Connect</strong>: self-built CDN, OCAs deployed into thousands of ISPs and IXPs worldwide; tiered into large Storage Appliances (near-full catalog) + ISP-embedded Edge (regional hits), prefilled nightly.</li>
+<li><strong>YouTube (Google Global Cache)</strong>: similarly places cache nodes inside ISPs, reusing Google's backbone.</li>
+<li><strong>Disney+ / most providers</strong>: multi-CDN (several at once), scheduling/switching between CDNs by real-time quality/cost.</li>
+<li><strong>Twitch</strong>: self-built PoPs + relays; live demands more on edge ingest and transcode proximity.</li>
+</ul></div>
+
+<h3>4. Playback & Startup Optimization — fuller manifest means slower start, shorter segments switch better but cost more</h3>
+<p><strong>Principle</strong>: startup time (TTFF) = DNS/TLS + fetch manifest + get DRM license + download and decode the <em>first segment</em>. To get under 2s, squeeze every step: pre-warm connections (warm CDN connection), slim the manifest, <strong>start the first segment at a low bitrate</strong> (show something, then quietly step up), and front-load keyframes. <em>Segment duration</em> is the core knob: short (2s) switches responsively and starts fast but means more requests and lower coding efficiency (dense keyframes); long (6–10s) is efficient but makes ABR sluggish and startup slow. VOD usually settles on <strong>4–6s</strong>.</p>
+<div class="tradeoff">
+<strong>Trade-off:</strong>
+<ul>
+<li><strong>Short segment (2s)</strong>: ✅ fast startup, responsive ABR, low live latency; ❌ HTTP requests multiply, more keyframes lower coding efficiency.</li>
+<li><strong>Long segment (10s)</strong>: ✅ high coding efficiency, fewer requests; ❌ slow recovery after a stall, sluggish ABR switching.</li>
+<li><strong>Conservative vs aggressive startup</strong>: lowest rung first → fastest start but mushy first frame; rung by estimated bandwidth → crisp first frame but occasionally slow start. Most pick "low then step up."</li>
+</ul></div>
+<div class="case">
+<strong>Real-world:</strong>
+<ul>
+<li><strong>Netflix</strong>: app pre-connects to CDN and prefetches the manifest at launch, so the first segment is in flight the instant you click; low-bitrate first segment for instant start, then step up.</li>
+<li><strong>YouTube</strong>: pre-connect + first-segment priority, mobile startup often &lt;1s; predictively prefetches the next likely-clicked video.</li>
+<li><strong>Apple LL-HLS</strong>: uses partial segments + preload hints to push live latency to ~2s while keeping HLS ABR.</li>
+</ul></div>
+
+<h2>Extensions & Optimization (as you grow)</h2>
+<ul>
+<li><strong>Live</strong>: transcode must be <em>real-time</em> (encode slower than playback = collapse); adopt <strong>LL-HLS / low-latency DASH</strong> with chunked CMAF + chunked transfer to emit sub-segment chunks as they encode, end-to-end 2–5s.</li>
+<li><strong>New-codec dividend</strong>: H.264→HEVC→AV1 each saves ~30–50% bitrate, but encoding is costly and old devices can't decode it — only worth AV1 re-encoding for <em>high-frequency popular</em> content, leave the long tail on H.264.</li>
+<li><strong>Multi-CDN scheduling</strong>: route per request by each CDN's rebuffer/cost/availability in real time; auto-failover on single-CDN outage.</li>
+<li><strong>QoE loop</strong>: clients continuously report startup/rebuffer/switch events → real-time dashboards → feed back into ABR tuning and CDN scheduling, locating issues in minutes.</li>
+<li><strong>Storage tiering</strong>: keep popular variants on SSD/edge, sink long-tail to cheap object storage or even "transcode on demand" (generate rare variants only on first play).</li>
+</ul>
+
+<h2>Pitfalls + Interview Questions</h2>
+<div class="callout"><strong>1. Serving streams from a central data center.</strong> Ten million concurrent × a few Mbps = hundreds of Tbps — no central egress can carry it; <em>CDN/edge is not an optimization, it's a prerequisite</em>. Not mentioning CDN is an instant fail.</div>
+<div class="callout"><strong>2. Putting ABR on the server.</strong> Only the client knows its own buffer level and instantaneous bandwidth in real time; ABR must live in the player; the server only offers multiple segment rungs.</div>
+<div class="callout"><strong>3. One-size-fits-all fixed ladder.</strong> Wastes bandwidth on easy content, under-delivers on hard. A senior answer names per-title/per-shot + VMAF.</div>
+<div class="callout"><strong>4. Ignoring startup and rebuffer metrics.</strong> Users churn on "won't open / keeps spinning," not "not crisp enough." Anchor SLOs to TTFF and rebuffer ratio, not average bitrate.</div>
+<p><strong>Common follow-ups:</strong> ① Estimate the egress bandwidth for ten million concurrent, and the order-of-magnitude transcode/storage cost of one movie. ② How does a video go from upload to playable worldwide? Draw the pipeline. ③ Failure modes of throughput-based vs buffer-based ABR — how do you hybridize? ④ How do you avoid an origin storm on a hot premiere? ⑤ VOD vs live architectural differences (real-time transcode, latency, buffering strategy)?</p>
+
+<h2>Deep-Dive Resources</h2>
+<ul>
+<li><strong>Netflix TechBlog — <a href="https://netflixtechblog.com/per-title-encode-optimization-7e99442b62a2">Per-Title Encode Optimization</a></strong>: the seminal work on content-adaptive ladders and the convex hull.</li>
+<li><strong>Netflix TechBlog — <a href="https://netflixtechblog.com/dynamic-optimizer-a-perceptual-video-encoding-optimization-framework-e19f1e3a277f">Dynamic Optimizer (per-shot)</a></strong>: per-shot encoding optimization framework.</li>
+<li><strong>Netflix TechBlog — <a href="https://netflixtechblog.com/toward-a-better-quality-metric-for-the-video-community-7ed94e752a30">VMAF perceptual quality metric</a></strong>: why VMAF over PSNR.</li>
+<li><strong>Netflix TechBlog — <a href="https://netflixtechblog.com/rebuilding-netflix-video-processing-pipeline-with-microservices-4e5e6310e359">Rebuilding Video Processing Pipeline with Microservices</a></strong>: engineering the transcode pipeline.</li>
+<li><strong>Netflix <a href="https://openconnect.netflix.com/">Open Connect</a></strong> + Apple <a href="https://developer.apple.com/streaming/">HTTP Live Streaming</a>: self-built CDN and HLS/LL-HLS official docs.</li>
+</ul>
+
+<h2>Deep Thinking (click to expand)</h2>
+
+<details>
+<summary>1. Estimate: 10M concurrent, 4 Mbps average — how much egress? Why does that number alone rule out "serve from a central data center"?</summary>
+<div class="answer">
+<p>10M × 4 Mbps = <strong>4×10⁷ Mbps = 40 Tbps</strong> (peak 4K is more, up to hundreds of Tbps). For comparison: a single mega data center's total egress is typically a few to ~teens of Tbps; a major submarine cable trunk is also Tbps-class. 40 Tbps means you must <em>spread traffic across hundreds–thousands of edge points worldwide</em>, each carrying tens–hundreds of Gbps — no single center can aggregate that egress. That's why CDN is an <strong>architectural prerequisite, not an optimization</strong> — and at third-party CDN per-GB pricing, this bandwidth bill would eat all profit, the economic motive behind Netflix building Open Connect. When costing it, remember: <em>transcode is one-time CPU, bandwidth is a forever monthly bill</em>, so trade compute for permanent bandwidth.</p>
+</div>
+</details>
+
+<details>
+<summary>2. Per-shot encoding raises encode units by an order of magnitude, exploding pipeline complexity. Why is this worth it for Netflix but maybe not for a startup?</summary>
+<div class="answer">
+<p>It's about the <strong>amortization ratio of transcode cost vs bandwidth savings</strong>. A Netflix hit is played hundreds of millions of times; per-shot saving 30% bitrate = permanently saving 30% of enormous bandwidth, while the one-time extra encode compute is amortized to negligible across a billion plays. A startup differs on two fronts: ① <em>low play counts</em> — the absolute bandwidth saved is small and can't amortize the extra encode cost; ② <em>engineering complexity</em> — per-shot needs analysis encodes, convex-hull maintenance, and scheduling/retry/QC of a huge number of encode units, a dedicated team's job. So the rational order is: fixed ladder to ship → per-title once volume grows (the ROI inflection) → per-shot only for top content. This is a classic <em>premature optimization</em> anti-example: burning money on per-shot before PMF, the bandwidth saved won't even cover the engineers' salaries.</p>
+</div>
+</details>
+
+<details>
+<summary>3. A user on the subway drops from 50 Mbps to 1 Mbps, then recovers. How do pure-throughput vs pure-buffer ABR behave? Why is hybrid better?</summary>
+<div class="answer">
+<p><strong>Pure throughput</strong>: at the moment of the drop it still picks a high rung based on "last segment was 50M," that segment can't finish → buffer drains → <em>rebuffer</em>; on recovery it aggressively steps up, hits jitter, rebuffers again, quality oscillates. <strong>Pure buffer-based (BOLA)</strong>: it only watches buffer level, so on the drop it reacts as the buffer falls and steps down smoothly — better jitter resistance; but the cost is <em>lagging reaction</em>, and at startup the buffer is at 0 with no history, so it's conservative and slow to start. <strong>Hybrid</strong> takes both strengths: at <em>startup</em>, buffer is empty, use throughput to probe fast and get the first frame up; in <em>steady state</em>, switch to buffer-based for jitter resistance; and keep a safety margin on bandwidth estimates (e.g. ×0.85) so you don't ride the edge and rebuffer. The essence: "different phases carry different amounts of information — use the most reliable signal for the moment."</p>
+</div>
+</details>
+
+<details>
+<summary>4. A hugely anticipated show launches Friday 8pm; millions click instantly. What happens with pure pull-on-demand? How do you prevent it?</summary>
+<div class="answer">
+<p>Pure pull: the new show's segments aren't on any edge node yet, so millions of requests all miss → all go to <strong>origin</strong> → origin and the origin links are instantly hammered (this is the cache version of a thundering herd / avalanche, see Day 2). Result: startup timeouts, mass play failures — right when you most need stability. <strong>Prevention</strong>: ① <em>Push prefill</em> — known to be hot, prefill all bitrate variants to global edges during off-peak nights before launch (Netflix Open Connect's core play); ② add <em>single-flight</em> on origin, letting only one origin request per segment through while others wait; ③ <em>tier</em> the edge so a regional mid-tier absorbs a wave before origin, converging the origin fan-out; ④ <em>stagger</em> the launch with phased rollout or a countdown to spread the click peak. The core idea matches cache warming: <em>predictable hotspots should be filled proactively, don't wait for the miss</em>.</p>
+</div>
+</details>
+
+<details>
+<summary>5. VOD wants "deeper buffer = smoother," live wants "low latency" — directly opposed buffering strategies. How does LL-HLS lower latency without giving up HLS's ABR and CDN compatibility?</summary>
+<div class="answer">
+<p>The conflict: buffer is the ammunition against jitter, but deeper buffer means further behind the live edge. Traditional HLS must wait for a full segment (e.g. 6s) to be generated and written before it can be pulled — that step alone accumulates a segment's worth of latency. <strong>LL-HLS's trick</strong>: split a segment further into <em>partial segments (hundreds of ms)</em>; the encoder emits as it encodes, the CDN forwards via chunked transfer as it receives, and the player gets the latest small chunk without waiting for the whole segment — latency drops from "whole segment" to "chunk" level. It also uses <em>preload hints / blocking playlist reload</em> so the player precisely prefetches the next chunk and avoids polling churn. The key elegance: it's still an <strong>HTTP + HLS framework</strong> — reusing existing CDN caching and the multi-rung ABR mechanism, unlike WebRTC which spins up a separate, uncacheable real-time channel. The cost is more frequent requests, a CDN requirement for chunked transfer support, and a thinner buffer with less jitter margin — fundamentally it moves to a new point on the "latency vs smoothness" trade-off rather than eliminating the conflict.</p>
+</div>
+</details>
+
+<div class="nav"><a href="index.en.html">← Back to index</a></div>
+</div>
+</body></html>
