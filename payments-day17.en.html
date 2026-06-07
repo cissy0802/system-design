@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 17 · Payment Systems — System Design Bi-daily</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"SF Pro Display","Noto Sans SC",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
+.container{max-width:820px;margin:0 auto;padding:24px 20px 60px}
+header{padding:40px 0 28px;border-bottom:1px solid rgba(100,200,255,0.15);margin-bottom:32px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem}
+.tag{padding:3px 10px;border-radius:4px;background:rgba(100,200,255,0.12);color:#64c8ff;border:1px solid rgba(100,200,255,0.25)}
+.tag.diff{background:rgba(94,234,212,0.1);color:#5eead4;border-color:rgba(94,234,212,0.3)}
+.tag.day{background:rgba(255,180,80,0.1);color:#ffb450;border-color:rgba(255,180,80,0.25)}
+h1{font-size:1.75rem;font-weight:800;background:linear-gradient(135deg,#64c8ff 0%,#5eead4 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:0.5px;line-height:1.3}
+h1 .en{display:block;font-size:1rem;color:#7a8590;-webkit-text-fill-color:#7a8590;margin-top:6px;font-weight:500}
+h2{font-size:1.2rem;color:#5eead4;margin:36px 0 14px;padding-left:12px;border-left:3px solid #5eead4}
+h3{font-size:1rem;color:#64c8ff;margin:20px 0 10px;font-weight:600}
+p{margin:10px 0;color:#c8cfd6}
+ul,ol{margin:10px 0 10px 22px;color:#c8cfd6}
+li{margin:6px 0}
+strong{color:#e8eef5;font-weight:600}
+em{color:#5eead4;font-style:normal;font-weight:500}
+code{font-family:"SF Mono",Menlo,Consolas,monospace;background:rgba(100,200,255,0.1);color:#5eead4;padding:1px 6px;border-radius:3px;font-size:0.88em}
+pre{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:14px 16px;overflow-x:auto;margin:12px 0;font-family:"SF Mono",Menlo,Consolas,monospace;font-size:0.84rem;line-height:1.55;color:#c8cfd6}
+pre code{background:none;color:inherit;padding:0;font-size:1em}
+.mermaid{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:18px;margin:14px 0;text-align:center;overflow-x:auto;cursor:zoom-in;transition:border-color 0.15s}
+.mermaid:hover{border-color:rgba(100,200,255,0.4)}
+.mermaid svg{width:100%;max-width:100%;height:auto;min-height:280px}
+.lightbox{position:fixed;inset:0;background:rgba(8,12,18,0.96);z-index:9999;display:none;align-items:center;justify-content:center;padding:24px;cursor:grab;backdrop-filter:blur(4px);overflow:hidden}
+.lightbox.open{display:flex}
+.lightbox.dragging{cursor:grabbing}
+.lightbox svg{width:auto;height:auto;max-width:96vw;max-height:92vh;transform-origin:center center;will-change:transform}
+.lightbox .hint{position:fixed;top:16px;right:20px;font-size:0.78rem;color:#7a8590;font-family:"SF Mono",Menlo,monospace;pointer-events:none}
+.callout{background:rgba(255,180,80,0.06);border-left:3px solid #ffb450;padding:12px 14px;margin:14px 0;border-radius:4px;font-size:0.94rem}
+.callout strong{color:#ffb450}
+.tradeoff{background:rgba(100,200,255,0.05);border:1px solid rgba(100,200,255,0.2);border-radius:6px;padding:12px 14px;margin:12px 0;font-size:0.94rem}
+.case{background:rgba(94,234,212,0.05);border-left:3px solid #5eead4;padding:12px 14px;margin:12px 0;border-radius:4px;font-size:0.94rem}
+.case strong{color:#5eead4}
+.nav{margin-top:50px;padding-top:24px;border-top:1px solid rgba(100,200,255,0.15);text-align:center}
+.nav a{color:#64c8ff;text-decoration:none;font-size:0.92rem;padding:8px 16px;border:1px solid rgba(100,200,255,0.3);border-radius:4px;transition:all 0.15s}
+.nav a:hover{background:rgba(100,200,255,0.1)}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:0.9rem}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid rgba(100,200,255,0.15)}
+th{color:#64c8ff;font-weight:600;background:rgba(100,200,255,0.05)}
+details{background:rgba(100,200,255,0.04);border:1px solid rgba(100,200,255,0.18);border-radius:6px;padding:12px 16px;margin:10px 0;transition:all 0.15s}
+details:hover{border-color:rgba(100,200,255,0.35)}
+details[open]{background:rgba(94,234,212,0.05);border-color:rgba(94,234,212,0.3)}
+details summary{font-weight:600;color:#e8eef5;list-style:none;outline:none;cursor:pointer;display:flex;align-items:flex-start;gap:10px;font-size:0.96rem}
+details summary::-webkit-details-marker{display:none}
+details summary::before{content:'▶';color:#64c8ff;font-size:0.75em;transition:transform 0.2s;flex-shrink:0;margin-top:5px}
+details[open] summary::before{transform:rotate(90deg);color:#5eead4}
+details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
+details .answer ul,details .answer ol{margin:6px 0 6px 22px}
+@media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+</style>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({startOnLoad:true,theme:'base',flowchart:{useMaxWidth:true,htmlLabels:true,nodeSpacing:50,rankSpacing:60},themeVariables:{primaryColor:'#1a2530',primaryTextColor:'#e8eef5',primaryBorderColor:'#64c8ff',lineColor:'#5eead4',secondaryColor:'#0e1419',tertiaryColor:'#0a0f14',background:'#0a0f14',mainBkg:'#1a2530',secondBkg:'#0e1419',textColor:'#d4dae0',fontFamily:'-apple-system,"SF Pro Display",sans-serif',fontSize:'16px'}});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const lb=document.createElement('div');lb.className='lightbox';
+  lb.innerHTML='<span class="hint">scroll = zoom · drag = pan · Esc / click bg = close</span>';
+  document.body.appendChild(lb);
+  let scale=1,panX=0,panY=0,dragging=false,moved=false,lx=0,ly=0;
+  const apply=()=>{const s=lb.querySelector('svg');if(s)s.style.transform=`translate(${panX}px,${panY}px) scale(${scale})`};
+  const reset=()=>{scale=1;panX=0;panY=0};
+  const close=()=>{lb.classList.remove('open');const s=lb.querySelector('svg');if(s)s.remove();reset()};
+  document.addEventListener('click',e=>{
+    if(e.target.closest('.lightbox')){if(moved){moved=false;return}close();return}
+    const w=e.target.closest('.mermaid');if(!w)return;
+    const svg=w.querySelector('svg');if(!svg)return;
+    const c=svg.cloneNode(true);c.removeAttribute('style');
+    c.style.maxWidth='96vw';c.style.maxHeight='92vh';
+    lb.appendChild(c);lb.classList.add('open');reset();apply();
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+  lb.addEventListener('wheel',e=>{
+    if(!lb.classList.contains('open'))return;
+    e.preventDefault();
+    const svg=lb.querySelector('svg');if(!svg)return;
+    const ns=Math.max(0.3,Math.min(10,scale*(1-e.deltaY*0.002)));
+    const r=svg.getBoundingClientRect();
+    const cx=e.clientX-(r.left+r.width/2),cy=e.clientY-(r.top+r.height/2);
+    const k=ns/scale-1;panX-=cx*k;panY-=cy*k;scale=ns;apply();
+  },{passive:false});
+  lb.addEventListener('mousedown',e=>{
+    if(!lb.classList.contains('open'))return;
+    dragging=true;moved=false;lx=e.clientX;ly=e.clientY;lb.classList.add('dragging');e.preventDefault();
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    const dx=e.clientX-lx,dy=e.clientY-ly;
+    if(Math.abs(dx)+Math.abs(dy)>3)moved=true;
+    panX+=dx;panY+=dy;lx=e.clientX;ly=e.clientY;apply();
+  });
+  document.addEventListener('mouseup',()=>{dragging=false;lb.classList.remove('dragging')});
+});
+</script>
+</head><body><div class="container">
+
+<header>
+<div class="meta">
+<span class="tag day">Day 17</span>
+<span class="tag diff">Hard</span>
+<span class="tag">Payments</span>
+<span class="tag">Idempotency</span>
+<span class="tag">Ledger</span>
+<span class="tag">Reconciliation</span>
+</div>
+<h1>Payment Systems — Engineering Where Money Can't Be Lost or Duplicated<span class="en">Idempotency, Double-Entry Ledger, Saga, Reconciliation</span></h1>
+</header>
+
+<h2>Problem Scenario & Constraints</h2>
+<p>Design a marketplace payment platform (think Airbnb / Uber): charge the guest, pay out the host. <strong>10M transactions/day</strong>, ~115 QPS average writes, ~3000 QPS at peak. This is one of the rare systems where <em>correctness vastly outranks availability</em> — better to refuse service than to double-charge, double-pay, or misrecord a single cent.</p>
+<p>Key constraints to clarify in an interview:</p>
+<ul>
+<li><strong>Idempotency</strong>: clients retry, networks time out. When the same payment is submitted multiple times, <strong>money must move exactly once</strong>.</li>
+<li><strong>Reconcilable</strong>: every cent must be traceable; internal books must match the PSP (Stripe/Adyen) and bank statements.</li>
+<li><strong>Unreliable externals</strong>: PSPs time out and return <code>unknown</code> — you can assume neither success nor failure.</li>
+<li><strong>Latency</strong>: synchronous charge P99 &lt; 500ms; payout can be async. Amounts are <strong>integer minor units</strong> (cents), never floats.</li>
+<li><strong>Compliance</strong>: the ledger must be immutable and auditable (regulatory requirement).</li>
+</ul>
+
+<h2>High-Level Architecture</h2>
+<div class="mermaid">
+graph TD
+  C[Client / Merchant] -->|idempotency-key| API[Payment API<br/>idempotency layer]
+  API --> ORC[Payment Orchestrator<br/>Saga]
+  ORC --> LED[Ledger Service<br/>immutable double-entry]
+  ORC -->|outbox| GW[PSP Gateway]
+  GW --> PSP[(Stripe / Adyen)]
+  PSP --> BANK[(Banks / Card networks)]
+  LED --> DB[(Ledger DB<br/>append-only)]
+  RECON[Reconciliation Job<br/>daily 3-way] --> DB
+  RECON --> PSP
+  RECON --> BANK
+</div>
+<p><strong>Responsibilities</strong>: ① the <em>idempotency layer</em> intercepts duplicate requests via an idempotency key; ② the <em>Orchestrator</em> uses Saga to chain "charge → record → payout" across services; ③ the <em>Ledger Service</em> is the single source of truth — every money movement lands as immutable debit/credit entries; ④ the <em>PSP Gateway</em> wraps external processors; ⑤ the <em>reconciliation job</em> compares internal ledger against PSP and bank statements line by line to surface breaks.</p>
+
+<h2>Key Technical Points</h2>
+
+<h3>① Idempotency — Turning "Did It Happen?" Into "Safe to Retry"</h3>
+<p><strong>Core trade-off: spend a little storage and a state machine to guarantee that any retry never moves money twice.</strong></p>
+<p>[Principle] The client generates an <strong>idempotency key</strong> (UUID) per payment and sends it with the request. The server persists key → request state: a retry with the same key replays the prior result. The trick is more than dedup — split a payment into atomic phases (Stripe calls them <em>recovery points</em>): create local record → call PSP → record ledger, persisting progress after each phase. If the process crashes midway, a retry resumes from the last recovery point rather than restarting. This is essentially a persisted state machine.</p>
+<div class="tradeoff"><strong>Options compared:</strong>
+<ul>
+<li><strong>Plain DB unique constraint</strong> (unique key column): one line of code, but only blocks fully-duplicate requests. It can't handle "charged the PSP but crashed locally" — on retry there's no local record, so you charge again.</li>
+<li><strong>Full idempotency layer</strong> (key + recovery point + cached response): resumes half-done requests, but needs a state machine and locking against concurrent same-key calls.</li>
+<li><strong>Concurrent same key</strong>: row-lock serialization (simple, may block) vs optimistic insert-conflict retry (lock-free, must handle races).</li>
+</ul></div>
+<pre><code># pseudo-code: idempotent charge with recovery-point resume
+def charge(key, req):
+    rec = db.upsert_idempotency(key, fingerprint(req))  # row-lock + body check
+    if rec.body_hash != fingerprint(req):
+        raise Conflict("same key, different request")    # Stripe rejects this
+    if rec.response:           # already done -> replay
+        return rec.response
+    if rec.phase < CREATED:
+        db.create_payment(rec); rec.phase = CREATED      # recovery point
+    if rec.phase < CHARGED:
+        r = psp.charge(req, idem=key)  # PSP carries the key too: two-layer idempotency
+        rec.phase = CHARGED; rec.save()
+    if rec.phase < LEDGERED:
+        ledger.record(rec); rec.phase = LEDGERED
+    rec.response = build_resp(rec); rec.save()
+    return rec.response</code></pre>
+<div class="case"><strong>Real cases:</strong> <a href="https://stripe.com/blog/idempotency" target="_blank">Stripe</a> implements idempotency keys + recovery points in Postgres so a request can crash at any phase and resume, and rejects "same key, different body." <a href="https://medium.com/airbnb-engineering/avoiding-double-payments-in-a-distributed-payments-system-2981f6b070bb" target="_blank">Airbnb</a> built a generic idempotency framework across its SOA payments path to achieve "at most once" money movement across microservices.</div>
+
+<h3>② Double-Entry Ledger — Immutable, Append-Only</h3>
+<p><strong>Core trade-off: give up the simplicity of "just update a balance" for an auditable, reconcilable source of truth that never loses an entry.</strong></p>
+<p>[Principle] Every money movement writes at least two entries (debit + credit), and <strong>the sum per transaction is always 0</strong> — an invariant accounting has validated for 500 years that naturally guards against missed entries. The ledger is <strong>immutable</strong> (append only, never update/delete): corrections (refunds, fixes) are made via a <em>reversing entry</em>, not by mutating the original. An account balance is the aggregation of all its entries.</p>
+<div class="tradeoff"><strong>Options compared:</strong>
+<ul>
+<li><strong>Mutable balance column on a business table</strong>: fast reads, but no audit trail, lost-update risk under concurrency, and corrections aren't traceable. Fine for small apps, not for finance.</li>
+<li><strong>Separate immutable ledger</strong>: fully auditable, reconciliation-friendly, but "live balance" needs aggregation — full-table <code>SUM</code> is too slow, so you need periodic <strong>balance snapshots + incremental entries</strong>.</li>
+<li><strong>Balance consistency</strong>: live SUM every time (accurate, slow) vs maintained materialized balance (fast, must update within the same transaction as the entries).</li>
+</ul></div>
+<pre><code># transfer: two entries in one DB transaction, assert conservation
+def transfer(from_acct, to_acct, amount, txn_id):  # amount is integer cents
+    with db.transaction():
+        e1 = Entry(txn=txn_id, acct=from_acct, delta=-amount)
+        e2 = Entry(txn=txn_id, acct=to_acct,   delta=+amount)
+        db.insert(e1); db.insert(e2)
+        assert e1.delta + e2.delta == 0     # double-entry invariant
+        # a refund is NOT a delete; it's a reversing txn referencing txn_id</code></pre>
+<div class="case"><strong>Real cases:</strong> <a href="https://developer.squareup.com/blog/books-an-immutable-double-entry-accounting-database-service/" target="_blank">Square's Books</a> is an immutable, double-entry database service ensuring "you can never transact in a way that yields illogical money movement." <a href="https://www.uber.com/blog/how-ledgerstore-supports-trillions-of-indexes/" target="_blank">Uber LedgerStore</a> is the immutable source of truth for all money events — append-only, supporting trillions of indexes. <a href="https://www.moderntreasury.com/journal/announcing-ledgers" target="_blank">Modern Treasury</a> treats double-entry, auditability, and immutability as its three ledger principles.</div>
+
+<h3>③ Cross-Service Money Movement — Saga, Not 2PC</h3>
+<p><strong>Core trade-off: 2PC gives strong consistency but deadlocks external systems; Saga gives availability but only eventual consistency, and you hand-write compensations.</strong></p>
+<p>[Principle] A full payment spans multiple services and an external PSP: charge guest → record ledger → trigger host payout. 2PC is unworkable here — the external PSP won't join your transaction coordinator, locks held across the network are too long, and the coordinator is a single point. Use a <strong>Saga</strong>: a chain of local transactions, each failure undone by a compensating action. The atomicity of "change local state" and "emit the next step" is guaranteed by the <strong>Outbox pattern</strong> (write the business table + outbox table in one transaction, then a relay delivers).</p>
+<div class="tradeoff"><strong>Options compared:</strong>
+<ul>
+<li><strong>2PC</strong>: strong consistency, but a coordinator failure leaves participants holding locks indefinitely, and external PSPs simply don't support it.</li>
+<li><strong>Saga</strong>: highly available and scalable, but only eventually consistent, with intermediate visible states and a compensation to write per step.</li>
+<li><strong>Compensation vs forward recovery</strong>: reversible steps (an auth hold) can be compensated; <strong>irreversible steps (money already paid out) can't be compensated, only forward-recovered — retried to success</strong>, so downstreams must be idempotent.</li>
+</ul></div>
+<pre><code># Outbox: local state + message land atomically; a relay delivers async
+def step_charge_then_payout(payment):
+    with db.transaction():
+        payment.status = "CHARGED"; db.save(payment)
+        db.insert(Outbox(event="StartPayout", payload=payment.id))  # same txn
+    # a separate relay polls the outbox -> emits -> marks sent
+    # a failed payout is NOT compensated (money received); forward-retry to success</code></pre>
+<div class="case"><strong>Real cases:</strong> at <a href="https://medium.com/airbnb-engineering/avoiding-double-payments-in-a-distributed-payments-system-2981f6b070bb" target="_blank">Airbnb</a>, one API call drills into multiple downstream services forming a complex distributed transaction; they reach eventual consistency via idempotency + auto-retry rather than 2PC. Uber's money path likewise keeps LedgerStore as the strongly-consistent core with async orchestration around it.</div>
+
+<h3>④ Reconciliation — Finding the Drift Between Books and Reality</h3>
+<p><strong>Core trade-off: real-time reconciliation is expensive but catches issues early; T+1 batch is cheap but exposes losses late.</strong></p>
+<p>[Principle] The internal ledger is "the money you think you have"; PSP/bank statements are "the money you actually have," and the two <strong>inevitably drift</strong>: fees, FX, refund timing, PSP bugs, unhandled timeouts. Run <strong>3-way reconciliation</strong> daily: internal ledger ↔ PSP statement ↔ bank, joined line by line on external_id, surfacing <em>breaks</em> (missing, amount mismatch, status mismatch), auto-classified (fee items auto-settled, suspected losses alerted), the rest handled manually. <strong>Reconciliation is a payment system's last line of defense</strong> — every bug in your idempotency/Saga logic eventually shows up here.</p>
+<div class="tradeoff"><strong>Options compared:</strong> real-time reconciliation (streaming compare, minute-level detection, costly) vs T+1 batch (once a day, cheap, but a loss can run for a day). Tolerance policy: zero-tolerance per-line settlement vs threshold alerting (small diffs recorded first, reviewed later).</div>
+<pre><code># pseudo-code: 3-way reconciliation matching
+def reconcile(ledger_rows, psp_rows):
+    by_ext = {r.external_id: r for r in psp_rows}
+    for L in ledger_rows:
+        P = by_ext.pop(L.external_id, None)
+        if P is None:        breaks.add("MISSING_IN_PSP", L)   # I recorded, PSP didn't
+        elif P.amount != L.amount:
+            breaks.add("AMOUNT_MISMATCH", L, P)                # usually a fee
+    for leftover in by_ext.values():
+        breaks.add("MISSING_IN_LEDGER", leftover)              # PSP has it, I missed -> loss risk</code></pre>
+<div class="case"><strong>Real cases:</strong> reconciliation is table stakes for every payments company. <a href="https://www.moderntreasury.com/journal/announcing-ledgers" target="_blank">Modern Treasury</a> makes reconcilability a core product; Stripe's and Square's immutable ledger designs exist precisely to make reconciliation traceable line by line.</div>
+
+<h2>Scaling & Optimization</h2>
+<ul>
+<li><strong>Sharding</strong>: shard the ledger by <code>account_id</code>; cross-account transfers land in the same logical shard or use a local transaction within a 2PC scope.</li>
+<li><strong>Hot/cold separation</strong>: old entries are rarely read but can't be deleted — Uber migrated historical ledger data off DynamoDB into its own LedgerStore, <strong>saving ~$6M/year</strong>.</li>
+<li><strong>CDC for real-time reconciliation/risk</strong>: stream ledger changes (Debezium) to the warehouse for near-real-time reconciliation and fraud detection.</li>
+<li><strong>Multi-currency</strong>: a separate ledger per currency; FX is recorded as two entries (out of one currency, into another).</li>
+<li><strong>Multi-region</strong>: money systems are usually region-pinned and consistency-first; cross-region settlement goes through async clearing.</li>
+</ul>
+
+<h2>Common Pitfalls & Interview Questions</h2>
+<ul>
+<li><strong>Storing money as float</strong>: rounding error accumulates to the cent. Use integer minor units or decimal.</li>
+<li><strong>Wrong idempotency-key scope</strong>: the same key with a different body should <strong>error</strong> (Stripe checks the request fingerprint), not return the old result.</li>
+<li><strong>Putting the PSP call inside the DB transaction</strong>: you hold a DB lock across a network round-trip and exhaust the connection pool. External calls must be outside the transaction.</li>
+<li><strong>The "exactly-once" illusion</strong>: over a network there is no true exactly-once, only <em>at-least-once delivery + idempotent consumption = effectively-once</em>.</li>
+<li><strong>Mishandling PSP unknown/timeout</strong>: treat it as neither success nor failure — actively query PSP status or let reconciliation catch it.</li>
+</ul>
+<p><strong>Frequent interview follow-ups:</strong> ① how do you avoid double payouts when the client retries? ② the PSP times out — how do you know whether money actually moved? ③ how do you record a refund (why can't you edit the original)? ④ why don't payments use 2PC? ⑤ how do you reconcile "to the cent"? Which breaks auto-settle and which need a human?</p>
+
+<h2>Going Deeper — Resources</h2>
+<ul>
+<li><a href="https://stripe.com/blog/idempotency" target="_blank">Stripe — Designing robust and predictable APIs with idempotency</a>: the canonical key + recovery-point implementation.</li>
+<li><a href="https://medium.com/airbnb-engineering/avoiding-double-payments-in-a-distributed-payments-system-2981f6b070bb" target="_blank">Airbnb — Avoiding Double Payments in a Distributed Payments System</a>: a generic idempotency framework under SOA.</li>
+<li><a href="https://developer.squareup.com/blog/books-an-immutable-double-entry-accounting-database-service/" target="_blank">Square — Books: an immutable double-entry accounting database</a>: engineering immutable double-entry.</li>
+<li><a href="https://www.uber.com/blog/how-ledgerstore-supports-trillions-of-indexes/" target="_blank">Uber — How LedgerStore Supports Trillions of Indexes</a>: storage design and cost optimization for the money source of truth.</li>
+<li><em>Designing Data-Intensive Applications</em> (Kleppmann), chapters 9, 11, 12: consistency, stream processing, and correctness.</li>
+</ul>
+
+<h2>Deeper Reflection</h2>
+<details><summary>1. A PSP call returned a timeout — money may or may not have moved. You can assume neither. What's the complete fallback chain?</summary>
+<div class="answer">
+<p>A timeout is the most dangerous state: the request may have stalled at "PSP charged but response lost." The chain:</p>
+<ul>
+<li><strong>Mark no terminal state locally</strong>: keep <code>PENDING</code>, never write success or failed.</li>
+<li><strong>Retry/re-query with the idempotency key</strong>: because the PSP request also carried the key, retrying is safe — if it charged, the PSP returns the original result rather than charging twice; if it didn't, this attempt succeeds.</li>
+<li><strong>Actively reconcile</strong>: call the PSP's status API by key to pull the truth and persist it.</li>
+<li><strong>Last line is reconciliation</strong>: even if the above are missed, T+1 reconciliation surfaces the "PSP has it, ledger doesn't" break and triggers a record or refund.</li>
+</ul>
+<p>Essence: converge "uncertain" into "certain" via idempotency + reconciliation, instead of guessing.</p>
+</div></details>
+
+<details><summary>2. Why can't a refund just set the original payment's amount to 0 or delete it? What principle is behind this?</summary>
+<div class="answer">
+<p>Because the ledger is <strong>immutable</strong> — editing/deleting the original destroys the audit trail and reconcilability. A refund writes a <strong>reversing entry</strong> referencing the original txn_id, with opposite direction. Benefits: ① complete, traceable history that regulators and reconciliation can reconstruct; ② the original payment still truly happened (fees, taxes, reports all depend on it); ③ a partial refund just writes a partial-amount reversing entry and the balance is naturally correct. This is the heart of double-entry's "append-only + reversing": <strong>errors aren't erased, they're corrected with new entries</strong> — the same logic as Git revert vs force-push.</p>
+</div></details>
+
+<details><summary>3. A celebrity merchant generates 1M transactions in a day, all on one account. What happens when the ledger is sharded by account_id, and how do you fix it?</summary>
+<div class="answer">
+<p>Sharding by account_id lands all of that account's entries on <strong>one shard</strong>, creating a hot spot: write contention, and the materialized balance row becomes a lock hot spot (every transaction updates that account's balance). Fixes:</p>
+<ul>
+<li><strong>Balance bucketing</strong>: split the single balance row into N sub-balances, scatter writes randomly across buckets, and SUM the N buckets on read — like a sharded counter for high-concurrency counting.</li>
+<li><strong>Batched posting</strong>: buffer high-frequency small amounts and aggregate them into a few entries per window (trading real-time for throughput).</li>
+<li><strong>Async materialization</strong>: still append entries one by one (no lock contention), and let a downstream aggregate the balance off the main write path.</li>
+</ul>
+<p>The key is to move "single-point balance update" off the write path — entries append lock-free, and the balance is computed eventually-consistently.</p>
+</div></details>
+
+<details><summary>4. If the ledger's conservation (debits = credits) mathematically guarantees no entry is lost, why bother with reconciliation at all?</summary>
+<div class="answer">
+<p>Because conservation only guarantees your ledger is internally <strong>self-consistent</strong>, not that it reflects external <strong>reality</strong>. Drift comes from boundaries: ① you think the PSP charged and recorded it, but the PSP actually failed (your ledger is still internally conserved, but disagrees with the PSP); ② the PSP took a fee you didn't record; ③ an unhandled timeout moved money at the PSP that you didn't record. None of these break internal conservation, yet they're real losses. Reconciliation is the only way to upgrade "internally consistent" to "consistent with reality" — it tests the <strong>system boundary</strong>, whereas conservation only tests the <strong>system interior</strong>. That's why reconciliation is the last line of defense.</p>
+</div></details>
+
+<details><summary>5. "At-least-once delivery + idempotent consumption = effectively-once" — what's the precondition for this in payments, and when does it break?</summary>
+<div class="answer">
+<p>Precondition: the consumer's idempotency <strong>key</strong> must map one-to-one to "the money movement," and the dedup record and side effect must land <strong>atomically</strong>. It breaks when:</p>
+<ul>
+<li><strong>Wrong key granularity</strong>: dedup on message_id, but the same business payment is triggered by two different messages → each passes dedup, money moves twice. Use the business payment id as the key.</li>
+<li><strong>Dedup and side effect not atomic</strong>: charge the PSP first, then write the dedup row, crash in between → on retry no dedup row, charge again. Must be in one transaction, or use a PSP-side idempotency key as a second layer.</li>
+<li><strong>Dedup record expires</strong>: TTL too short, so when the retry arrives the record is gone and it degrades to no idempotency.</li>
+</ul>
+<p>So "effectively-once" isn't free — it requires <strong>the key to align with business semantics + dedup atomic with the side effect + the downstream also idempotent</strong>, all at once.</p>
+</div></details>
+
+<div class="nav"><a href="index.en.html">← Back to index</a></div>
+</div>
+</body></html>

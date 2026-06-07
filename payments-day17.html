@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 17 · 支付系统 (Payment Systems) — System Design Bi-daily</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"SF Pro Display","Noto Sans SC",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
+.container{max-width:820px;margin:0 auto;padding:24px 20px 60px}
+header{padding:40px 0 28px;border-bottom:1px solid rgba(100,200,255,0.15);margin-bottom:32px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem}
+.tag{padding:3px 10px;border-radius:4px;background:rgba(100,200,255,0.12);color:#64c8ff;border:1px solid rgba(100,200,255,0.25)}
+.tag.diff{background:rgba(94,234,212,0.1);color:#5eead4;border-color:rgba(94,234,212,0.3)}
+.tag.day{background:rgba(255,180,80,0.1);color:#ffb450;border-color:rgba(255,180,80,0.25)}
+h1{font-size:1.75rem;font-weight:800;background:linear-gradient(135deg,#64c8ff 0%,#5eead4 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:0.5px;line-height:1.3}
+h1 .en{display:block;font-size:1rem;color:#7a8590;-webkit-text-fill-color:#7a8590;margin-top:6px;font-weight:500}
+h2{font-size:1.2rem;color:#5eead4;margin:36px 0 14px;padding-left:12px;border-left:3px solid #5eead4}
+h3{font-size:1rem;color:#64c8ff;margin:20px 0 10px;font-weight:600}
+p{margin:10px 0;color:#c8cfd6}
+ul,ol{margin:10px 0 10px 22px;color:#c8cfd6}
+li{margin:6px 0}
+strong{color:#e8eef5;font-weight:600}
+em{color:#5eead4;font-style:normal;font-weight:500}
+code{font-family:"SF Mono",Menlo,Consolas,monospace;background:rgba(100,200,255,0.1);color:#5eead4;padding:1px 6px;border-radius:3px;font-size:0.88em}
+pre{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:14px 16px;overflow-x:auto;margin:12px 0;font-family:"SF Mono",Menlo,Consolas,monospace;font-size:0.84rem;line-height:1.55;color:#c8cfd6}
+pre code{background:none;color:inherit;padding:0;font-size:1em}
+.mermaid{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:18px;margin:14px 0;text-align:center;overflow-x:auto;cursor:zoom-in;transition:border-color 0.15s}
+.mermaid:hover{border-color:rgba(100,200,255,0.4)}
+.mermaid svg{width:100%;max-width:100%;height:auto;min-height:280px}
+.lightbox{position:fixed;inset:0;background:rgba(8,12,18,0.96);z-index:9999;display:none;align-items:center;justify-content:center;padding:24px;cursor:grab;backdrop-filter:blur(4px);overflow:hidden}
+.lightbox.open{display:flex}
+.lightbox.dragging{cursor:grabbing}
+.lightbox svg{width:auto;height:auto;max-width:96vw;max-height:92vh;transform-origin:center center;will-change:transform}
+.lightbox .hint{position:fixed;top:16px;right:20px;font-size:0.78rem;color:#7a8590;font-family:"SF Mono",Menlo,monospace;pointer-events:none}
+.callout{background:rgba(255,180,80,0.06);border-left:3px solid #ffb450;padding:12px 14px;margin:14px 0;border-radius:4px;font-size:0.94rem}
+.callout strong{color:#ffb450}
+.tradeoff{background:rgba(100,200,255,0.05);border:1px solid rgba(100,200,255,0.2);border-radius:6px;padding:12px 14px;margin:12px 0;font-size:0.94rem}
+.case{background:rgba(94,234,212,0.05);border-left:3px solid #5eead4;padding:12px 14px;margin:12px 0;border-radius:4px;font-size:0.94rem}
+.case strong{color:#5eead4}
+.nav{margin-top:50px;padding-top:24px;border-top:1px solid rgba(100,200,255,0.15);text-align:center}
+.nav a{color:#64c8ff;text-decoration:none;font-size:0.92rem;padding:8px 16px;border:1px solid rgba(100,200,255,0.3);border-radius:4px;transition:all 0.15s}
+.nav a:hover{background:rgba(100,200,255,0.1)}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:0.9rem}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid rgba(100,200,255,0.15)}
+th{color:#64c8ff;font-weight:600;background:rgba(100,200,255,0.05)}
+details{background:rgba(100,200,255,0.04);border:1px solid rgba(100,200,255,0.18);border-radius:6px;padding:12px 16px;margin:10px 0;transition:all 0.15s}
+details:hover{border-color:rgba(100,200,255,0.35)}
+details[open]{background:rgba(94,234,212,0.05);border-color:rgba(94,234,212,0.3)}
+details summary{font-weight:600;color:#e8eef5;list-style:none;outline:none;cursor:pointer;display:flex;align-items:flex-start;gap:10px;font-size:0.96rem}
+details summary::-webkit-details-marker{display:none}
+details summary::before{content:'▶';color:#64c8ff;font-size:0.75em;transition:transform 0.2s;flex-shrink:0;margin-top:5px}
+details[open] summary::before{transform:rotate(90deg);color:#5eead4}
+details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
+details .answer ul,details .answer ol{margin:6px 0 6px 22px}
+@media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+</style>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({startOnLoad:true,theme:'base',flowchart:{useMaxWidth:true,htmlLabels:true,nodeSpacing:50,rankSpacing:60},themeVariables:{primaryColor:'#1a2530',primaryTextColor:'#e8eef5',primaryBorderColor:'#64c8ff',lineColor:'#5eead4',secondaryColor:'#0e1419',tertiaryColor:'#0a0f14',background:'#0a0f14',mainBkg:'#1a2530',secondBkg:'#0e1419',textColor:'#d4dae0',fontFamily:'-apple-system,"SF Pro Display",sans-serif',fontSize:'16px'}});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const lb=document.createElement('div');lb.className='lightbox';
+  lb.innerHTML='<span class="hint">scroll = zoom · drag = pan · Esc / click bg = close</span>';
+  document.body.appendChild(lb);
+  let scale=1,panX=0,panY=0,dragging=false,moved=false,lx=0,ly=0;
+  const apply=()=>{const s=lb.querySelector('svg');if(s)s.style.transform=`translate(${panX}px,${panY}px) scale(${scale})`};
+  const reset=()=>{scale=1;panX=0;panY=0};
+  const close=()=>{lb.classList.remove('open');const s=lb.querySelector('svg');if(s)s.remove();reset()};
+  document.addEventListener('click',e=>{
+    if(e.target.closest('.lightbox')){if(moved){moved=false;return}close();return}
+    const w=e.target.closest('.mermaid');if(!w)return;
+    const svg=w.querySelector('svg');if(!svg)return;
+    const c=svg.cloneNode(true);c.removeAttribute('style');
+    c.style.maxWidth='96vw';c.style.maxHeight='92vh';
+    lb.appendChild(c);lb.classList.add('open');reset();apply();
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+  lb.addEventListener('wheel',e=>{
+    if(!lb.classList.contains('open'))return;
+    e.preventDefault();
+    const svg=lb.querySelector('svg');if(!svg)return;
+    const ns=Math.max(0.3,Math.min(10,scale*(1-e.deltaY*0.002)));
+    const r=svg.getBoundingClientRect();
+    const cx=e.clientX-(r.left+r.width/2),cy=e.clientY-(r.top+r.height/2);
+    const k=ns/scale-1;panX-=cx*k;panY-=cy*k;scale=ns;apply();
+  },{passive:false});
+  lb.addEventListener('mousedown',e=>{
+    if(!lb.classList.contains('open'))return;
+    dragging=true;moved=false;lx=e.clientX;ly=e.clientY;lb.classList.add('dragging');e.preventDefault();
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    const dx=e.clientX-lx,dy=e.clientY-ly;
+    if(Math.abs(dx)+Math.abs(dy)>3)moved=true;
+    panX+=dx;panY+=dy;lx=e.clientX;ly=e.clientY;apply();
+  });
+  document.addEventListener('mouseup',()=>{dragging=false;lb.classList.remove('dragging')});
+});
+</script>
+</head><body><div class="container">
+
+<header>
+<div class="meta">
+<span class="tag day">Day 17</span>
+<span class="tag diff">Hard</span>
+<span class="tag">Payments</span>
+<span class="tag">Idempotency</span>
+<span class="tag">Ledger</span>
+<span class="tag">Reconciliation</span>
+</div>
+<h1>支付系统 — 钱不能多也不能少的工程<span class="en">Payment Systems: Idempotency, Double-Entry Ledger, Saga, Reconciliation</span></h1>
+</header>
+
+<h2>问题场景与需求约束</h2>
+<p>设计一个 marketplace 支付平台（类似 Airbnb / Uber）：向 guest 收款、给 host 打款。<strong>日处理 1000 万笔交易</strong>，平均写 ~115 QPS、大促峰值 ~3000 QPS。这是少数 <em>correctness 远高于 availability</em> 的系统——宁可拒绝服务，也绝不能重复扣款、重复打款、把账记错一分。</p>
+<p>面试要先澄清的关键约束：</p>
+<ul>
+<li><strong>幂等性</strong>：客户端会重试、网络会超时，同一笔支付被提交多次时，<strong>钱只能动一次</strong>。</li>
+<li><strong>可对账</strong>：每一分钱必须可追溯，内部账目与 PSP（Stripe/Adyen）、银行流水必须对得上。</li>
+<li><strong>外部依赖不可靠</strong>：PSP 会超时、会返回 <code>unknown</code>——既不能假设成功也不能假设失败。</li>
+<li><strong>延迟</strong>：同步 charge P99 &lt; 500ms；payout 可异步。金额用<strong>整数 minor units</strong>（分），绝不用 float。</li>
+<li><strong>合规</strong>：账本不可篡改、可审计（监管要求）。</li>
+</ul>
+
+<h2>高层架构</h2>
+<div class="mermaid">
+graph TD
+  C[客户端/商户] -->|idempotency-key| API[Payment API<br/>幂等层]
+  API --> ORC[Payment Orchestrator<br/>Saga 编排]
+  ORC --> LED[Ledger Service<br/>不可变双重记账]
+  ORC -->|outbox| GW[PSP Gateway]
+  GW --> PSP[(Stripe / Adyen)]
+  PSP --> BANK[(银行 / 卡组织)]
+  LED --> DB[(Ledger DB<br/>append-only)]
+  RECON[Reconciliation Job<br/>每日三方对账] --> DB
+  RECON --> PSP
+  RECON --> BANK
+</div>
+<p><strong>组件职责</strong>：① <em>幂等层</em>拦截重复请求，用 idempotency key 保证一次支付只执行一次；② <em>Orchestrator</em> 用 Saga 串联「收款→记账→打款」跨服务流程；③ <em>Ledger Service</em> 是唯一真相源，所有钱的移动以不可变借贷分录落库；④ <em>PSP Gateway</em> 封装外部支付商；⑤ <em>对账作业</em>把内部 ledger 与 PSP、银行流水逐笔比对，找出 break。</p>
+
+<h2>关键技术点</h2>
+
+<h3>① 幂等性设计 — 把「不知道成没成」变成可安全重试</h3>
+<p><strong>核心 trade-off：用一点存储和一层状态机，换『任意重试都不会重复动钱』的保证。</strong></p>
+<p>【原理】客户端为每次支付生成一个 <strong>idempotency key</strong>（UUID），随请求上送。服务端把 key → 请求状态持久化：同一 key 重试时直接返回上次结果。关键不止「去重」——要把一次支付拆成多个原子阶段（Stripe 称 <em>recovery points</em>）：创建本地记录 → 调 PSP → 记 ledger，每个阶段完成就持久化进度。进程中途崩溃，重试时从上个 recovery point 续跑，而不是从头重来。这本质是一个落库的状态机。</p>
+<div class="tradeoff"><strong>选型对比：</strong>
+<ul>
+<li><strong>纯 DB unique 约束</strong>（key 列唯一）：实现一行，但只能挡「完全重复的请求」。挡不住「已扣 PSP 但本地崩溃」——重试时本地无记录，会再扣一次。</li>
+<li><strong>完整幂等层</strong>（key + recovery point + 缓存 response）：能续跑半成品请求，但要维护状态机、加锁防并发同 key。</li>
+<li><strong>并发同 key</strong>：行锁串行化（简单、可能阻塞）vs 乐观插入冲突重试（无锁、要处理竞态）。</li>
+</ul></div>
+<pre><code># pseudo-code: 幂等支付（recovery point 续跑）
+def charge(key, req):
+    rec = db.upsert_idempotency(key, fingerprint(req))  # 行锁 + 校验 body 一致
+    if rec.body_hash != fingerprint(req):
+        raise Conflict("same key, different request")    # Stripe 会拒绝
+    if rec.response:           # 已完成 → 直接回放
+        return rec.response
+    if rec.phase < CREATED:
+        db.create_payment(rec); rec.phase = CREATED      # recovery point
+    if rec.phase < CHARGED:
+        r = psp.charge(req, idem=key)  # PSP 侧也带 key，双层幂等
+        rec.phase = CHARGED; rec.save()
+    if rec.phase < LEDGERED:
+        ledger.record(rec); rec.phase = LEDGERED
+    rec.response = build_resp(rec); rec.save()
+    return rec.response</code></pre>
+<div class="case"><strong>现实案例：</strong><a href="https://stripe.com/blog/idempotency" target="_blank">Stripe</a> 在 Postgres 里实现 idempotency key + recovery point，请求可在任意阶段崩溃后续跑，并校验「同 key 不同 body」直接报错。<a href="https://medium.com/airbnb-engineering/avoiding-double-payments-in-a-distributed-payments-system-2981f6b070bb" target="_blank">Airbnb</a> 在其 SOA 支付链路上建了一个通用 idempotency 框架，靠它在多个微服务间实现「最多一次」的金额移动。</div>
+
+<h3>② 双重记账 Ledger — 不可变、append-only</h3>
+<p><strong>核心 trade-off：放弃「直接改余额」的简单，换可审计、可对账、永不丢账的真相源。</strong></p>
+<p>【原理】每一次钱的移动至少写两条分录（借 + 贷），且<strong>每笔交易的借贷之和恒为 0</strong>——这是会计五百年验证过的不变量，天然防漏记。账本<strong>不可变</strong>（只 append，不 update/delete）：要改账（退款、纠错）靠写一条<em>冲正分录</em>（reversing entry），而非删改原记录。账户余额 = 该账户所有分录的聚合。</p>
+<div class="tradeoff"><strong>选型对比：</strong>
+<ul>
+<li><strong>业务表加 balance 列（可变）</strong>：读余额快，但无审计轨迹、并发更新易丢更新、改错无法追溯。小系统够用，金融系统不行。</li>
+<li><strong>独立不可变 ledger</strong>：完整可审计、对账友好，但「实时余额」要聚合算——全表 <code>SUM</code> 太慢，需周期 <strong>snapshot 物化余额 + 增量分录</strong>。</li>
+<li><strong>余额一致性</strong>：每次实时 SUM（准但慢）vs 维护物化余额（快但要保证与分录同事务更新）。</li>
+</ul></div>
+<pre><code># 转账：同一 DB 事务内写两条分录，断言守恒
+def transfer(from_acct, to_acct, amount, txn_id):  # amount 是整数分
+    with db.transaction():
+        e1 = Entry(txn=txn_id, acct=from_acct, delta=-amount)
+        e2 = Entry(txn=txn_id, acct=to_acct,   delta=+amount)
+        db.insert(e1); db.insert(e2)
+        assert e1.delta + e2.delta == 0     # 双重记账不变量
+        # 退款不是 delete，而是写一条反向 txn 引用原 txn_id</code></pre>
+<div class="case"><strong>现实案例：</strong><a href="https://developer.squareup.com/blog/books-an-immutable-double-entry-accounting-database-service/" target="_blank">Square 的 Books</a> 是一个不可变、双重记账的数据库服务，确保「不可能产生不合逻辑的金额变动」。<a href="https://www.uber.com/blog/how-ledgerstore-supports-trillions-of-indexes/" target="_blank">Uber LedgerStore</a> 是其所有金钱事件的不可变真相源，append-only、支持万亿级索引。<a href="https://www.moderntreasury.com/journal/announcing-ledgers" target="_blank">Modern Treasury</a> 把双重记账、可审计、不可变作为账本三原则。</div>
+
+<h3>③ 跨服务金额移动 — 用 Saga 而非 2PC</h3>
+<p><strong>核心 trade-off：2PC 给你强一致但会锁死外部系统；Saga 给你可用性但只有最终一致，且要手写补偿。</strong></p>
+<p>【原理】一次完整支付涉及多个服务和外部 PSP：收 guest 款 → 记 ledger → 触发 host payout。2PC 在这里不可行——外部 PSP 不参与你的事务协调、锁持有跨网络太久、协调者是单点。改用 <strong>Saga</strong>：一串本地事务，每步失败用补偿动作回滚。「改本地状态」和「发出下一步消息」的原子性，用 <strong>Outbox pattern</strong> 保证（同事务写业务表 + outbox 表，再由 relay 投递）。</p>
+<div class="tradeoff"><strong>选型对比：</strong>
+<ul>
+<li><strong>2PC</strong>：强一致，但协调者故障会让参与者长期持锁阻塞，外部 PSP 根本不支持。</li>
+<li><strong>Saga</strong>：高可用、可扩展，但只有最终一致、有中间可见状态、要为每步写补偿。</li>
+<li><strong>补偿 vs 前向恢复</strong>：可逆步骤（预授权）可补偿；<strong>不可逆步骤（已打款）不能补偿，只能 forward recovery——重试到成功</strong>，所以下游必须幂等。</li>
+</ul></div>
+<pre><code># Outbox：本地状态与消息原子落库；relay 异步投递
+def step_charge_then_payout(payment):
+    with db.transaction():
+        payment.status = "CHARGED"; db.save(payment)
+        db.insert(Outbox(event="StartPayout", payload=payment.id))  # 同事务
+    # 单独的 relay 进程轮询 outbox → 发消息 → 标记已发
+    # 失败的 payout 不补偿（钱已收），forward retry 直到成功</code></pre>
+<div class="case"><strong>现实案例：</strong><a href="https://medium.com/airbnb-engineering/avoiding-double-payments-in-a-distributed-payments-system-2981f6b070bb" target="_blank">Airbnb</a> 在 SOA 下，一个 API 调用会下钻多个下游服务形成复杂分布式事务，他们靠幂等 + 自动重试实现最终一致而非 2PC。Uber 的金钱链路同样以 LedgerStore 为强一致核心、外围异步编排。</div>
+
+<h3>④ 对账与核验 — 找出账面与现实的漂移</h3>
+<p><strong>核心 trade-off：实时对账贵但早发现，T+1 批量便宜但延迟暴露资损。</strong></p>
+<p>【原理】内部 ledger 是「你以为的钱」，PSP/银行流水是「实际的钱」，两者<strong>必然漂移</strong>：手续费、汇率、退款时差、PSP 的 bug、漏处理的 timeout。每日做<strong>三方对账</strong>：内部 ledger ↔ PSP statement ↔ 银行流水，按 external_id 逐笔 join，找出 <em>break</em>（缺失、金额不符、状态不符），自动归类（手续费类自动平账、疑似资损告警），剩余人工兜底。<strong>对账是支付系统最后一道防线</strong>——前面所有幂等/Saga 的 bug 最终都会在这里现形。</p>
+<div class="tradeoff"><strong>选型对比：</strong>实时对账（流式比对，分钟级发现，成本高）vs T+1 批量（一天一次，便宜，但资损可能跑一天）。容忍策略：零容忍逐笔平账 vs 阈值告警（小额差异先记账后人工）。</div>
+<pre><code># pseudo-code: 三方对账匹配
+def reconcile(ledger_rows, psp_rows):
+    by_ext = {r.external_id: r for r in psp_rows}
+    for L in ledger_rows:
+        P = by_ext.pop(L.external_id, None)
+        if P is None:        breaks.add("MISSING_IN_PSP", L)   # 我记了PSP没有
+        elif P.amount != L.amount:
+            breaks.add("AMOUNT_MISMATCH", L, P)                # 多半是手续费
+    for leftover in by_ext.values():
+        breaks.add("MISSING_IN_LEDGER", leftover)              # PSP有我漏记 → 资损风险</code></pre>
+<div class="case"><strong>现实案例：</strong>对账是所有支付公司的标配能力。<a href="https://www.moderntreasury.com/journal/announcing-ledgers" target="_blank">Modern Treasury</a> 把可对账作为产品核心；Stripe / Square 的不可变 ledger 设计正是为了让对账可逐笔追溯。</div>
+
+<h2>扩展与优化</h2>
+<ul>
+<li><strong>分片</strong>：ledger 按 <code>account_id</code> 分库分表，跨账户转账落在同一逻辑分片或用 2PC 范围内的本地事务。</li>
+<li><strong>冷热分离</strong>：老分录访问少但不能删——Uber 把历史 ledger 迁出 DynamoDB 进自研 LedgerStore，<strong>年省约 600 万美元</strong>。</li>
+<li><strong>CDC 实时对账/风控</strong>：把 ledger 变更流（Debezium）打到数仓，做近实时对账和欺诈检测。</li>
+<li><strong>多货币</strong>：每币种独立账本，FX 换汇记成两笔分录（出一种币、进另一种币）。</li>
+<li><strong>多区域</strong>：钱的系统通常 region-pinned、强一致优先，跨区结算走异步清算。</li>
+</ul>
+
+<h2>常见陷阱与面试问题</h2>
+<ul>
+<li><strong>用 float 存钱</strong>：浮点误差累积到分。用整数 minor units 或 decimal。</li>
+<li><strong>idempotency key 作用域错</strong>：同 key 配不同请求体应当<strong>报错</strong>（Stripe 校验 request fingerprint），而不是返回旧结果。</li>
+<li><strong>把 PSP 调用放进 DB 事务里</strong>：持有数据库锁等待网络往返，连接池瞬间打满。外部调用必须在事务外。</li>
+<li><strong>「Exactly-once」幻觉</strong>：网络下不存在真正的 exactly-once，只有 <em>at-least-once 投递 + 幂等消费 = effectively-once</em>。</li>
+<li><strong>漏处理 PSP 的 unknown/timeout</strong>：既不能当成功也不能当失败——要主动查询 PSP 状态或交给对账兜底。</li>
+</ul>
+<p><strong>高频面试追问：</strong>① 客户端重试时如何保证不重复打款？② PSP 返回超时，你怎么知道钱到底动没动？③ 退款怎么记账（为什么不能改原记录）？④ 为什么支付不用 2PC？⑤ 怎么做到对账「到分」？哪类 break 可自动平、哪类必须人工？</p>
+
+<h2>深入资源</h2>
+<ul>
+<li><a href="https://stripe.com/blog/idempotency" target="_blank">Stripe — Designing robust and predictable APIs with idempotency</a>：幂等 key + recovery point 的权威实现。</li>
+<li><a href="https://medium.com/airbnb-engineering/avoiding-double-payments-in-a-distributed-payments-system-2981f6b070bb" target="_blank">Airbnb — Avoiding Double Payments in a Distributed Payments System</a>：SOA 下的通用幂等框架。</li>
+<li><a href="https://developer.squareup.com/blog/books-an-immutable-double-entry-accounting-database-service/" target="_blank">Square — Books: an immutable double-entry accounting database</a>：不可变双重记账的工程化。</li>
+<li><a href="https://www.uber.com/blog/how-ledgerstore-supports-trillions-of-indexes/" target="_blank">Uber — How LedgerStore Supports Trillions of Indexes</a>：金钱真相源的存储设计与成本优化。</li>
+<li><em>Designing Data-Intensive Applications</em>（Kleppmann）第 9、11、12 章：一致性、流处理与正确性。</li>
+</ul>
+
+<h2>深入思考</h2>
+<details><summary>1. PSP 调用返回了 timeout——钱可能扣了也可能没扣。你绝不能假设任一种。完整的兜底链路是什么？</summary>
+<div class="answer">
+<p>timeout 是支付系统最危险的状态：请求可能在「PSP 已扣款但响应丢失」处中断。处理链路：</p>
+<ul>
+<li><strong>不在本地标记任何终态</strong>：保持 <code>PENDING</code>，绝不写成 success 或 failed。</li>
+<li><strong>带 idempotency key 重查/重试</strong>：因为发给 PSP 的请求也带了 key，重试是安全的——若已扣，PSP 返回原结果而非二次扣款；若没扣，这次扣成功。</li>
+<li><strong>主动 reconcile</strong>：调 PSP 的查询接口按 key 拉状态，落地真相。</li>
+<li><strong>最终防线是对账</strong>：即便上面都漏了，T+1 对账会发现「PSP 有我 ledger 没有」的 break，触发补记账或退款。</li>
+</ul>
+<p>本质：把「不确定」用幂等 + 对账收敛成「确定」，而不是猜。</p>
+</div></details>
+
+<details><summary>2. 为什么退款不能直接把原支付记录的金额改成 0 或删掉？这背后是什么原则？</summary>
+<div class="answer">
+<p>因为账本<strong>不可变</strong>——改/删原记录会摧毁审计轨迹和对账能力。退款应写一条<strong>冲正分录</strong>（reversing entry），引用原 txn_id，方向相反。好处：① 历史完整可追溯，监管和对账都能还原；② 原支付仍真实发生过（手续费、税务、报表都依赖它）；③ 部分退款只需写部分金额的反向分录，余额自然正确。这正是双重记账「append-only + reversing」的核心：<strong>错误不是抹掉，而是用新分录纠正</strong>，和 Git 的 revert 而非 force-push 同理。</p>
+</div></details>
+
+<details><summary>3. 一个明星商户某天产生 100 万笔交易，全压在它那一个 account 上——ledger 按 account_id 分片会怎样？怎么救？</summary>
+<div class="answer">
+<p>按 account_id 分片会让这个账户的所有分录落在<strong>同一分片</strong>，形成热点：写入争抢、物化余额行成为锁热点（每笔都要更新该账户余额）。解法：</p>
+<ul>
+<li><strong>余额分桶</strong>：把单一余额行拆成 N 个子余额（sub-balance），写入随机打散到桶，读余额时 SUM N 个桶——类似高并发计数器的 sharded counter。</li>
+<li><strong>批量记账</strong>：高频小额先进缓冲，按窗口聚合成少量分录入账（牺牲实时性换吞吐）。</li>
+<li><strong>异步物化</strong>：分录仍逐笔 append（无锁竞争），余额由下游异步聚合，不在主写路径上更新。</li>
+</ul>
+<p>核心是把「单点余额更新」从写路径上移走——分录可以无锁 append，余额可以最终一致地算出来。</p>
+</div></details>
+
+<details><summary>4. 既然 ledger 守恒（借贷恒等）能数学上保证不丢账，为什么还要花大力气做对账？</summary>
+<div class="answer">
+<p>因为守恒只保证<strong>你自己账本内部</strong>自洽，不保证账本反映了<strong>外部现实</strong>。漂移来自边界：① 你以为 PSP 扣成功并记了账，实际 PSP 失败了（你的账本内部仍守恒，但与 PSP 不符）；② PSP 收了手续费，你没记；③ 漏处理的 timeout 让 PSP 动了钱你没记。这些都不破坏内部守恒，却是真实资损。对账是把「内部一致」升级为「与现实一致」的唯一手段——它检验的是<strong>系统边界</strong>，而守恒只检验<strong>系统内部</strong>。这也是为什么对账被称作支付系统的最后一道防线。</p>
+</div></details>
+
+<details><summary>5. 「至少一次投递 + 幂等消费 = 有效一次」——这个等式在支付里成立的前提是什么？什么情况下会破？</summary>
+<div class="answer">
+<p>前提：消费端的幂等判断<strong>键</strong>必须和「钱的移动」一一对应，且去重记录与副作用<strong>原子</strong>落库。会破的情况：</p>
+<ul>
+<li><strong>幂等键选错粒度</strong>：用 message_id 去重，但同一笔业务支付被两个不同 message 触发 → 各自幂等通过，钱动两次。应以业务支付 id 为幂等键。</li>
+<li><strong>去重与副作用不原子</strong>：先调 PSP 扣款再写去重表，中间崩溃 → 重试时去重表没记录，再扣一次。必须同事务，或 PSP 侧也带幂等 key 做二层防护。</li>
+<li><strong>幂等记录过期</strong>：TTL 太短，重试到来时记录已清，退化成无幂等。</li>
+</ul>
+<p>所以「effectively-once」不是免费的，它要求<strong>幂等键对齐业务语义 + 去重与副作用原子 + 下游也幂等</strong>三者同时满足。</p>
+</div></details>
+
+<div class="nav"><a href="index.html">← 回到 index</a></div>
+</div>
+</body></html>
