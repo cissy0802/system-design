@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 18 · 订阅与计费 (Subscription & Billing) — System Design Bi-daily</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"SF Pro Display","Noto Sans SC",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
+.container{max-width:820px;margin:0 auto;padding:24px 20px 60px}
+header{padding:40px 0 28px;border-bottom:1px solid rgba(100,200,255,0.15);margin-bottom:32px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem}
+.tag{padding:3px 10px;border-radius:4px;background:rgba(100,200,255,0.12);color:#64c8ff;border:1px solid rgba(100,200,255,0.25)}
+.tag.diff{background:rgba(94,234,212,0.1);color:#5eead4;border-color:rgba(94,234,212,0.3)}
+.tag.day{background:rgba(255,180,80,0.1);color:#ffb450;border-color:rgba(255,180,80,0.25)}
+h1{font-size:1.75rem;font-weight:800;background:linear-gradient(135deg,#64c8ff 0%,#5eead4 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:0.5px;line-height:1.3}
+h1 .en{display:block;font-size:1rem;color:#7a8590;-webkit-text-fill-color:#7a8590;margin-top:6px;font-weight:500}
+h2{font-size:1.2rem;color:#5eead4;margin:36px 0 14px;padding-left:12px;border-left:3px solid #5eead4}
+h3{font-size:1rem;color:#64c8ff;margin:20px 0 10px;font-weight:600}
+p{margin:10px 0;color:#c8cfd6}
+ul,ol{margin:10px 0 10px 22px;color:#c8cfd6}
+li{margin:6px 0}
+strong{color:#e8eef5;font-weight:600}
+em{color:#5eead4;font-style:normal;font-weight:500}
+code{font-family:"SF Mono",Menlo,Consolas,monospace;background:rgba(100,200,255,0.1);color:#5eead4;padding:1px 6px;border-radius:3px;font-size:0.88em}
+pre{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:14px 16px;overflow-x:auto;margin:12px 0;font-family:"SF Mono",Menlo,Consolas,monospace;font-size:0.84rem;line-height:1.55;color:#c8cfd6}
+pre code{background:none;color:inherit;padding:0;font-size:1em}
+.mermaid{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:18px;margin:14px 0;text-align:center;overflow-x:auto;cursor:zoom-in;transition:border-color 0.15s}
+.mermaid:hover{border-color:rgba(100,200,255,0.4)}
+.mermaid svg{width:100%;max-width:100%;height:auto;min-height:280px}
+.lightbox{position:fixed;inset:0;background:rgba(8,12,18,0.96);z-index:9999;display:none;align-items:center;justify-content:center;padding:24px;cursor:grab;backdrop-filter:blur(4px);overflow:hidden}
+.lightbox.open{display:flex}
+.lightbox.dragging{cursor:grabbing}
+.lightbox svg{width:auto;height:auto;max-width:96vw;max-height:92vh;transform-origin:center center;will-change:transform}
+.lightbox .hint{position:fixed;top:16px;right:20px;font-size:0.78rem;color:#7a8590;font-family:"SF Mono",Menlo,monospace;pointer-events:none}
+.callout{background:rgba(255,180,80,0.06);border-left:3px solid #ffb450;padding:12px 14px;margin:14px 0;border-radius:4px;font-size:0.94rem}
+.callout strong{color:#ffb450}
+.tradeoff{background:rgba(100,200,255,0.05);border:1px solid rgba(100,200,255,0.2);border-radius:6px;padding:12px 14px;margin:12px 0;font-size:0.94rem}
+.case{background:rgba(94,234,212,0.05);border-left:3px solid #5eead4;padding:12px 14px;margin:12px 0;border-radius:4px;font-size:0.94rem}
+.case strong{color:#5eead4}
+.nav{margin-top:50px;padding-top:24px;border-top:1px solid rgba(100,200,255,0.15);text-align:center}
+.nav a{color:#64c8ff;text-decoration:none;font-size:0.92rem;padding:8px 16px;border:1px solid rgba(100,200,255,0.3);border-radius:4px;transition:all 0.15s}
+.nav a:hover{background:rgba(100,200,255,0.1)}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:0.9rem}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid rgba(100,200,255,0.15)}
+th{color:#64c8ff;font-weight:600;background:rgba(100,200,255,0.05)}
+details{background:rgba(100,200,255,0.04);border:1px solid rgba(100,200,255,0.18);border-radius:6px;padding:12px 16px;margin:10px 0;transition:all 0.15s}
+details:hover{border-color:rgba(100,200,255,0.35)}
+details[open]{background:rgba(94,234,212,0.05);border-color:rgba(94,234,212,0.3)}
+details summary{font-weight:600;color:#e8eef5;list-style:none;outline:none;cursor:pointer;display:flex;align-items:flex-start;gap:10px;font-size:0.96rem}
+details summary::-webkit-details-marker{display:none}
+details summary::before{content:'▶';color:#64c8ff;font-size:0.75em;transition:transform 0.2s;flex-shrink:0;margin-top:5px}
+details[open] summary::before{transform:rotate(90deg);color:#5eead4}
+details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
+details .answer ul,details .answer ol{margin:6px 0 6px 22px}
+@media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+</style>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({startOnLoad:true,theme:'base',flowchart:{useMaxWidth:true,htmlLabels:true,nodeSpacing:50,rankSpacing:60},themeVariables:{primaryColor:'#1a2530',primaryTextColor:'#e8eef5',primaryBorderColor:'#64c8ff',lineColor:'#5eead4',secondaryColor:'#0e1419',tertiaryColor:'#0a0f14',background:'#0a0f14',mainBkg:'#1a2530',secondBkg:'#0e1419',textColor:'#d4dae0',fontFamily:'-apple-system,"SF Pro Display",sans-serif',fontSize:'16px'}});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const lb=document.createElement('div');lb.className='lightbox';
+  lb.innerHTML='<span class="hint">scroll = zoom · drag = pan · Esc / click bg = close</span>';
+  document.body.appendChild(lb);
+  let scale=1,panX=0,panY=0,dragging=false,moved=false,lx=0,ly=0;
+  const apply=()=>{const s=lb.querySelector('svg');if(s)s.style.transform=`translate(${panX}px,${panY}px) scale(${scale})`};
+  const reset=()=>{scale=1;panX=0;panY=0};
+  const close=()=>{lb.classList.remove('open');const s=lb.querySelector('svg');if(s)s.remove();reset()};
+  document.addEventListener('click',e=>{
+    if(e.target.closest('.lightbox')){if(moved){moved=false;return}close();return}
+    const w=e.target.closest('.mermaid');if(!w)return;
+    const svg=w.querySelector('svg');if(!svg)return;
+    const c=svg.cloneNode(true);c.removeAttribute('style');
+    c.style.maxWidth='96vw';c.style.maxHeight='92vh';
+    lb.appendChild(c);lb.classList.add('open');reset();apply();
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+  lb.addEventListener('wheel',e=>{
+    if(!lb.classList.contains('open'))return;
+    e.preventDefault();
+    const svg=lb.querySelector('svg');if(!svg)return;
+    const ns=Math.max(0.3,Math.min(10,scale*(1-e.deltaY*0.002)));
+    const r=svg.getBoundingClientRect();
+    const cx=e.clientX-(r.left+r.width/2),cy=e.clientY-(r.top+r.height/2);
+    const k=ns/scale-1;panX-=cx*k;panY-=cy*k;scale=ns;apply();
+  },{passive:false});
+  lb.addEventListener('mousedown',e=>{
+    if(!lb.classList.contains('open'))return;
+    dragging=true;moved=false;lx=e.clientX;ly=e.clientY;lb.classList.add('dragging');e.preventDefault();
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    const dx=e.clientX-lx,dy=e.clientY-ly;
+    if(Math.abs(dx)+Math.abs(dy)>3)moved=true;
+    panX+=dx;panY+=dy;lx=e.clientX;ly=e.clientY;apply();
+  });
+  document.addEventListener('mouseup',()=>{dragging=false;lb.classList.remove('dragging')});
+});
+</script>
+</head><body><div class="container">
+
+<header>
+<div class="meta">
+<span class="tag day">Day 18</span>
+<span class="tag diff">Hard</span>
+<span class="tag">Billing</span>
+<span class="tag">Subscriptions</span>
+<span class="tag">Proration</span>
+<span class="tag">Metering</span>
+</div>
+<h1>订阅与计费 — 把"按时间和用量收钱"做成可对账的引擎<span class="en">Subscription & Billing: Lifecycle State Machine, Proration, Usage Metering, Multi-currency & Tax</span></h1>
+</header>
+
+<h2>问题场景与需求约束</h2>
+<p>设计一个 SaaS 计费平台（类似 Stripe Billing / Chargebee）：<strong>10 万企业订阅</strong>，混合定价 = 月度/年度固定费（seat-based）+ 按量计费（API 调用、存储 GB）。客户随时升降级套餐、增减席位，跨 30+ 国家、多货币、需自动算税。这是 Day 17 支付的<em>上游</em>：支付解决"怎么把一笔钱安全收掉"，计费解决"<strong>这个月到底该收多少钱、向谁、为什么</strong>"。</p>
+<p>面试要先澄清的关键约束：</p>
+<ul>
+<li><strong>金额永远整数</strong>：minor units（分）存储，绝不用 float，否则四舍五入误差累积成对账 break。</li>
+<li><strong>账单可解释</strong>：每张 invoice 的每一行（line item）都要能追溯到"为什么是这个数"——监管与客户投诉都要查。</li>
+<li><strong>变更幂等</strong>：扣费 cron 重跑、客户重复点"升级"都不能多生成一张 invoice。</li>
+<li><strong>规模</strong>：固定费扣费 ~10 万张 invoice/月，但<strong>用量事件 ~10 亿/天</strong>——计费的真正吞吐瓶颈在 metering 不在 invoicing。</li>
+<li><strong>延迟</strong>：账单生成可异步（分钟级），但 proration 预览要同步（&lt; 300ms）让客户当场看到差价。</li>
+</ul>
+
+<h2>高层架构</h2>
+<div class="mermaid">
+graph TD
+  CAT[Pricing Catalog<br/>产品/价格/计划] --> SUB[Subscription Service<br/>生命周期状态机]
+  EV[用量事件 ~10亿/天] --> ING[Metering Ingest<br/>去重+幂等]
+  ING --> AGG[聚合 Rollup<br/>Redis→Postgres]
+  SUB --> BILL[Billing Engine<br/>周期触发 / Proration]
+  AGG --> BILL
+  TAX[Tax Engine<br/>税率+税则] --> BILL
+  BILL --> INV[(Invoice Store<br/>不可变账单)]
+  INV --> PAY[Payment / 收款<br/>Day 17 幂等支付]
+  PAY -->|失败| DUN[Dunning<br/>重试+催收]
+  INV --> LED[(Ledger<br/>双重记账/收入确认)]
+</div>
+<p><strong>组件职责</strong>：① <em>Pricing Catalog</em> 定义产品、价格、计划（版本化，改价不影响存量订阅）；② <em>Subscription Service</em> 维护每个订阅的生命周期状态机；③ <em>Metering</em> 把海量用量事件去重、聚合成可计费数量；④ <em>Billing Engine</em> 是核心——周期到点把"固定费 + 用量 + proration 调整 + 税"汇成一张 invoice；⑤ 账单交给 Day 17 的<em>幂等支付</em>收款，失败进 <em>Dunning</em> 催收；⑥ 所有金额落 <em>Ledger</em> 做收入确认与对账。</p>
+
+<h2>关键技术点</h2>
+
+<h3>① 订阅生命周期状态机 + 周期触发 — 让"到点扣费"既不漏也不重</h3>
+<p><strong>核心 trade-off：用一个显式落库的状态机，换掉散落在各处的 if-else 与重复扣费风险。</strong></p>
+<p>【原理】订阅不是一个布尔"激活/未激活"，而是状态机：<code>trialing → active → past_due → canceled / unpaid</code>。状态转移由两类事件驱动：<em>时间</em>（周期结束 = 该出账）和<em>动作</em>（升级、取消、支付成功/失败）。到点扣费的触发有两种实现：扫表 cron（每分钟查 <code>next_billing_at &lt;= now</code>）或为每个订阅注册一个 scheduled job。关键是<strong>幂等</strong>：把"为周期 P 生成 invoice"用 <code>(subscription_id, period_start)</code> 做唯一键，cron 重跑只命中已存在的 invoice，绝不重复出账。</p>
+<div class="tradeoff"><strong>选型对比：</strong>
+<ul>
+<li><strong>扫表 cron</strong>：实现简单、易补偿（漏了下一轮自动捞起来）；但 10 万订阅同一天到期会造成<em>出账尖峰</em>（如月初 1 号），要打散账单日（anchor date）或分片错峰。</li>
+<li><strong>每订阅 scheduled job</strong>（如 timer 队列）：负载天然平滑；但调度器本身要高可用，丢了一个 timer = 漏一次扣费，需对账兜底。</li>
+<li><strong>状态机落库 vs 隐式状态</strong>：显式 <code>status</code> 列 + 转移日志可审计、可回放；用多个布尔字段拼状态会产生非法组合（既 trialing 又 past_due），早晚出 bug。</li>
+</ul></div>
+<pre><code># pseudo-code: 幂等周期出账（cron 每分钟跑）
+def bill_due_subscriptions(now):
+    for sub in db.query("status IN ('active','past_due') AND next_billing_at <= %s", now):
+        period = (sub.current_period_start, sub.current_period_end)
+        # 唯一键去重：同周期只出一张账
+        inv = db.get_or_create_invoice(sub.id, period[0])
+        if inv.status != 'draft':          # 已出过 → 跳过
+            continue
+        add_recurring_lines(inv, sub)      # 固定费/席位
+        add_metered_lines(inv, sub, period)# 用量（见技术点③）
+        finalize_and_charge(inv)           # 定稿→交支付
+        sub.advance_period()               # 推进到下一周期
+</code></pre>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Stripe Billing</strong>：subscription 是显式状态机（<code>trialing / active / past_due / canceled / unpaid</code>），每个周期生成一张 invoice，<code>billing_cycle_anchor</code> 控制账单日，刻意把不同客户错峰到不同日期。</li>
+<li><strong>Chargebee / Recurly</strong>：同样以"subscription + 周期 invoice"为核心模型，支持 trial、暂停、续订。</li>
+<li><strong>AWS</strong>：账单按月聚合，月初出账尖峰是典型的"billing run"批处理工程。</li>
+</ul></div>
+
+<h3>② Proration（按比例计费）— 中途变更怎么"补差价"</h3>
+<p><strong>核心 trade-off：proration 让定价公平且即时，但每一次变更都往账单塞入正负两条调整行，复杂度与可解释性成本陡增。</strong></p>
+<p>【原理】客户在周期中途从 $10/月 升到 $20/月，不能整月按新价收。proration 把变更点切成两段：<em>退还</em>旧套餐剩余时间的未使用部分（负数 credit），<em>补收</em>新套餐剩余时间（正数 charge）。半个月升级 → <code>-$5</code>（旧价未用）+ <code>$10</code>（新价剩余）= 净补 <code>$5</code>。这些以 <strong>invoice line item</strong> 形式累积，下次出账或立即结算。比例因子 = 剩余秒数 / 周期总秒数——按秒算，不是按天，否则边界不公。</p>
+<div class="tradeoff"><strong>选型对比：</strong>
+<ul>
+<li><strong>立即 proration（默认）</strong>：公平、所见即所得；但频繁升降级（A/B 试套餐）会刷出一堆 ±调整行，账单像流水账，客服解释成本高。</li>
+<li><strong>不 proration（下周期生效）</strong>：账单干净；但客户"立刻升级却月底才付费 / 降级了这个月还按高价"，体感不公。</li>
+<li><strong>credit 入账户余额 vs 立即退款</strong>：负 proration 通常<em>不</em>自动退现金，而是记成账户 credit 抵下期——避免退款手续费与欺诈（升级再退款套现）。</li>
+</ul></div>
+<pre><code># pseudo-code: 升级 proration（按秒比例）
+def prorate_change(sub, new_price, now):
+    total = sub.period_end - sub.period_start      # 周期总秒数
+    remain = sub.period_end - now                  # 剩余秒数
+    factor = remain / total
+    credit = -round(sub.current_price * factor)    # 退旧价未用（minor units）
+    charge =  round(new_price        * factor)     # 补新价剩余
+    add_line(sub.invoice, "unused time credit", credit)
+    add_line(sub.invoice, "remaining time @ new", charge)
+    sub.current_price = new_price                  # 余额 credit 抵扣，不退现金
+</code></pre>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Stripe Prorations</strong>：升降级自动生成正负 proration line items，按秒计比例；负 proration 默认不退现金而记 credit，可 <code>preview</code> 让客户先看差价（对应我们 &lt;300ms 同步预览的需求）。</li>
+<li><strong>GitHub / Slack 席位计费</strong>：年中加人按比例补差价，减人记 credit 抵续费——seat-based proration 的经典形态。</li>
+</ul></div>
+
+<h3>③ 用量计费（Metering）— 10 亿事件/天怎么聚合成几个数字</h3>
+<p><strong>核心 trade-off：在精度（每个事件都算）与吞吐/成本（聚合后再记）之间权衡，外加迟到事件破坏已定稿账单的风险。</strong></p>
+<p>【原理】metering pipeline 四段：<em>Emit</em>（业务发用量事件）→ <em>Ingest</em>（校验+幂等去重）→ <em>Meter</em>（聚合成可计费量）→ <em>Invoice</em>（汇入账单）。10 亿/天直接一条条写 DB 会爆，工业做法是<strong>两级聚合</strong>：先在应用内存/Redis 按 <code>(customer, meter, 小时)</code> 累加，每分钟 flush 一次到 Postgres rollup 表，出账时只 SUM 几千行小时桶。聚合函数受限：通常只支持 <code>sum / count / last</code>——"峰值并发""日均存储"这类 max/avg 要业务侧自己算好上报 last 值。事件必须带 <em>幂等键</em>（event_id）去重，否则客户端重试 = 多计费。</p>
+<div class="tradeoff"><strong>选型对比：</strong>
+<ul>
+<li><strong>事件级精确（每事件落库）</strong>：可逐笔审计；但 10 亿/天的写入与存储成本爆炸，出账时聚合扫描慢。</li>
+<li><strong>两级预聚合</strong>：吞吐高、出账快；但丢了单事件明细（争议时只能给小时粒度），且内存层崩溃会丢未 flush 的窗口 → 需 at-least-once + 幂等去重兜底。</li>
+<li><strong>迟到事件处理</strong>：周期边界后才到的事件，是塞进已关账单（要 reopen，乱）还是计入下期（简单但归属错）？多数系统设<em>宽限窗口</em>，窗口外的事件入下期并打标记。</li>
+</ul></div>
+<pre><code># pseudo-code: 两级聚合 + 幂等去重
+def ingest(event):
+    if not redis.set(f"seen:{event.id}", 1, nx=True, ex=DAY):  # 幂等
+        return                                  # 重复事件丢弃
+    key = (event.customer, event.meter, hour_bucket(event.ts))
+    redis.hincrby("usage", key, event.qty)      # 内存累加
+
+def flush_every_minute():                        # 二级：落 Postgres
+    for key, qty in redis.hgetall("usage"):
+        db.upsert_rollup(key, qty)               # 小时桶
+# 出账：SELECT SUM(qty) ... WHERE customer=? AND ts IN [period]
+</code></pre>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Stripe Billing Meters</strong>：上报 usage events，按 <code>sum/count/last</code> 聚合到账期；官方建议高频场景在应用侧先累加、定期 flush 一个聚合事件，避免打爆 API 与配额。</li>
+<li><strong>Datadog / Snowflake / Cloudflare</strong>：用量型计费的典型，海量计量事件先在数据管道里 rollup，再喂给 billing。</li>
+<li><strong>AWS metering</strong>：每个服务上报计量，月底聚合成账单行，迟到/修正通过后续调整体现。</li>
+</ul></div>
+
+<h3>④ 多货币与税务 — 同一套引擎服务全球</h3>
+<p><strong>核心 trade-off：本币计价体验最好，但引入 FX 风险、税则复杂度与对账维度爆炸。</strong></p>
+<p>【原理】两件事必须做对。<em>货币</em>：每个 price 用 minor units + ISO 货币码存储（日元无小数、第纳尔三位小数——别假设两位）；跨币种<strong>不在出账时实时换汇</strong>，而是为每币种预设价格，避免汇率波动让账单不可复现。<em>税</em>：税额是<em>额外加</em>（exclusive，美国常见）还是<em>已含</em>（inclusive，欧盟含 VAT）由地区/货币决定；商品要打 tax code 决定税率与是否免税。税在出账瞬间按当时税率冻结进 invoice，事后税率变更不回改历史账单。</p>
+<div class="tradeoff"><strong>选型对比：</strong>
+<ul>
+<li><strong>多币种预设价 vs 实时换汇</strong>：预设价账单可复现、无 FX 风险，但要维护 N 套价格；实时换汇灵活，但同一操作不同时刻金额不同，对账与退款变噩梦。</li>
+<li><strong>自建税引擎 vs 第三方（Stripe Tax / Avalara）</strong>：自建省抽成但要追全球税率/起征点变化（合规地狱）；第三方贵但把合规风险外包。</li>
+<li><strong>tax inclusive vs exclusive</strong>：含税显示客户友好（欧盟法规要求），但反推净额有舍入；外加税净额清晰，却让美国客户结账时"金额怎么变多了"。</li>
+</ul></div>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Stripe Tax</strong>：按货币自动选 tax behavior（USD/CAD 默认 exclusive，其余 inclusive），多币种价格可逐币种覆盖；用 product tax code 跨 100+ 国家算税。</li>
+<li><strong>Apple App Store / Google Play</strong>：全球定价用各区"价格档位"而非实时换汇，正是预设价模式。</li>
+</ul></div>
+
+<h2>扩展与优化（增长后怎么办）</h2>
+<ul>
+<li><strong>出账尖峰</strong>：把账单 anchor date 打散到全月（而非都在 1 号），billing run 按客户分片并行；用量 rollup 提前到周期内增量计算，出账时只做收尾。</li>
+<li><strong>Dunning（催收）</strong>：支付失败不等于流失——按 backoff 重试（如第 1/3/5/7 天），配合 smart retry（避开发卡行拒付高峰）、邮件提醒、最后降级到 <code>unpaid</code>。这是 SaaS 挽回收入的关键一环。</li>
+<li><strong>收入确认（RevRec）</strong>：年付一次性收钱但要按月确认收入（ASC 606 / IFRS 15），靠 Ledger 把"已收现金"与"已确认收入"分开记——预收款是负债，逐月转收入。</li>
+<li><strong>定价实验</strong>：Pricing Catalog 版本化，新价格只对新订阅生效，存量订阅 grandfather（保留旧价）；改价绝不能就地改存量订阅的引用。</li>
+<li><strong>对账</strong>：billing 的 invoice 总额 ⇄ 支付实收 ⇄ ledger 收入，三方逐笔对账（接 Day 17 的对账作业），任何 break 都要可定位到 line item。</li>
+</ul>
+
+<h2>常见陷阱 + 面试追问</h2>
+<div class="callout"><strong>1. 用 float 存钱。</strong> <code>0.1 + 0.2 ≠ 0.3</code>，累积舍入误差最终在对账时炸出几分钱的 break。永远用整数 minor units，且记住不是所有币种都两位小数。</div>
+<div class="callout"><strong>2. 出账不幂等。</strong> cron 重跑、消息重投、客户狂点升级，没有 <code>(sub_id, period)</code> 唯一键就会重复出账、重复扣款。幂等是计费的底线。</div>
+<div class="callout"><strong>3. proration 按天而非按秒。</strong> 边界日的归属会让客户多付/少付，争议不断；且要明确升级立即收、降级记 credit 的策略。</div>
+<div class="callout"><strong>4. 改价就地改存量订阅。</strong> 价格必须版本化，存量订阅引用旧版本；否则一次调价把所有老客户账单全改了，等着上新闻。</div>
+<div class="callout"><strong>5. 迟到用量事件直接塞进已定稿账单。</strong> 已 finalize 的 invoice 应不可变；迟到事件入下期或走显式 credit note 调整，而不是偷偷改历史。</div>
+<p style="margin-top:14px"><strong>高频追问：</strong>① 周期出账用 cron 还是 per-subscription timer，怎么保证不漏不重？② 中途升级的 proration 一步步算给我看（按秒）。③ 10 亿用量事件/天的 metering 怎么设计，迟到事件怎么办？④ 年付怎么做收入确认，现金和收入为什么要分开记？⑤ inclusive vs exclusive 税，多币种为什么不实时换汇？</p>
+
+<h2>深入资源</h2>
+<ul>
+<li><strong>Stripe Billing — Subscriptions Overview & Prorations</strong>（<a href="https://docs.stripe.com/billing/subscriptions/overview">overview</a> / <a href="https://docs.stripe.com/billing/subscriptions/prorations">prorations</a>）：生命周期状态机与按秒 proration 的权威实现。</li>
+<li><strong>Stripe — Designing robust and predictable APIs with idempotency</strong>（<a href="https://stripe.com/blog/idempotency">stripe.com/blog/idempotency</a>）：出账与变更幂等的工程基础。</li>
+<li><strong>Stripe Billing Meters / Usage-based billing</strong>（<a href="https://docs.stripe.com/billing/subscriptions/usage-based-legacy/recording-usage">recording usage</a>）：用量聚合 sum/count/last 与高频上报的官方建议。</li>
+<li><strong>Stripe Tax — Tax behavior & multi-currency</strong>（<a href="https://docs.stripe.com/tax/products-prices-tax-codes-tax-behavior">tax behavior</a>）：inclusive/exclusive 与多币种税则。</li>
+<li><strong>TigerBeetle — Debit/Credit schema</strong>（<a href="https://docs.tigerbeetle.com/concepts/debit-credit/">docs</a>）：把收入确认建成双重记账不变量。</li>
+<li><strong>《Designing Data-Intensive Applications》</strong>（Kleppmann）：批处理出账、幂等与对账思想的底层原理。</li>
+</ul>
+
+<h2>深入思考（点击展开答案）</h2>
+
+<details>
+<summary>1. 10 万订阅都在每月 1 号出账，billing run 扛不住尖峰。除了"加机器"，至少给两种结构性解法，各自代价？</summary>
+<div class="answer">
+<ul>
+<li><strong>打散 anchor date</strong>：按客户创建日或 hash 把账单日均匀分布到全月 1–28 号，尖峰摊成 1/30。代价：客户账单日不统一，企业客户做财务对账时可能希望统一账期，需要支持"自定义对齐日"作为例外。</li>
+<li><strong>分片并行 + 增量预聚合</strong>：billing run 按 <code>customer_id % N</code> 分片到多 worker 并行，且用量 rollup 在周期内就增量算好，1 号当天只做"收尾 + 定稿"而非从零扫 10 亿事件。代价：增量状态要持久化与一致，崩溃恢复复杂。</li>
+</ul>
+<p>二阶收益：出账尖峰会传导到<em>支付</em>侧——10 万张账单同时 charge 会打爆 PSP 配额并撞上发卡行限流，所以打散账单日同时也在给下游支付削峰。</p>
+</div>
+</details>
+
+<details>
+<summary>2. 客户在一个周期内升级→降级→再升级三次，账单会变成什么样？怎么让它仍然可解释？</summary>
+<div class="answer">
+<p>每次变更都按秒生成一对 ±proration line items，三次变更 = 6 条调整行 + 各自的剩余时间补收，账单像流水账。可解释性靠几点：</p>
+<ul>
+<li>每条 line item 带 <strong>period_start/end + 关联的 price_id + 比例因子</strong>，能还原"为什么是这个数"。</li>
+<li>负 proration 进<strong>账户 credit 余额</strong>而非立即退款，最终账单 = 净额，避免反复退款手续费与套现欺诈。</li>
+<li>提供 <code>preview</code> 让客户每次变更当场看差额（对应 &lt;300ms 同步预览需求），减少事后客诉。</li>
+</ul>
+<p>陷阱：频繁变更可能产生"反复试套餐套利"——某些系统对一周期内多次降级设限或只在周期末结算，正是用干净度换公平性的 trade-off。</p>
+</div>
+</details>
+
+<details>
+<summary>3. 一个用量事件在周期结束后 2 小时才到达（客户端缓冲/网络延迟）。塞进已关账单、计入下期、还是别的？各方案破在哪？</summary>
+<div class="answer">
+<ul>
+<li><strong>reopen 已关账单</strong>：归属正确，但已 finalize/已收款的 invoice 再改违反"账单不可变"，且若已对账会制造 break，监管也不喜欢。</li>
+<li><strong>计入下期</strong>：实现简单、账单不可变；但收入归属错期（这个月的用量算到下个月），RevRec 与客户对账会对不上。</li>
+<li><strong>宽限窗口 + credit note</strong>：设一个出账宽限窗（如周期末后 N 小时才定稿），窗内的迟到事件仍计入本期；窗外的用显式 <em>credit/debit note</em> 作为对历史账单的可审计调整，而非偷改原单。</li>
+</ul>
+<p>本质是 Day 20 流处理的 <strong>watermark / 迟到数据</strong>问题在计费域的投影：你要在"等多久才定稿"（完整性）与"多快出账"（时效）之间设一个 watermark，并为窗外数据准备可审计的补偿通道。</p>
+</div>
+</details>
+
+<details>
+<summary>4. 年付一次性收了 $1200，为什么不能当月就确认 $1200 收入？这对系统数据模型有什么要求？</summary>
+<div class="answer">
+<p>会计准则（ASC 606 / IFRS 15）要求收入按<strong>服务交付进度</strong>确认：年付一次收的现金里，未交付部分是<em>递延收入（负债）</em>，要随服务逐月（$100/月）转成已确认收入。原因是收了钱不等于赚到——若客户第二个月退订，多确认的收入要冲回。</p>
+<p>对系统的要求：现金流与收入流<strong>必须分开记</strong>。Ledger 用双重记账：收款时 借现金 / 贷递延收入；每月 借递延收入 / 贷已确认收入。这正是 TigerBeetle 式 debit/credit 不变量的用武之地——任何时刻"已收现金 = 已确认 + 待确认"恒等，单边写入成为非法状态而非隐蔽 bug。中途取消则冲销剩余递延收入 + 退现金。</p>
+</div>
+</details>
+
+<details>
+<summary>5. 计费系统和 Day 17 支付系统的幂等键，能不能共用一个？边界在哪？</summary>
+<div class="answer">
+<p>不能简单共用，它们幂等的是<em>不同层次的操作</em>：</p>
+<ul>
+<li><strong>计费幂等</strong>键 = <code>(subscription_id, period_start)</code>，保证"这个周期只生成一张 invoice"。它防的是<em>重复出账</em>。</li>
+<li><strong>支付幂等</strong>键 = 每次 charge 的 idempotency key（如 invoice_id 或一次性 UUID），保证"这张账单只扣一次钱"。它防的是<em>重复扣款</em>。</li>
+</ul>
+<p>边界：一张 invoice 可能被 charge <em>多次尝试</em>（dunning：第 1/3/5 天重试）。这些重试应共享同一支付幂等键（针对该 invoice），让 PSP 识别为同一笔、不重复扣；但每次重试是计费状态机的合法转移，不应被计费层幂等当成"重复"丢弃。所以两层幂等键解耦：计费保证"账不重出"，支付保证"钱不重扣"，dunning 在两者之间编排重试——这正是分层幂等的经典设计。</p>
+</div>
+</details>
+
+</div>
+</body></html>
