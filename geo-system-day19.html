@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 19 · 地理系统 (Geospatial Systems) — System Design Bi-daily</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"SF Pro Display","Noto Sans SC",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
+.container{max-width:820px;margin:0 auto;padding:24px 20px 60px}
+header{padding:40px 0 28px;border-bottom:1px solid rgba(100,200,255,0.15);margin-bottom:32px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem}
+.tag{padding:3px 10px;border-radius:4px;background:rgba(100,200,255,0.12);color:#64c8ff;border:1px solid rgba(100,200,255,0.25)}
+.tag.diff{background:rgba(94,234,212,0.1);color:#5eead4;border-color:rgba(94,234,212,0.3)}
+.tag.day{background:rgba(255,180,80,0.1);color:#ffb450;border-color:rgba(255,180,80,0.25)}
+h1{font-size:1.75rem;font-weight:800;background:linear-gradient(135deg,#64c8ff 0%,#5eead4 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:0.5px;line-height:1.3}
+h1 .en{display:block;font-size:1rem;color:#7a8590;-webkit-text-fill-color:#7a8590;margin-top:6px;font-weight:500}
+h2{font-size:1.2rem;color:#5eead4;margin:36px 0 14px;padding-left:12px;border-left:3px solid #5eead4}
+h3{font-size:1rem;color:#64c8ff;margin:20px 0 10px;font-weight:600}
+p{margin:10px 0;color:#c8cfd6}
+ul,ol{margin:10px 0 10px 22px;color:#c8cfd6}
+li{margin:6px 0}
+strong{color:#e8eef5;font-weight:600}
+em{color:#5eead4;font-style:normal;font-weight:500}
+code{font-family:"SF Mono",Menlo,Consolas,monospace;background:rgba(100,200,255,0.1);color:#5eead4;padding:1px 6px;border-radius:3px;font-size:0.88em}
+pre{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:14px 16px;overflow-x:auto;margin:12px 0;font-family:"SF Mono",Menlo,Consolas,monospace;font-size:0.84rem;line-height:1.55;color:#c8cfd6}
+pre code{background:none;color:inherit;padding:0;font-size:1em}
+.mermaid{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:18px;margin:14px 0;text-align:center;overflow-x:auto;cursor:zoom-in;transition:border-color 0.15s}
+.mermaid:hover{border-color:rgba(100,200,255,0.4)}
+.mermaid svg{width:100%;max-width:100%;height:auto;min-height:280px}
+.lightbox{position:fixed;inset:0;background:rgba(8,12,18,0.96);z-index:9999;display:none;align-items:center;justify-content:center;padding:24px;cursor:grab;backdrop-filter:blur(4px);overflow:hidden}
+.lightbox.open{display:flex}
+.lightbox.dragging{cursor:grabbing}
+.lightbox svg{width:auto;height:auto;max-width:96vw;max-height:92vh;transform-origin:center center;will-change:transform}
+.lightbox .hint{position:fixed;top:16px;right:20px;font-size:0.78rem;color:#7a8590;font-family:"SF Mono",Menlo,monospace;pointer-events:none}
+.callout{background:rgba(255,180,80,0.06);border-left:3px solid #ffb450;padding:12px 14px;margin:14px 0;border-radius:4px;font-size:0.94rem}
+.callout strong{color:#ffb450}
+.tradeoff{background:rgba(100,200,255,0.05);border:1px solid rgba(100,200,255,0.2);border-radius:6px;padding:12px 14px;margin:12px 0;font-size:0.94rem}
+.case{background:rgba(94,234,212,0.05);border-left:3px solid #5eead4;padding:12px 14px;margin:12px 0;border-radius:4px;font-size:0.94rem}
+.case strong{color:#5eead4}
+.nav{margin-top:50px;padding-top:24px;border-top:1px solid rgba(100,200,255,0.15);text-align:center}
+.nav a{color:#64c8ff;text-decoration:none;font-size:0.92rem;padding:8px 16px;border:1px solid rgba(100,200,255,0.3);border-radius:4px;transition:all 0.15s}
+.nav a:hover{background:rgba(100,200,255,0.1)}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:0.9rem}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid rgba(100,200,255,0.15)}
+th{color:#64c8ff;font-weight:600;background:rgba(100,200,255,0.05)}
+details{background:rgba(100,200,255,0.04);border:1px solid rgba(100,200,255,0.18);border-radius:6px;padding:12px 16px;margin:10px 0;transition:all 0.15s}
+details:hover{border-color:rgba(100,200,255,0.35)}
+details[open]{background:rgba(94,234,212,0.05);border-color:rgba(94,234,212,0.3)}
+details summary{font-weight:600;color:#e8eef5;list-style:none;outline:none;cursor:pointer;display:flex;align-items:flex-start;gap:10px;font-size:0.96rem}
+details summary::-webkit-details-marker{display:none}
+details summary::before{content:'▶';color:#64c8ff;font-size:0.75em;transition:transform 0.2s;flex-shrink:0;margin-top:5px}
+details[open] summary::before{transform:rotate(90deg);color:#5eead4}
+details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
+details .answer ul,details .answer ol{margin:6px 0 6px 22px}
+@media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+</style>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({startOnLoad:true,theme:'base',flowchart:{useMaxWidth:true,htmlLabels:true,nodeSpacing:50,rankSpacing:60},themeVariables:{primaryColor:'#1a2530',primaryTextColor:'#e8eef5',primaryBorderColor:'#64c8ff',lineColor:'#5eead4',secondaryColor:'#0e1419',tertiaryColor:'#0a0f14',background:'#0a0f14',mainBkg:'#1a2530',secondBkg:'#0e1419',textColor:'#d4dae0',fontFamily:'-apple-system,"SF Pro Display",sans-serif',fontSize:'16px'}});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const lb=document.createElement('div');lb.className='lightbox';
+  lb.innerHTML='<span class="hint">scroll = zoom · drag = pan · Esc / click bg = close</span>';
+  document.body.appendChild(lb);
+  let scale=1,panX=0,panY=0,dragging=false,moved=false,lx=0,ly=0;
+  const apply=()=>{const s=lb.querySelector('svg');if(s)s.style.transform=`translate(${panX}px,${panY}px) scale(${scale})`};
+  const reset=()=>{scale=1;panX=0;panY=0};
+  const close=()=>{lb.classList.remove('open');const s=lb.querySelector('svg');if(s)s.remove();reset()};
+  document.addEventListener('click',e=>{
+    if(e.target.closest('.lightbox')){if(moved){moved=false;return}close();return}
+    const w=e.target.closest('.mermaid');if(!w)return;
+    const svg=w.querySelector('svg');if(!svg)return;
+    const c=svg.cloneNode(true);c.removeAttribute('style');
+    c.style.maxWidth='96vw';c.style.maxHeight='92vh';
+    lb.appendChild(c);lb.classList.add('open');reset();apply();
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+  lb.addEventListener('wheel',e=>{
+    if(!lb.classList.contains('open'))return;
+    e.preventDefault();
+    const svg=lb.querySelector('svg');if(!svg)return;
+    const ns=Math.max(0.3,Math.min(10,scale*(1-e.deltaY*0.002)));
+    const r=svg.getBoundingClientRect();
+    const cx=e.clientX-(r.left+r.width/2),cy=e.clientY-(r.top+r.height/2);
+    const k=ns/scale-1;panX-=cx*k;panY-=cy*k;scale=ns;apply();
+  },{passive:false});
+  lb.addEventListener('mousedown',e=>{
+    if(!lb.classList.contains('open'))return;
+    dragging=true;moved=false;lx=e.clientX;ly=e.clientY;lb.classList.add('dragging');e.preventDefault();
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    const dx=e.clientX-lx,dy=e.clientY-ly;
+    if(Math.abs(dx)+Math.abs(dy)>3)moved=true;
+    panX+=dx;panY+=dy;lx=e.clientX;ly=e.clientY;apply();
+  });
+  document.addEventListener('mouseup',()=>{dragging=false;lb.classList.remove('dragging')});
+});
+</script>
+</head><body><div class="container">
+
+<header>
+<div class="meta">
+<span class="tag day">Day 19</span>
+<span class="tag diff">Hard</span>
+<span class="tag">Geospatial</span>
+<span class="tag">S2 / H3 / Geohash</span>
+<span class="tag">Uber Dispatch</span>
+</div>
+<h1>地理系统 — 把球面切成格子，再在格子里找最近的人<span class="en">Geospatial Systems: Geohash vs S2 vs H3, Nearby Queries, Uber Dispatch</span></h1>
+</header>
+
+<h2>问题场景与需求约束</h2>
+<p>设计一个 <strong>5000 万 DAU 的网约车「附近的司机」服务</strong>：乘客点开 App，要在 <strong>p99 &lt; 100ms</strong> 内返回半径 3km 内、最近的 20 个可用司机，并据此派单。难点在<em>读写都重</em>——这不是「设计 Yelp 静态门店搜索」那种以读为主的场景。</p>
+<ul>
+<li><strong>写极重</strong>：峰值 200 万在线司机，每 4 秒上报一次 GPS → <strong>50 万 location writes/s</strong>，且每条写都让旧位置失效。</li>
+<li><strong>读也重</strong>：高峰 10 万 QPS 的附近查询，每次要在百万级动点中筛出半径内的 top-N。</li>
+<li><strong>延迟</strong>：派单链路 p99 &lt; 100ms，地理检索只能占其中 ~20ms。</li>
+<li><strong>动态数据</strong>：司机一直在移动，索引必须支持高频 update，不能像门店那样建一次静态索引。</li>
+<li><strong>地理倾斜</strong>：机场、演唱会、早高峰 CBD —— 局部密度可能是平均值的 100 倍，是热点的天然温床。</li>
+</ul>
+<p>核心三问：<em>① 怎么把经纬度变成可索引的 key（地理编码）；② 怎么高效查半径内的点（附近查询）；③ 百万动点怎么分片不打爆单机（dispatch 架构）。</em></p>
+
+<h2>高层架构</h2>
+<pre class="mermaid">
+graph TD
+    R["乘客 App<br/><i>发起 nearby 请求</i>"]
+    D["司机 App<br/><i>每 4s 上报 GPS</i>"]
+    GW["API Gateway<br/><i>WebSocket 长连</i>"]
+    DISP["Dispatch 服务 (DISCO)<br/><i>supply/demand 匹配</i>"]
+    RING["一致性哈希环<br/><i>按 geo cell 分片</i>"]
+    N1["Geo Shard A<br/><i>cell 集合 → 内存网格</i>"]
+    N2["Geo Shard B"]
+    N3["Geo Shard C"]
+    DB[("位置存储<br/>Redis GEO / 内存")]
+
+    D -->|① location update| GW --> DISP
+    R -->|② nearby+派单| GW --> DISP
+    DISP -->|③ 按 cell 路由| RING
+    RING --> N1 & N2 & N3
+    N1 & N2 & N3 -.->|④ 持久化兜底| DB
+
+    classDef client fill:#1a2530,stroke:#64c8ff,color:#e8eef5
+    classDef svc fill:#0e2030,stroke:#5eead4,color:#e8eef5
+    classDef shard fill:#1a1a30,stroke:#ffb450,color:#e8eef5
+    classDef store fill:#2a1530,stroke:#ff7ab6,color:#e8eef5
+    class R,D client
+    class GW,DISP,RING svc
+    class N1,N2,N3 shard
+    class DB store
+</pre>
+<p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">司机位置先地理编码成 cell ID，再用 cell ID 做分片键路由到对应 shard；查询只触达「目标 cell + 邻居 cell」所在的少数 shard</p>
+<p><strong>组件职责</strong>：网关维持司机长连收 GPS；<em>Dispatch（Uber 叫 DISCO）</em>把经纬度编码为 geo cell，用<em>一致性哈希环</em>（Uber 用 Ringpop）按 cell 把 supply/demand 分片到内存节点；每个 shard 在内存维护「cell → 司机集合」网格，查询只读「中心 cell + 一圈邻居」。<strong>真相在内存</strong>，位置存储（Redis GEO 或异步落盘）只兜底崩溃恢复。</p>
+
+<h2>关键技术点</h2>
+
+<h3>1. 地理编码：Geohash vs S2 vs H3 — 怎么把球面切成可索引的格子</h3>
+<p><strong>原理</strong>：二维经纬度直接建 B-Tree 索引没用——范围查询要同时约束两个维度。核心思路是用<em>空间填充曲线（space-filling curve）把 2D 降到 1D</em>：把经纬度编码成一个保持局部性的整数/字符串，<strong>空间相邻 ≈ 编码相邻</strong>，于是「附近」退化成「前缀相同」或「ID 区间相邻」，能用普通的有序索引（B-Tree / sorted set）查。三种主流方案的差异在于「用什么形状的格子、怎么填充曲线」。</p>
+<table>
+<thead><tr><th></th><th>Geohash</th><th>S2 (Google)</th><th>H3 (Uber)</th></tr></thead>
+<tbody>
+<tr><td><strong>格子形状</strong></td><td>矩形</td><td>球面四边形</td><td>六边形(+12 个五边形)</td></tr>
+<tr><td><strong>曲线</strong></td><td>Z-order(经纬度位交错)</td><td>Hilbert 曲线 (映射到立方体六面)</td><td>Hilbert-like (icosahedron)</td></tr>
+<tr><td><strong>编码</strong></td><td>base32 字符串</td><td>64-bit cell ID</td><td>64-bit cell ID</td></tr>
+<tr><td><strong>邻居距离</strong></td><td>不均匀(对角≠边)</td><td>不均匀</td><td>均匀(6 邻居等距)</td></tr>
+<tr><td><strong>层级</strong></td><td>逐字符细化</td><td>30 级, 严格四叉嵌套</td><td>16 级, 近似嵌套</td></tr>
+<tr><td><strong>痛点</strong></td><td>边界突变 + 两极畸变</td><td>四边形邻接不均</td><td>父子不完美嵌套</td></tr>
+</tbody></table>
+<div class="tradeoff">
+<strong>Trade-off：</strong>
+<ul>
+<li><strong>Geohash</strong>：✅ 实现极简、人可读、前缀即包含关系，Redis GEO 底层就是它；❌ <strong>边界突变</strong>——两个物理上挨着的点可能 geohash 前缀完全不同（跨格边），导致「附近」漏查；且矩形格子在高纬度严重畸变。</li>
+<li><strong>S2</strong>：✅ 球面无缝、严格四叉树层级（cell 完美包含子 cell），范围扫描天然高效，Google Maps/Bigtable 地理键都用它；❌ 四边形的对角邻居和边邻居距离不等，做「环状半径查询」时格子数估算麻烦。</li>
+<li><strong>H3</strong>：✅ <strong>六边形是唯一所有邻居等距的平面铺砌</strong>，做 <code>kRing</code>（取 k 圈邻居）、流量聚合、ML 特征时天然均匀；❌ 数学上六边形无法完美铺满球面，必须塞 12 个五边形（在 icosahedron 顶点），且父 cell 不能精确切成 7 个子 cell（只能近似），跨层聚合有误差。</li>
+</ul></div>
+<pre><code># Geohash 核心：经纬度二分 + 位交错 (pseudo-code)
+def geohash(lat, lon, precision_bits=50):
+    lat_rng, lon_rng = [-90, 90], [-180, 180]
+    bits, is_lon = [], True            # 经纬交替取位
+    while len(bits) &lt; precision_bits:
+        rng = lon_rng if is_lon else lat_rng
+        mid = (rng[0] + rng[1]) / 2
+        val = lon if is_lon else lat
+        if val &gt;= mid: bits.append(1); rng[0] = mid   # 落在上半 → 1
+        else:          bits.append(0); rng[1] = mid   # 下半 → 0
+        is_lon = not is_lon
+    return bits   # 越长越精确; 共享前缀越长 = 物理越近(但反之不成立!)
+</code></pre>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Google S2</strong>：Maps、Bigtable、Wikidata 的地理键都基于 S2，把球面用 Hilbert 曲线切成保序的 64-bit ID（<a href="https://s2geometry.io/">s2geometry.io</a>，2017 开源）。</li>
+<li><strong>Uber H3</strong>：用六边形做定价、派单、供需热力分析，2018 开源（<a href="https://www.uber.com/en-US/blog/h3/">H3 blog</a> / <a href="https://github.com/uber/h3">github.com/uber/h3</a>），现已是行业事实标准。</li>
+<li><strong>Redis GEO</strong>：<code>GEOADD</code>/<code>GEOSEARCH</code> 底层把 geohash 编码塞进 sorted set 的 score，用 ZRANGEBYSCORE 做范围查。</li>
+</ul></div>
+
+<h3>2. 附近查询：网格桶 vs 四叉树/R-Tree — 怎么避开 O(N) 全表扫</h3>
+<p><strong>原理</strong>：朴素做法是算乘客到每个司机的距离再排序，O(N) 在百万动点下必死。两条主流路线：<em>① 固定网格（grid bucketing）</em>——把空间切成等大 cell，每个司机挂到一个 cell 桶，查询时只看「中心 cell + 周围 8 个邻居」桶里的候选，再精算距离；<em>② 树形索引（quadtree / R-Tree）</em>——按密度自适应划分，稀疏区大格、密集区细格。动点高频更新场景，固定网格胜出，因为<strong>update 是 O(1) 的「从旧桶删、加到新桶」，而树要维护平衡、分裂合并代价高</strong>。</p>
+<div class="tradeoff">
+<strong>Trade-off：</strong>
+<ul>
+<li><strong>固定网格</strong>：✅ update/query 都 O(1)、实现简单、对动点友好；❌ cell 大小固定——选大了密集区一个桶几万人（退化成 O(N)），选小了半径查询要扫一大片桶。机场就是反例。</li>
+<li><strong>四叉树 / R-Tree（PostGIS GiST）</strong>：✅ 自适应密度、半径/多边形查询精确，适合静态门店（Yelp）；❌ 高频 update 要重平衡，写放大严重，不适合每秒 50 万次移动。</li>
+<li><strong>分层网格（H3/S2 多分辨率）</strong>：✅ 折中——按区域密度选不同 resolution；❌ 跨分辨率聚合和邻居计算复杂。</li>
+</ul></div>
+<pre><code># 固定网格 + 邻居环查询 (pseudo-code)
+def nearby(lat, lon, radius_m, k=20):
+    center = cell_of(lat, lon)             # 编码成 cell ID
+    # 半径换算成要扫几圈邻居: radius / cell_edge_len, 向上取整
+    ring = ceil(radius_m / CELL_EDGE_M)
+    candidates = []
+    for c in k_ring(center, ring):         # 中心 + ring 圈邻居 cell
+        candidates += grid[c]              # 桶里的司机, O(候选数)
+    # 只对候选精算 haversine, 过滤半径再取最近 k 个
+    in_range = [(haversine(lat,lon,d.lat,d.lon), d)
+                for d in candidates if haversine(...) &lt;= radius_m]
+    return heapq.nsmallest(k, in_range)    # top-k, O(M log k)
+</code></pre>
+<div class="callout">
+<strong>边界陷阱</strong>：只查中心 cell 会漏掉「就在格子边线外侧」的近邻——它物理很近但落在邻居 cell。所以<em>必须查中心 + 一圈邻居</em>（H3 的 <code>kRing</code> / S2 的 cell neighbors）。这也是 geohash 直接做附近查询不可靠的根因。</p>
+</div>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>PostGIS</strong>：用 GiST 索引（R-Tree 变体）做 <code>ST_DWithin</code> 半径查询，是静态地理数据（门店、地块、Yelp 式搜索）的标配。</li>
+<li><strong>Uber</strong>：派单不用树，而是用内存网格 + 一致性哈希分片承接高频动点（见技术点 4）。</li>
+<li><strong>Tile38 / Redis GEO</strong>：geofence、附近查询用 geohash 网格 + sorted set，适合中等规模实时定位。</li>
+</ul></div>
+
+<h3>3. 距离计算与去重：haversine、近似与正确性陷阱</h3>
+<p><strong>原理</strong>：cell 只能粗筛候选，最终排序得算真实球面距离。<em>haversine 公式</em>算两个经纬度的大圆距离（geodesic），比平面欧氏距离正确（地球是球）。但 haversine 含三角函数，对候选集每个点算一次也有成本，所以工程上常<strong>先用便宜的近似（如经纬度差的平方、或直接用 cell 距离）粗排，只对 top 候选算精确 haversine</strong>。另一个常被忽略的点：派单要的是<em>道路 ETA 而非直线距离</em>——直线最近的司机可能隔着一条河，真实到达时间反而最长。</p>
+<div class="tradeoff">
+<strong>Trade-off：</strong>
+<ul>
+<li><strong>欧氏（平面）距离</strong>：✅ 最快、无三角函数；❌ 只在小范围（&lt;几十 km）近似成立，跨纬度/大范围误差大。</li>
+<li><strong>haversine（大圆）</strong>：✅ 球面正确、足够精确；❌ 有 <code>sin/cos/atan2</code> 开销，海量候选时不可对全集算。</li>
+<li><strong>道路网络 ETA（图最短路 / 历史路况）</strong>：✅ 业务真正想要的；❌ 极贵，只能对 cell 粗筛后的少量候选算，且依赖实时路况服务。</li>
+</ul></div>
+<pre><code># haversine: 球面两点大圆距离 (米)
+import math
+def haversine(lat1, lon1, lat2, lon2):
+    R = 6371000                              # 地球半径(米)
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    dp = math.radians(lat2 - lat1)
+    dl = math.radians(lon2 - lon1)
+    a = math.sin(dp/2)**2 + math.cos(p1)*math.cos(p2)*math.sin(dl/2)**2
+    return 2 * R * math.asin(math.sqrt(a))
+# 工程优化: 先用 (dlat²+dlon²) 粗排候选, 只对 top-N 算 haversine,
+# 派单最终再用道路 ETA 重排(直线近≠到达快)
+</code></pre>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Uber</strong>：cell 粗筛出候选司机后，用 ETA（基于路网和实时路况）而非直线距离做最终派单排序——「最近」按到达时间算。</li>
+<li><strong>Redis GEO</strong>：<code>GEODIST</code> 内部用 haversine 算两点距离，单位可选 m/km。</li>
+<li><strong>地图导航</strong>（Google Maps / 高德）：直线距离只用于初筛，真实路线走 contraction hierarchies 等图最短路算法。</li>
+</ul></div>
+
+<h3>4. Dispatch 架构：百万动点的地理分片与热点治理</h3>
+<p><strong>原理</strong>：单机内存放不下也扛不住全球司机的读写，必须分片。<em>关键决策：用 geo cell 而非 user ID 做分片键</em>——因为附近查询本质是地理局部的，按 cell 分片能让「一次查询只命中少数相邻 shard」，避免 fan-out 到所有节点。Uber 的 DISCO 用 <strong>Ringpop（一致性哈希 + gossip 成员协议）</strong>把 geo cell 映射到节点：同一片区域的 supply（司机）和 demand（乘客）落在同一/相邻节点上，匹配在本地完成。节点增删时只迁移环上相邻的一段 cell，不全量 rehash。</p>
+<div class="tradeoff">
+<strong>Trade-off：分片键怎么选</strong>
+<ul>
+<li><strong>按 geo cell 分片</strong>：✅ 查询局部性好、匹配在少数节点完成；❌ <strong>地理热点</strong>——机场/演唱会的 cell 单点过载，要把热 cell 动态再切细或拆到多节点。</li>
+<li><strong>按 user/driver ID 哈希分片</strong>：✅ 负载绝对均匀；❌ 附近查询要 fan-out 到所有 shard 再合并，p99 爆炸，不可取。</li>
+<li><strong>静态范围分片（按城市/行政区）</strong>：✅ 直观、运维简单；❌ 城市间负载天差地别，跨边界查询难处理。</li>
+</ul></div>
+<pre><code># 按 geo cell 路由 + 邻居跨 shard 合并 (pseudo-code)
+def dispatch_nearby(lat, lon, radius):
+    cells = k_ring(cell_of(lat, lon), ring_for(radius))
+    # 邻居 cell 可能落在不同 shard, 并发查后合并
+    shards = {ring.lookup(c) for c in cells}      # 一致性哈希环定位
+    results = parallel_map(shards, lambda s: s.query(cells, lat, lon))
+    return rank_by_eta(flatten(results))[:20]
+
+# 热 cell 治理: 监控每 cell 的 driver 数与 QPS,
+# 超阈值则把该 cell 降一级分辨率(切成子 cell)分散到多节点
+</code></pre>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Uber DISCO</strong>：用 Go 写的实时匹配引擎，靠 <strong>Ringpop</strong> 把地理空间分片到节点、做请求转发与容错（<a href="https://highscalability.com/how-uber-scales-their-real-time-market-platform/">High Scalability: How Uber Scales Their Real-time Market Platform</a>，2015）。</li>
+<li><strong>Lyft</strong>：同样用地理网格 + 实时供需匹配，定价与派单依赖 geohash/H3 类网格做区域聚合。</li>
+<li><strong>DoorDash / 美团</strong>：外卖调度是同构问题——骑手是动点 supply，订单是 demand，按配送区域（geo cell）分片匹配。</li>
+</ul></div>
+
+<h2>扩展与优化（增长后怎么办）</h2>
+<ul>
+<li><strong>读扩展</strong>：位置数据是「读多写多」，给每个 geo shard 加内存只读副本（异步同步），nearby 查询打副本，写仍走主。</li>
+<li><strong>热点动态再分片</strong>：监控每 cell 的密度/QPS，机场等热 cell 自动降分辨率（切子 cell）分散到多节点；冷区合并 cell 省内存。</li>
+<li><strong>多分辨率索引</strong>：同时维护粗/细两级 cell——大半径查询用粗 cell 少扫桶，小半径用细 cell 精筛。</li>
+<li><strong>持久化与恢复</strong>：内存网格定期 snapshot + WAL，节点重启能快速重建；位置过期用 TTL（司机 30s 没上报即视为离线）。</li>
+<li><strong>多区域</strong>：地理天然可按大区切分（北美/欧洲/亚太各自集群），跨区查询极少，是天然的 sharding 边界。</li>
+</ul>
+
+<h2>常见陷阱 + 面试追问</h2>
+<div class="callout">
+<strong>1. 只查中心 cell 漏掉边界近邻。</strong> geohash 共享前缀长 = 物理近，但<em>反之不成立</em>（边界两侧物理很近、前缀完全不同）。必须查「中心 + 一圈邻居」cell，这是面试最爱的陷阱。
+</div>
+<div class="callout">
+<strong>2. 用直线距离派单。</strong> haversine 最近 ≠ 到达最快。隔着河/单行道的司机直线近但 ETA 长。面试官会追问「最近怎么定义」——答案是道路 ETA。
+</div>
+<div class="callout">
+<strong>3. 固定网格在热点退化成 O(N)。</strong> 机场一个 cell 几万司机，半径查询扫单桶就崩。要么自适应分辨率，要么热点 cell 二次细分。
+</div>
+<div class="callout">
+<strong>4. 用 user ID 哈希分片地理数据。</strong> 看似均匀，实则附近查询要 fan-out 全集群。地理数据必须按 cell 分片保局部性。
+</div>
+<div class="callout">
+<strong>5. 把动点当静态门店建 R-Tree。</strong> 每秒 50 万 update 会把树的重平衡打挂。动点用内存网格（O(1) 换桶），R-Tree 留给静态数据。
+</div>
+
+<h2>深入资源</h2>
+<ul>
+<li><strong>《Designing Data-Intensive Applications》第 3 章</strong>（Kleppmann）：多维索引、R-Tree、空间填充曲线与 PostGIS 的本质讨论。</li>
+<li><strong>Google S2 Geometry</strong>：<a href="https://s2geometry.io/">s2geometry.io</a> + <a href="https://opensource.googleblog.com/2017/12/announcing-s2-library-geometry-on-sphere.html">2017 开源公告</a>，Hilbert 曲线与球面 cell 层级。</li>
+<li><strong>Uber H3</strong>：<a href="https://www.uber.com/en-US/blog/h3/">H3 blog</a> + <a href="https://github.com/uber/h3">github.com/uber/h3</a>，六边形网格的设计取舍。</li>
+<li><strong>High Scalability：How Uber Scales Their Real-time Market Platform</strong>（<a href="https://highscalability.com/how-uber-scales-their-real-time-market-platform/">2015</a>）：DISCO、Ringpop、地理分片的经典拆解。</li>
+</ul>
+
+<h2>深入思考（点击展开答案）</h2>
+
+<details>
+<summary>1. 为什么六边形比正方形「更适合」做地理网格？给出至少两个数学上的理由，以及它的代价。</summary>
+<div class="answer">
+<p><strong>理由一：邻居等距。</strong> 正方形格子有 4 个边邻居和 4 个对角邻居，对角邻居的中心距离是边邻居的 √2 倍——做「取一圈邻居」时不同方向的覆盖半径不一致。六边形 6 个邻居全部等距、共边，<code>kRing(k)</code> 取到的区域近似一个真圆，对半径查询、流量扩散、ML 空间特征都更均匀。</p>
+<p><strong>理由二：量化误差均匀。</strong> 把连续点量化到 cell 中心时，六边形是平面上「最接近圆」的可铺砌多边形，平均量化误差比正方形小，边缘效应更小。</p>
+<p><strong>代价：</strong> 六边形无法完美铺满球面——欧拉定理决定了铺球必然要插入恰好 12 个五边形（落在 icosahedron 顶点）。且父 cell 装不下整数个子 cell（切 7 个子时边缘要借相邻 cell），所以 H3 层级是<em>近似</em>嵌套，跨分辨率聚合有边界误差。S2 的四边形则能严格四叉嵌套——这正是它在「需要精确层级范围扫描」场景（数据库地理键）更受青睐的原因。</p>
+</div>
+</details>
+
+<details>
+<summary>2. 半径 3km 的查询，cell 边长选 500m 还是 5km，分别会怎样？怎么定 cell 大小？</summary>
+<div class="answer">
+<p><strong>cell 太小（500m）</strong>：半径 3km 要扫约 (3000/500)=6 圈邻居，六边形约 <code>3·6·(6+1)+1 ≈ 127</code> 个 cell，每个 cell 一次查找——桶多、合并成本高，但每桶候选少、精算距离便宜。</p>
+<p><strong>cell 太大（5km）</strong>：只扫中心 + 1 圈共 7 个 cell，但每个 cell 覆盖 5km，桶里塞了大量根本超出 3km 的司机，精算 haversine 的候选量暴涨，且边界浪费严重。</p>
+<p><strong>定 cell 大小的原则</strong>：让 <em>cell 边长 ≈ 典型查询半径</em>，使一次查询命中「中心 + 1～2 圈」即可，桶数和桶内候选数都可控。但单一分辨率应付不了「3km 找车 vs 100km 找城际拼车」的跨尺度需求——所以生产系统用<strong>多分辨率</strong>：按查询半径动态选 resolution（H3/S2 都内建层级），大半径用粗 cell、小半径用细 cell。Uber 还会按区域密度调分辨率，CBD 用更细的 cell。</p>
+</div>
+</details>
+
+<details>
+<summary>3. 司机每 4 秒上报一次位置 = 50 万 writes/s。这些写真的都要落数据库吗？怎么扛？</summary>
+<div class="answer">
+<p><strong>核心认知：位置数据「高频、易失、低价值单点」——绝大多数中间位置永不会被读，没必要持久化。</strong></p>
+<ul>
+<li><strong>真相在内存。</strong> 当前位置存内存网格，写就是「从旧 cell 桶删、加到新桶」的 O(1) 操作，不碰磁盘。50 万 writes/s 对内存哈希毫无压力。</li>
+<li><strong>持久化只为恢复。</strong> 异步 snapshot + WAL，丢几秒无所谓——司机 4 秒后又上报最新位置自愈，RPO 几秒可接受。</li>
+<li><strong>写放大治理。</strong> 静止司机自适应降低上报频率；网关侧 coalescing，同一司机 4 秒内多次上报只留最新。</li>
+<li><strong>分片摊薄。</strong> 50 万/s 按 cell 分到几百 shard，每 shard 仅几千 writes/s。</li>
+</ul>
+<p>对比账户余额——「低频、必须持久、强一致」绝不能丢。位置数据正相反：<em>承认它易失、用最新上报自愈</em>，是廉价扛住海量写的根本。</p>
+</div>
+</details>
+
+<details>
+<summary>4. 演唱会散场，3 万人同时在一个 cell 叫车。这个 hot cell 怎么不把单节点打挂？</summary>
+<div class="answer">
+<p>这是地理分片的固有死穴：按 cell 分片，热 cell 必然单点过载。多管齐下：</p>
+<ul>
+<li><strong>动态再分片：</strong> 监控每 cell 的 supply/demand 与 QPS，超阈值就把热 cell 切成子 cell（H3 降一级 = 7 个子）分散到多节点；难点是迁移期写要短暂排队。</li>
+<li><strong>就近 L1 缓存：</strong> dispatch 节点本地缓存热 cell 的司机快照（TTL 1～2s），查询读本地，回源压力骤降——代价是 1～2s stale，但派单本有容忍度。</li>
+<li><strong>需求侧削峰：</strong> 动态定价（surge）本质是用价格把瞬时需求摊到时间轴，是产品级 backpressure。</li>
+<li><strong>匹配批处理：</strong> 按 1～2s 窗口批量做全局最优分配，而非每请求贪心匹配，既提高接单率也削平瞬时 QPS。</li>
+</ul>
+<p>这和 Day 2 的 hot key、Day 4 的 sharding hot spot 是<em>同构问题</em>——解法永远是「再切细 + 副本 + 本地缓存 + 需求侧限流」的组合。</p>
+</div>
+</details>
+
+<details>
+<summary>5. 为什么不直接用 Postgres + PostGIS 的 GiST 索引搞定一切？它的边界在哪？</summary>
+<div class="answer">
+<p>PostGIS 是地理数据的瑞士军刀，<strong>静态/低频场景完美</strong>（门店、地块、Yelp 式搜索），<code>ST_DWithin</code> 半径查、多边形相交、最近邻开箱即用，还有事务和持久化。但派单撞墙三处：</p>
+<ul>
+<li><strong>写吞吐：</strong> R-Tree/GiST 是树，每次 update 可能触发节点分裂/合并与索引页重写。每秒 50 万次移动会把 WAL 和索引维护打爆——树为读优化，不为高频写。</li>
+<li><strong>水平扩展：</strong> 单实例地理索引扛不住全球动点，而按 cell 分片 + 跨片附近查询 Postgres 原生不支持，要自己在上层做（退化成自建网格）。</li>
+<li><strong>延迟：</strong> 检索只占 ~20ms，磁盘 DB 查询延迟（即便命中 buffer pool）难稳定压到这量级，内存网格才行。</li>
+</ul>
+<p><strong>结论：</strong>选型由<em>更新频率</em>决定——静态地理数据用 PostGIS；百万级高频动点用内存网格 + 一致性哈希分片（Uber 路线）。把动点硬塞进 R-Tree 是最常见的过度工程。</p>
+</div>
+</details>
+
+</div>
+</body></html>
