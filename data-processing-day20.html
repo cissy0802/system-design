@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 20 · 计算作业系统 (Batch vs Stream) — System Design Bi-daily</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"SF Pro Display","Noto Sans SC",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
+.container{max-width:820px;margin:0 auto;padding:24px 20px 60px}
+header{padding:40px 0 28px;border-bottom:1px solid rgba(100,200,255,0.15);margin-bottom:32px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem}
+.tag{padding:3px 10px;border-radius:4px;background:rgba(100,200,255,0.12);color:#64c8ff;border:1px solid rgba(100,200,255,0.25)}
+.tag.diff{background:rgba(94,234,212,0.1);color:#5eead4;border-color:rgba(94,234,212,0.3)}
+.tag.day{background:rgba(255,180,80,0.1);color:#ffb450;border-color:rgba(255,180,80,0.25)}
+h1{font-size:1.75rem;font-weight:800;background:linear-gradient(135deg,#64c8ff 0%,#5eead4 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:0.5px;line-height:1.3}
+h1 .en{display:block;font-size:1rem;color:#7a8590;-webkit-text-fill-color:#7a8590;margin-top:6px;font-weight:500}
+h2{font-size:1.2rem;color:#5eead4;margin:36px 0 14px;padding-left:12px;border-left:3px solid #5eead4}
+h3{font-size:1rem;color:#64c8ff;margin:20px 0 10px;font-weight:600}
+p{margin:10px 0;color:#c8cfd6}
+ul,ol{margin:10px 0 10px 22px;color:#c8cfd6}
+li{margin:6px 0}
+strong{color:#e8eef5;font-weight:600}
+em{color:#5eead4;font-style:normal;font-weight:500}
+code{font-family:"SF Mono",Menlo,Consolas,monospace;background:rgba(100,200,255,0.1);color:#5eead4;padding:1px 6px;border-radius:3px;font-size:0.88em}
+pre{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:14px 16px;overflow-x:auto;margin:12px 0;font-family:"SF Mono",Menlo,Consolas,monospace;font-size:0.84rem;line-height:1.55;color:#c8cfd6}
+pre code{background:none;color:inherit;padding:0;font-size:1em}
+.mermaid{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:18px;margin:14px 0;text-align:center;overflow-x:auto;cursor:zoom-in;transition:border-color 0.15s}
+.mermaid:hover{border-color:rgba(100,200,255,0.4)}
+.mermaid svg{width:100%;max-width:100%;height:auto;min-height:280px}
+.lightbox{position:fixed;inset:0;background:rgba(8,12,18,0.96);z-index:9999;display:none;align-items:center;justify-content:center;padding:24px;cursor:grab;backdrop-filter:blur(4px);overflow:hidden}
+.lightbox.open{display:flex}
+.lightbox.dragging{cursor:grabbing}
+.lightbox svg{width:auto;height:auto;max-width:96vw;max-height:92vh;transform-origin:center center;will-change:transform}
+.lightbox .hint{position:fixed;top:16px;right:20px;font-size:0.78rem;color:#7a8590;font-family:"SF Mono",Menlo,monospace;pointer-events:none}
+.callout{background:rgba(255,180,80,0.06);border-left:3px solid #ffb450;padding:12px 14px;margin:14px 0;border-radius:4px;font-size:0.94rem}
+.callout strong{color:#ffb450}
+.tradeoff{background:rgba(100,200,255,0.05);border:1px solid rgba(100,200,255,0.2);border-radius:6px;padding:12px 14px;margin:12px 0;font-size:0.94rem}
+.case{background:rgba(94,234,212,0.05);border-left:3px solid #5eead4;padding:12px 14px;margin:12px 0;border-radius:4px;font-size:0.94rem}
+.case strong{color:#5eead4}
+.nav{margin-top:50px;padding-top:24px;border-top:1px solid rgba(100,200,255,0.15);text-align:center}
+.nav a{color:#64c8ff;text-decoration:none;font-size:0.92rem;padding:8px 16px;border:1px solid rgba(100,200,255,0.3);border-radius:4px;transition:all 0.15s}
+.nav a:hover{background:rgba(100,200,255,0.1)}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:0.9rem}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid rgba(100,200,255,0.15)}
+th{color:#64c8ff;font-weight:600;background:rgba(100,200,255,0.05)}
+details{background:rgba(100,200,255,0.04);border:1px solid rgba(100,200,255,0.18);border-radius:6px;padding:12px 16px;margin:10px 0;transition:all 0.15s}
+details:hover{border-color:rgba(100,200,255,0.35)}
+details[open]{background:rgba(94,234,212,0.05);border-color:rgba(94,234,212,0.3)}
+details summary{font-weight:600;color:#e8eef5;list-style:none;outline:none;cursor:pointer;display:flex;align-items:flex-start;gap:10px;font-size:0.96rem}
+details summary::-webkit-details-marker{display:none}
+details summary::before{content:'▶';color:#64c8ff;font-size:0.75em;transition:transform 0.2s;flex-shrink:0;margin-top:5px}
+details[open] summary::before{transform:rotate(90deg);color:#5eead4}
+details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
+details .answer ul,details .answer ol{margin:6px 0 6px 22px}
+@media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+</style>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({startOnLoad:true,theme:'base',flowchart:{useMaxWidth:true,htmlLabels:true,nodeSpacing:50,rankSpacing:60},themeVariables:{primaryColor:'#1a2530',primaryTextColor:'#e8eef5',primaryBorderColor:'#64c8ff',lineColor:'#5eead4',secondaryColor:'#0e1419',tertiaryColor:'#0a0f14',background:'#0a0f14',mainBkg:'#1a2530',secondBkg:'#0e1419',textColor:'#d4dae0',fontFamily:'-apple-system,"SF Pro Display",sans-serif',fontSize:'16px'}});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const lb=document.createElement('div');lb.className='lightbox';
+  lb.innerHTML='<span class="hint">scroll = zoom · drag = pan · Esc / click bg = close</span>';
+  document.body.appendChild(lb);
+  let scale=1,panX=0,panY=0,dragging=false,moved=false,lx=0,ly=0;
+  const apply=()=>{const s=lb.querySelector('svg');if(s)s.style.transform=`translate(${panX}px,${panY}px) scale(${scale})`};
+  const reset=()=>{scale=1;panX=0;panY=0};
+  const close=()=>{lb.classList.remove('open');const s=lb.querySelector('svg');if(s)s.remove();reset()};
+  document.addEventListener('click',e=>{
+    if(e.target.closest('.lightbox')){if(moved){moved=false;return}close();return}
+    const w=e.target.closest('.mermaid');if(!w)return;
+    const svg=w.querySelector('svg');if(!svg)return;
+    const c=svg.cloneNode(true);c.removeAttribute('style');
+    c.style.maxWidth='96vw';c.style.maxHeight='92vh';
+    lb.appendChild(c);lb.classList.add('open');reset();apply();
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+  lb.addEventListener('wheel',e=>{
+    if(!lb.classList.contains('open'))return;
+    e.preventDefault();
+    const svg=lb.querySelector('svg');if(!svg)return;
+    const ns=Math.max(0.3,Math.min(10,scale*(1-e.deltaY*0.002)));
+    const r=svg.getBoundingClientRect();
+    const cx=e.clientX-(r.left+r.width/2),cy=e.clientY-(r.top+r.height/2);
+    const k=ns/scale-1;panX-=cx*k;panY-=cy*k;scale=ns;apply();
+  },{passive:false});
+  lb.addEventListener('mousedown',e=>{
+    if(!lb.classList.contains('open'))return;
+    dragging=true;moved=false;lx=e.clientX;ly=e.clientY;lb.classList.add('dragging');e.preventDefault();
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    const dx=e.clientX-lx,dy=e.clientY-ly;
+    if(Math.abs(dx)+Math.abs(dy)>3)moved=true;
+    panX+=dx;panY+=dy;lx=e.clientX;ly=e.clientY;apply();
+  });
+  document.addEventListener('mouseup',()=>{dragging=false;lb.classList.remove('dragging')});
+});
+</script>
+</head><body><div class="container">
+
+<header>
+<div class="meta">
+<span class="tag day">Day 20</span>
+<span class="tag diff">Hard</span>
+<span class="tag">Data Processing</span>
+<span class="tag">Batch/Stream</span>
+<span class="tag">Lambda/Kappa</span>
+<span class="tag">Exactly-once</span>
+</div>
+<h1>计算作业系统 — 批处理与流处理的统一战争<span class="en">Data Processing: Batch vs Stream, Lambda/Kappa, Watermark, Exactly-once</span></h1>
+</header>
+
+<h2>问题场景 + 需求约束</h2>
+<p>为一个流媒体平台设计<strong>事件处理平台</strong>：客户端每次播放、暂停、卡顿都打一条事件，<strong>2 万亿 events/天</strong>（均值 ~2300 万 eps，晚高峰冲到 5000 万）。两类截然不同的消费方：</p>
+<ul>
+<li><strong>实时</strong>：秒级算出每个视频的并发观看数、卡顿率、CTR，喂给推荐与告警。SLO：端到端 <em>p99 &lt; 5s</em>，可容忍极小误差。</li>
+<li><strong>离线</strong>：按合约给内容方<em>精确</em>分成、做 BI 报表。要求 T+1 出账、可回放修正，<em>一分钱都不能错</em>。</li>
+</ul>
+<p>核心矛盾：<strong>同一份数据，一边要低延迟近似、一边要高吞吐精确</strong>。这正是「批 vs 流」「Lambda vs Kappa」之争的源头。关键约束：事件<em>乱序到达</em>（移动端弱网，离线缓存几小时后才上报）、平台<em>失败必须不丢不重</em>（计费场景）。</p>
+
+<h2>高层架构（以可回放日志为中心）</h2>
+<pre class="mermaid">
+graph LR
+    SRC["客户端事件<br/><i>5000万 eps</i>"]
+    LOG["Kafka<br/><i>可回放日志 · 保留7天</i>"]
+    subgraph 流处理层
+      SP["Flink 作业<br/><i>event-time 窗口</i>"]
+    end
+    subgraph 回放/批层
+      BP["回放作业<br/><i>同一份代码</i>"]
+    end
+    RT[("实时存储<br/>Druid/Redis")]
+    LAKE[("数据湖<br/>S3 + Iceberg")]
+    SERVE["服务层<br/><i>推荐/告警/BI</i>"]
+
+    SRC --> LOG
+    LOG -->|实时消费| SP --> RT --> SERVE
+    LOG -.从头replay.-> BP --> LAKE --> SERVE
+
+    classDef src fill:#1a2530,stroke:#64c8ff,color:#e8eef5
+    classDef log fill:#1a1a30,stroke:#ffb450,color:#e8eef5
+    classDef proc fill:#0e2030,stroke:#5eead4,color:#e8eef5
+    classDef store fill:#2a1530,stroke:#ff7ab6,color:#e8eef5
+    class SRC src
+    class LOG log
+    class SP,BP proc
+    class RT,LAKE,SERVE store
+</pre>
+<p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px"><strong>Kafka 是真相之源</strong>：实时链路在线消费，纠错时从 offset 0 回放同一份数据，无需另建批管道</p>
+<p>三段职责：<em>可回放日志</em>（Kafka/Pulsar）做缓冲与解耦，让生产消费解绑、支持 replay；<em>流处理层</em>（Flink）做有状态的窗口聚合，输出实时指标；<em>存储层</em>分两路——实时指标进 Druid/Redis 供低延迟查询，明细落数据湖（S3+Iceberg）供离线精算与回放。</p>
+
+<h2>关键技术点</h2>
+
+<h3>1. 批 vs 流：有界数据是无界数据的特例</h3>
+<p><strong>原理</strong>：传统认知是「批 = 攒一批跑一次，流 = 来一条算一条」，但更深的洞见是——<em>批处理只是流处理的一个特例</em>：有界数据（bounded）= 知道结尾的无界数据（unbounded）。Spark 的 micro-batch 把流切成小批（200ms 一个），Flink 则是<em>真·逐条</em>流式、把批当成「有头有尾的流」来跑。延迟下限因此天差地别。</p>
+<table>
+<thead><tr><th></th><th>Spark (micro-batch)</th><th>Flink (true streaming)</th><th>纯批 (MapReduce/Spark batch)</th></tr></thead>
+<tbody>
+<tr><td><strong>延迟</strong></td><td>百毫秒~秒</td><td>毫秒级</td><td>分钟~小时</td></tr>
+<tr><td><strong>吞吐</strong></td><td>极高</td><td>高</td><td>极高</td></tr>
+<tr><td><strong>状态/窗口</strong></td><td>支持但偏弱</td><td>一等公民</td><td>无（每次全量）</td></tr>
+<tr><td><strong>适合</strong></td><td>ETL+近实时混合</td><td>低延迟有状态</td><td>大规模回填/训练集</td></tr>
+</tbody></table>
+<div class="tradeoff">
+<strong>Trade-off：</strong>
+<ul>
+<li><strong>Micro-batch</strong>：✅ 复用批引擎、调度简单、吞吐高、容错靠批边界天然 checkpoint；❌ 延迟受批间隔下限约束（再小也有调度开销），窗口语义受限于 batch 边界。</li>
+<li><strong>True streaming</strong>：✅ 毫秒延迟、灵活的 event-time 窗口、丰富状态；❌ 容错更复杂（要 ABS checkpoint）、运维门槛高、状态后端要调优。</li>
+<li><strong>纯批</strong>：✅ 单位成本最低、最适合 TB 级回填与离线训练；❌ 延迟以小时计，不能做实时。</li>
+</ul></div>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Netflix</strong>：Keystone 平台基于 <em>Kafka + Flink</em>，给各团队提供托管的流处理服务（SPaaS），日处理万亿级事件。</li>
+<li><strong>Uber</strong>：实时定价、欺诈检测、ETA 大量跑在 Flink 上，自建 AthenaX 让用户用 SQL 写流作业。</li>
+<li><strong>Alibaba</strong>：双 11 大屏与实时风控用 Flink（曾基于 Flink 自研 Blink 分支，后回馈社区）。</li>
+<li><strong>Databricks</strong>：力推 Spark Structured Streaming 的 micro-batch + Continuous 模式，与 Delta Lake 整合做湖仓一体。</li>
+</ul></div>
+
+<h3>2. Lambda vs Kappa：要不要维护两套代码</h3>
+<p><strong>原理</strong>：Lambda 架构（Nathan Marz）跑<em>两条链路</em>——batch layer 算精确结果（高延迟）、speed layer 算实时近似（低延迟），查询时把两者合并。问题是<em>同一套业务逻辑要写两遍</em>（一份 Spark、一份 Flink），永远对不齐、维护翻倍。Kappa 架构（Jay Kreps）的洞见：既然流引擎已经成熟，<strong>砍掉批层，只留一条流链路</strong>，要纠错就把日志从头 replay 一遍。</p>
+<div class="tradeoff">
+<strong>Trade-off：</strong>
+<ul>
+<li><strong>Lambda</strong>：✅ 批层做兜底，逻辑改了重算历史很自然，精确性有保障；❌ <em>两套代码两套引擎</em>，一致性靠人肉对齐，运维与认知成本翻倍。</li>
+<li><strong>Kappa</strong>：✅ 单一代码与引擎、概念统一、纠错=replay；❌ 全量 replay 成本高（要重建大状态、重刷下游），依赖日志长期保留，重算窗口受 retention 限制。</li>
+<li><strong>现代折中（湖仓）</strong>：用 Iceberg/Delta + Flink，流写批读、一份存储两种访问，弱化两层之分。</li>
+</ul></div>
+<pre><code># Kappa 的「纠错」不是补丁，而是重放
+# 1. 发现聚合逻辑有 bug，修正 Flink 作业代码
+# 2. 起一个新作业实例，从 offset 0（或某 checkpoint）重新消费
+# 3. 写入一张新结果表 metrics_v2
+# 4. 校验无误后，下游查询原子切到 v2，删除 v1
+# 关键前提：Kafka retention 足够长 + 结果表可双写并存
+</code></pre>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>LinkedIn</strong>：Kappa 思想发源地——Jay Kreps 在此造了 Kafka 与 Samza，主张「一切皆日志」、用 replay 替代批层。</li>
+<li><strong>Uber</strong>：演进出 Kappa+ 模式，让流作业也能高效重放历史数据做回填，避免另起 Spark 批管道。</li>
+<li><strong>许多团队仍用 Lambda</strong>：当离线精确口径与实时口径业务上本就不同（如最终对账 vs 实时大盘），双链路反而清晰。</li>
+</ul></div>
+
+<h3>3. Event-time 与 Watermark：和乱序、迟到数据讲和</h3>
+<p><strong>原理</strong>：分清两个时间——<em>event-time</em>（事件真实发生的时刻，写在数据里）与 <em>processing-time</em>（系统处理它的时刻）。网络抖动、移动端离线缓存让两者出现<em>偏移（skew）</em>，事件<em>乱序到达</em>。按 event-time 开窗才能算对「8:00–8:05 这个视频的播放量」，但系统永远无法确定「8:05 的数据是不是全到齐了」。<strong>Watermark</strong> 是引擎对「event-time 已推进到 T，比 T 早的数据基本到齐了」的<em>启发式断言</em>——它一推过窗口右界，就触发计算并关窗。</p>
+<pre class="mermaid">
+graph LR
+    subgraph 乱序到达["事件按 processing-time 到达（乱序）"]
+      direction LR
+      A["e@8:01"] --> B["e@8:04"] --> C["e@8:02"] --> WM["💧Watermark=8:05"] --> D["e@8:03<br/>迟到!"]
+    end
+    WM -->|触发| W["关闭 8:00-8:05 窗口<br/>输出聚合结果"]
+    D -.allowed lateness.-> W2["更新已发结果<br/>或进 side output"]
+    classDef ev fill:#1a2530,stroke:#64c8ff,color:#e8eef5
+    classDef wm fill:#1a1a30,stroke:#ffb450,color:#e8eef5
+    classDef win fill:#0e2030,stroke:#5eead4,color:#e8eef5
+    class A,B,C,D ev
+    class WM wm
+    class W,W2 win
+</pre>
+<div class="tradeoff">
+<strong>Trade-off（completeness vs latency）：</strong>
+<ul>
+<li><strong>Watermark 给得激进</strong>（小 skew）：✅ 低延迟早出结果；❌ 迟到数据多、结果不准。</li>
+<li><strong>Watermark 给得保守</strong>（大 skew）：✅ 结果更全更准；❌ 窗口迟迟不关、延迟高、状态占用久。</li>
+<li><strong>救济手段</strong>：<code>allowed lateness</code> 容忍一段迟到并<em>更新</em>已发结果；再晚的进 <em>side output</em> 单独处理。Akidau 的 Dataflow 模型把它拆成 What/Where/<strong>When</strong>/How 四问。</li>
+</ul></div>
+<pre><code># Flink event-time 滚动窗口 + 迟到处理
+stream
+  .assignTimestampsAndWatermarks(           // 声明 event-time 与 watermark 策略
+     WatermarkStrategy.forBoundedOutOfOrderness(Duration.ofSeconds(10)))
+  .keyBy(e -> e.videoId)
+  .window(TumblingEventTimeWindows.of(Time.minutes(5)))
+  .allowedLateness(Time.minutes(1))          // 关窗后再容忍 1 分钟迟到
+  .sideOutputLateData(lateTag)               // 更晚的旁路输出，离线补
+  .aggregate(new PlayCountAgg());
+</code></pre>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Google</strong>：Dataflow / Beam 的 watermark + trigger 模型由 Tyler Akidau 等系统化（《Streaming 101/102》），后成为 Apache Beam 与流处理界的通用语言。</li>
+<li><strong>Flink</strong>：原生支持 event-time、watermark、allowed lateness，是开源界对该模型最完整的实现。</li>
+</ul></div>
+
+<h3>4. Exactly-once：到底是处理一次，还是「效果」一次</h3>
+<p><strong>原理</strong>：分布式下消息会重发、节点会崩。<em>at-most-once</em>（可能丢）、<em>at-least-once</em>（可能重）易实现；<em>exactly-once</em> 最难。关键澄清：网络层不可能真正「只传一次」，工程上追求的是 <strong>effectively-once</strong>——状态与输出<em>等价于</em>只处理一次。Flink 的做法是 <em>checkpoint</em>：用 Chandy-Lamport 的变体「异步屏障快照（ABS）」，往数据流里插入<em>屏障（barrier）</em>，算子收到屏障就快照自己的状态；崩溃后从上个一致快照恢复、并把 source offset 一起回滚。</p>
+<div class="tradeoff">
+<strong>Trade-off：</strong>
+<ul>
+<li><strong>At-least-once + 幂等 sink</strong>：✅ 简单、延迟低；❌ 把去重责任推给下游（靠唯一键 upsert），并非所有 sink 都幂等。</li>
+<li><strong>Exactly-once（事务/2PC sink）</strong>：✅ 端到端精确，计费场景必需；❌ 屏障对齐会引入延迟、吞吐下降；事务 sink（Kafka transactions、两阶段提交）增加复杂度与提交延迟。</li>
+<li><strong>本质</strong>：exactly-once 是「<em>checkpoint 内部状态一致</em> + <em>输出端原子提交</em>」两件事的合体，缺一不可——只做 checkpoint 而 sink 非事务，重启仍会重复写下游。</li>
+</ul></div>
+<pre><code># 端到端 exactly-once = 状态快照 + 事务性输出（2PC）
+# checkpoint 完成时：
+#   pre-commit:  把这一批输出预写到事务（Kafka txn / DB 临时区）
+#   notify:      所有算子快照成功 → coordinator 发 commit
+#   commit:      事务提交，下游可见；崩溃则 abort，回滚到上个 checkpoint
+# 失败恢复：source offset 与算子状态一起回到上个一致点，重放但不重复对外
+</code></pre>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Flink</strong>：容错基于 Chandy-Lamport 一致快照的 ABS 算法，配合 <code>TwoPhaseCommitSinkFunction</code> 做端到端 exactly-once（官方文档详述）。</li>
+<li><strong>Kafka</strong>：通过幂等 producer + 事务（transactional.id）实现 read-process-write 的 exactly-once 语义。</li>
+<li><strong>Netflix / Uber</strong>：计费、对账类作业坚持 exactly-once；纯监控指标常退而求 at-least-once + 幂等，换更低延迟。</li>
+</ul></div>
+
+<h2>扩展与优化（增长后怎么办）</h2>
+<ul>
+<li><strong>状态膨胀</strong>：大窗口/长 TTL 让算子状态涨到 TB 级。换 RocksDB 状态后端（落盘+增量 checkpoint），给 key 设 state TTL，热点 key 预聚合。</li>
+<li><strong>反压（backpressure）</strong>：下游慢会沿管道往上游传导。监控算子 busy/backpressure 比例，扩并行度或给慢 sink 加缓冲；本质是 Day 8 消息队列的 backpressure 在算子链上的延伸。</li>
+<li><strong>湖仓融合</strong>：用 Iceberg/Delta/Hudi 让流式写入与批量读取共享一份存储，弱化 Lambda 的两层，向 Kappa 靠拢。</li>
+<li><strong>回放成本</strong>：纯 Kappa 全量 replay 慢，可保留定期 savepoint/快照做「批式 bootstrap + 流式追平」，避免每次从 offset 0。</li>
+<li><strong>多区与容灾</strong>：跨区跑镜像作业，checkpoint 存对象存储；failover 时从远端 checkpoint 拉起。</li>
+</ul>
+
+<h2>常见陷阱 + 面试问题</h2>
+<div class="callout"><strong>1. 用 processing-time 开窗算「每分钟指标」。</strong> 一旦数据乱序或回放，结果全错——回放时所有历史数据都在「现在」涌入，processing-time 窗口会把它们塞进同一分钟。计窗口必须用 event-time。</div>
+<div class="callout"><strong>2. 以为开了 exactly-once 就万事大吉。</strong> 它只保证<em>状态与对 sink 的输出</em>精确；副作用（发邮件、调外部 API）不在事务里，照样可能重复。外部副作用要单独做幂等。</div>
+<div class="callout"><strong>3. Kappa 却没规划 Kafka retention。</strong> 要 replay 30 天却只存 3 天，纠错时数据已被删——Kappa 的可行性<em>直接绑定</em>日志保留期与重算成本。</div>
+<div class="callout"><strong>4. watermark 设太松或太紧。</strong> 太紧→大量迟到丢数；太松→窗口不关、延迟与状态双高。要按真实 skew 分布（看 p99 延迟）来定，并用 allowed lateness 兜底。</div>
+<p><strong>高频追问：</strong>① 为什么说「批是流的特例」？micro-batch 与 true streaming 的延迟下限差在哪？② Lambda 的两套代码具体怎么不一致、Kappa 怎么解决又引入什么新约束？③ Watermark 推进慢导致窗口不关、状态暴涨，怎么排查与缓解？④ 端到端 exactly-once 需要 source、算子、sink 各满足什么条件？⑤ 5000 万 eps、5s SLO，并行度与状态后端怎么估算？</p>
+
+<h2>深入资源</h2>
+<ul>
+<li><strong>《Designing Data-Intensive Applications》Ch 10–11</strong>（Kleppmann）：批处理与流处理、流批统一的本质讨论。</li>
+<li><strong>Jay Kreps《Questioning the Lambda Architecture》</strong>（O'Reilly Radar）：Kappa 架构的原始论述。</li>
+<li><strong>Tyler Akidau《Streaming 101 / 102: The world beyond batch》</strong>（O'Reilly Radar）：event-time、watermark、trigger 的奠基读物；延伸为《Streaming Systems》一书。</li>
+<li><strong>Apache Flink 官方文档 · Stateful Stream Processing / Fault Tolerance</strong>：ABS checkpoint 与端到端 exactly-once 机制。</li>
+<li><strong>Netflix TechBlog《Keystone Real-time Stream Processing Platform》</strong>：万亿级 Kafka+Flink 平台的工程实践。</li>
+</ul>
+
+<h2>深入思考（点击展开答案）</h2>
+
+<details>
+<summary>1. 为什么说「批处理只是流处理的特例」？这个统一视角在工程上带来什么具体好处？</summary>
+<div class="answer">
+<p>有界数据（一个文件、一天的日志）= <em>知道何时结束</em>的无界数据流。一旦把批看成「有头有尾的流」，就只需<strong>一个引擎、一套窗口/状态/时间语义</strong>同时表达两者：处理实时流时 watermark 随真实时间推进；处理历史批时 watermark 可以「快进」，瞬间扫完全部数据。</p>
+<p>工程好处：① 业务逻辑写一遍同时服务实时与回填，消除 Lambda 的双份代码与口径漂移；② 测试可用历史数据回放验证流作业正确性；③ 运维只维护一个技术栈。Flink/Beam 正是按这个理念设计——`Bounded` 与 `Unbounded` source 走同一套算子。代价是这个引擎本身比纯批引擎复杂得多（要处理 event-time、状态、容错）。</p>
+</div>
+</details>
+
+<details>
+<summary>2. 一个 event-time 窗口因为某个分区的 watermark 卡住而迟迟不关，怎么定位根因？至少给 3 个方向。</summary>
+<div class="answer">
+<p>关键认知：<strong>算子的 watermark = 所有上游输入分区 watermark 的最小值（min）</strong>。只要一个分区不推进，整体就被它拖住——这是「木桶最短板」。</p>
+<ul>
+<li><strong>空闲分区（idle partition）</strong>：某 Kafka 分区没新数据，它的 watermark 永远停在旧值，把全局拉住。解法：开启 `withIdleness`，让空闲源不参与 min 计算。</li>
+<li><strong>数据倾斜/落后分区</strong>：某分区生产严重滞后（如某区域上报延迟），其 event-time 真的落后。解法：排查上游延迟，或调整 watermark 策略容忍。</li>
+<li><strong>时钟/时间戳错误</strong>：少数事件带了未来或远古时间戳，污染 watermark 生成。解法：对时间戳做边界过滤，异常进 side output。</li>
+<li><strong>反压</strong>：下游慢导致屏障/数据滞留，间接表现为 watermark 不推进。看 backpressure 指标区分。</li>
+</ul>
+<p>排查靠 Flink Web UI 的 per-operator watermark 指标，逐级看是哪个 subtask 的 watermark 偏低。</p>
+</div>
+</details>
+
+<details>
+<summary>3. 端到端 exactly-once 要 source、算子、sink 三方各满足什么？为什么只做 checkpoint 不够？</summary>
+<div class="answer">
+<ul>
+<li><strong>Source 必须可重放且可定位</strong>：能按 offset 回退重读（Kafka 行，普通 socket 不行）。恢复时 offset 随状态一起回滚到 checkpoint 点。</li>
+<li><strong>算子状态必须一致快照</strong>：靠 ABS 屏障对齐，保证快照反映「恰好处理到屏障前所有记录」的一致切面。</li>
+<li><strong>Sink 必须支持事务或幂等</strong>：这是最容易漏的一环。只做 checkpoint、sink 却是普通 append——崩溃重放时，上个 checkpoint 之后已写出的数据会被<em>再写一遍</em>，下游重复。</li>
+</ul>
+<p>所以 exactly-once = <strong>一致快照（内部）+ 原子提交（边界）</strong>。Flink 用两阶段提交把 sink 的可见性与 checkpoint 绑定：checkpoint 成功才 commit 事务，失败则 abort。代价是输出有「提交延迟」——下游只能看到已 commit 的 checkpoint，所以 exactly-once 天然牺牲一点延迟。这也是监控类作业宁愿用 at-least-once + 幂等 upsert 的原因。</p>
+</div>
+</details>
+
+<details>
+<summary>4. 5000 万 eps、端到端 p99 < 5s，粗估流作业的并行度与状态规模，瓶颈最可能在哪？</summary>
+<div class="answer">
+<p><em>数量级估算（面试就要这个）：</em></p>
+<ul>
+<li><strong>并行度</strong>：单个 Flink slot 乐观处理 ~10–50 万 eps（取决于逻辑复杂度）。5000 万 / 20 万 ≈ 250+ 并行度，留余量按 ~400 个 slot 起步。Kafka 分区数要 ≥ 并行度，否则有 slot 闲置。</li>
+<li><strong>状态规模</strong>：若按 videoId 做 5 分钟窗口聚合，活跃 video 假设 1000 万、每个 key 状态 ~200B → ~2GB 活跃状态；但若 key 基数高（如 user×video）或窗口长，轻松到 TB 级 → 必须 RocksDB 状态后端 + 增量 checkpoint。</li>
+<li><strong>延迟预算</strong>：5s 里要塞下 watermark skew（容忍乱序，可能占 2–3s 大头）+ 窗口触发 + checkpoint 间隔 + sink 提交。watermark 容忍度往往是 p99 延迟的主导项,不是计算本身。</li>
+</ul>
+<p><strong>最可能的瓶颈：</strong>不是 CPU，而是①<em>状态 IO</em>（大 key 基数下 RocksDB 读写放大）；②<em>数据倾斜</em>（热门视频的 key 把单 subtask 打爆，要预聚合/加盐打散）；③<em>checkpoint 时长</em>（状态大时快照久，影响恢复与 exactly-once 提交延迟）。</p>
+</div>
+</details>
+
+<details>
+<summary>5. 串联 Day 5/8：Kappa 的「replay 纠错」和复制延迟、消息投递语义是什么关系？</summary>
+<div class="answer">
+<p>三者本质同源——<strong>都建立在「日志是真相、可回放」这一前提上</strong>。</p>
+<ul>
+<li><strong>对 Day 8（消息队列）</strong>：Kappa 能成立完全依赖 Kafka 的<em>持久化可重放日志</em>与<em>at-least-once 投递</em>。replay 就是把 consumer offset 重置到过去。但 at-least-once 意味着 replay 会重复投递,所以下游处理必须靠 checkpoint+事务做成 exactly-once,否则重算结果会翻倍——这正是技术点 4 与 Kappa 的咬合点。</li>
+<li><strong>对 Day 5（复制）</strong>：流处理的状态后端 + checkpoint 本身就是一种「状态机复制」——把输入日志确定性地重放,任意副本都能重建相同状态。这与数据库 leader 把 WAL 流给 follower 重放是<em>同一思想</em>:日志 + 确定性回放 = 可恢复、可复制的状态。</li>
+<li><strong>反向约束</strong>:正因为 replay 依赖确定性,流作业里<em>不能有非确定逻辑</em>(如 `now()`、随机数、依赖外部可变状态),否则重放结果和首次不一致,Kappa 的「重算等价于原算」前提就破了。这是面试官最爱的隐藏陷阱。</li>
+</ul>
+</div>
+</details>
+
+</div></body></html>

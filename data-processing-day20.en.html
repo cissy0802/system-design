@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 20 · Data Processing (Batch vs Stream) — System Design Bi-daily</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"SF Pro Display","Noto Sans SC",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
+.container{max-width:820px;margin:0 auto;padding:24px 20px 60px}
+header{padding:40px 0 28px;border-bottom:1px solid rgba(100,200,255,0.15);margin-bottom:32px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem}
+.tag{padding:3px 10px;border-radius:4px;background:rgba(100,200,255,0.12);color:#64c8ff;border:1px solid rgba(100,200,255,0.25)}
+.tag.diff{background:rgba(94,234,212,0.1);color:#5eead4;border-color:rgba(94,234,212,0.3)}
+.tag.day{background:rgba(255,180,80,0.1);color:#ffb450;border-color:rgba(255,180,80,0.25)}
+h1{font-size:1.75rem;font-weight:800;background:linear-gradient(135deg,#64c8ff 0%,#5eead4 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:0.5px;line-height:1.3}
+h1 .en{display:block;font-size:1rem;color:#7a8590;-webkit-text-fill-color:#7a8590;margin-top:6px;font-weight:500}
+h2{font-size:1.2rem;color:#5eead4;margin:36px 0 14px;padding-left:12px;border-left:3px solid #5eead4}
+h3{font-size:1rem;color:#64c8ff;margin:20px 0 10px;font-weight:600}
+p{margin:10px 0;color:#c8cfd6}
+ul,ol{margin:10px 0 10px 22px;color:#c8cfd6}
+li{margin:6px 0}
+strong{color:#e8eef5;font-weight:600}
+em{color:#5eead4;font-style:normal;font-weight:500}
+code{font-family:"SF Mono",Menlo,Consolas,monospace;background:rgba(100,200,255,0.1);color:#5eead4;padding:1px 6px;border-radius:3px;font-size:0.88em}
+pre{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:14px 16px;overflow-x:auto;margin:12px 0;font-family:"SF Mono",Menlo,Consolas,monospace;font-size:0.84rem;line-height:1.55;color:#c8cfd6}
+pre code{background:none;color:inherit;padding:0;font-size:1em}
+.mermaid{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:18px;margin:14px 0;text-align:center;overflow-x:auto;cursor:zoom-in;transition:border-color 0.15s}
+.mermaid:hover{border-color:rgba(100,200,255,0.4)}
+.mermaid svg{width:100%;max-width:100%;height:auto;min-height:280px}
+.lightbox{position:fixed;inset:0;background:rgba(8,12,18,0.96);z-index:9999;display:none;align-items:center;justify-content:center;padding:24px;cursor:grab;backdrop-filter:blur(4px);overflow:hidden}
+.lightbox.open{display:flex}
+.lightbox.dragging{cursor:grabbing}
+.lightbox svg{width:auto;height:auto;max-width:96vw;max-height:92vh;transform-origin:center center;will-change:transform}
+.lightbox .hint{position:fixed;top:16px;right:20px;font-size:0.78rem;color:#7a8590;font-family:"SF Mono",Menlo,monospace;pointer-events:none}
+.callout{background:rgba(255,180,80,0.06);border-left:3px solid #ffb450;padding:12px 14px;margin:14px 0;border-radius:4px;font-size:0.94rem}
+.callout strong{color:#ffb450}
+.tradeoff{background:rgba(100,200,255,0.05);border:1px solid rgba(100,200,255,0.2);border-radius:6px;padding:12px 14px;margin:12px 0;font-size:0.94rem}
+.case{background:rgba(94,234,212,0.05);border-left:3px solid #5eead4;padding:12px 14px;margin:12px 0;border-radius:4px;font-size:0.94rem}
+.case strong{color:#5eead4}
+.nav{margin-top:50px;padding-top:24px;border-top:1px solid rgba(100,200,255,0.15);text-align:center}
+.nav a{color:#64c8ff;text-decoration:none;font-size:0.92rem;padding:8px 16px;border:1px solid rgba(100,200,255,0.3);border-radius:4px;transition:all 0.15s}
+.nav a:hover{background:rgba(100,200,255,0.1)}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:0.9rem}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid rgba(100,200,255,0.15)}
+th{color:#64c8ff;font-weight:600;background:rgba(100,200,255,0.05)}
+details{background:rgba(100,200,255,0.04);border:1px solid rgba(100,200,255,0.18);border-radius:6px;padding:12px 16px;margin:10px 0;transition:all 0.15s}
+details:hover{border-color:rgba(100,200,255,0.35)}
+details[open]{background:rgba(94,234,212,0.05);border-color:rgba(94,234,212,0.3)}
+details summary{font-weight:600;color:#e8eef5;list-style:none;outline:none;cursor:pointer;display:flex;align-items:flex-start;gap:10px;font-size:0.96rem}
+details summary::-webkit-details-marker{display:none}
+details summary::before{content:'▶';color:#64c8ff;font-size:0.75em;transition:transform 0.2s;flex-shrink:0;margin-top:5px}
+details[open] summary::before{transform:rotate(90deg);color:#5eead4}
+details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
+details .answer ul,details .answer ol{margin:6px 0 6px 22px}
+@media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+</style>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({startOnLoad:true,theme:'base',flowchart:{useMaxWidth:true,htmlLabels:true,nodeSpacing:50,rankSpacing:60},themeVariables:{primaryColor:'#1a2530',primaryTextColor:'#e8eef5',primaryBorderColor:'#64c8ff',lineColor:'#5eead4',secondaryColor:'#0e1419',tertiaryColor:'#0a0f14',background:'#0a0f14',mainBkg:'#1a2530',secondBkg:'#0e1419',textColor:'#d4dae0',fontFamily:'-apple-system,"SF Pro Display",sans-serif',fontSize:'16px'}});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const lb=document.createElement('div');lb.className='lightbox';
+  lb.innerHTML='<span class="hint">scroll = zoom · drag = pan · Esc / click bg = close</span>';
+  document.body.appendChild(lb);
+  let scale=1,panX=0,panY=0,dragging=false,moved=false,lx=0,ly=0;
+  const apply=()=>{const s=lb.querySelector('svg');if(s)s.style.transform=`translate(${panX}px,${panY}px) scale(${scale})`};
+  const reset=()=>{scale=1;panX=0;panY=0};
+  const close=()=>{lb.classList.remove('open');const s=lb.querySelector('svg');if(s)s.remove();reset()};
+  document.addEventListener('click',e=>{
+    if(e.target.closest('.lightbox')){if(moved){moved=false;return}close();return}
+    const w=e.target.closest('.mermaid');if(!w)return;
+    const svg=w.querySelector('svg');if(!svg)return;
+    const c=svg.cloneNode(true);c.removeAttribute('style');
+    c.style.maxWidth='96vw';c.style.maxHeight='92vh';
+    lb.appendChild(c);lb.classList.add('open');reset();apply();
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+  lb.addEventListener('wheel',e=>{
+    if(!lb.classList.contains('open'))return;
+    e.preventDefault();
+    const svg=lb.querySelector('svg');if(!svg)return;
+    const ns=Math.max(0.3,Math.min(10,scale*(1-e.deltaY*0.002)));
+    const r=svg.getBoundingClientRect();
+    const cx=e.clientX-(r.left+r.width/2),cy=e.clientY-(r.top+r.height/2);
+    const k=ns/scale-1;panX-=cx*k;panY-=cy*k;scale=ns;apply();
+  },{passive:false});
+  lb.addEventListener('mousedown',e=>{
+    if(!lb.classList.contains('open'))return;
+    dragging=true;moved=false;lx=e.clientX;ly=e.clientY;lb.classList.add('dragging');e.preventDefault();
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    const dx=e.clientX-lx,dy=e.clientY-ly;
+    if(Math.abs(dx)+Math.abs(dy)>3)moved=true;
+    panX+=dx;panY+=dy;lx=e.clientX;ly=e.clientY;apply();
+  });
+  document.addEventListener('mouseup',()=>{dragging=false;lb.classList.remove('dragging')});
+});
+</script>
+</head><body><div class="container">
+
+<header>
+<div class="meta">
+<span class="tag day">Day 20</span>
+<span class="tag diff">Hard</span>
+<span class="tag">Data Processing</span>
+<span class="tag">Batch/Stream</span>
+<span class="tag">Lambda/Kappa</span>
+<span class="tag">Exactly-once</span>
+</div>
+<h1>Data Processing Systems — The War to Unify Batch and Stream<span class="en">Batch vs Stream, Lambda/Kappa, Watermark, Exactly-once</span></h1>
+</header>
+
+<h2>Scenario + Requirements</h2>
+<p>Design an <strong>event processing platform</strong> for a streaming service: every play, pause, and rebuffer emits an event — <strong>2 trillion events/day</strong> (~23M eps average, peaking at 50M eps in prime time). Two radically different consumers:</p>
+<ul>
+<li><strong>Real-time</strong>: per-second concurrent-viewer counts, rebuffer rate, CTR — fed into recommendations and alerts. SLO: end-to-end <em>p99 &lt; 5s</em>, small errors tolerable.</li>
+<li><strong>Offline</strong>: <em>exact</em> revenue splits to content partners, BI reports. T+1 settlement, replayable for corrections — <em>not a cent can be wrong</em>.</li>
+</ul>
+<p>The core tension: <strong>one dataset, one side wants low-latency approximations, the other high-throughput exactness</strong>. This is precisely the origin of the "batch vs stream" and "Lambda vs Kappa" debates. Key constraints: events arrive <em>out of order</em> (flaky mobile networks; offline-cached events upload hours later), and on failure the platform <em>must neither lose nor duplicate</em> (billing).</p>
+
+<h2>High-Level Architecture (log-centric)</h2>
+<pre class="mermaid">
+graph LR
+    SRC["Client events<br/><i>50M eps</i>"]
+    LOG["Kafka<br/><i>replayable log · 7-day retention</i>"]
+    subgraph Stream layer
+      SP["Flink jobs<br/><i>event-time windows</i>"]
+    end
+    subgraph Replay/batch
+      BP["Replay job<br/><i>same code</i>"]
+    end
+    RT[("Real-time store<br/>Druid/Redis")]
+    LAKE[("Data lake<br/>S3 + Iceberg")]
+    SERVE["Serving<br/><i>recs/alerts/BI</i>"]
+
+    SRC --> LOG
+    LOG -->|live consume| SP --> RT --> SERVE
+    LOG -.replay from 0.-> BP --> LAKE --> SERVE
+
+    classDef src fill:#1a2530,stroke:#64c8ff,color:#e8eef5
+    classDef log fill:#1a1a30,stroke:#ffb450,color:#e8eef5
+    classDef proc fill:#0e2030,stroke:#5eead4,color:#e8eef5
+    classDef store fill:#2a1530,stroke:#ff7ab6,color:#e8eef5
+    class SRC src
+    class LOG log
+    class SP,BP proc
+    class RT,LAKE,SERVE store
+</pre>
+<p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px"><strong>Kafka is the source of truth</strong>: the live path consumes online; to correct, replay the same data from offset 0 — no separate batch pipeline needed</p>
+<p>Three roles: a <em>replayable log</em> (Kafka/Pulsar) buffers and decouples producers from consumers and enables replay; the <em>stream layer</em> (Flink) does stateful windowed aggregation, emitting real-time metrics; the <em>storage layer</em> splits two ways — real-time metrics into Druid/Redis for low-latency queries, raw detail into a data lake (S3+Iceberg) for offline exact accounting and replay.</p>
+
+<h2>Key Technical Points</h2>
+
+<h3>1. Batch vs Stream: bounded data is a special case of unbounded</h3>
+<p><strong>Principle</strong>: the naive view is "batch = collect a chunk, run once; stream = compute per record." The deeper insight: <em>batch is just a special case of streaming</em> — bounded data = unbounded data where you know the end. Spark's micro-batch chops the stream into tiny batches (e.g. 200ms each); Flink is <em>truly per-record</em> streaming and treats batch as "a stream with a head and a tail." Their latency floors differ accordingly.</p>
+<table>
+<thead><tr><th></th><th>Spark (micro-batch)</th><th>Flink (true streaming)</th><th>Pure batch (MapReduce/Spark batch)</th></tr></thead>
+<tbody>
+<tr><td><strong>Latency</strong></td><td>100s of ms ~ sec</td><td>milliseconds</td><td>minutes ~ hours</td></tr>
+<tr><td><strong>Throughput</strong></td><td>very high</td><td>high</td><td>very high</td></tr>
+<tr><td><strong>State/windows</strong></td><td>supported but weaker</td><td>first-class</td><td>none (full recompute)</td></tr>
+<tr><td><strong>Best for</strong></td><td>ETL + near-real-time mix</td><td>low-latency stateful</td><td>large backfills/training sets</td></tr>
+</tbody></table>
+<div class="tradeoff">
+<strong>Trade-off:</strong>
+<ul>
+<li><strong>Micro-batch</strong>: ✅ reuses the batch engine, simple scheduling, high throughput, fault tolerance falls out of batch boundaries (natural checkpoint); ❌ latency bounded below by the batch interval (scheduling overhead remains), window semantics constrained by batch edges.</li>
+<li><strong>True streaming</strong>: ✅ millisecond latency, flexible event-time windows, rich state; ❌ fault tolerance is harder (needs ABS checkpoints), higher ops bar, state backend needs tuning.</li>
+<li><strong>Pure batch</strong>: ✅ lowest unit cost, ideal for TB-scale backfills and offline training; ❌ latency in hours, can't do real-time.</li>
+</ul></div>
+<div class="case">
+<strong>Real-world:</strong>
+<ul>
+<li><strong>Netflix</strong>: the Keystone platform runs on <em>Kafka + Flink</em>, offering managed stream processing as a service (SPaaS), processing trillions of events daily.</li>
+<li><strong>Uber</strong>: real-time pricing, fraud detection, and ETA run heavily on Flink; their AthenaX lets users write streaming jobs in SQL.</li>
+<li><strong>Alibaba</strong>: Singles' Day dashboards and real-time risk control run on Flink (built the Blink fork on Flink, later contributed back upstream).</li>
+<li><strong>Databricks</strong>: champions Spark Structured Streaming (micro-batch + Continuous mode), integrated with Delta Lake for a lakehouse.</li>
+</ul></div>
+
+<h3>2. Lambda vs Kappa: do you maintain two codebases?</h3>
+<p><strong>Principle</strong>: the Lambda architecture (Nathan Marz) runs <em>two paths</em> — a batch layer computes exact results (high latency) and a speed layer computes real-time approximations (low latency); queries merge the two. The problem: <em>the same business logic is written twice</em> (once in Spark, once in Flink), they drift apart, and maintenance doubles. The Kappa architecture (Jay Kreps) insight: since stream engines have matured, <strong>drop the batch layer, keep one streaming path</strong>, and to correct anything, replay the log from the beginning.</p>
+<div class="tradeoff">
+<strong>Trade-off:</strong>
+<ul>
+<li><strong>Lambda</strong>: ✅ the batch layer is a safety net, re-running history after a logic change is natural, exactness guaranteed; ❌ <em>two codebases, two engines</em>, consistency maintained by hand, doubled ops and cognitive cost.</li>
+<li><strong>Kappa</strong>: ✅ single codebase and engine, unified concepts, correction = replay; ❌ full replay is expensive (rebuild large state, re-flush downstream), depends on long log retention, recompute window bounded by retention.</li>
+<li><strong>Modern middle ground (lakehouse)</strong>: Iceberg/Delta + Flink — stream-write, batch-read, one storage two access patterns, blurring the two-layer split.</li>
+</ul></div>
+<pre><code># Kappa "correction" is not a patch — it's a replay
+# 1. Find a bug in the aggregation logic; fix the Flink job code
+# 2. Start a new job instance, re-consume from offset 0 (or a checkpoint)
+# 3. Write into a new result table metrics_v2
+# 4. After validation, atomically switch downstream to v2, drop v1
+# Prerequisites: long-enough Kafka retention + result tables can coexist
+</code></pre>
+<div class="case">
+<strong>Real-world:</strong>
+<ul>
+<li><strong>LinkedIn</strong>: birthplace of the Kappa idea — Jay Kreps built Kafka and Samza here, advocating "everything is a log" and replacing the batch layer with replay.</li>
+<li><strong>Uber</strong>: evolved a "Kappa+" pattern letting stream jobs efficiently replay historical data for backfills, avoiding a separate Spark batch pipeline.</li>
+<li><strong>Many teams still use Lambda</strong>: when offline-exact and real-time definitions genuinely differ in the business (final reconciliation vs live dashboard), two paths are actually clearer.</li>
+</ul></div>
+
+<h3>3. Event-time and Watermark: making peace with out-of-order and late data</h3>
+<p><strong>Principle</strong>: distinguish two clocks — <em>event-time</em> (when the event actually happened, embedded in the data) and <em>processing-time</em> (when the system handles it). Network jitter and mobile offline caching create <em>skew</em> between them, and events arrive <em>out of order</em>. You must window by event-time to correctly count "plays of this video in 8:00–8:05," but the system can never be sure "have all the 8:05 events arrived yet?" A <strong>watermark</strong> is the engine's <em>heuristic assertion</em> that "event-time has advanced to T; data earlier than T has mostly arrived" — once it passes a window's right edge, the window fires and closes.</p>
+<pre class="mermaid">
+graph LR
+    subgraph arrival["events arriving by processing-time (out of order)"]
+      direction LR
+      A["e@8:01"] --> B["e@8:04"] --> C["e@8:02"] --> WM["💧Watermark=8:05"] --> D["e@8:03<br/>late!"]
+    end
+    WM -->|fire| W["close 8:00-8:05 window<br/>emit aggregate"]
+    D -.allowed lateness.-> W2["update emitted result<br/>or side output"]
+    classDef ev fill:#1a2530,stroke:#64c8ff,color:#e8eef5
+    classDef wm fill:#1a1a30,stroke:#ffb450,color:#e8eef5
+    classDef win fill:#0e2030,stroke:#5eead4,color:#e8eef5
+    class A,B,C,D ev
+    class WM wm
+    class W,W2 win
+</pre>
+<div class="tradeoff">
+<strong>Trade-off (completeness vs latency):</strong>
+<ul>
+<li><strong>Aggressive watermark</strong> (small skew): ✅ low latency, results emitted early; ❌ more late data, less accurate.</li>
+<li><strong>Conservative watermark</strong> (large skew): ✅ more complete and accurate; ❌ windows close slowly, higher latency, state held longer.</li>
+<li><strong>Remedies</strong>: <code>allowed lateness</code> tolerates a window of late data and <em>updates</em> already-emitted results; anything later goes to a <em>side output</em> for separate handling. Akidau's Dataflow model frames this as What / Where / <strong>When</strong> / How.</li>
+</ul></div>
+<pre><code># Flink event-time tumbling window + late-data handling
+stream
+  .assignTimestampsAndWatermarks(           // declare event-time and watermark strategy
+     WatermarkStrategy.forBoundedOutOfOrderness(Duration.ofSeconds(10)))
+  .keyBy(e -> e.videoId)
+  .window(TumblingEventTimeWindows.of(Time.minutes(5)))
+  .allowedLateness(Time.minutes(1))          // tolerate 1 more min of lateness after close
+  .sideOutputLateData(lateTag)               // even-later events bypass to offline fix
+  .aggregate(new PlayCountAgg());
+</code></pre>
+<div class="case">
+<strong>Real-world:</strong>
+<ul>
+<li><strong>Google</strong>: the watermark + trigger model of Dataflow / Beam was systematized by Tyler Akidau et al. (<em>Streaming 101/102</em>) and became the lingua franca of Apache Beam and the streaming world.</li>
+<li><strong>Flink</strong>: natively supports event-time, watermarks, and allowed lateness — the most complete open-source implementation of this model.</li>
+</ul></div>
+
+<h3>4. Exactly-once: processed once, or "effect" once?</h3>
+<p><strong>Principle</strong>: in distributed systems messages get redelivered and nodes crash. <em>At-most-once</em> (may drop) and <em>at-least-once</em> (may duplicate) are easy; <em>exactly-once</em> is the hard one. Key clarification: the network can never truly "deliver once" — engineering aims for <strong>effectively-once</strong>: state and output are <em>equivalent to</em> processing once. Flink's approach is <em>checkpointing</em>: using a variant of Chandy-Lamport called Asynchronous Barrier Snapshotting (ABS), it injects <em>barriers</em> into the stream; an operator snapshots its state on receiving a barrier; after a crash it restores from the last consistent snapshot and rolls back source offsets with it.</p>
+<div class="tradeoff">
+<strong>Trade-off:</strong>
+<ul>
+<li><strong>At-least-once + idempotent sink</strong>: ✅ simple, low latency; ❌ pushes dedup onto downstream (unique-key upsert), and not all sinks are idempotent.</li>
+<li><strong>Exactly-once (transactional / 2PC sink)</strong>: ✅ end-to-end exactness, mandatory for billing; ❌ barrier alignment adds latency and lowers throughput; transactional sinks (Kafka transactions, two-phase commit) add complexity and commit latency.</li>
+<li><strong>Essence</strong>: exactly-once is the union of "<em>consistent internal state snapshot</em>" + "<em>atomic output commit</em>" — neither alone suffices. Checkpointing without a transactional sink still double-writes downstream on restart.</li>
+</ul></div>
+<pre><code># End-to-end exactly-once = state snapshot + transactional output (2PC)
+# On checkpoint completion:
+#   pre-commit:  pre-write this batch of output into a transaction (Kafka txn / DB staging)
+#   notify:      all operators snapshotted -> coordinator sends commit
+#   commit:      transaction commits, visible downstream; on crash -> abort, roll back to last checkpoint
+# Recovery: source offset and operator state both return to the last consistent point — replay without re-emitting
+</code></pre>
+<div class="case">
+<strong>Real-world:</strong>
+<ul>
+<li><strong>Flink</strong>: fault tolerance based on the ABS variant of Chandy-Lamport consistent snapshots, combined with <code>TwoPhaseCommitSinkFunction</code> for end-to-end exactly-once (detailed in the official docs).</li>
+<li><strong>Kafka</strong>: achieves read-process-write exactly-once via the idempotent producer + transactions (transactional.id).</li>
+<li><strong>Netflix / Uber</strong>: billing and reconciliation jobs insist on exactly-once; pure monitoring metrics often settle for at-least-once + idempotency to get lower latency.</li>
+</ul></div>
+
+<h2>Scaling & Optimization</h2>
+<ul>
+<li><strong>State growth</strong>: large windows / long TTLs push operator state to TB scale. Switch to the RocksDB state backend (on-disk + incremental checkpoints), set state TTL on keys, pre-aggregate hot keys.</li>
+<li><strong>Backpressure</strong>: a slow downstream propagates up the pipeline. Monitor operator busy/backpressure ratios, scale parallelism, or buffer ahead of slow sinks — this is Day 8's message-queue backpressure extended along the operator chain.</li>
+<li><strong>Lakehouse convergence</strong>: Iceberg/Delta/Hudi let streaming writes and batch reads share one storage, dissolving Lambda's two layers and leaning toward Kappa.</li>
+<li><strong>Replay cost</strong>: pure-Kappa full replay is slow; keep periodic savepoints/snapshots for "batch bootstrap + stream catch-up" instead of replaying from offset 0 each time.</li>
+<li><strong>Multi-region & DR</strong>: run mirrored jobs across regions, store checkpoints in object storage; on failover, resume from the remote checkpoint.</li>
+</ul>
+
+<h2>Pitfalls + Interview Questions</h2>
+<div class="callout"><strong>1. Windowing "per-minute metrics" by processing-time.</strong> The moment data is out of order or replayed, results are wrong — on replay all historical data floods in "now," and processing-time windows cram them into the same minute. Windowed metrics must use event-time.</div>
+<div class="callout"><strong>2. Assuming exactly-once solves everything.</strong> It only guarantees <em>state and output to the sink</em> are exact; side effects (sending email, calling an external API) aren't in the transaction and can still duplicate. External side effects need their own idempotency.</div>
+<div class="callout"><strong>3. Going Kappa without planning Kafka retention.</strong> Wanting to replay 30 days but storing only 3 — the data is gone when you need to correct. Kappa's feasibility is <em>directly tied</em> to log retention and recompute cost.</div>
+<div class="callout"><strong>4. Setting the watermark too loose or too tight.</strong> Too tight → lots of late data dropped; too loose → windows won't close, latency and state both high. Tune to the real skew distribution (look at p99 lateness) and use allowed lateness as a backstop.</div>
+<p><strong>Common follow-ups:</strong> ① Why is "batch a special case of stream"? Where does the latency floor differ between micro-batch and true streaming? ② How exactly do Lambda's two codebases drift, how does Kappa fix it, and what new constraint does it introduce? ③ A slow-advancing watermark keeps windows open and state ballooning — how do you diagnose and mitigate? ④ What must source, operators, and sink each satisfy for end-to-end exactly-once? ⑤ At 50M eps and a 5s SLO, how do you estimate parallelism and state size?</p>
+
+<h2>Deep-Dive Resources</h2>
+<ul>
+<li><strong>Designing Data-Intensive Applications, Ch 10–11</strong> (Kleppmann): batch and stream processing, and unifying the two.</li>
+<li><strong>Jay Kreps, "Questioning the Lambda Architecture"</strong> (O'Reilly Radar): the original case for the Kappa architecture.</li>
+<li><strong>Tyler Akidau, "Streaming 101 / 102: The world beyond batch"</strong> (O'Reilly Radar): foundational reading on event-time, watermarks, and triggers; expanded into the book <em>Streaming Systems</em>.</li>
+<li><strong>Apache Flink docs · Stateful Stream Processing / Fault Tolerance</strong>: the ABS checkpoint and end-to-end exactly-once mechanism.</li>
+<li><strong>Netflix TechBlog, "Keystone Real-time Stream Processing Platform"</strong>: engineering practice for a trillion-scale Kafka+Flink platform.</li>
+</ul>
+
+<h2>Going Deeper (click to expand)</h2>
+
+<details>
+<summary>1. Why is "batch just a special case of stream"? What concrete engineering wins does this unified view bring?</summary>
+<div class="answer">
+<p>Bounded data (a file, a day of logs) = unbounded data where you <em>know when it ends</em>. Once you see batch as "a stream with a head and a tail," a <strong>single engine with one set of window/state/time semantics</strong> can express both: on a live stream the watermark advances with real time; on a historical batch the watermark can "fast-forward," scanning all the data instantly.</p>
+<p>Wins: ① business logic written once serves both real-time and backfill, eliminating Lambda's duplicate code and definition drift; ② you can validate a stream job's correctness by replaying historical data; ③ ops maintains one stack. Flink/Beam are designed around this — `Bounded` and `Unbounded` sources flow through the same operators. The cost is that this engine is far more complex than a pure batch one (it must handle event-time, state, fault tolerance).</p>
+</div>
+</details>
+
+<details>
+<summary>2. An event-time window won't close because one partition's watermark is stuck. How do you find the root cause? Give at least 3 directions.</summary>
+<div class="answer">
+<p>Key insight: <strong>an operator's watermark = the minimum of all upstream input partitions' watermarks (min)</strong>. If one partition doesn't advance, the whole thing is held back — the "weakest stave in the barrel."</p>
+<ul>
+<li><strong>Idle partition</strong>: a Kafka partition gets no new data, so its watermark stays at an old value and drags the global min. Fix: enable `withIdleness` so idle sources don't participate in the min.</li>
+<li><strong>Skewed/lagging partition</strong>: one partition produces far behind (e.g. a region reports late), so its event-time genuinely lags. Fix: investigate upstream delay, or relax the watermark strategy.</li>
+<li><strong>Clock/timestamp errors</strong>: a few events carry future or ancient timestamps, polluting watermark generation. Fix: bound-filter timestamps, route anomalies to a side output.</li>
+<li><strong>Backpressure</strong>: a slow downstream stalls barriers/data, which indirectly looks like a stuck watermark. Distinguish via backpressure metrics.</li>
+</ul>
+<p>Diagnose with Flink Web UI per-operator watermark metrics, drilling down to which subtask's watermark is low.</p>
+</div>
+</details>
+
+<details>
+<summary>3. What must source, operators, and sink each satisfy for end-to-end exactly-once? Why is checkpointing alone not enough?</summary>
+<div class="answer">
+<ul>
+<li><strong>Source must be replayable and seekable</strong>: able to rewind and re-read by offset (Kafka qualifies; a plain socket does not). On recovery, offsets roll back with the state to the checkpoint point.</li>
+<li><strong>Operator state must snapshot consistently</strong>: via ABS barrier alignment, guaranteeing the snapshot reflects "exactly the records up to the barrier" — a consistent cut.</li>
+<li><strong>Sink must support transactions or idempotency</strong>: the most commonly missed piece. Checkpoint only, with a plain-append sink — on replay, data already written after the last checkpoint gets <em>written again</em>, duplicating downstream.</li>
+</ul>
+<p>So exactly-once = <strong>consistent snapshot (internal) + atomic commit (boundary)</strong>. Flink ties sink visibility to checkpoints via two-phase commit: commit the transaction only when the checkpoint succeeds, otherwise abort. The cost is "commit latency" — downstream only sees committed checkpoints, so exactly-once inherently sacrifices a bit of latency. That's why monitoring jobs prefer at-least-once + idempotent upsert.</p>
+</div>
+</details>
+
+<details>
+<summary>4. At 50M eps and end-to-end p99 < 5s, roughly estimate the job's parallelism and state size. Where's the likely bottleneck?</summary>
+<div class="answer">
+<p><em>Order-of-magnitude estimate (what interviews want):</em></p>
+<ul>
+<li><strong>Parallelism</strong>: a single Flink slot optimistically handles ~100K–500K eps (depending on logic complexity). 50M / 200K ≈ 250+ parallelism; with headroom, start around ~400 slots. Kafka partitions must be ≥ parallelism or slots sit idle.</li>
+<li><strong>State size</strong>: 5-minute windows keyed by videoId, say 10M active videos at ~200B each → ~2GB active state; but with a high-cardinality key (user×video) or long windows, it easily hits TB → you must use the RocksDB backend + incremental checkpoints.</li>
+<li><strong>Latency budget</strong>: of the 5s, you must fit watermark skew (tolerating out-of-order, possibly 2–3s — the big chunk) + window firing + checkpoint interval + sink commit. Watermark tolerance, not computation, often dominates p99 latency.</li>
+</ul>
+<p><strong>Most likely bottleneck:</strong> not CPU, but ① <em>state IO</em> (RocksDB read/write amplification under high key cardinality); ② <em>data skew</em> (a hot video's key overwhelms one subtask — pre-aggregate or salt to spread); ③ <em>checkpoint duration</em> (large state takes long to snapshot, hurting recovery and exactly-once commit latency).</p>
+</div>
+</details>
+
+<details>
+<summary>5. Connecting Days 5/8: how does Kappa's "replay correction" relate to replication lag and delivery semantics?</summary>
+<div class="answer">
+<p>All three share one root — <strong>they rest on the premise that "the log is truth and is replayable."</strong></p>
+<ul>
+<li><strong>vs Day 8 (message queues)</strong>: Kappa works only because of Kafka's <em>durable, replayable log</em> and <em>at-least-once delivery</em>. Replay is just resetting the consumer offset to the past. But at-least-once means replay redelivers duplicates, so downstream processing must be made exactly-once via checkpoint+transactions — otherwise the recomputed result doubles. This is exactly where Point 4 interlocks with Kappa.</li>
+<li><strong>vs Day 5 (replication)</strong>: a stream processor's state backend + checkpoints are themselves a form of "state machine replication" — deterministically replay the input log and any replica rebuilds identical state. This is the <em>same idea</em> as a database leader shipping its WAL to followers to replay: log + deterministic replay = recoverable, replicable state.</li>
+<li><strong>Reverse constraint</strong>: precisely because replay depends on determinism, a stream job <em>must not contain non-deterministic logic</em> (`now()`, random numbers, dependence on external mutable state), or the replayed result won't match the first run, breaking Kappa's "recompute equals original compute" premise. This is an interviewer's favorite hidden trap.</li>
+</ul>
+</div>
+</details>
+
+</div></body></html>
