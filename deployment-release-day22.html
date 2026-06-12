@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 22 · 上线与发布 (Deployment & Release) — System Design Bi-daily</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"SF Pro Display","Noto Sans SC",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
+.container{max-width:820px;margin:0 auto;padding:24px 20px 60px}
+header{padding:40px 0 28px;border-bottom:1px solid rgba(100,200,255,0.15);margin-bottom:32px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem}
+.tag{padding:3px 10px;border-radius:4px;background:rgba(100,200,255,0.12);color:#64c8ff;border:1px solid rgba(100,200,255,0.25)}
+.tag.diff{background:rgba(94,234,212,0.1);color:#5eead4;border-color:rgba(94,234,212,0.3)}
+.tag.day{background:rgba(255,180,80,0.1);color:#ffb450;border-color:rgba(255,180,80,0.25)}
+h1{font-size:1.75rem;font-weight:800;background:linear-gradient(135deg,#64c8ff 0%,#5eead4 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:0.5px;line-height:1.3}
+h1 .en{display:block;font-size:1rem;color:#7a8590;-webkit-text-fill-color:#7a8590;margin-top:6px;font-weight:500}
+h2{font-size:1.2rem;color:#5eead4;margin:36px 0 14px;padding-left:12px;border-left:3px solid #5eead4}
+h3{font-size:1rem;color:#64c8ff;margin:20px 0 10px;font-weight:600}
+p{margin:10px 0;color:#c8cfd6}
+ul,ol{margin:10px 0 10px 22px;color:#c8cfd6}
+li{margin:6px 0}
+strong{color:#e8eef5;font-weight:600}
+em{color:#5eead4;font-style:normal;font-weight:500}
+code{font-family:"SF Mono",Menlo,Consolas,monospace;background:rgba(100,200,255,0.1);color:#5eead4;padding:1px 6px;border-radius:3px;font-size:0.88em}
+pre{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:14px 16px;overflow-x:auto;margin:12px 0;font-family:"SF Mono",Menlo,Consolas,monospace;font-size:0.84rem;line-height:1.55;color:#c8cfd6}
+pre code{background:none;color:inherit;padding:0;font-size:1em}
+.mermaid{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:18px;margin:14px 0;text-align:center;overflow-x:auto;cursor:zoom-in;transition:border-color 0.15s}
+.mermaid:hover{border-color:rgba(100,200,255,0.4)}
+.mermaid svg{width:100%;max-width:100%;height:auto;min-height:280px}
+.lightbox{position:fixed;inset:0;background:rgba(8,12,18,0.96);z-index:9999;display:none;align-items:center;justify-content:center;padding:24px;cursor:grab;backdrop-filter:blur(4px);overflow:hidden}
+.lightbox.open{display:flex}
+.lightbox.dragging{cursor:grabbing}
+.lightbox svg{width:auto;height:auto;max-width:96vw;max-height:92vh;transform-origin:center center;will-change:transform}
+.lightbox .hint{position:fixed;top:16px;right:20px;font-size:0.78rem;color:#7a8590;font-family:"SF Mono",Menlo,monospace;pointer-events:none}
+.callout{background:rgba(255,180,80,0.06);border-left:3px solid #ffb450;padding:12px 14px;margin:14px 0;border-radius:4px;font-size:0.94rem}
+.callout strong{color:#ffb450}
+.tradeoff{background:rgba(100,200,255,0.05);border:1px solid rgba(100,200,255,0.2);border-radius:6px;padding:12px 14px;margin:12px 0;font-size:0.94rem}
+.case{background:rgba(94,234,212,0.05);border-left:3px solid #5eead4;padding:12px 14px;margin:12px 0;border-radius:4px;font-size:0.94rem}
+.case strong{color:#5eead4}
+.nav{margin-top:50px;padding-top:24px;border-top:1px solid rgba(100,200,255,0.15);text-align:center}
+.nav a{color:#64c8ff;text-decoration:none;font-size:0.92rem;padding:8px 16px;border:1px solid rgba(100,200,255,0.3);border-radius:4px;transition:all 0.15s}
+.nav a:hover{background:rgba(100,200,255,0.1)}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:0.9rem}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid rgba(100,200,255,0.15)}
+th{color:#64c8ff;font-weight:600;background:rgba(100,200,255,0.05)}
+details{background:rgba(100,200,255,0.04);border:1px solid rgba(100,200,255,0.18);border-radius:6px;padding:12px 16px;margin:10px 0;transition:all 0.15s}
+details:hover{border-color:rgba(100,200,255,0.35)}
+details[open]{background:rgba(94,234,212,0.05);border-color:rgba(94,234,212,0.3)}
+details summary{font-weight:600;color:#e8eef5;list-style:none;outline:none;cursor:pointer;display:flex;align-items:flex-start;gap:10px;font-size:0.96rem}
+details summary::-webkit-details-marker{display:none}
+details summary::before{content:'▶';color:#64c8ff;font-size:0.75em;transition:transform 0.2s;flex-shrink:0;margin-top:5px}
+details[open] summary::before{transform:rotate(90deg);color:#5eead4}
+details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
+details .answer ul,details .answer ol{margin:6px 0 6px 22px}
+@media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+</style>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({startOnLoad:true,theme:'base',flowchart:{useMaxWidth:true,htmlLabels:true,nodeSpacing:50,rankSpacing:60},themeVariables:{primaryColor:'#1a2530',primaryTextColor:'#e8eef5',primaryBorderColor:'#64c8ff',lineColor:'#5eead4',secondaryColor:'#0e1419',tertiaryColor:'#0a0f14',background:'#0a0f14',mainBkg:'#1a2530',secondBkg:'#0e1419',textColor:'#d4dae0',fontFamily:'-apple-system,"SF Pro Display",sans-serif',fontSize:'16px'}});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const lb=document.createElement('div');lb.className='lightbox';
+  lb.innerHTML='<span class="hint">scroll = zoom · drag = pan · Esc / click bg = close</span>';
+  document.body.appendChild(lb);
+  let scale=1,panX=0,panY=0,dragging=false,moved=false,lx=0,ly=0;
+  const apply=()=>{const s=lb.querySelector('svg');if(s)s.style.transform=`translate(${panX}px,${panY}px) scale(${scale})`};
+  const reset=()=>{scale=1;panX=0;panY=0};
+  const close=()=>{lb.classList.remove('open');const s=lb.querySelector('svg');if(s)s.remove();reset()};
+  document.addEventListener('click',e=>{
+    if(e.target.closest('.lightbox')){if(moved){moved=false;return}close();return}
+    const w=e.target.closest('.mermaid');if(!w)return;
+    const svg=w.querySelector('svg');if(!svg)return;
+    const c=svg.cloneNode(true);c.removeAttribute('style');
+    c.style.maxWidth='96vw';c.style.maxHeight='92vh';
+    lb.appendChild(c);lb.classList.add('open');reset();apply();
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+  lb.addEventListener('wheel',e=>{
+    if(!lb.classList.contains('open'))return;
+    e.preventDefault();
+    const svg=lb.querySelector('svg');if(!svg)return;
+    const ns=Math.max(0.3,Math.min(10,scale*(1-e.deltaY*0.002)));
+    const r=svg.getBoundingClientRect();
+    const cx=e.clientX-(r.left+r.width/2),cy=e.clientY-(r.top+r.height/2);
+    const k=ns/scale-1;panX-=cx*k;panY-=cy*k;scale=ns;apply();
+  },{passive:false});
+  lb.addEventListener('mousedown',e=>{
+    if(!lb.classList.contains('open'))return;
+    dragging=true;moved=false;lx=e.clientX;ly=e.clientY;lb.classList.add('dragging');e.preventDefault();
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    const dx=e.clientX-lx,dy=e.clientY-ly;
+    if(Math.abs(dx)+Math.abs(dy)>3)moved=true;
+    panX+=dx;panY+=dy;lx=e.clientX;ly=e.clientY;apply();
+  });
+  document.addEventListener('mouseup',()=>{dragging=false;lb.classList.remove('dragging')});
+});
+</script>
+</head><body><div class="container">
+
+<header>
+<div class="meta">
+<span class="tag day">Day 22</span>
+<span class="tag diff">Medium</span>
+<span class="tag">Deployment</span>
+<span class="tag">Canary</span>
+<span class="tag">Feature Flags</span>
+<span class="tag">DB Migration</span>
+</div>
+<h1>上线与发布 — 每天部署上百次、坏版本 5 分钟自动滚回<span class="en">Deployment & Release: Blue-Green, Canary, Feature Flags & Schema Migration</span></h1>
+</header>
+
+<h2>问题场景 + 需求约束</h2>
+<p>设计一个支撑 <strong>500+ 微服务、日均数千次部署</strong> 的发布平台。目标不是「能上线」，而是 <strong>在高频部署下把坏版本的爆炸半径压到最小</strong>：一个有 bug 的版本进了生产，要在 <strong>用户感知前自动检测并回滚</strong>，而不是等告警、等 on-call 起床。</p>
+<p>这件事的反面教材是 <strong>Knight Capital 2012</strong>：一次部署把新代码推到 8 台服务器中的 7 台，第 8 台还跑着旧代码，复用了一个废弃的 feature flag，<strong>45 分钟内亏掉约 4.4 亿美元</strong>，公司就此终结（<a href="https://www.sec.gov/Archives/edgar/data/0001060749/000119312512336167/d392288d8k.htm" style="color:#64c8ff">SEC 8-K</a>）。发布系统不是 CI 的尾巴，它是可靠性工程的核心。</p>
+<ul>
+<li><strong>部署频率</strong>：日均数千次（Amazon 量级是每秒级），人工评审每个版本不现实 → <em>自动化卡口</em>是前提。</li>
+<li><strong>零停机</strong>：滚动期间新旧版本并存，要求请求无感、连接不断。</li>
+<li><strong>回滚 SLO</strong>：从「检测到异常」到「流量切回旧版本」&lt; 5 分钟（MTTR 的主要构成）。</li>
+<li><strong>状态约束</strong>：无状态服务好办；带 schema 变更的有状态服务才是难点 —— 数据库回不了滚。</li>
+<li><strong>解耦</strong>：<em>部署</em>（把代码放上去）必须和<em>发布</em>（让用户看到功能）解耦，否则没法灰度。</li>
+</ul>
+
+<h2>高层架构</h2>
+<p>核心是一条带<strong>自动金丝雀分析（ACA）</strong>的流水线：新版本先只接一小撮流量，把它的黄金指标（错误率、延迟、饱和度）与基线版本做<strong>统计对比</strong>，显著劣化就自动回滚，达标才逐步放量。Feature flag 平台横切在外，让「发布」可以在不重新部署的前提下用配置开关控制。</p>
+<pre class="mermaid">
+graph LR
+    DEV["commit / CI<br/><i>build + 单测</i>"]
+    ART["镜像仓库<br/><i>immutable artifact</i>"]
+    CD["发布编排<br/><i>Spinnaker / Argo</i>"]
+    LB["流量路由<br/><i>service mesh / LB</i>"]
+    BASE["Baseline v1<br/><i>旧版本</i>"]
+    CAN["Canary v2<br/><i>新版本 · 5%</i>"]
+    ACA{"金丝雀分析<br/><i>指标统计对比</i>"}
+    OBS[("Metrics / Traces")]
+
+    DEV --> ART --> CD --> LB
+    LB -->|95%| BASE
+    LB -->|5%| CAN
+    BASE --> OBS
+    CAN --> OBS
+    OBS --> ACA
+    ACA -->|达标| CD
+    ACA -.->|劣化→回滚| LB
+
+    classDef ci fill:#1a2530,stroke:#64c8ff,color:#e8eef5
+    classDef route fill:#0e2030,stroke:#5eead4,color:#e8eef5
+    classDef ver fill:#1a1a30,stroke:#ffb450,color:#e8eef5
+    classDef judge fill:#2a1530,stroke:#ff7ab6,color:#e8eef5
+    class DEV,ART,CD ci
+    class LB,OBS route
+    class BASE,CAN ver
+    class ACA judge
+</pre>
+<p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">金丝雀只接小流量；分析模块自动判优劣，达标放量、劣化回滚 —— 人不在回路里</p>
+
+<h2>关键技术点</h2>
+
+<h3>1. 部署策略：Rolling vs Blue-Green vs Canary</h3>
+<p>一句话 trade-off：<em>用「多花的资源 + 慢」换「更小的爆炸半径 + 更快回滚」</em>。</p>
+<p><strong>原理</strong>：三者本质都是「新旧版本如何共存与切换」。<strong>Rolling</strong>（滚动）逐批替换实例，每批下线旧的、起新的，全程只需 1 份资源，但回滚要再滚一遍、慢。<strong>Blue-Green</strong>（蓝绿）开两套完整环境，绿色就绪后流量一次性切过去，回滚就是把路由切回蓝色 —— <em>秒级回滚</em>，代价是双倍资源。<strong>Canary</strong>（金丝雀）只把 1%~5% 流量导给新版本，观察指标再决定放量还是回滚，爆炸半径最小，但流程最复杂、放量最慢。</p>
+<table>
+<thead><tr><th></th><th>Rolling</th><th>Blue-Green</th><th>Canary</th></tr></thead>
+<tbody>
+<tr><td><strong>资源开销</strong></td><td>1×（+1 批）</td><td>2×</td><td>1× + 少量</td></tr>
+<tr><td><strong>回滚速度</strong></td><td>慢（再滚一轮）</td><td>秒级（切路由）</td><td>快（撤金丝雀）</td></tr>
+<tr><td><strong>爆炸半径</strong></td><td>中（逐批扩大）</td><td>大（一次全切）</td><td>极小（1~5%）</td></tr>
+<tr><td><strong>新旧共存</strong></td><td>是（需兼容）</td><td>短暂</td><td>是（需兼容）</td></tr>
+<tr><td><strong>适用</strong></td><td>默认、无状态</td><td>要秒级回滚、能承担双倍成本</td><td>高风险变更、有完善可观测性</td></tr>
+</tbody></table>
+<div class="tradeoff">
+<strong>关键陷阱：</strong>Rolling 和 Canary 都让<strong>新旧版本同时在线</strong>，所以两个版本必须<em>互相兼容</em>（前后向）—— 这把难度从「部署」转移到了「兼容性设计」（见技术点 3、4）。Blue-Green 看似规避了共存，但共享同一个数据库时，schema 仍要对蓝绿两版都兼容。
+</div>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Netflix</strong>：用 <a href="https://spinnaker.io/" style="color:#5eead4">Spinnaker</a> 编排，红黑部署（蓝绿变体）+ 金丝雀，跨 AWS 多区域。</li>
+<li><strong>Kubernetes</strong>：原生 Deployment 即 rolling update（<code>maxSurge</code>/<code>maxUnavailable</code> 控制批次）；蓝绿/金丝雀靠 Argo Rollouts、Flagger 实现。</li>
+<li><strong>Google</strong>：金丝雀 + 渐进放量是 SRE 标准实践，《Site Reliability Engineering》专门讲发布工程。</li>
+</ul></div>
+
+<h3>2. 自动金丝雀分析：让统计学替你做发布决策</h3>
+<p>一句话 trade-off：<em>用「统计严谨性 + 工程复杂度」换「人不再肉眼盯 dashboard」</em>。</p>
+<p><strong>原理</strong>：金丝雀的价值在于<em>对比</em>，而不是孤立地看新版本指标。正确做法是同时跑一个<strong>基线（baseline）</strong>—— 用和金丝雀<em>相同版本的旧代码</em>、接<em>相同小流量</em>，排除「正好赶上流量高峰」之类的环境噪声。然后对两组的错误率、延迟分位、CPU 等指标做<strong>统计假设检验</strong>，判断差异是否显著。Netflix Kayenta 用 <strong>Mann-Whitney U 检验</strong>（非参数，不假设正态分布）给每个指标打分，再汇总成一个「通过 / 边缘 / 失败」判定。</p>
+<pre><code># 金丝雀判定核心逻辑 (pseudo-code)
+def judge_canary(canary, baseline, metrics):
+    scores = []
+    for m in metrics:                       # 错误率、p99、CPU...
+        # 非参数检验：金丝雀样本是否显著差于基线
+        p = mann_whitney_u(canary[m], baseline[m])
+        if significant(p) and worse(canary[m], baseline[m]):
+            scores.append(FAIL)
+        else:
+            scores.append(PASS)
+    fail_ratio = scores.count(FAIL) / len(scores)
+    if fail_ratio > 0.5:  return "ROLLBACK"   # 自动回滚
+    if fail_ratio > 0:    return "MANUAL"      # 人工介入
+    return "PROMOTE"                           # 自动放量
+</code></pre>
+<div class="tradeoff">
+<strong>Trade-off：</strong>
+<ul>
+<li><strong>不设基线、只看绝对阈值</strong>：✅ 简单；❌ 阈值要手调、易误报（流量高峰把延迟顶上去也触发回滚）。</li>
+<li><strong>金丝雀 vs 基线对比</strong>：✅ 抵消环境噪声、阈值自适应；❌ 多一份基线资源、需要足够样本量（低流量服务统计不显著）。</li>
+<li><strong>金丝雀只接 5% 流量</strong>：观测窗口要够长才能积累样本，与「快速放量」存在张力。</li>
+</ul></div>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Netflix + Google</strong>：开源 <a href="https://netflixtechblog.com/automated-canary-analysis-at-netflix-with-kayenta-3260bc7acc69" style="color:#5eead4">Kayenta</a>，用 Mann-Whitney U 检验；上线时已承担 Netflix 约 30% 的金丝雀判定、日均约 200 次。</li>
+<li><strong>Argo Rollouts / Flagger</strong>：在 K8s 上对接 Prometheus 做 metric analysis，按阈值/对比自动推进或回滚。</li>
+</ul></div>
+
+<h3>3. 部署 ≠ 发布：用 Feature Flag 解耦</h3>
+<p>一句话 trade-off：<em>用「flag 的配置债 + 代码分支复杂度」换「随时灰度、随时关停、上线无需重新部署」</em>。</p>
+<p><strong>原理</strong>：把代码部署到生产，不等于把功能暴露给用户。新功能包在一个 <strong>feature flag</strong> 里，部署时默认关闭（dark launch），之后通过配置中心<strong>按用户/比例/地区动态开启</strong>。这带来三个能力：① <strong>渐进放量</strong>（1% → 50% → 100%，出问题秒关，无需回滚部署）；② <strong>解耦发布与部署时间</strong>（代码合主干即可，营销定时再开）；③ <strong>A/B 实验</strong>。Knight Capital 的惨剧正源于 flag 治理失败 —— <em>复用了一个早该删除的旧 flag</em>。</p>
+<pre><code># Feature flag 调用 (pseudo-code)
+if flags.enabled("new_checkout_v2", user=ctx.user,
+                 rollout_pct=5, allow=["beta_team"]):
+    return checkout_v2(ctx)     # 新路径：仅 5% + 内测组
+else:
+    return checkout_v1(ctx)     # 旧路径：兜底
+# kill switch：把 rollout_pct 设 0，无需部署即可全量关停
+</code></pre>
+<div class="tradeoff">
+<strong>Trade-off：</strong>
+<ul>
+<li><strong>不用 flag（靠部署/回滚控制）</strong>：✅ 代码干净；❌ 每次灰度都要重新部署，关停慢、无法精细分人群。</li>
+<li><strong>用 flag</strong>：✅ 秒级 kill switch、精细灰度、实验；❌ <em>flag 债</em> —— 旧 flag 不清理就是定时炸弹，代码里 if/else 分支组合爆炸、测试覆盖困难。</li>
+<li><strong>纪律</strong>：临时 flag 必须有「下线日期」，放量到 100% 后回头删代码（很多团队栽在这一步）。</li>
+</ul></div>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Flickr</strong>：2009 年的经典博文 <a href="https://code.flickr.net/2009/12/02/flipping-out/" style="color:#5eead4">「Flipping Out」</a>奠定了 feature flag + dark launch 的工程范式。</li>
+<li><strong>Facebook</strong>：Gatekeeper 系统按地区/用户群精细控制功能曝光，部署与发布彻底解耦。</li>
+<li><strong>LaunchDarkly</strong>：把 feature flag 做成独立 SaaS 品类，progressive delivery 的代表。</li>
+</ul></div>
+
+<h3>4. 向后兼容与数据库迁移：唯一不能回滚的东西</h3>
+<p>一句话 trade-off：<em>用「多步骤 + 临时双写的工程量」换「schema 变更全程零停机、任意时刻可回滚」</em>。</p>
+<p><strong>原理</strong>：代码能回滚，<strong>数据回不了滚</strong>。一旦删了列、改了类型，旧版本代码读到就崩。新旧版本共存期间，schema 必须同时让两版都能跑。解法是 <strong>Expand-Contract（扩张-收缩，又名 Parallel Change）</strong>：把破坏性变更拆成三段 —— <em>Expand</em> 只加不减（加新列/新表，不动旧的）；<em>Migrate</em> 双写 + 回填历史数据，读切到新结构；<em>Contract</em> 等所有旧版本下线后，才删旧列。每一步都向后兼容，回滚只是停在当前步。<strong>API 层同理</strong>：Stripe 的<a href="https://stripe.com/blog/api-versioning" style="color:#64c8ff">日期版本</a>把账号「钉」在首次调用的版本，内部只写最新逻辑，再由<em>响应兼容层</em>把结果转换回旧格式 —— 自 2011 年起从未真正破坏过 API。</p>
+<pre class="mermaid">
+graph LR
+    E["① Expand<br/><i>加 new_col</i><br/>不删旧的"]
+    M["② Migrate<br/><i>双写 old+new</i><br/>回填 + 读切新"]
+    C["③ Contract<br/><i>删 old_col</i><br/>旧版本已下线"]
+    E --> M --> C
+    E -.可回滚.-> X1["旧代码仍工作"]
+    M -.可回滚.-> X2["旧列仍在"]
+    classDef step fill:#1a2530,stroke:#5eead4,color:#e8eef5
+    classDef safe fill:#0e2030,stroke:#64c8ff,color:#7a8590
+    class E,M,C step
+    class X1,X2 safe
+</pre>
+<div class="tradeoff">
+<strong>Trade-off：</strong>
+<ul>
+<li><strong>直接 ALTER（一步到位）</strong>：✅ 简单；❌ 共存期旧代码崩、大表 ALTER 可能锁表、无法回滚。</li>
+<li><strong>Expand-Contract 三段式</strong>：✅ 全程兼容、可随时停；❌ 步骤多、Migrate 期要维护双写、忘了做 Contract 会留技术债。</li>
+<li><strong>纪律</strong>：Expand 和 Contract 必须是<em>独立的两次发布</em>，中间确认所有旧实例已退场，否则就是 Knight Capital 式的版本错配。</li>
+</ul></div>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Stripe</strong>：日期滚动版本 + 响应兼容层，13 年零破坏性变更，被业界奉为 API 版本管理标杆。</li>
+<li><strong>Martin Fowler</strong>：把该模式正式命名为 <a href="https://martinfowler.com/bliki/ParallelChange.html" style="color:#5eead4">Parallel Change</a>（expand / migrate / contract 三段）。</li>
+<li><strong>GitHub / Shopify</strong>：大表迁移用「在线 schema change」工具（gh-ost / lhm）配合 expand-contract，避免锁表停机。</li>
+</ul></div>
+
+<h2>扩展与优化</h2>
+<ul>
+<li><strong>渐进放量自动化</strong>：金丝雀达标后按 5%→25%→50%→100% 阶梯放量，每档都跑一轮分析，全自动推进（Argo Rollouts 的 step）。</li>
+<li><strong>多区域错峰</strong>：先发一个小区域，烤 24 小时（catch 只有特定时区/流量模式才暴露的 bug），再全球铺开。</li>
+<li><strong>回滚 vs 前滚</strong>：带 schema 变更时往往「前滚修复（roll forward）」比回滚更安全 —— 因为数据已经按新结构写了。这要求 hotfix 流水线本身极快。</li>
+<li><strong>flag 治理</strong>：建 flag 生命周期看板，自动提醒清理过期 flag，把「flag 债」纳入技术债管理。</li>
+<li><strong>部署即代码</strong>：发布流程版本化（pipeline as code），审计每次变更，可重放。</li>
+</ul>
+
+<h2>常见陷阱 + 面试追问</h2>
+<div class="callout">
+<strong>1. 「能部署」当成「能发布」</strong>：没把部署和发布解耦，灰度只能靠反复部署。面试期望你主动提 feature flag。
+</div>
+<div class="callout">
+<strong>2. 忘了新旧版本要双向兼容</strong>：rolling/canary 期间新旧共存，新版本写的数据旧版本要能读，反之亦然。最容易翻车的是「先删 API 字段再发客户端」的顺序错配。
+</div>
+<div class="callout">
+<strong>3. 把数据库迁移当代码部署</strong>：以为回滚部署就万事大吉，结果 schema 已改、旧代码读崩。务必 expand-contract，且 Expand/Contract 分两次发。
+</div>
+<div class="callout">
+<strong>4. 金丝雀不设基线</strong>：只看新版本绝对指标，被流量波动误导。正确做法是金丝雀 vs 同流量基线做统计对比。
+</div>
+<div class="callout">
+<strong>5. flag 不清理</strong>：Knight Capital 复用废弃 flag 触发死代码，45 分钟亏 4.4 亿。临时 flag 必须有过期与清理机制。
+</div>
+
+<h2>深入资源</h2>
+<ul>
+<li><strong>《Designing Data-Intensive Applications》Ch 4</strong>（Kleppmann）：演进式 schema、向前/向后兼容的本质讨论。</li>
+<li><strong>Netflix TechBlog</strong>：<a href="https://netflixtechblog.com/automated-canary-analysis-at-netflix-with-kayenta-3260bc7acc69" style="color:#64c8ff">Automated Canary Analysis with Kayenta</a> —— ACA 的统计方法与工程实现。</li>
+<li><strong>Stripe Blog</strong>：<a href="https://stripe.com/blog/api-versioning" style="color:#64c8ff">APIs as infrastructure: future-proofing Stripe with versioning</a>。</li>
+<li><strong>Martin Fowler bliki</strong>：<a href="https://martinfowler.com/bliki/ParallelChange.html" style="color:#64c8ff">ParallelChange</a>、<a href="https://martinfowler.com/bliki/BlueGreenDeployment.html" style="color:#64c8ff">BlueGreenDeployment</a>、<a href="https://martinfowler.com/bliki/CanaryRelease.html" style="color:#64c8ff">CanaryRelease</a>、<a href="https://martinfowler.com/bliki/FeatureToggle.html" style="color:#64c8ff">FeatureToggle</a>。</li>
+<li><strong>Flickr code blog</strong>：<a href="https://code.flickr.net/2009/12/02/flipping-out/" style="color:#64c8ff">Flipping Out</a> —— feature flag + dark launch 范式起点。</li>
+</ul>
+
+<h2>深入思考（点击展开答案）</h2>
+
+<details>
+<summary>1. 蓝绿部署号称「秒级回滚」，但如果两套环境共享同一个数据库，这个承诺会在什么情况下失效？</summary>
+<div class="answer">
+<p>蓝绿的秒级回滚只对<strong>无状态、无 schema 变更</strong>的版本成立。一旦绿色版本上线时执行了破坏性 schema 变更（删列、改类型），切回蓝色时蓝色代码读到的还是<em>已经变了的库</em>，照样崩 —— 数据库是蓝绿共享的，它没跟着回滚。</p>
+<p>更隐蔽的是<strong>数据污染</strong>：绿色运行的几分钟里写入了只有新格式才合法的数据（比如新枚举值、新 JSON 结构），回到蓝色后，蓝色读到这些「未来数据」反序列化失败。</p>
+<p><strong>正确姿势</strong>：schema 必须先用 expand-contract 走到「对蓝绿两版都兼容」的中间态，再做蓝绿切换。也就是说，<em>数据迁移的节奏必须领先于代码发布</em>，蓝绿只解决无状态部分的回滚。这也是为什么「带 schema 变更时前滚常比回滚安全」。</p>
+</div>
+</details>
+
+<details>
+<summary>2. 一个 QPS 很低的内部服务（每分钟几十次请求）想做自动金丝雀分析，会遇到什么根本性障碍？怎么办？</summary>
+<div class="answer">
+<p><strong>障碍：样本量不足，统计检验失去意义。</strong>金丝雀只接 5% 流量，本来 QPS 就低，5% 后每分钟可能只有几个请求。Mann-Whitney U 这类检验在小样本下要么 p 值永远不显著（放过真 bug），要么单个异常点就左右结论（误报）。统计需要足够的 n。</p>
+<p><strong>办法</strong>：① <em>提高金丝雀流量比例</em>（低流量服务直接给 50%，反正绝对量小，爆炸半径仍可控）；② <em>拉长观测窗口</em>（不看每分钟，看几小时累积）；③ <em>降级为蓝绿 + 阈值告警</em>，放弃统计对比，靠简单错误率阈值 + 人工确认；④ <em>合成流量</em>，用回放/压测给金丝雀灌可控负载凑样本。本质是：ACA 是为高流量设计的，低流量服务该换更朴素的策略，别为统计而统计。</p>
+</div>
+</details>
+
+<details>
+<summary>3. Expand-Contract 要求「Expand 和 Contract 分两次发布」。如果团队图省事合成一次发，最坏会发生什么？</summary>
+<div class="answer">
+<p>合成一次发，意味着「加新列 + 双写 + 删旧列」在同一个版本里完成。问题出在<strong>滚动部署的共存窗口</strong>：当新版本正在逐批替换旧版本时，集群里同时有「已删旧列认知」的新实例和「还在读写旧列」的旧实例。</p>
+<p>新实例已经把旧列 DROP 了 → 旧实例的查询立刻 <code>column not found</code> 报错。这就是 Knight Capital 的结构性病因：<em>同一时刻不同实例对数据契约的认知不一致</em>。</p>
+<p>即使不滚动、用蓝绿一次切，回滚时也回不去 —— 旧列已被物理删除。<strong>分两次发的本质</strong>，是在两次发布之间插入一个「确认所有旧实例已退场」的同步点，把「版本共存」这个分布式难题，降维成两个各自兼容的串行步骤。省这一步省掉的正是安全性本身。</p>
+</div>
+</details>
+
+<details>
+<summary>4. Feature flag 给了「秒级 kill switch」，那它能不能替代金丝雀和回滚？三者是什么关系？</summary>
+<div class="answer">
+<p>不能替代，三者作用在<strong>不同层次</strong>，是组合关系：</p>
+<ul>
+<li><strong>金丝雀</strong>解决「<em>要不要让这个二进制进生产</em>」—— 针对整个部署单元的风险评估，颗粒度是「版本」。</li>
+<li><strong>Feature flag</strong>解决「<em>已经在生产的代码，要不要让用户看到这个功能</em>」—— 颗粒度是「功能 / 人群」，且无需重新部署即可开关。</li>
+<li><strong>回滚</strong>是兜底 —— 当前两者都没拦住、坏版本已造成影响时，把二进制换回旧的。</li>
+</ul>
+<p>典型流水线是<em>三者叠加</em>：新功能藏在 flag 后（关闭）随版本部署 → 金丝雀分析确认这个版本本身健康 → 全量部署 → 再单独用 flag 渐进打开功能、出问题秒关。flag 关不掉的问题（如框架升级、依赖变更、内存泄漏）才需要金丝雀拦截和回滚。把 flag 当万能开关、不做金丝雀，等于放弃了对「版本级劣化」的防护。</p>
+</div>
+</details>
+
+<details>
+<summary>5. 估算：一个版本有 0.1% 概率引入会致瘫的 bug。若每天部署 1000 次、每次直接全量，与改用「金丝雀拦截掉 95%」相比，年度生产事故次数差多少？</summary>
+<div class="answer">
+<p><strong>全量直发</strong>：每次部署致瘫概率 0.1%，每天 1000 次 → 期望 <code>1000 × 0.001 = 1</code> 次/天致瘫事故 → <strong>一年约 365 次</strong>。系统基本没法用了。</p>
+<p><strong>金丝雀拦截 95%</strong>：金丝雀只接小流量，坏版本即便漏过也只影响 5% 用户那一小段时间，且 95% 的坏版本在放量前被自动回滚挡下 → 真正全量爆发的事故降到 <code>365 × 5% ≈ 18</code> 次/年，且每次的<em>用户影响面</em>还被金丝雀流量比例进一步缩小（影响 = 概率 × 爆炸半径，两个因子都被压低）。</p>
+<p><strong>二阶洞察</strong>：可靠性不是靠「让 bug 不发生」（0.1% 这个基础率很难再降），而是靠<em>把每次失败的代价压低</em>。高频部署反而更安全 —— 部署越频繁，每次变更越小，金丝雀越容易从指标里识别出「是哪次变更搞坏的」。这就是「deploy more often to be safer」这个反直觉结论的数学来源：频率高 + 批量小 + 自动拦截，整体风险远低于「攒一大波、谨慎地全量发一次」。</p>
+</div>
+</details>
+
+<div class="nav"><a href="index.html">← 回到 index</a></div>
+</div>
+</body></html>
