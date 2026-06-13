@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 23 · Reliability — System Design Bi-daily</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"SF Pro Display","Noto Sans SC",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
+.container{max-width:820px;margin:0 auto;padding:24px 20px 60px}
+header{padding:40px 0 28px;border-bottom:1px solid rgba(100,200,255,0.15);margin-bottom:32px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem}
+.tag{padding:3px 10px;border-radius:4px;background:rgba(100,200,255,0.12);color:#64c8ff;border:1px solid rgba(100,200,255,0.25)}
+.tag.diff{background:rgba(94,234,212,0.1);color:#5eead4;border-color:rgba(94,234,212,0.3)}
+.tag.day{background:rgba(255,180,80,0.1);color:#ffb450;border-color:rgba(255,180,80,0.25)}
+h1{font-size:1.75rem;font-weight:800;background:linear-gradient(135deg,#64c8ff 0%,#5eead4 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:0.5px;line-height:1.3}
+h1 .en{display:block;font-size:1rem;color:#7a8590;-webkit-text-fill-color:#7a8590;margin-top:6px;font-weight:500}
+h2{font-size:1.2rem;color:#5eead4;margin:36px 0 14px;padding-left:12px;border-left:3px solid #5eead4}
+h3{font-size:1rem;color:#64c8ff;margin:20px 0 10px;font-weight:600}
+p{margin:10px 0;color:#c8cfd6}
+ul,ol{margin:10px 0 10px 22px;color:#c8cfd6}
+li{margin:6px 0}
+strong{color:#e8eef5;font-weight:600}
+em{color:#5eead4;font-style:normal;font-weight:500}
+code{font-family:"SF Mono",Menlo,Consolas,monospace;background:rgba(100,200,255,0.1);color:#5eead4;padding:1px 6px;border-radius:3px;font-size:0.88em}
+pre{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:14px 16px;overflow-x:auto;margin:12px 0;font-family:"SF Mono",Menlo,Consolas,monospace;font-size:0.84rem;line-height:1.55;color:#c8cfd6}
+pre code{background:none;color:inherit;padding:0;font-size:1em}
+.mermaid{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:18px;margin:14px 0;text-align:center;overflow-x:auto;cursor:zoom-in;transition:border-color 0.15s}
+.mermaid:hover{border-color:rgba(100,200,255,0.4)}
+.mermaid svg{width:100%;max-width:100%;height:auto;min-height:280px}
+.lightbox{position:fixed;inset:0;background:rgba(8,12,18,0.96);z-index:9999;display:none;align-items:center;justify-content:center;padding:24px;cursor:grab;backdrop-filter:blur(4px);overflow:hidden}
+.lightbox.open{display:flex}
+.lightbox.dragging{cursor:grabbing}
+.lightbox svg{width:auto;height:auto;max-width:96vw;max-height:92vh;transform-origin:center center;will-change:transform}
+.lightbox .hint{position:fixed;top:16px;right:20px;font-size:0.78rem;color:#7a8590;font-family:"SF Mono",Menlo,monospace;pointer-events:none}
+.callout{background:rgba(255,180,80,0.06);border-left:3px solid #ffb450;padding:12px 14px;margin:14px 0;border-radius:4px;font-size:0.94rem}
+.callout strong{color:#ffb450}
+.tradeoff{background:rgba(100,200,255,0.05);border:1px solid rgba(100,200,255,0.2);border-radius:6px;padding:12px 14px;margin:12px 0;font-size:0.94rem}
+.case{background:rgba(94,234,212,0.05);border-left:3px solid #5eead4;padding:12px 14px;margin:12px 0;border-radius:4px;font-size:0.94rem}
+.case strong{color:#5eead4}
+.nav{margin-top:50px;padding-top:24px;border-top:1px solid rgba(100,200,255,0.15);text-align:center}
+.nav a{color:#64c8ff;text-decoration:none;font-size:0.92rem;padding:8px 16px;border:1px solid rgba(100,200,255,0.3);border-radius:4px;transition:all 0.15s}
+.nav a:hover{background:rgba(100,200,255,0.1)}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:0.9rem}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid rgba(100,200,255,0.15)}
+th{color:#64c8ff;font-weight:600;background:rgba(100,200,255,0.05)}
+details{background:rgba(100,200,255,0.04);border:1px solid rgba(100,200,255,0.18);border-radius:6px;padding:12px 16px;margin:10px 0;transition:all 0.15s}
+details:hover{border-color:rgba(100,200,255,0.35)}
+details[open]{background:rgba(94,234,212,0.05);border-color:rgba(94,234,212,0.3)}
+details summary{font-weight:600;color:#e8eef5;list-style:none;outline:none;cursor:pointer;display:flex;align-items:flex-start;gap:10px;font-size:0.96rem}
+details summary::-webkit-details-marker{display:none}
+details summary::before{content:'▶';color:#64c8ff;font-size:0.75em;transition:transform 0.2s;flex-shrink:0;margin-top:5px}
+details[open] summary::before{transform:rotate(90deg);color:#5eead4}
+details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
+details .answer ul,details .answer ol{margin:6px 0 6px 22px}
+@media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+</style>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({startOnLoad:true,theme:'base',flowchart:{useMaxWidth:true,htmlLabels:true,nodeSpacing:50,rankSpacing:60},themeVariables:{primaryColor:'#1a2530',primaryTextColor:'#e8eef5',primaryBorderColor:'#64c8ff',lineColor:'#5eead4',secondaryColor:'#0e1419',tertiaryColor:'#0a0f14',background:'#0a0f14',mainBkg:'#1a2530',secondBkg:'#0e1419',textColor:'#d4dae0',fontFamily:'-apple-system,"SF Pro Display",sans-serif',fontSize:'16px'}});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const lb=document.createElement('div');lb.className='lightbox';
+  lb.innerHTML='<span class="hint">scroll = zoom · drag = pan · Esc / click bg = close</span>';
+  document.body.appendChild(lb);
+  let scale=1,panX=0,panY=0,dragging=false,moved=false,lx=0,ly=0;
+  const apply=()=>{const s=lb.querySelector('svg');if(s)s.style.transform=`translate(${panX}px,${panY}px) scale(${scale})`};
+  const reset=()=>{scale=1;panX=0;panY=0};
+  const close=()=>{lb.classList.remove('open');const s=lb.querySelector('svg');if(s)s.remove();reset()};
+  document.addEventListener('click',e=>{
+    if(e.target.closest('.lightbox')){if(moved){moved=false;return}close();return}
+    const w=e.target.closest('.mermaid');if(!w)return;
+    const svg=w.querySelector('svg');if(!svg)return;
+    const c=svg.cloneNode(true);c.removeAttribute('style');
+    c.style.maxWidth='96vw';c.style.maxHeight='92vh';
+    lb.appendChild(c);lb.classList.add('open');reset();apply();
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+  lb.addEventListener('wheel',e=>{
+    if(!lb.classList.contains('open'))return;
+    e.preventDefault();
+    const svg=lb.querySelector('svg');if(!svg)return;
+    const ns=Math.max(0.3,Math.min(10,scale*(1-e.deltaY*0.002)));
+    const r=svg.getBoundingClientRect();
+    const cx=e.clientX-(r.left+r.width/2),cy=e.clientY-(r.top+r.height/2);
+    const k=ns/scale-1;panX-=cx*k;panY-=cy*k;scale=ns;apply();
+  },{passive:false});
+  lb.addEventListener('mousedown',e=>{
+    if(!lb.classList.contains('open'))return;
+    dragging=true;moved=false;lx=e.clientX;ly=e.clientY;lb.classList.add('dragging');e.preventDefault();
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    const dx=e.clientX-lx,dy=e.clientY-ly;
+    if(Math.abs(dx)+Math.abs(dy)>3)moved=true;
+    panX+=dx;panY+=dy;lx=e.clientX;ly=e.clientY;apply();
+  });
+  document.addEventListener('mouseup',()=>{dragging=false;lb.classList.remove('dragging')});
+});
+</script>
+</head><body><div class="container">
+
+<header>
+<div class="meta">
+<span class="tag day">Day 23</span>
+<span class="tag diff">Medium</span>
+<span class="tag">Reliability</span>
+<span class="tag">Circuit Breaker</span>
+<span class="tag">Backoff</span>
+<span class="tag">Bulkhead</span>
+</div>
+<h1>Reliability — One flaky dependency shouldn't take down the whole chain<span class="en">Circuit Breaker, Retry/Backoff, Bulkhead & Graceful Degradation</span></h1>
+</header>
+
+<h2>Problem & Constraints</h2>
+<p>Design an e-commerce <strong>checkout path</strong>: 50K orders/sec, p99 SLO 300ms, overall availability target 99.95% (~4.4h downtime/year). Placing an order synchronously calls roughly <strong>30 downstream dependencies</strong> — inventory, coupons, fraud, address, payment pre-auth… Only inventory and payment are <em>critical</em>; the rest are non-critical.</p>
+<p>What you really need to prevent isn't "a service died" but <strong>cascading failure</strong>: one GC pause in the coupon service pushes its response from 20ms to 5s. The caller waits synchronously, every order request pins a thread blocking on coupons — within seconds the thread pool is exhausted and <strong>even requests that never touch coupons can't get in</strong>. One non-critical dependency drags down the entire checkout. The core thesis of reliability engineering: <em>keep local failures local</em>. This issue covers four complementary weapons: circuit breaker, retry with backoff, bulkhead, graceful degradation.</p>
+<ul>
+<li><strong>Failure model</strong>: downstreams rarely die outright — they go <em>slow</em>. Slow is worse than dead, because it quietly drains your threads/connections.</li>
+<li><strong>Dependency tiering</strong>: critical vs non-critical. Non-critical deps must be skippable, or their availability becomes your floor.</li>
+<li><strong>Serial availability</strong>: 30 deps in series, each 99.9% → overall ≈ 99.9%³⁰ ≈ <strong>97%</strong>. Without isolation, more deps = more fragile.</li>
+<li><strong>Idempotency</strong>: determines whether you can safely retry (see Day 7, Day 17).</li>
+</ul>
+
+<h2>High-Level Architecture</h2>
+<p>Every downstream call passes through a <strong>resilience layer</strong>: timeout → bulkhead (isolated resource pool) → circuit breaker (tracks error rate) → retry (with backoff). If any stage decides failure, it immediately goes to a <strong>fallback</strong> (cached value / default / skip) instead of blocking. At the ingress there's also <strong>load shedding</strong>, which under overload protects critical requests first.</p>
+<pre class="mermaid">
+graph LR
+    IN["order request"]
+    LS{"load shed<br/><i>overload→drop</i>"}
+    ORD["order svc<br/><i>orchestrate</i>"]
+    BH["bulkhead<br/><i>pool per dep</i>"]
+    CB{"breaker<br/><i>open?</i>"}
+    DEP["downstream<br/><i>coupon/fraud...</i>"]
+    FB["fallback<br/><i>cache/default/skip</i>"]
+
+    IN --> LS -->|admit| ORD --> BH --> CB
+    LS -.->|reject 429| IN
+    CB -->|closed| DEP
+    CB -.->|open→fail fast| FB
+    DEP -.->|timeout/error| FB
+
+    classDef in fill:#1a2530,stroke:#64c8ff,color:#e8eef5
+    classDef gate fill:#2a1530,stroke:#ff7ab6,color:#e8eef5
+    classDef core fill:#1a1a30,stroke:#ffb450,color:#e8eef5
+    classDef dep fill:#0e2030,stroke:#5eead4,color:#e8eef5
+    class IN in
+    class LS,CB gate
+    class ORD,BH core
+    class DEP,FB dep
+</pre>
+<p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">Each dependency is isolated; failures fail fast to a fallback so one slow dep can't exhaust global resources</p>
+
+<h2>Key Techniques</h2>
+
+<h3>1. Circuit Breaker — pull the switch on a failing dependency</h3>
+<p>One-line trade-off: <em>trade "temporary unavailability of the failing dependency" for "the caller fails fast and the downstream gets to breathe"</em>.</p>
+<p><strong>Principle</strong>: the electrical-breaker metaphor. A three-state machine: <strong>Closed</strong> (let traffic through, track failure rate) → failure rate exceeds threshold → <strong>Open</strong> (reject directly, send nothing, go straight to fallback) → cool down → <strong>Half-Open</strong> (admit a few probe requests) → success returns to Closed, failure goes back to Open. It turns "wait out the full timeout before failing" (wasting seconds each time while still piling pressure on a dying downstream) into <em>fail fast</em>, and by cutting the sustained barrage it gives the downstream a chance to recover.</p>
+<div class="tradeoff">
+<strong>Trade-off:</strong>
+<ul>
+<li><strong>Timeout only, no breaker</strong>: ✅ simple; ❌ when downstream is slow, every request waits out the full timeout (e.g. 1s); threads still get exhausted under load, and you keep hammering a downstream that never recovers.</li>
+<li><strong>Consecutive-failure count</strong> (e.g. 5 in a row): ✅ trivial to implement; ❌ at high QPS "5" is reached instantly (too sensitive); at low QPS it never trips.</li>
+<li><strong>Sliding-window error rate</strong> (e.g. &gt;50% over 10s): ✅ adapts to traffic, more stable; ❌ needs windowed stats and a minimum-request threshold to avoid small-sample misfires.</li>
+</ul></div>
+<pre><code># Circuit breaker state machine (pseudo-code)
+def call(dep, req):
+    if state == OPEN:
+        if now() - opened_at > cooldown:   # cooldown elapsed
+            state = HALF_OPEN               # admit one probe
+        else:
+            return fallback(req)            # fail fast, don't hit dep
+    try:
+        resp = dep.invoke(req, timeout=200ms)
+        on_success()                        # half-open success -> CLOSED
+        return resp
+    except (Timeout, ServerError):
+        on_failure()                        # window error rate over threshold -> OPEN
+        return fallback(req)
+</code></pre>
+<div class="case">
+<strong>Real-world:</strong>
+<ul>
+<li><strong>Netflix Hystrix</strong>: the canonical implementation — one <code>HystrixCommand</code> per remote dependency, trips when error rate crosses a threshold (<a href="https://github.com/Netflix/Hystrix/wiki/How-it-Works" style="color:#5eead4">How it Works</a>).</li>
+<li><strong>resilience4j</strong>: the mainstream JVM successor after Hystrix went into maintenance, using count- or time-based sliding windows.</li>
+<li><strong>Martin Fowler</strong>: <a href="https://martinfowler.com/bliki/CircuitBreaker.html" style="color:#5eead4">CircuitBreaker</a> is the standard definition of the pattern.</li>
+</ul></div>
+
+<h3>2. Retry with Backoff + Jitter — a double-edged sword</h3>
+<p>One-line trade-off: <em>trade "extra load from retries" for "absorbing transient blips" — but get it wrong and you pour gasoline on the fire</em>.</p>
+<p><strong>Principle</strong>: transient faults (network blips, leader election, occasional timeouts) usually heal with one retry. But <strong>naive immediate retry is an amplifier</strong>: downstream overloads → many requests fail → all clients retry at once → downstream gets hit with double the traffic and dies for good. That's a <strong>retry storm</strong>. Two antidotes: ① <strong>exponential backoff</strong>, doubling the wait after each failure (100ms→200ms→400ms) to give the downstream room to recover; ② <strong>jitter</strong>, adding randomness so retry times spread out — otherwise clients "align" into a synchronized pulse and slam the downstream periodically.</p>
+<div class="tradeoff">
+<strong>Trade-off:</strong>
+<ul>
+<li><strong>Fixed-interval retry</strong>: ✅ simple, predictable; ❌ gives no recovery room and clients easily align into pulses.</li>
+<li><strong>Pure exponential backoff (no jitter)</strong>: ✅ relieves pressure; ❌ everyone backs off in lockstep, still synchronizing into periodic spikes.</li>
+<li><strong>Exponential backoff + Full Jitter</strong>: ✅ flattens spikes into near-constant load (Marc Brooker's measured optimum); ❌ higher variance in per-request latency.</li>
+<li><strong>Fixed max-retries vs Retry Budget</strong>: instead of "retry up to 3 times" per request, globally cap "retries ≤ 10% of total requests" (token bucket). The former still amplifies 3× under broad failure; the latter is inherently bounded.</li>
+</ul></div>
+<pre><code># Full-jitter exponential backoff (AWS recommended)
+def retry(req, max_attempts=3):
+    base, cap = 0.1, 2.0          # 100ms base, 2s cap
+    for attempt in range(max_attempts):
+        try:
+            return call(req)       # only retry idempotent + retryable errors
+        except Retryable:
+            if attempt == max_attempts - 1: raise
+            if not retry_budget.try_acquire(): raise  # global retry budget
+            backoff = min(cap, base * 2 ** attempt)
+            sleep(random.uniform(0, backoff))         # full jitter
+</code></pre>
+<div class="case">
+<strong>Real-world:</strong>
+<ul>
+<li><strong>AWS</strong>: Marc Brooker's <a href="https://aws.amazon.com/builders-library/timeouts-retries-and-backoff-with-jitter/" style="color:#5eead4">Timeouts, retries, and backoff with jitter</a> and <a href="https://aws.amazon.com/blogs/architecture/exponential-backoff-and-jitter/" style="color:#5eead4">Exponential Backoff And Jitter</a> are the authoritative sources; most AWS SDKs ship it by default.</li>
+<li><strong>Google SRE</strong>: uses a <em>retry budget</em> (proportional cap) rather than a fixed count, to stop retry amplification from crushing backends (<em>SRE Book</em>, Handling Overload).</li>
+<li><strong>gRPC</strong>: built-in retry policy with backoff params and a retryable-status-code allowlist.</li>
+</ul></div>
+
+<h3>3. Bulkhead — partition resources into watertight compartments</h3>
+<p>One-line trade-off: <em>trade "lower overall resource utilization" for "a single dependency's failure can't exhaust global resources"</em>.</p>
+<p><strong>Principle</strong>: from shipbuilding — a hull split into <strong>watertight compartments</strong>, so a breach in one doesn't sink the ship. Mapped to systems: don't let all downstream calls share one thread/connection pool. Give each dependency its own <em>quota</em> (e.g. coupons gets at most 20 threads). Then if coupons slows down, it can only fill its own 20, while <strong>critical inventory and payment calls still have threads</strong> — the failure is sealed in its compartment. This is the real cure for the avalanche scenario at the top.</p>
+<div class="tradeoff">
+<strong>Trade-off:</strong>
+<ul>
+<li><strong>No isolation (shared pool)</strong>: ✅ highest utilization; ❌ one slow dep drains the whole pool = cascading failure, exactly what we're avoiding.</li>
+<li><strong>Thread-pool isolation</strong>: ✅ can enforce timeout interruption (the call runs on a separate thread, the main thread can "walk away") and acts as natural throttling; ❌ thread-switch overhead, one pool per dep costs memory.</li>
+<li><strong>Semaphore isolation</strong>: ✅ lightweight, no thread switching; ❌ <em>cannot interrupt</em> a blocked call (a semaphore only caps concurrency; timeouts must come from below), best for local low-latency calls.</li>
+</ul></div>
+<pre><code># Semaphore bulkhead: cap per-dependency concurrency (pseudo-code)
+sem = {dep: Semaphore(limit[dep]) for dep in deps}   # per-dep quota
+def call(dep, req):
+    if not sem[dep].try_acquire():      # full -> reject immediately, no queue
+        return fallback(req)            # compartment full -> doesn't spill to others
+    try:
+        return dep.invoke(req, timeout=200ms)
+    finally:
+        sem[dep].release()
+</code></pre>
+<div class="case">
+<strong>Real-world:</strong>
+<ul>
+<li><strong>Netflix</strong>: Hystrix defaults to thread-pool isolation, running <strong>40+ thread pools and 100+ command types</strong> in production, sealing each dependency's failure in its own pool (<a href="https://github.com/Netflix/Hystrix/wiki/How-it-Works" style="color:#5eead4">Hystrix Wiki</a>).</li>
+<li><strong>Michael Nygard, <em>Release It!</em></strong>: formalized the Bulkhead stability pattern via the ship-compartment metaphor (same origin as Circuit Breaker).</li>
+<li><strong>Kubernetes / service mesh</strong>: resource quotas and connection-pool limits (Envoy's max connections / pending requests) implement process- and connection-level bulkheads.</li>
+</ul></div>
+
+<h3>4. Graceful Degradation + Load Shedding — partial beats total death</h3>
+<p>One-line trade-off: <em>trade "feature completeness / result precision" for "keeping the critical path alive"</em>.</p>
+<p><strong>Principle</strong>: when a dependency fails or the system overloads, rather than returning 500 or collapsing entirely, return a <strong>degraded response</strong>: coupon service down → place the order at list price (fall back to a default); personalized recommendations down → return the popular list (fall back to cache/static). The companion at ingress is <strong>load shedding</strong>: as the system nears overload, proactively <em>reject</em> some requests (return 429) so the rest can complete normally — <strong>partial success beats everyone timing out</strong>. Choose what to drop by <em>criticality</em>: shed non-critical first, protect core checkout.</p>
+<div class="tradeoff">
+<strong>Trade-off:</strong>
+<ul>
+<li><strong>No degradation, hard fail</strong>: ✅ clean semantics (right or error); ❌ a non-critical dep's availability directly becomes your floor; brittle UX.</li>
+<li><strong>No load shedding, admit everything</strong>: ✅ drop nothing; ❌ under overload all requests slow down until everything times out (goodput → 0), worse than dropping some.</li>
+<li><strong>Random shed vs priority shed</strong>: random is simple but hits critical requests too; criticality-based is better but requires propagating priority labels end-to-end.</li>
+</ul></div>
+<div class="case">
+<strong>Real-world:</strong>
+<ul>
+<li><strong>Google SRE</strong>: server-side load shedding + client-side throttling + request criticality tiers is the standard overload practice (<a href="https://sre.google/sre-book/handling-overload/" style="color:#5eead4">Handling Overload</a>, <a href="https://sre.google/sre-book/addressing-cascading-failures/" style="color:#5eead4">Addressing Cascading Failures</a>).</li>
+<li><strong>Netflix</strong>: every Hystrix dependency has a fallback — if personalized data is unavailable, return non-personalized default content; better imprecise than blank.</li>
+</ul></div>
+
+<h2>Extensions & Optimizations</h2>
+<ul>
+<li><strong>Adaptive concurrency limits</strong>: instead of hand-tuning fixed bulkhead sizes, use a TCP-congestion-control-like algorithm (Netflix concurrency-limits) that adjusts the concurrency cap based on latency changes.</li>
+<li><strong>Hedged requests</strong>: for idempotent reads, if p95 hasn't returned, fire a second request in parallel and take the first to arrive — sharply cutting tail latency (pair with a retry budget to prevent amplification).</li>
+<li><strong>End-to-end timeout budget</strong>: allocate a total budget at ingress (e.g. 300ms) and propagate it decreasing per hop (deadline propagation), so each downstream knows how much time is left and gives up when it's gone.</li>
+<li><strong>Chaos engineering</strong>: writing these protections doesn't mean they work — use fault injection (inject latency, kill deps) to verify the breaker actually trips and the fallback actually catches (see the upcoming chaos-engineering issue).</li>
+<li><strong>Regional failover</strong>: when an AZ/region fails, shift traffic to a healthy region — reliability one level above per-host isolation.</li>
+</ul>
+
+<h2>Common Pitfalls + Interview Follow-ups</h2>
+<div class="callout">
+<strong>1. Retries stack across layers → exponential amplification</strong>: A→B→C, each retrying 3×, and the bottom C actually takes 3×3×3 = <strong>27×</strong> traffic. Rule: <em>retry only at the outermost layer</em>, or share a retry budget end-to-end.
+</div>
+<div class="callout">
+<strong>2. Timeout hierarchy inverted</strong>: the upstream timeout must be <em>greater than</em> the sum of downstream timeouts. If upstream is 1s and downstream is 2s, upstream gives up early while downstream keeps computing — wasted resources, plus possible upstream retries. Timeouts should decrease top-down.
+</div>
+<div class="callout">
+<strong>3. Retrying without distinguishing error types</strong>: 4xx (bad params, auth failure) won't fix on retry no matter how many times — it just adds load. Retry only timeouts and 5xx, and only when the operation is idempotent (a double charge is an incident).
+</div>
+<div class="callout">
+<strong>4. The fallback itself depends on the failed component</strong>: if degradation reads from a "cache" that shares the same dead Redis as the main path, the fallback is useless. The fallback path must be simpler and more independent than the main path.
+</div>
+<div class="callout">
+<strong>5. Guessing breaker thresholds</strong>: too sensitive → normal blips trip it (false positives); too dull → effectively absent. Base it on a minimum request count + sliding-window error rate, and think through half-open probe concurrency (don't let probes become a thundering herd).
+</div>
+
+<h2>Further Resources</h2>
+<ul>
+<li><strong>Amazon Builders' Library</strong>: Marc Brooker, <a href="https://aws.amazon.com/builders-library/timeouts-retries-and-backoff-with-jitter/" style="color:#64c8ff">Timeouts, retries, and backoff with jitter</a> — the authoritative practice on timeouts/retries/backoff.</li>
+<li><strong>Google <em>SRE Book</em></strong>: <a href="https://sre.google/sre-book/handling-overload/" style="color:#64c8ff">Handling Overload</a> and <a href="https://sre.google/sre-book/addressing-cascading-failures/" style="color:#64c8ff">Addressing Cascading Failures</a> — load shedding, throttling, cascading failures.</li>
+<li><strong>Martin Fowler bliki</strong>: <a href="https://martinfowler.com/bliki/CircuitBreaker.html" style="color:#64c8ff">CircuitBreaker</a> — the standard definition.</li>
+<li><strong>Netflix</strong>: <a href="https://github.com/Netflix/Hystrix/wiki/How-it-Works" style="color:#64c8ff">Hystrix Wiki</a> — engineering details of circuit breaker + bulkhead + fallback.</li>
+<li><strong>Michael Nygard, <em>Release It!</em></strong> (Pragmatic Bookshelf): the original source of the stability patterns (Circuit Breaker / Bulkhead / Fail Fast / Shed Load).</li>
+</ul>
+
+<h2>Deeper Thinking (click to expand)</h2>
+
+<details>
+<summary>1. A→B→C, three layers, each configured "retry up to 3×". When C briefly overloads, what's the actual amplification it absorbs? Why is a retry budget safer than max-retries?</summary>
+<div class="answer">
+<p><strong>Amplification = 27×</strong>. Per-layer retries are <em>multiplicative</em>: 3×3×3. A request that should hit once becomes 27 at the bottom — exactly the mechanism by which a retry storm finishes off an overloaded downstream that was only trying to catch its breath.</p>
+<p><strong>Why retry budget is better</strong>: max-retries is a <em>per-request</em> local cap and can't constrain overall amplification; under broad failure every request maxes out 3×, still 27× when stacked. A retry budget uses a token bucket to cap "retries ≤ X% of normal requests" — a <em>global</em> ceiling, so no matter how big the failure, retry traffic can't exceed that ratio. In practice combine both: small per-request cap plus a global budget.</p>
+</div>
+</details>
+
+<details>
+<summary>2. After the breaker goes Open and the cooldown elapses to Half-Open, it admits probes. What happens if probe concurrency isn't limited? How should you design Half-Open?</summary>
+<div class="answer">
+<p><strong>Risk</strong>: if at the instant cooldown ends you let all backed-up requests through to probe, you deliver another blow to a dying downstream — just as it's about to recover it's knocked back to Open, flapping in an <em>open→half-open→open</em> cycle, and the downstream never catches up. That's a mini thundering herd.</p>
+<p><strong>Design points</strong>: ① Half-Open admits only a <em>tiny</em> number of probes (e.g. 1 or a small fixed concurrency); everything else keeps failing fast to fallback; ② require N consecutive successes before returning to Closed (one success isn't enough — don't be fooled by a fluke); ③ a probe failure immediately reverts to Open and <em>resets or extends</em> the cooldown (add backoff to avoid frequent probing); ④ the cooldown itself can grow exponentially, so the longer the outage, the sparser the probes. Essence: Half-Open is "test recovery with a trickle," never "revive at full volume."</p>
+</div>
+</details>
+
+<details>
+<summary>3. Why must the upstream timeout exceed the sum of downstream timeouts? What chain reaction follows from setting upstream shorter than downstream?</summary>
+<div class="answer">
+<p><strong>Consequences of setting it short</strong>: upstream 1s, downstream 2s. The downstream is still processing normally (say it would return at 1.5s), but upstream already gave up at 1s. So: ① the downstream finishes work nobody wants — pure waste; ② upstream counts the "timeout" as a failure and may retry, sending another request to an already-busy downstream, <em>amplifying load</em>; ③ upstream's timeout pollutes the breaker's stats, tripping it on a false judgment that the downstream is unhealthy — when nothing is actually broken.</p>
+<p><strong>Correct approach</strong>: the timeout budget <em>decreases top-down</em>. Ingress 300ms; after network and self overhead, give downstream 250ms; it gives its downstream 200ms… each layer tighter than its parent. Better still, use <em>deadline propagation</em>: pass an absolute deadline down, and a downstream that sees the deadline already passed just gives up without computing. This gives the whole chain a consistent view of "how much time is left," eliminating wasted work.</p>
+</div>
+</details>
+
+<details>
+<summary>4. Under overload, load shedding (proactively rejecting some) counterintuitively beats "admit everything." Explain via goodput, and how retries push a no-shedding system into a death spiral.</summary>
+<div class="answer">
+<p><strong>Goodput view</strong>: throughput is how many requests you accept; goodput is how many <em>complete successfully within SLO</em>. Under overload, if you admit everything, every request queues and slows, eventually all exceed the deadline — clients get nothing but timeouts, goodput approaches <strong>0</strong>, while CPU is fully spent on doomed requests. Shed some (return 429) and the rest have ample resources to finish within SLO, so goodput is actually <em>higher</em>. Do a little less, accomplish more.</p>
+<p><strong>Death spiral</strong>: no shedding + client retries = positive feedback. Overload→slow→timeout→client retry→higher load→slower… each retry round pushes the system deeper, with no self-healing. Breaking the spiral needs: server-side load shedding + client-side throttling (adaptive throttling that reduces sends based on recent reject rate) + retry budget. Miss any one and the system "locks up" at the overload point instead of bouncing back.</p>
+</div>
+</details>
+
+<details>
+<summary>5. Circuit breaker, bulkhead, retry, degradation — can they substitute for each other? Use one "coupon service slows to 5s" incident to show where each intercepts and what breaks if it's missing.</summary>
+<div class="answer">
+<p>No substitution — they intercept at <strong>different stages</strong>, as defense in depth:</p>
+<ul>
+<li><strong>Bulkhead</strong> intercepts "resource exhaustion": coupons slow, it fills at most its dedicated 20 threads, critical calls unaffected. Missing it → the slow dep eats all global threads, site-wide avalanche (the opening scenario).</li>
+<li><strong>Circuit breaker</strong> intercepts "sustained useless waiting": detects coupon error rate spiking and trips, so later requests fail fast instead of each waiting 5s. Missing it → even with a bulkhead, those 20 threads stay pinned by 5s slow calls and that dependency's throughput goes to zero.</li>
+<li><strong>Retry (+backoff)</strong> handles "transient" blips: a one-off slow call can be saved by backoff retry; but for sustained failure the breaker must stop retries, or retries add pressure.</li>
+<li><strong>Degradation</strong> decides "what the user gets after failure": once the breaker trips / the call fails, fall back to list-price checkout so the user still completes the core flow. Missing it → the first three all work, but the user still sees a failed order.</li>
+</ul>
+<p>Stitched together: the bulkhead <em>contains</em> the failure, the breaker <em>stops</em> useless calls, retry <em>absorbs</em> transient blips, degradation <em>catches</em> the user experience. Drop any one and this slow coupon call causes perceptible harm at some layer.</p>
+</div>
+</details>
+
+</div>
+</body></html>

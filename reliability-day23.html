@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 23 · 可靠性 (Reliability) — System Design Bi-daily</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"SF Pro Display","Noto Sans SC",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
+.container{max-width:820px;margin:0 auto;padding:24px 20px 60px}
+header{padding:40px 0 28px;border-bottom:1px solid rgba(100,200,255,0.15);margin-bottom:32px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem}
+.tag{padding:3px 10px;border-radius:4px;background:rgba(100,200,255,0.12);color:#64c8ff;border:1px solid rgba(100,200,255,0.25)}
+.tag.diff{background:rgba(94,234,212,0.1);color:#5eead4;border-color:rgba(94,234,212,0.3)}
+.tag.day{background:rgba(255,180,80,0.1);color:#ffb450;border-color:rgba(255,180,80,0.25)}
+h1{font-size:1.75rem;font-weight:800;background:linear-gradient(135deg,#64c8ff 0%,#5eead4 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:0.5px;line-height:1.3}
+h1 .en{display:block;font-size:1rem;color:#7a8590;-webkit-text-fill-color:#7a8590;margin-top:6px;font-weight:500}
+h2{font-size:1.2rem;color:#5eead4;margin:36px 0 14px;padding-left:12px;border-left:3px solid #5eead4}
+h3{font-size:1rem;color:#64c8ff;margin:20px 0 10px;font-weight:600}
+p{margin:10px 0;color:#c8cfd6}
+ul,ol{margin:10px 0 10px 22px;color:#c8cfd6}
+li{margin:6px 0}
+strong{color:#e8eef5;font-weight:600}
+em{color:#5eead4;font-style:normal;font-weight:500}
+code{font-family:"SF Mono",Menlo,Consolas,monospace;background:rgba(100,200,255,0.1);color:#5eead4;padding:1px 6px;border-radius:3px;font-size:0.88em}
+pre{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:14px 16px;overflow-x:auto;margin:12px 0;font-family:"SF Mono",Menlo,Consolas,monospace;font-size:0.84rem;line-height:1.55;color:#c8cfd6}
+pre code{background:none;color:inherit;padding:0;font-size:1em}
+.mermaid{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:18px;margin:14px 0;text-align:center;overflow-x:auto;cursor:zoom-in;transition:border-color 0.15s}
+.mermaid:hover{border-color:rgba(100,200,255,0.4)}
+.mermaid svg{width:100%;max-width:100%;height:auto;min-height:280px}
+.lightbox{position:fixed;inset:0;background:rgba(8,12,18,0.96);z-index:9999;display:none;align-items:center;justify-content:center;padding:24px;cursor:grab;backdrop-filter:blur(4px);overflow:hidden}
+.lightbox.open{display:flex}
+.lightbox.dragging{cursor:grabbing}
+.lightbox svg{width:auto;height:auto;max-width:96vw;max-height:92vh;transform-origin:center center;will-change:transform}
+.lightbox .hint{position:fixed;top:16px;right:20px;font-size:0.78rem;color:#7a8590;font-family:"SF Mono",Menlo,monospace;pointer-events:none}
+.callout{background:rgba(255,180,80,0.06);border-left:3px solid #ffb450;padding:12px 14px;margin:14px 0;border-radius:4px;font-size:0.94rem}
+.callout strong{color:#ffb450}
+.tradeoff{background:rgba(100,200,255,0.05);border:1px solid rgba(100,200,255,0.2);border-radius:6px;padding:12px 14px;margin:12px 0;font-size:0.94rem}
+.case{background:rgba(94,234,212,0.05);border-left:3px solid #5eead4;padding:12px 14px;margin:12px 0;border-radius:4px;font-size:0.94rem}
+.case strong{color:#5eead4}
+.nav{margin-top:50px;padding-top:24px;border-top:1px solid rgba(100,200,255,0.15);text-align:center}
+.nav a{color:#64c8ff;text-decoration:none;font-size:0.92rem;padding:8px 16px;border:1px solid rgba(100,200,255,0.3);border-radius:4px;transition:all 0.15s}
+.nav a:hover{background:rgba(100,200,255,0.1)}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:0.9rem}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid rgba(100,200,255,0.15)}
+th{color:#64c8ff;font-weight:600;background:rgba(100,200,255,0.05)}
+details{background:rgba(100,200,255,0.04);border:1px solid rgba(100,200,255,0.18);border-radius:6px;padding:12px 16px;margin:10px 0;transition:all 0.15s}
+details:hover{border-color:rgba(100,200,255,0.35)}
+details[open]{background:rgba(94,234,212,0.05);border-color:rgba(94,234,212,0.3)}
+details summary{font-weight:600;color:#e8eef5;list-style:none;outline:none;cursor:pointer;display:flex;align-items:flex-start;gap:10px;font-size:0.96rem}
+details summary::-webkit-details-marker{display:none}
+details summary::before{content:'▶';color:#64c8ff;font-size:0.75em;transition:transform 0.2s;flex-shrink:0;margin-top:5px}
+details[open] summary::before{transform:rotate(90deg);color:#5eead4}
+details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
+details .answer ul,details .answer ol{margin:6px 0 6px 22px}
+@media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+</style>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({startOnLoad:true,theme:'base',flowchart:{useMaxWidth:true,htmlLabels:true,nodeSpacing:50,rankSpacing:60},themeVariables:{primaryColor:'#1a2530',primaryTextColor:'#e8eef5',primaryBorderColor:'#64c8ff',lineColor:'#5eead4',secondaryColor:'#0e1419',tertiaryColor:'#0a0f14',background:'#0a0f14',mainBkg:'#1a2530',secondBkg:'#0e1419',textColor:'#d4dae0',fontFamily:'-apple-system,"SF Pro Display",sans-serif',fontSize:'16px'}});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const lb=document.createElement('div');lb.className='lightbox';
+  lb.innerHTML='<span class="hint">scroll = zoom · drag = pan · Esc / click bg = close</span>';
+  document.body.appendChild(lb);
+  let scale=1,panX=0,panY=0,dragging=false,moved=false,lx=0,ly=0;
+  const apply=()=>{const s=lb.querySelector('svg');if(s)s.style.transform=`translate(${panX}px,${panY}px) scale(${scale})`};
+  const reset=()=>{scale=1;panX=0;panY=0};
+  const close=()=>{lb.classList.remove('open');const s=lb.querySelector('svg');if(s)s.remove();reset()};
+  document.addEventListener('click',e=>{
+    if(e.target.closest('.lightbox')){if(moved){moved=false;return}close();return}
+    const w=e.target.closest('.mermaid');if(!w)return;
+    const svg=w.querySelector('svg');if(!svg)return;
+    const c=svg.cloneNode(true);c.removeAttribute('style');
+    c.style.maxWidth='96vw';c.style.maxHeight='92vh';
+    lb.appendChild(c);lb.classList.add('open');reset();apply();
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+  lb.addEventListener('wheel',e=>{
+    if(!lb.classList.contains('open'))return;
+    e.preventDefault();
+    const svg=lb.querySelector('svg');if(!svg)return;
+    const ns=Math.max(0.3,Math.min(10,scale*(1-e.deltaY*0.002)));
+    const r=svg.getBoundingClientRect();
+    const cx=e.clientX-(r.left+r.width/2),cy=e.clientY-(r.top+r.height/2);
+    const k=ns/scale-1;panX-=cx*k;panY-=cy*k;scale=ns;apply();
+  },{passive:false});
+  lb.addEventListener('mousedown',e=>{
+    if(!lb.classList.contains('open'))return;
+    dragging=true;moved=false;lx=e.clientX;ly=e.clientY;lb.classList.add('dragging');e.preventDefault();
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    const dx=e.clientX-lx,dy=e.clientY-ly;
+    if(Math.abs(dx)+Math.abs(dy)>3)moved=true;
+    panX+=dx;panY+=dy;lx=e.clientX;ly=e.clientY;apply();
+  });
+  document.addEventListener('mouseup',()=>{dragging=false;lb.classList.remove('dragging')});
+});
+</script>
+</head><body><div class="container">
+
+<header>
+<div class="meta">
+<span class="tag day">Day 23</span>
+<span class="tag diff">Medium</span>
+<span class="tag">Reliability</span>
+<span class="tag">Circuit Breaker</span>
+<span class="tag">Backoff</span>
+<span class="tag">Bulkhead</span>
+</div>
+<h1>可靠性 — 一个下游抖动，不让它拖垮整条链路<span class="en">Reliability: Circuit Breaker, Retry/Backoff, Bulkhead & Graceful Degradation</span></h1>
+</header>
+
+<h2>问题场景 + 需求约束</h2>
+<p>设计一条电商<strong>下单链路</strong>：下单 QPS 5 万，p99 SLO 300ms，整体可用性目标 99.95%（年停机 ~4.4 小时）。下单要同步调用约 <strong>30 个下游依赖</strong>——库存、优惠券、风控、地址、支付预授权……其中只有库存和支付是<em>核心</em>，其余非核心。</p>
+<p>真正要防的不是「某个服务挂了」，而是 <strong>级联故障（cascading failure）</strong>：优惠券服务一次 GC 停顿，响应从 20ms 涨到 5s。调用方同步等待，每个下单请求占着一个线程死等——几秒内线程池被占满，<strong>连根本不查优惠券的请求也排不进来</strong>。一个非核心依赖拖垮了整个下单。可靠性工程的核心命题就是：<em>让局部故障止于局部</em>。本期讲四件互补的武器：断路器、退避重试、舱壁、优雅降级。</p>
+<ul>
+<li><strong>故障模型</strong>：下游不是「全挂」，更多是「变慢」——慢比挂更危险，因为它悄悄耗尽你的线程/连接。</li>
+<li><strong>依赖分级</strong>：核心 vs 非核心。非核心依赖必须能被「跳过」，否则它的可用性就是你的可用性下限。</li>
+<li><strong>串联可用性</strong>：30 个依赖串联，每个 99.9%，整体 ≈ 99.9%³⁰ ≈ <strong>97%</strong>。不做隔离，依赖越多越脆。</li>
+<li><strong>幂等性</strong>：决定了能不能安全重试（见 Day 7、Day 17）。</li>
+</ul>
+
+<h2>高层架构</h2>
+<p>每个下游调用都穿过一层 <strong>resilience 中间层</strong>：超时 → 舱壁（独立资源池）→ 断路器（统计错误率）→ 重试（带退避）。任何一环判定失败，立刻走 <strong>fallback</strong>（缓存值 / 默认值 / 跳过）而不是死等。入口处还有一道 <strong>负载保护（load shedding）</strong>，过载时优先保住核心请求。</p>
+<pre class="mermaid">
+graph LR
+    IN["下单请求"]
+    LS{"负载保护<br/><i>过载→shed</i>"}
+    ORD["下单服务<br/><i>编排</i>"]
+    BH["舱壁<br/><i>每依赖独立池</i>"]
+    CB{"断路器<br/><i>open?</i>"}
+    DEP["下游依赖<br/><i>优惠券/风控...</i>"]
+    FB["Fallback<br/><i>缓存/默认/跳过</i>"]
+
+    IN --> LS -->|放行| ORD --> BH --> CB
+    LS -.->|拒绝 429| IN
+    CB -->|closed| DEP
+    CB -.->|open→fail fast| FB
+    DEP -.->|超时/错误| FB
+
+    classDef in fill:#1a2530,stroke:#64c8ff,color:#e8eef5
+    classDef gate fill:#2a1530,stroke:#ff7ab6,color:#e8eef5
+    classDef core fill:#1a1a30,stroke:#ffb450,color:#e8eef5
+    classDef dep fill:#0e2030,stroke:#5eead4,color:#e8eef5
+    class IN in
+    class LS,CB gate
+    class ORD,BH core
+    class DEP,FB dep
+</pre>
+<p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">每个依赖被独立隔离；失败快速短路到 fallback，不让一个慢依赖耗尽全局资源</p>
+
+<h2>关键技术点</h2>
+
+<h3>1. 断路器 Circuit Breaker — 给故障依赖「拉闸」</h3>
+<p>一句话 trade-off：<em>用「对故障依赖的临时不可用」换「调用方快速失败、下游获得喘息」</em>。</p>
+<p><strong>原理</strong>：电闸的隐喻。断路器是个三态机：<strong>Closed</strong>（正常放行，统计失败率）→ 失败率超阈值 → <strong>Open</strong>（直接拒绝，不再发请求，立刻走 fallback）→ 冷却一段时间 → <strong>Half-Open</strong>（放少量探测请求试水）→ 成功则回 Closed，失败则退回 Open。它把「等满超时再失败」（每次浪费几秒、还在给濒死的下游加压）变成「<em>fail fast</em>」，同时切断了持续打击，让下游有机会恢复。</p>
+<div class="tradeoff">
+<strong>Trade-off：</strong>
+<ul>
+<li><strong>只设超时、不用断路器</strong>：✅ 简单；❌ 下游慢时每个请求都死等满超时（如 1s），高并发下线程照样被耗尽，且持续加压不给恢复机会。</li>
+<li><strong>连续失败计数触发</strong>（如连错 5 次）：✅ 实现简单；❌ 高 QPS 下「5 次」瞬间达到，太敏感；低 QPS 下又迟迟不触发。</li>
+<li><strong>滑动窗口错误率触发</strong>（如 10s 内 &gt;50%）：✅ 对流量自适应、更稳；❌ 需维护时间窗口统计，且要设最小请求数门槛避免小样本误判。</li>
+</ul></div>
+<pre><code># 断路器状态机 (pseudo-code)
+def call(dep, req):
+    if state == OPEN:
+        if now() - opened_at > cooldown:   # 冷却到点
+            state = HALF_OPEN               # 放一个探测
+        else:
+            return fallback(req)            # fail fast，不打下游
+    try:
+        resp = dep.invoke(req, timeout=200ms)
+        on_success()                        # half-open 成功 → CLOSED
+        return resp
+    except (Timeout, ServerError):
+        on_failure()                        # 窗口错误率超阈值 → OPEN
+        return fallback(req)
+</code></pre>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Netflix Hystrix</strong>：把断路器做成业界标杆，每个远程依赖一个 <code>HystrixCommand</code>，错误率超阈值即跳闸（<a href="https://github.com/Netflix/Hystrix/wiki/How-it-Works" style="color:#5eead4">How it Works</a>）。</li>
+<li><strong>resilience4j</strong>：Hystrix 停止维护后的 JVM 主流替代，用滑动窗口（按数量或时间）统计失败率。</li>
+<li><strong>Martin Fowler</strong>：<a href="https://martinfowler.com/bliki/CircuitBreaker.html" style="color:#5eead4">CircuitBreaker</a> 一文是该模式的标准定义来源。</li>
+</ul></div>
+
+<h3>2. 退避重试 Retry with Backoff + Jitter — 重试是把双刃剑</h3>
+<p>一句话 trade-off：<em>用「重试带来的额外负载」换「吸收瞬时抖动」——但用错就是火上浇油</em>。</p>
+<p><strong>原理</strong>：瞬时故障（网络抖动、leader 选举、偶发超时）重试一次往往就好。但 <strong>naive 立即重试是放大器</strong>：下游过载 → 大量请求失败 → 所有客户端同时重试 → 下游被双倍流量彻底打死，这就是 <strong>retry storm（重试风暴）</strong>。两个解药：① <strong>指数退避（exponential backoff）</strong>，每次失败等待翻倍（100ms→200ms→400ms），给下游恢复时间；② <strong>jitter（抖动）</strong>，加随机让重试时刻错开，否则所有客户端会「对齐」成同步脉冲，周期性地一起砸过去。</p>
+<div class="tradeoff">
+<strong>Trade-off：</strong>
+<ul>
+<li><strong>固定间隔重试</strong>：✅ 简单可预测；❌ 不给下游恢复时间，且客户端容易对齐成脉冲。</li>
+<li><strong>纯指数退避（无 jitter）</strong>：✅ 减压；❌ 大家退避节奏一致，仍会同步成周期性尖峰。</li>
+<li><strong>指数退避 + Full Jitter</strong>：✅ 把尖峰摊平成近似恒定负载（Marc Brooker 实测最优）；❌ 单请求延迟方差变大。</li>
+<li><strong>固定最大重试次数 vs Retry Budget</strong>：与其每个请求都「最多重试 3 次」，不如全局限制「重试量 ≤ 总请求的 10%」（token bucket）。前者在大面积故障时仍会整体放大 3 倍；后者天然封顶。</li>
+</ul></div>
+<pre><code># Full Jitter 指数退避 (AWS 推荐)
+def retry(req, max_attempts=3):
+    base, cap = 0.1, 2.0          # 100ms 起，封顶 2s
+    for attempt in range(max_attempts):
+        try:
+            return call(req)       # 仅对幂等 + 可重试错误重试
+        except Retryable:
+            if attempt == max_attempts - 1: raise
+            if not retry_budget.try_acquire(): raise  # 全局重试预算
+            backoff = min(cap, base * 2 ** attempt)
+            sleep(random.uniform(0, backoff))         # full jitter
+</code></pre>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>AWS</strong>：Marc Brooker 的 <a href="https://aws.amazon.com/builders-library/timeouts-retries-and-backoff-with-jitter/" style="color:#5eead4">Timeouts, retries, and backoff with jitter</a> 与 <a href="https://aws.amazon.com/blogs/architecture/exponential-backoff-and-jitter/" style="color:#5eead4">Exponential Backoff And Jitter</a>，是退避抖动的权威来源，多数 AWS SDK 默认内置。</li>
+<li><strong>Google SRE</strong>：用 <em>retry budget</em>（按比例限制重试）而非固定次数，防止重试放大压垮后端（《SRE Book》Handling Overload 章）。</li>
+<li><strong>gRPC</strong>：内置 retry policy，支持退避参数与可重试状态码白名单。</li>
+</ul></div>
+
+<h3>3. 舱壁 Bulkhead — 把资源切成隔舱</h3>
+<p>一句话 trade-off：<em>用「整体资源利用率下降」换「单依赖故障不耗尽全局资源」</em>。</p>
+<p><strong>原理</strong>：源自造船——船体分成多个<strong>水密隔舱</strong>，一处进水不会沉船。映射到系统：不要让所有下游调用共用同一个线程池/连接池。给每个依赖分配<em>独立配额</em>（如优惠券最多占 20 个线程）。这样优惠券变慢，最多占满它自己那 20 个，<strong>核心的库存、支付调用仍有线程可用</strong>——故障被关在隔舱里。这正是开头那个雪崩场景的根治方案。</p>
+<div class="tradeoff">
+<strong>Trade-off：</strong>
+<ul>
+<li><strong>不隔离（共享池）</strong>：✅ 资源利用率最高；❌ 一个慢依赖耗尽全池 = 级联故障，正是要避免的。</li>
+<li><strong>线程池隔离</strong>：✅ 能强制超时中断（调用跑在独立线程，主线程可「走开」）、天然限流；❌ 线程切换开销、每依赖一个池占内存。</li>
+<li><strong>信号量隔离</strong>：✅ 轻量、无线程切换；❌ <em>不能中断</em>阻塞中的调用（信号量只限并发数，超时得靠下层），适合本地低延迟调用。</li>
+</ul></div>
+<pre><code># 信号量舱壁：限制单依赖并发 (pseudo-code)
+sem = {dep: Semaphore(limit[dep]) for dep in deps}   # 每依赖独立配额
+def call(dep, req):
+    if not sem[dep].try_acquire():      # 满了立即拒绝，不排队
+        return fallback(req)            # 隔舱满 → 不波及其他依赖
+    try:
+        return dep.invoke(req, timeout=200ms)
+    finally:
+        sem[dep].release()
+</code></pre>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Netflix</strong>：Hystrix 默认用线程池隔离，生产中跑 <strong>40+ 个线程池、100+ 命令类型</strong>，单依赖故障被关在自己的池里（<a href="https://github.com/Netflix/Hystrix/wiki/How-it-Works" style="color:#5eead4">Hystrix Wiki</a>）。</li>
+<li><strong>Michael Nygard《Release It!》</strong>：用船舱隔舱比喻正式提出 Bulkhead 稳定性模式（与 Circuit Breaker 同源）。</li>
+<li><strong>Kubernetes / 服务网格</strong>：用资源 quota、连接池上限（Envoy 的 max connections / pending requests）实现进程级与连接级舱壁。</li>
+</ul></div>
+
+<h3>4. 优雅降级 + 负载保护 — 宁可残缺，不可全死</h3>
+<p>一句话 trade-off：<em>用「功能完整性 / 结果精度」换「核心链路存活」</em>。</p>
+<p><strong>原理</strong>：当依赖失败或系统过载，与其返回 500、与其全盘崩溃，不如返回一个<strong>降级响应</strong>：优惠券服务挂了就按原价下单（fallback 到默认值）；个性化推荐挂了就返回热门榜（fallback 到缓存/静态结果）。配套的是入口侧 <strong>load shedding（负载保护）</strong>：当系统接近过载，主动<em>拒绝</em>一部分请求（返回 429），保住剩余请求能正常完成——<strong>部分成功远好于全体超时</strong>。拒绝时按 <em>criticality（请求优先级）</em>取舍：先拒非核心、保核心下单。</p>
+<div class="tradeoff">
+<strong>Trade-off：</strong>
+<ul>
+<li><strong>不降级、硬失败</strong>：✅ 语义清晰（要么对要么报错）；❌ 非核心依赖的可用性直接成为整体下限，体验脆。</li>
+<li><strong>不做 load shedding，全收</strong>：✅ 不丢请求；❌ 过载时所有请求一起变慢直到全部超时（goodput 归零），比拒一部分更糟。</li>
+<li><strong>随机 shed vs 按优先级 shed</strong>：随机简单但会误伤核心请求；按 criticality 更优，但要求全链路传递优先级标签。</li>
+</ul></div>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Google SRE</strong>：服务端 load shedding + 客户端节流（client-side throttling）+ 请求 criticality 分级，是处理过载的标准实践（<a href="https://sre.google/sre-book/handling-overload/" style="color:#5eead4">Handling Overload</a>、<a href="https://sre.google/sre-book/addressing-cascading-failures/" style="color:#5eead4">Addressing Cascading Failures</a>）。</li>
+<li><strong>Netflix</strong>：每个 Hystrix 依赖都配 fallback——个性化数据拉不到就返回非个性化的兜底内容，宁可不精准也不空白。</li>
+</ul></div>
+
+<h2>扩展与优化</h2>
+<ul>
+<li><strong>自适应并发限流</strong>：与其手调每个舱壁的固定大小，不如用类 TCP 拥塞控制的自适应算法（Netflix concurrency-limits），按延迟变化动态调并发上限。</li>
+<li><strong>对冲请求（hedged requests）</strong>：对幂等读，p95 没返回就并发发第二个请求、取先到的，显著压低长尾延迟（但要配重试预算防放大）。</li>
+<li><strong>全链路超时预算</strong>：入口分配总预算（如 300ms），逐层递减传递（deadline propagation），下游知道还剩多少时间，过期直接放弃。</li>
+<li><strong>混沌工程验证</strong>：这些防护写了不等于有效，要靠故障注入（注延迟、断依赖）主动验证断路器真能跳、fallback 真能兜（详见后续混沌工程篇）。</li>
+<li><strong>区域级 failover</strong>：单可用区/区域故障时，把流量切到健康区域，是比单机隔离更高层级的可靠性。</li>
+</ul>
+
+<h2>常见陷阱 + 面试追问</h2>
+<div class="callout">
+<strong>1. 重试在每层叠加 → 指数放大</strong>：A→B→C 三层，每层各重试 3 次，底层 C 实际承受 3×3×3 = <strong>27 倍</strong>流量。规则：<em>只在最外层重试</em>，或全链路共享 retry budget。
+</div>
+<div class="callout">
+<strong>2. 超时层级设反</strong>：上游超时必须 <em>大于</em> 下游超时之和。若上游 1s、下游 2s，上游早早超时放弃，下游还在傻算——白白浪费资源、还可能引发上游重试。超时应自上而下递减。
+</div>
+<div class="callout">
+<strong>3. 不区分错误类型就重试</strong>：4xx（参数错、鉴权失败）重试多少次都没用，只会加压；只重试超时和 5xx，且必须确认操作幂等（重复扣款是事故）。
+</div>
+<div class="callout">
+<strong>4. fallback 本身依赖故障组件</strong>：降级走的「缓存」如果和主路径共用同一个挂掉的 Redis，fallback 形同虚设。兜底路径必须比主路径更简单、更独立。
+</div>
+<div class="callout">
+<strong>5. 断路器阈值拍脑袋</strong>：太敏感→正常抖动就跳闸误伤；太迟钝→形同虚设。要基于最小请求数 + 滑动窗口错误率，并想清楚 half-open 探测的并发控制（别让探测又变成惊群）。
+</div>
+
+<h2>深入资源</h2>
+<ul>
+<li><strong>Amazon Builders' Library</strong>：Marc Brooker, <a href="https://aws.amazon.com/builders-library/timeouts-retries-and-backoff-with-jitter/" style="color:#64c8ff">Timeouts, retries, and backoff with jitter</a> —— 超时/重试/退避的权威实践。</li>
+<li><strong>Google《SRE Book》</strong>：<a href="https://sre.google/sre-book/handling-overload/" style="color:#64c8ff">Handling Overload</a> 与 <a href="https://sre.google/sre-book/addressing-cascading-failures/" style="color:#64c8ff">Addressing Cascading Failures</a> —— load shedding、节流、级联故障的系统论述。</li>
+<li><strong>Martin Fowler bliki</strong>：<a href="https://martinfowler.com/bliki/CircuitBreaker.html" style="color:#64c8ff">CircuitBreaker</a> —— 断路器模式标准定义。</li>
+<li><strong>Netflix</strong>：<a href="https://github.com/Netflix/Hystrix/wiki/How-it-Works" style="color:#64c8ff">Hystrix Wiki</a>，断路器 + 舱壁 + fallback 的工程实现细节。</li>
+<li><strong>Michael Nygard《Release It!》</strong>（Pragmatic Bookshelf）：稳定性模式（Circuit Breaker / Bulkhead / Fail Fast / Shed Load）的原始出处。</li>
+</ul>
+
+<h2>深入思考（点击展开答案）</h2>
+
+<details>
+<summary>1. A→B→C 三层调用，每层各配「最多重试 3 次」。C 短暂过载时，它实际承受的放大倍数是多少？为什么 retry budget 比 max-retries 更安全？</summary>
+<div class="answer">
+<p><strong>放大倍数 = 27 倍</strong>。每层重试是<em>乘法叠加</em>：3×3×3。一个本该 1 次的请求在最底层变成 27 次——这正是 retry storm 把过载下游彻底打死的机制，它本来只是想喘口气。</p>
+<p><strong>retry budget 为何更好</strong>：max-retries 是<em>每请求</em>的局部限制，无法约束整体放大；大面积故障时每个请求都顶满 3 次，叠加后仍是 27 倍。retry budget 用 token bucket 限制「重试量 ≤ 正常请求的 X%」，是<em>全局</em>封顶——故障再大，重试流量也超不过这个比例。实践上两者结合：单请求设小上限，全局再套 budget。</p>
+</div>
+</details>
+
+<details>
+<summary>2. 断路器进入 Open 后冷却到点转 Half-Open，此时放探测请求。若不限制探测并发会怎样？怎么设计 Half-Open？</summary>
+<div class="answer">
+<p><strong>风险</strong>：若冷却结束的瞬间把所有积压请求都放过去探测，等于又给濒死的下游一记重击——刚要恢复又被打回 Open，陷入 <em>open→half-open→open</em> 的颠簸（flapping），下游永远缓不过来，这又是一次小型惊群。</p>
+<p><strong>设计要点</strong>：① Half-Open 只放<em>极少量</em>探测（如 1 个或固定小并发），其余请求继续 fail-fast 走 fallback；② 探测连续成功 N 次才回 Closed，单次成功不够（避免被偶发成功骗回）；③ 探测失败立即退回 Open 并<em>重置甚至延长</em>冷却（可加退避，避免高频探测）；④ 冷却时间本身可指数增长，故障持续越久探测越稀疏。本质：Half-Open 是「小流量试探恢复」，绝不能变成「全量复活」。</p>
+</div>
+</details>
+
+<details>
+<summary>3. 为什么上游超时必须大于下游超时之和？把上游设得比下游短会发生什么连锁反应？</summary>
+<div class="answer">
+<p><strong>设短的后果</strong>：上游 1s、下游 2s。下游还在正常处理（比如 1.5s 能返回），上游已在 1s 时超时放弃。于是：① 下游白白干完活，结果没人要——纯资源浪费；② 上游把这次「超时」当失败，可能触发重试，再发一个请求给本就繁忙的下游，<em>放大负载</em>；③ 上游的超时会污染断路器统计，让它误判下游不健康而跳闸——明明下游没坏。</p>
+<p><strong>正确做法</strong>：超时预算<em>自上而下递减</em>。入口 300ms，留出网络与自身开销后，给下游 250ms，下游再给它的下游 200ms……每层都比父级紧。更进一步用 <em>deadline propagation</em>：把「绝对截止时间」透传下去，下游一看 deadline 已过就直接放弃，连算都不算。这样整条链路对「还剩多少时间」有一致认知，杜绝白做功。</p>
+</div>
+</details>
+
+<details>
+<summary>4. 过载时 load shedding（主动拒绝一部分）反直觉地比「全部都收」更好。用 goodput 解释为什么，以及重试如何让不做 shedding 的系统陷入死亡螺旋。</summary>
+<div class="answer">
+<p><strong>goodput（有效吞吐）视角</strong>：throughput 是收了多少请求，goodput 是<em>在 SLO 内成功完成</em>多少。过载时若全收，每个请求都排长队、都变慢，最终全部超过 deadline——客户端拿到的全是超时，goodput 趋近 <strong>0</strong>，而 CPU 还全耗在这些注定失败的请求上。主动 shed 掉一部分（返回 429），剩下的请求资源充足、能在 SLO 内完成，goodput 反而<em>更高</em>。少做一点，成事更多。</p>
+<p><strong>死亡螺旋</strong>：不 shed + 客户端重试 = 正反馈。过载→变慢→超时→重试→负载更高→更慢……每轮都把系统推得更深，无法自愈。打破螺旋需要：服务端 load shedding + 客户端节流（adaptive throttling，按近期拒绝率主动减少发送）+ retry budget。三者缺一，系统就会在过载点「锁死」而非自动回弹。</p>
+</div>
+</details>
+
+<details>
+<summary>5. 断路器、舱壁、重试、降级——四者能互相替代吗？用一次「优惠券服务慢到 5s」的故障说明它们各自拦在哪一环、缺一会怎样。</summary>
+<div class="answer">
+<p>不能替代，它们拦在<strong>不同环节</strong>，是纵深防御：</p>
+<ul>
+<li><strong>舱壁</strong>拦「资源耗尽」：优惠券慢，最多占满它专属的 20 个线程，核心调用不受影响。缺它 → 慢依赖吃光全局线程，全站雪崩（开头场景）。</li>
+<li><strong>断路器</strong>拦「持续无效等待」：检测到优惠券错误率飙升就跳闸，后续请求 fail-fast，不再每个都干等 5s。缺它 → 即使有舱壁，那 20 个线程也一直被 5s 慢调用占满，该依赖吞吐归零。</li>
+<li><strong>重试（+退避）</strong>处理「瞬时」抖动：如果只是偶发一次慢，退避重试能救回；但对持续故障，靠断路器及时停止重试，否则重试反而加压。</li>
+<li><strong>降级</strong>决定「失败后给用户什么」：断路器跳闸/调用失败后，fallback 到原价下单，用户仍能完成核心流程。缺它 → 前三者都生效，但用户看到的还是下单失败。</li>
+</ul>
+<p>串起来：舱壁<em>关住</em>故障、断路器<em>停止</em>无效调用、重试<em>吸收</em>瞬时抖动、降级<em>兜住</em>用户体验。任何一环缺失，这次优惠券慢调用都会在某个层面造成可感知的损害。</p>
+</div>
+</details>
+
+</div>
+</body></html>
