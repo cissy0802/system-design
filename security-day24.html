@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 24 · 安全基础 (Security) — System Design Bi-daily</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"SF Pro Display","Noto Sans SC",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
+.container{max-width:820px;margin:0 auto;padding:24px 20px 60px}
+header{padding:40px 0 28px;border-bottom:1px solid rgba(100,200,255,0.15);margin-bottom:32px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem}
+.tag{padding:3px 10px;border-radius:4px;background:rgba(100,200,255,0.12);color:#64c8ff;border:1px solid rgba(100,200,255,0.25)}
+.tag.diff{background:rgba(94,234,212,0.1);color:#5eead4;border-color:rgba(94,234,212,0.3)}
+.tag.day{background:rgba(255,180,80,0.1);color:#ffb450;border-color:rgba(255,180,80,0.25)}
+h1{font-size:1.75rem;font-weight:800;background:linear-gradient(135deg,#64c8ff 0%,#5eead4 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:0.5px;line-height:1.3}
+h1 .en{display:block;font-size:1rem;color:#7a8590;-webkit-text-fill-color:#7a8590;margin-top:6px;font-weight:500}
+h2{font-size:1.2rem;color:#5eead4;margin:36px 0 14px;padding-left:12px;border-left:3px solid #5eead4}
+h3{font-size:1rem;color:#64c8ff;margin:20px 0 10px;font-weight:600}
+p{margin:10px 0;color:#c8cfd6}
+ul,ol{margin:10px 0 10px 22px;color:#c8cfd6}
+li{margin:6px 0}
+strong{color:#e8eef5;font-weight:600}
+em{color:#5eead4;font-style:normal;font-weight:500}
+code{font-family:"SF Mono",Menlo,Consolas,monospace;background:rgba(100,200,255,0.1);color:#5eead4;padding:1px 6px;border-radius:3px;font-size:0.88em}
+pre{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:14px 16px;overflow-x:auto;margin:12px 0;font-family:"SF Mono",Menlo,Consolas,monospace;font-size:0.84rem;line-height:1.55;color:#c8cfd6}
+pre code{background:none;color:inherit;padding:0;font-size:1em}
+.mermaid{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:18px;margin:14px 0;text-align:center;overflow-x:auto;cursor:zoom-in;transition:border-color 0.15s}
+.mermaid:hover{border-color:rgba(100,200,255,0.4)}
+.mermaid svg{width:100%;max-width:100%;height:auto;min-height:280px}
+.lightbox{position:fixed;inset:0;background:rgba(8,12,18,0.96);z-index:9999;display:none;align-items:center;justify-content:center;padding:24px;cursor:grab;backdrop-filter:blur(4px);overflow:hidden}
+.lightbox.open{display:flex}
+.lightbox.dragging{cursor:grabbing}
+.lightbox svg{width:auto;height:auto;max-width:96vw;max-height:92vh;transform-origin:center center;will-change:transform}
+.lightbox .hint{position:fixed;top:16px;right:20px;font-size:0.78rem;color:#7a8590;font-family:"SF Mono",Menlo,monospace;pointer-events:none}
+.callout{background:rgba(255,180,80,0.06);border-left:3px solid #ffb450;padding:12px 14px;margin:14px 0;border-radius:4px;font-size:0.94rem}
+.callout strong{color:#ffb450}
+.tradeoff{background:rgba(100,200,255,0.05);border:1px solid rgba(100,200,255,0.2);border-radius:6px;padding:12px 14px;margin:12px 0;font-size:0.94rem}
+.case{background:rgba(94,234,212,0.05);border-left:3px solid #5eead4;padding:12px 14px;margin:12px 0;border-radius:4px;font-size:0.94rem}
+.case strong{color:#5eead4}
+.nav{margin-top:50px;padding-top:24px;border-top:1px solid rgba(100,200,255,0.15);text-align:center}
+.nav a{color:#64c8ff;text-decoration:none;font-size:0.92rem;padding:8px 16px;border:1px solid rgba(100,200,255,0.3);border-radius:4px;transition:all 0.15s}
+.nav a:hover{background:rgba(100,200,255,0.1)}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:0.9rem}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid rgba(100,200,255,0.15)}
+th{color:#64c8ff;font-weight:600;background:rgba(100,200,255,0.05)}
+details{background:rgba(100,200,255,0.04);border:1px solid rgba(100,200,255,0.18);border-radius:6px;padding:12px 16px;margin:10px 0;transition:all 0.15s}
+details:hover{border-color:rgba(100,200,255,0.35)}
+details[open]{background:rgba(94,234,212,0.05);border-color:rgba(94,234,212,0.3)}
+details summary{font-weight:600;color:#e8eef5;list-style:none;outline:none;cursor:pointer;display:flex;align-items:flex-start;gap:10px;font-size:0.96rem}
+details summary::-webkit-details-marker{display:none}
+details summary::before{content:'▶';color:#64c8ff;font-size:0.75em;transition:transform 0.2s;flex-shrink:0;margin-top:5px}
+details[open] summary::before{transform:rotate(90deg);color:#5eead4}
+details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
+details .answer ul,details .answer ol{margin:6px 0 6px 22px}
+@media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+</style>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({startOnLoad:true,theme:'base',flowchart:{useMaxWidth:true,htmlLabels:true,nodeSpacing:50,rankSpacing:60},sequence:{useMaxWidth:true},themeVariables:{primaryColor:'#1a2530',primaryTextColor:'#e8eef5',primaryBorderColor:'#64c8ff',lineColor:'#5eead4',secondaryColor:'#0e1419',tertiaryColor:'#0a0f14',background:'#0a0f14',mainBkg:'#1a2530',secondBkg:'#0e1419',textColor:'#d4dae0',fontFamily:'-apple-system,"SF Pro Display",sans-serif',fontSize:'16px'}});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const lb=document.createElement('div');lb.className='lightbox';
+  lb.innerHTML='<span class="hint">scroll = zoom · drag = pan · Esc / click bg = close</span>';
+  document.body.appendChild(lb);
+  let scale=1,panX=0,panY=0,dragging=false,moved=false,lx=0,ly=0;
+  const apply=()=>{const s=lb.querySelector('svg');if(s)s.style.transform=`translate(${panX}px,${panY}px) scale(${scale})`};
+  const reset=()=>{scale=1;panX=0;panY=0};
+  const close=()=>{lb.classList.remove('open');const s=lb.querySelector('svg');if(s)s.remove();reset()};
+  document.addEventListener('click',e=>{
+    if(e.target.closest('.lightbox')){if(moved){moved=false;return}close();return}
+    const w=e.target.closest('.mermaid');if(!w)return;
+    const svg=w.querySelector('svg');if(!svg)return;
+    const c=svg.cloneNode(true);c.removeAttribute('style');
+    c.style.maxWidth='96vw';c.style.maxHeight='92vh';
+    lb.appendChild(c);lb.classList.add('open');reset();apply();
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+  lb.addEventListener('wheel',e=>{
+    if(!lb.classList.contains('open'))return;
+    e.preventDefault();
+    const svg=lb.querySelector('svg');if(!svg)return;
+    const ns=Math.max(0.3,Math.min(10,scale*(1-e.deltaY*0.002)));
+    const r=svg.getBoundingClientRect();
+    const cx=e.clientX-(r.left+r.width/2),cy=e.clientY-(r.top+r.height/2);
+    const k=ns/scale-1;panX-=cx*k;panY-=cy*k;scale=ns;apply();
+  },{passive:false});
+  lb.addEventListener('mousedown',e=>{
+    if(!lb.classList.contains('open'))return;
+    dragging=true;moved=false;lx=e.clientX;ly=e.clientY;lb.classList.add('dragging');e.preventDefault();
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    const dx=e.clientX-lx,dy=e.clientY-ly;
+    if(Math.abs(dx)+Math.abs(dy)>3)moved=true;
+    panX+=dx;panY+=dy;lx=e.clientX;ly=e.clientY;apply();
+  });
+  document.addEventListener('mouseup',()=>{dragging=false;lb.classList.remove('dragging')});
+});
+</script>
+</head><body><div class="container">
+
+<header>
+<div class="meta">
+<span class="tag day">Day 24</span>
+<span class="tag diff">Hard</span>
+<span class="tag">Security</span>
+<span class="tag">OAuth2/OIDC</span>
+<span class="tag">JWT vs Session</span>
+<span class="tag">Secrets</span>
+</div>
+<h1>安全基础 — 你是谁、你能做什么、密钥放哪<span class="en">Security: AuthN vs AuthZ, OAuth2/OIDC, JWT vs Session, Secret Management</span></h1>
+</header>
+
+<h2>问题场景 + 需求约束</h2>
+<p>为一个<strong>多租户 SaaS</strong> 设计认证授权系统：500 万注册用户、日活 100 万、登录峰值 5000 QPS。要同时服务 <strong>Web、移动 App、对外开放 API、第三方集成</strong>四类客户端；企业客户要求用自己的 IdP 做 <em>SSO</em>（OIDC/SAML）；合规要求<strong>密钥可轮换、操作可审计、凭证泄露可即时止血</strong>。</p>
+<p>安全设计有个反直觉的核心：<strong>它几乎全是 trade-off，而不是「越严越好」</strong>。把 token 做成永不撤销的 stateless JWT，性能爽但泄露后无法止血；把密钥写进环境变量，部署简单但轮换是噩梦。这一期讲四件分层的事——<em>认证 vs 授权的边界、OAuth/OIDC 委托、JWT vs Session 的撤销代价、密钥的生命周期管理</em>。它们对应安全的三个永恒问题：你是谁、你能做什么、秘密放哪。</p>
+<ul>
+<li><strong>信任边界</strong>：哪里是「不可信外部」、哪里是「已认证内部」？token 在边界被签发，在每个内部入口被校验。</li>
+<li><strong>认证频率 vs 授权频率</strong>：登录一天一次，授权检查每个请求一次（5000+ QPS）——授权的性能预算远紧于认证。</li>
+<li><strong>失血控制（RTO）</strong>：凭证泄露后，能在几分钟内让它失效，还是要等它自然过期？这个数字决定 token 设计。</li>
+<li><strong>合规</strong>：审计日志、密钥轮换周期、最小权限，都是设计约束而非事后补丁。</li>
+</ul>
+
+<h2>高层架构</h2>
+<p>所有外部请求先到 <strong>API 网关</strong>，网关做粗粒度的 <em>token 校验</em>（签名、过期、scope）——这是认证边界。认证本身委托给 <strong>IdP / 授权服务器</strong>（自建或 Auth0/Okta），它签发 access token + refresh token。请求进入内部后，各服务用 <strong>授权决策点（PDP）</strong>做细粒度权限判断（这个用户能不能改这个租户的这条数据）。所有服务的密钥/凭证不写在配置里，运行时从 <strong>Secret 管理</strong>（Vault / 云 KMS）动态获取。</p>
+<pre class="mermaid">
+graph LR
+    C["客户端<br/><i>Web/移动/API</i>"]
+    GW["API 网关<br/><i>AuthN: 校验 token</i>"]
+    IDP["授权服务器/IdP<br/><i>签发 token</i>"]
+    SVC["业务服务<br/><i>AuthZ: PDP 决策</i>"]
+    SS["Secret 管理<br/><i>Vault/KMS</i>"]
+    DB[("用户/权限存储")]
+
+    C -->|① 登录| IDP
+    IDP -->|② access+refresh| C
+    C -->|③ Bearer token| GW
+    GW -->|④ 校验通过| SVC
+    GW -.->|公钥/JWKS| IDP
+    SVC -->|⑤ 能否操作?| SVC
+    SVC -.->|动态凭证| SS
+    SVC --> DB
+
+    classDef ext fill:#2a1530,stroke:#ff7ab6,color:#e8eef5
+    classDef gate fill:#1a1a30,stroke:#ffb450,color:#e8eef5
+    classDef core fill:#1a2530,stroke:#64c8ff,color:#e8eef5
+    classDef sec fill:#0e2030,stroke:#5eead4,color:#e8eef5
+    class C ext
+    class GW gate
+    class IDP,SVC core
+    class SS,DB sec
+</pre>
+<p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">认证发生在边界一次、授权发生在每个内部入口；密钥永不落地配置文件</p>
+
+<h2>关键技术点</h2>
+
+<h3>1. AuthN vs AuthZ — 先分清「你是谁」和「你能做什么」</h3>
+<p>一句话 trade-off：<em>认证可以集中做一次，授权必须在每个资源访问点做一次——混淆两者是 Web 头号漏洞的根源</em>。</p>
+<p><strong>原理</strong>：<em>认证（Authentication）</em>回答「你是谁」，结果是一份可信身份凭证，登录时产生一次。<em>授权（Authorization）</em>回答「你能对这个资源做这个操作吗」，必须在<strong>每一次资源访问</strong>时判断。两者频率、位置、失败语义都不同：认证失败返回 <code>401 Unauthorized</code>（你没证明身份），授权失败返回 <code>403 Forbidden</code>（身份没问题但没权限）。最经典的漏洞 <strong>IDOR</strong>（Insecure Direct Object Reference）就是把认证当授权——「用户登录了」就直接信任他请求的 <code>/orders/456</code>，却没检查这个 order 是否属于他。OWASP 把这类「Broken Access Control」列为头号风险。</p>
+<div class="tradeoff">
+<strong>Trade-off：授权决策放哪</strong>
+<ul>
+<li><strong>嵌入式（每个服务自己判断）</strong>：✅ 零网络延迟、无 SPOF；❌ 权限逻辑散落各处、策略变更要重新部署所有服务、难审计。</li>
+<li><strong>集中式 PDP（如 OPA / 中心授权服务）</strong>：✅ 策略统一、可审计、热更新；❌ 每请求多一跳（要靠 sidecar 本地缓存策略缓解）、PDP 是关键路径。</li>
+<li><strong>关系型授权（Google Zanzibar 模型）</strong>：✅ 适合「文档共享给某人」这种细粒度 ReBAC、全局一致；❌ 架构复杂，需要专门的权限图存储。</li>
+</ul></div>
+<pre><code># 区分 401 与 403，并在每个资源访问点校验归属
+def get_order(req, order_id):
+    user = authenticate(req)            # 没身份 → 401
+    if user is None:
+        raise HTTP(401)                 # 让客户端去重新登录
+    order = db.get_order(order_id)
+    if order.tenant_id != user.tenant_id:   # ⚠️ 授权:校验资源归属
+        raise HTTP(403)                 # 有身份但越权 → 403,别用 404 误导也别漏检
+    return order
+</code></pre>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Google Zanzibar</strong>：统一授权系统，为 Drive/YouTube/Calendar 等提供「谁能访问什么」的全局一致权限判断，催生了 SpiceDB、OpenFGA 等开源实现（<a href="https://research.google/pubs/pub48190/" style="color:#5eead4">Zanzibar 论文</a>）。</li>
+<li><strong>OWASP</strong>：Broken Access Control 长期高居 <a href="https://owasp.org/Top10/" style="color:#5eead4">Top 10</a> 首位，IDOR 是其典型表现。</li>
+<li><strong>AWS IAM</strong>：把 AuthN（凭证）与 AuthZ（policy 评估）彻底分离，每个 API 调用都过一遍 policy engine。</li>
+</ul></div>
+
+<h3>2. OAuth 2.0 / OIDC — 不要自己存第三方密码，用委托授权</h3>
+<p>一句话 trade-off：<em>用「引入授权服务器与重定向复杂度」换「永不接触用户在别处的密码、可细粒度授权与撤销」</em>。</p>
+<p><strong>原理</strong>：<em>OAuth 2.0 是授权委托框架</em>——让用户授权第三方应用代表他访问资源，而不交出密码，产出 <strong>access token</strong>（带 scope，代表「能做什么」）。但 OAuth 本身<strong>不是认证协议</strong>：access token 只说明「持有者被授权」，不可靠地说明「用户是谁」。<em>OIDC（OpenID Connect）</em>在 OAuth 之上加了身份层，多签发一个 <strong>id_token</strong>（JWT 格式，含用户身份声明），这才是「用 Google 登录」的正确底座。现代唯一推荐的 flow 是 <strong>Authorization Code + PKCE</strong>：先拿一次性 code，再用 code（加 PKCE 校验）换 token，token 永不经过浏览器 URL。早期的 Implicit flow（token 直接回传到 URL）已被官方废弃，因为 token 会泄露在 history/referer/日志里。</p>
+<div class="tradeoff">
+<strong>Trade-off：选哪个授权流</strong>
+<ul>
+<li><strong>Authorization Code + PKCE</strong>：✅ 最安全，适合所有有用户参与的场景（Web/移动/SPA）；❌ 多次重定向、要处理 code 交换。</li>
+<li><strong>Client Credentials</strong>：✅ 适合服务对服务（无用户），简单；❌ 仅限可信后端，凭证泄露即全权。</li>
+<li><strong>Resource Owner Password (ROPC)</strong>：⚠️ 直接收用户密码换 token，<em>已不推荐</em>，仅限自家一方应用的过渡，违背了 OAuth 的初衷。</li>
+</ul></div>
+<pre><code># Authorization Code + PKCE (客户端侧伪代码)
+verifier  = random_urlsafe(64)                  # 高熵随机串,保密
+challenge = base64url(sha256(verifier))         # 派生,可公开
+# ① 跳转授权服务器,带 challenge(不带 verifier)
+redirect(f"{AUTH}/authorize?client_id={CID}&response_type=code"
+         f"&code_challenge={challenge}&code_challenge_method=S256&scope=openid")
+# ② 用户登录授权后,授权服务器回调带 code
+# ③ 用 code + 原始 verifier 换 token(攻击者截到 code 也无 verifier)
+tok = POST(f"{AUTH}/token", code=code, code_verifier=verifier, client_id=CID)
+#   → { access_token, refresh_token, id_token }  id_token 用于确认"你是谁"
+</code></pre>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>oauth.net / 规范</strong>：Aaron Parecki 维护的 <a href="https://oauth.net/2/" style="color:#5eead4">OAuth 2.0</a> 与《OAuth 2.0 Simplified》是入门权威；PKCE 现已是所有客户端类型的推荐默认。</li>
+<li><strong>"Sign in with Google/Apple"</strong>：本质都是 OIDC，第三方拿 id_token 确认身份，从不触碰你的 Google 密码。</li>
+<li><strong>Okta / Auth0</strong>：把 OAuth/OIDC 做成托管 IdP，企业用它做 SSO，省去自建授权服务器。</li>
+</ul></div>
+
+<h3>3. JWT vs Session — stateless 的代价是「撤销难」</h3>
+<p>一句话 trade-off：<em>JWT 用「无法即时撤销」换「每个请求无需查存储即可验证」；Session 反之</em>。</p>
+<p><strong>原理</strong>：<em>Session</em> 把状态留在服务端（Redis/DB），客户端只拿一个不透明的 <code>session_id</code>，每请求服务端查一次。<em>JWT</em> 把状态（用户 ID、scope、过期时间）签进自包含 token，服务端只验签名、不查存储——这就是 stateless，能在任意服务、任意区域独立验证。代价是：<strong>token 一旦签发，在过期前无法收回</strong>。被盗的 JWT 在有效期内畅通无阻；用户改了权限或被封号，旧 token 仍认旧权限。业界折中是<strong>短期 access token（JWT，5–15 分钟）+ 长期 refresh token（有状态，存服务端可撤销）</strong>：撤销时让 refresh token 失效，access token 最多再活几分钟。</p>
+<table>
+<thead><tr><th></th><th>Session（有状态）</th><th>JWT（无状态）</th></tr></thead>
+<tbody>
+<tr><td><strong>每请求开销</strong></td><td>查 store 一次</td><td>本地验签，零查询</td></tr>
+<tr><td><strong>即时撤销</strong></td><td>✅ 删 session 即失效</td><td>❌ 过期前无法收回</td></tr>
+<tr><td><strong>横向扩展</strong></td><td>需共享 session store</td><td>✅ 任意节点独立验证</td></tr>
+<tr><td><strong>权限变更生效</strong></td><td>立即</td><td>下次刷新才生效</td></tr>
+<tr><td><strong>适用</strong></td><td>单体/同机房、强撤销需求</td><td>微服务/多区域、短时 token</td></tr>
+</tbody></table>
+<pre><code># JWT 验证的三个致命陷阱
+claims = jwt.decode(
+    token, key=PUBLIC_KEY,
+    algorithms=["RS256"],     # ① 显式锁定算法! 否则攻击者改 alg:none 绕过验签,
+                              #    或 RS256→HS256 用"公钥当 HMAC 密钥"伪造(算法混淆)
+    options={"require": ["exp", "iss", "aud"]})
+assert claims["iss"] == TRUSTED_ISSUER   # ② 必须校验签发者
+assert claims["aud"] == MY_API           # ③ 必须校验受众,否则别处签的 token 也能用
+# ④ 撤销:维护 jti 黑名单或短 TTL,纯 stateless JWT 无法"登出"
+</code></pre>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Auth0 / Tim McLean</strong>：经典文《Critical vulnerabilities in JSON Web Token libraries》揭示 <code>alg:none</code> 与 RS256→HS256 算法混淆攻击（<a href="https://auth0.com/blog/critical-vulnerabilities-in-json-web-token-libraries/" style="color:#5eead4">原文</a>），直接促成了 JWT 最佳实践规范。</li>
+<li><strong>IETF RFC 8725</strong>：<a href="https://datatracker.ietf.org/doc/html/rfc8725" style="color:#5eead4">JWT Best Current Practices</a>——明确要求锁定算法、校验 aud/iss，是 JWT 落地的必读。</li>
+<li><strong>多数大型 SaaS</strong>：采用「短 access token + 可撤销 refresh token」的混合模式，兼顾 stateless 性能与可止血。</li>
+</ul></div>
+
+<h3>4. Secret 管理 — 密钥不是配置，是会过期、会泄露的活物</h3>
+<p>一句话 trade-off：<em>用「引入 Vault/KMS 的运维与可用性复杂度」换「集中审计、自动轮换、泄露后可秒级失效」</em>。</p>
+<p><strong>原理</strong>：DB 密码、API key、签名私钥若散落在环境变量、配置文件、甚至 git 里，就是 <strong>secret sprawl</strong>——没人知道有多少份、谁能看、上次轮换是何时。成熟方案有三层进阶：①集中存储（Vault / 云 KMS）做单一可信源 + 审计；②<strong>动态短期凭证</strong>——应用启动时向 Vault 申请「只活 1 小时的临时 DB 账号」，过期自动销毁，泄露窗口极小；③<strong>workload identity</strong>——干脆不发静态密钥，用平台签发的实例身份（AWS IAM Role、SPIFFE）直接换取访问，<em>根本没有长期 secret 可泄露</em>。轮换从「全公司协调改密码」变成「后台自动滚动」。</p>
+<div class="tradeoff">
+<strong>Trade-off：</strong>
+<ul>
+<li><strong>环境变量 / 配置文件</strong>：✅ 零依赖、简单；❌ 易进 git/日志、轮换要重新部署、无审计、泄露后无法定位影响面。</li>
+<li><strong>集中 Secret 管理（Vault/KMS）</strong>：✅ 审计 + 轮换 + 细粒度访问；❌ 多一个关键依赖（Vault 挂了应用拿不到密钥，需 HA + 缓存）、运维成本。</li>
+<li><strong>动态凭证 / workload identity</strong>：✅ 短命凭证、泄露影响最小、免轮换；❌ 改造成本高，需平台级身份基础设施支持。</li>
+</ul></div>
+<pre><code># 动态短期凭证: 不读静态密码,运行时申请临时账号
+lease = vault.read("database/creds/app-readonly")   # 申请一次性 DB 凭证
+db = connect(user=lease.username, pw=lease.password) # ⚠️ TTL=1h,到期 Vault 自动回收
+schedule_renew(lease, before_expiry="10m")           # 续租或重新申请
+# 对比:静态 DB_PASSWORD 写进 env → 永久有效,泄露后必须全员改密+重启
+</code></pre>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>HashiCorp Vault</strong>：dynamic secrets（按需生成短期 DB/云凭证）+ 集中审计 + 自动轮换，是该领域事实标准。</li>
+<li><strong>Netflix Metatron / Lemur</strong>：Metatron 在实例启动时下发 workload 身份证书；<a href="https://netflixtechblog.com/introducing-lemur-ceae8830f621" style="color:#5eead4">Lemur</a> 负责 X.509 证书的编排与自动轮换。</li>
+<li><strong>Fly.io</strong>：Thomas Ptacek 的《<a href="https://fly.io/blog/api-tokens-a-tedious-survey/" style="color:#5eead4">API Tokens: A Tedious Survey</a>》系统梳理了从随机串到 Macaroon 的 token 设计谱系，是 token 选型必读。</li>
+<li><strong>AWS IAM Roles</strong>：EC2/容器不持有长期密钥，凭实例角色换取自动轮换的临时凭证。</li>
+</ul></div>
+
+<h2>扩展与优化（增长后怎么办）</h2>
+<ul>
+<li><strong>登录被撞库/暴破</strong>：登录端点要专门限流（见 Day 10）+ 失败计数锁定 + MFA；密码存储用 <em>bcrypt/argon2</em>（慢哈希 + per-user salt），绝不裸 SHA。</li>
+<li><strong>token 防盗用</strong>：access token 放 <code>httpOnly</code> + <code>Secure</code> cookie 防 XSS 偷取，配合 SameSite / CSRF token 防跨站；进一步用 <em>token binding / DPoP</em> 把 token 绑到客户端密钥，偷了也用不了。</li>
+<li><strong>服务间认证</strong>：内部调用上 <em>mTLS</em>（service mesh 如 Istio 自动签发/轮换证书），零信任网络下「内网」不再天然可信。</li>
+<li><strong>免密趋势</strong>：Passkeys / WebAuthn 用设备生物识别 + 公钥，彻底消灭可被钓鱼的密码。</li>
+<li><strong>瓶颈识别</strong>：授权检查在每请求热路径——PDP 用本地策略缓存 + 决策结果短缓存；JWKS 公钥要缓存避免每验签都拉。</li>
+</ul>
+
+<h2>常见陷阱 + 面试问题</h2>
+<div class="callout">
+<strong>1. JWT 放 localStorage 还是 cookie？</strong> localStorage 易被 XSS 脚本读走；<code>httpOnly</code> cookie 防 XSS 但要防 CSRF（SameSite + CSRF token）。没有银弹，要按攻击面权衡——面试常考你知不知道两者的失败模式。
+</div>
+<div class="callout">
+<strong>2. 纯 stateless JWT 怎么实现「登出」？</strong> 严格说做不到即时登出。要么维护 <code>jti</code> 黑名单（又变回有状态），要么 access token TTL 设到几分钟、靠 refresh token 撤销兜底。承认这个 trade-off 比假装能撤销更专业。
+</div>
+<div class="callout">
+<strong>3. 401 还是 403？</strong> 没/坏凭证 → 401（去重新认证）；凭证有效但无权限 → 403。有些场景为防资源枚举，对越权资源故意返 404 隐藏存在性——这是有意的安全选择，不是漏检。
+</div>
+<div class="callout">
+<strong>4. JWT 验签忘了锁 algorithm</strong>：不显式指定 <code>algorithms</code>，库会信任 token 自带的 <code>alg</code>——攻击者填 <code>none</code> 或把 RS256 改 HS256 即可伪造。务必锁死算法并校验 <code>aud/iss</code>。
+</div>
+<div class="callout">
+<strong>5. 把 secret 提交进 git</strong>：哪怕事后删除，历史里仍在，且可能已被爬取。一旦提交即视为泄露，必须立即轮换——这也是为什么动态短期凭证比静态密钥安全得多。
+</div>
+
+<h2>深入资源</h2>
+<ul>
+<li><strong>oauth.net + 《OAuth 2.0 Simplified》(Aaron Parecki)</strong>：OAuth/OIDC 的权威入口与通俗读本。</li>
+<li><strong>IETF RFC 8725 — JWT Best Current Practices</strong>：JWT 落地的安全清单（锁算法、校验 aud/iss）。</li>
+<li><strong>Auth0 Blog — Critical vulnerabilities in JSON Web Token libraries (Tim McLean)</strong>：alg:none 与算法混淆攻击的经典剖析。</li>
+<li><strong>Google Zanzibar 论文 + Fly.io《API Tokens: A Tedious Survey》</strong>：分别是细粒度授权与 token 设计谱系的深度参考。</li>
+<li><strong>OWASP Top 10 + Cheat Sheet Series</strong>：Broken Access Control、Authentication、Secrets 的实战防御清单。</li>
+</ul>
+
+<h2>深入思考（点击展开答案）</h2>
+
+<details>
+<summary>1. 你的 access token TTL 设为 15 分钟。一个被盗 token 最长能用多久？把 TTL 砍到 1 分钟能消除风险吗？代价是什么？</summary>
+<div class="answer">
+<p><strong>最长 15 分钟</strong>（纯 stateless JWT 无法提前收回）。砍到 1 分钟<em>缩小</em>了泄露窗口，但不能消除风险：①攻击者可在 1 分钟内造成破坏；②真正危险的是 refresh token——它长寿且能不断换新 access token，偷了 refresh token 等于长期通行证。</p>
+<p><strong>代价</strong>：access token 每 1 分钟就要刷一次，refresh 请求 QPS 暴涨 15 倍，而 refresh 通常要查有状态存储（验证 refresh token 是否被撤销），等于把「stateless 省查询」的好处抵消大半。</p>
+<p><strong>正解</strong>：短 access token + <em>refresh token rotation</em>——每次刷新发新 refresh token 并作废旧的，若检测到旧 refresh token 被重复使用（说明被盗用并行使用），立即吊销整条 token 链。这才是兼顾性能与失血控制的工业做法。</p>
+</div>
+</details>
+
+<details>
+<summary>2. 为什么说 OAuth 2.0「不是认证协议」，用 access token 来判断「用户是谁」会出什么问题？</summary>
+<div class="answer">
+<p>access token 表达的是<strong>授权</strong>：「持有者被允许访问某资源」，它不保证「持有者就是某用户本人」。经典漏洞是 <em>confused deputy / token substitution</em>：应用 A 拿到一个对它有效的 access token，就以为对应的用户已在<em>我这里</em>登录——但这个 token 可能是为别的应用、别的受众签发的，攻击者把自己的 token 塞进来即可冒充。</p>
+<p>OIDC 正是为补这个洞而生：它额外签发 <strong>id_token</strong>（带 <code>aud</code>=你的 client_id、<code>iss</code>、<code>sub</code>、<code>nonce</code>），明确告诉你「这个身份是签发给你的应用的」。所以「登录」要用 id_token 并校验 aud/nonce，而不是拿 access token 当身份凭证。</p>
+</div>
+</details>
+
+<details>
+<summary>3. 一名前端开发说「我把 JWT 放 localStorage，再加个 CSRF token 就安全了」。哪里搞反了？</summary>
+<div class="answer">
+<p>搞反了攻击面。<strong>localStorage 的威胁是 XSS</strong>（任意注入脚本能 <code>localStorage.getItem</code> 读走 token），而 <strong>CSRF token 防的是 CSRF</strong>（跨站伪造请求，利用浏览器自动带 cookie）。localStorage 里的 token <em>不会</em>被浏览器自动附带，本就不太受 CSRF 威胁；加 CSRF token 没解决它真正的 XSS 风险。</p>
+<p>正确组合是二选一对症下药：要么 <code>httpOnly</code> cookie（防 XSS 读取）+ SameSite/CSRF token（防 CSRF）；要么 token 存内存（非持久，刷新即失，缩小 XSS 窗口）。根治还是收敛 XSS 本身（CSP、输出转义）。把无关的防御手段叠上去只是「安全剧场」。</p>
+</div>
+</details>
+
+<details>
+<summary>4. 集中式 PDP（如中心授权服务）每请求多一跳，在 5000 QPS 热路径上怎么不让它成为延迟与可用性瓶颈？</summary>
+<div class="answer">
+<ul>
+<li><strong>策略下沉 + 本地评估</strong>：不是每请求都问中心 PDP，而是把<em>策略</em>推送到每个服务旁的 sidecar（OPA 模式），本地用内存数据评估，决策延迟 ~微秒级。中心只负责分发策略与收集审计。</li>
+<li><strong>数据 vs 策略分离</strong>：策略变动慢可缓存；权限<em>数据</em>（谁属于哪个组）变动快，可用 bundle 增量同步或带短 TTL 缓存，容忍秒级最终一致。</li>
+<li><strong>决策结果缓存</strong>：相同 (user, action, resource) 短时缓存，但要权衡——权限撤销的生效延迟 = 缓存 TTL。</li>
+<li><strong>失败模式明确</strong>：PDP 不可达时是 fail-open（放行，可用优先）还是 fail-close（拒绝，安全优先）？安全场景几乎都该 fail-close，但核心读路径可能要分级。</li>
+</ul>
+<p>本质和 Day 2 缓存、Day 23 可靠性同构：把强一致的中心决策，变成「本地缓存 + 异步同步」来摊薄热路径开销。</p>
+</div>
+</details>
+
+<details>
+<summary>5. 你的签名私钥泄露了。stateless JWT 体系下，攻击者能伪造任意用户的 token。止血和恢复的完整步骤是什么？这暴露了 stateless 的什么根本弱点？</summary>
+<div class="answer">
+<p><strong>止血与恢复</strong>：①立即轮换签名密钥对，用新私钥签、新公钥（JWKS）发布；②但旧公钥若还在 JWKS/各服务缓存里，旧伪造 token 仍被接受——必须从 JWKS 移除旧 <code>kid</code> 并强制各验证方刷新缓存；③所有用旧 kid 签的 token 立即失效（按 kid 拒绝），等于强制全员重新登录；④审计期间签发的 token，排查是否已有伪造滥用。</p>
+<p><strong>根本弱点</strong>：stateless 的安全性<em>完全</em>押在签名密钥的保密上——密钥是单点。一旦泄露，影响面是「自上次轮换以来的全部用户」，且因为不查存储，系统无法区分「真 token」和「用泄露密钥伪造的 token」。这正是要<strong>密钥定期轮换 + 多 kid 并存 + 私钥存 HSM/KMS 永不出库</strong>的原因：把单点变成可快速替换、可隔离的部件。对照 Session 体系，泄露 session store 也很糟，但删库即可全体失效，不存在「离线伪造」问题。</p>
+</div>
+</details>
+
+</div>
+</body></html>
