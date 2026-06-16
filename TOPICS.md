@@ -26,23 +26,23 @@
 - Day 22: 上线与发布 — Blue-Green vs Canary vs Rolling, Feature flags, Backwards compatibility, DB migration
 - Day 23: 可靠性 — Circuit breaker, Retry with backoff, Bulkhead, Graceful degradation
 - Day 24: 安全基础 — AuthN vs AuthZ, OAuth2 / OIDC, JWT vs session, Secret management
-- Day 25: CDN 与 Edge — Cloudflare 架构, Edge compute, Cache invalidation, Anycast
-- Day 26: 文件存储 — S3 架构, Object vs Block vs File, 上传下载优化, Backup
-- Day 27: 权限与账号系统 — RBAC vs ABAC, Multi-tenancy, Org/Team/Project 层级, Audit log
-- Day 28: 全文搜索与推荐集成 — BM25 + vector, 重排序, Multi-stage retrieval, Snippet 生成
-- Day 29: LLM 服务架构 — 请求路由与负载均衡, Streaming response, Prompt caching, Cost/latency/quality 三角
-- Day 30: AI 产品后端 — RAG 架构, Agent loop 服务化, Embedding 服务设计, 人机协同
-- Day 31: 实时系统 — WebRTC, 实时协作传输, 低延迟架构, 实时游戏后端
-- Day 32: 物联网与边缘 — IoT 数据摄取, 边缘计算, MQTT, 时序数据库
-- Day 33: 区块链与分布式账本 — 共识算法(PoW/PoS), 智能合约架构, 去中心化存储, 性能权衡
-- Day 34: 多租户 SaaS 架构 — 租户隔离, 数据分区, 资源配额, 计费集成
-- Day 35: 数据湖与湖仓 — 数据湖 vs 数仓 vs 湖仓, Iceberg/Delta, 元数据管理, 批流一体
-- Day 36: 工作流引擎 — Temporal/Airflow, Saga 编排, 持久化执行, 补偿事务
-- Day 37: 特征平台与 ML 基础设施 — 特征存储, 在线/离线一致, 模型服务, A/B 实验平台
-- Day 38: 全球化与多区域 — 数据驻留, 多活架构, 跨区域一致性, 延迟优化
-- Day 39: 隐私与合规架构 — GDPR 删除权, 数据脱敏, 审计追踪, 同意管理
-- Day 40: 成本与容量工程 — 容量规划, 成本归因, 自动扩缩容, 资源效率
-- Day 41: 混沌工程与韧性测试 — 故障注入, 游戏日, 韧性验证, 金丝雀深化
-- Day 42: 协作编辑系统 — OT vs CRDT, 冲突解决, 离线同步, Figma/Notion 架构
-- Day 43: 系统设计面试 — 需求澄清与范围界定, 4 步框架(功能/非功能→高层设计→深挖→权衡), 白板沟通与出声推理, 常见失分点(过早抠细节/不问假设/不谈 trade-off/不画图)
-- Day 44: 容量估算与假设 — Back-of-envelope 估算, QPS/存储/带宽/内存推导, 数量级直觉(2 的幂 + 延迟数字), 如何显式声明并校验假设; 区分面试 vs 生产(面试靠 BOTE + 出声 justify, 生产靠真实指标/压测/可观测性回归, 见 Day 40)
+- Day 25: 系统设计面试 — 需求澄清与范围界定, 4 步框架(功能/非功能→高层设计→深挖→权衡), 白板沟通与出声推理, 常见失分点(过早抠细节/不问假设/不谈 trade-off/不画图)
+- Day 26: 容量估算与假设 — Back-of-envelope 估算, QPS/存储/带宽/内存推导, 数量级直觉(2 的幂 + 延迟数字), 如何显式声明并校验假设; 区分面试 vs 生产(面试靠 BOTE + 出声 justify, 生产靠真实指标/压测/可观测性回归, 见 Day 27)
+- Day 27: 成本与容量工程 — 容量规划, 成本归因, 自动扩缩容, 资源效率
+- Day 28: CDN 与 Edge — Cloudflare 架构, Edge compute, Cache invalidation, Anycast
+- Day 29: 文件存储 — S3 架构, Object vs Block vs File, 上传下载优化, Backup
+- Day 30: 权限与账号系统 — RBAC vs ABAC, Multi-tenancy, Org/Team/Project 层级, Audit log
+- Day 31: 全文搜索与推荐集成 — BM25 + vector, 重排序, Multi-stage retrieval, Snippet 生成
+- Day 32: LLM 服务架构 — 请求路由与负载均衡, Streaming response, Prompt caching, Cost/latency/quality 三角
+- Day 33: AI 产品后端 — RAG 架构, Agent loop 服务化, Embedding 服务设计, 人机协同
+- Day 34: 实时系统 — WebRTC, 实时协作传输, 低延迟架构, 实时游戏后端
+- Day 35: 物联网与边缘 — IoT 数据摄取, 边缘计算, MQTT, 时序数据库
+- Day 36: 区块链与分布式账本 — 共识算法(PoW/PoS), 智能合约架构, 去中心化存储, 性能权衡
+- Day 37: 多租户 SaaS 架构 — 租户隔离, 数据分区, 资源配额, 计费集成
+- Day 38: 数据湖与湖仓 — 数据湖 vs 数仓 vs 湖仓, Iceberg/Delta, 元数据管理, 批流一体
+- Day 39: 工作流引擎 — Temporal/Airflow, Saga 编排, 持久化执行, 补偿事务
+- Day 40: 特征平台与 ML 基础设施 — 特征存储, 在线/离线一致, 模型服务, A/B 实验平台
+- Day 41: 全球化与多区域 — 数据驻留, 多活架构, 跨区域一致性, 延迟优化
+- Day 42: 隐私与合规架构 — GDPR 删除权, 数据脱敏, 审计追踪, 同意管理
+- Day 43: 混沌工程与韧性测试 — 故障注入, 游戏日, 韧性验证, 金丝雀深化
+- Day 44: 协作编辑系统 — OT vs CRDT, 冲突解决, 离线同步, Figma/Notion 架构
