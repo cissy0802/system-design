@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 27 · 成本与容量工程 (Cost & Capacity Engineering) — System Design Bi-daily</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"SF Pro Display","Noto Sans SC",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
+.container{max-width:820px;margin:0 auto;padding:24px 20px 60px}
+header{padding:40px 0 28px;border-bottom:1px solid rgba(100,200,255,0.15);margin-bottom:32px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem}
+.tag{padding:3px 10px;border-radius:4px;background:rgba(100,200,255,0.12);color:#64c8ff;border:1px solid rgba(100,200,255,0.25)}
+.tag.diff{background:rgba(94,234,212,0.1);color:#5eead4;border-color:rgba(94,234,212,0.3)}
+.tag.day{background:rgba(255,180,80,0.1);color:#ffb450;border-color:rgba(255,180,80,0.25)}
+h1{font-size:1.75rem;font-weight:800;background:linear-gradient(135deg,#64c8ff 0%,#5eead4 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:0.5px;line-height:1.3}
+h1 .en{display:block;font-size:1rem;color:#7a8590;-webkit-text-fill-color:#7a8590;margin-top:6px;font-weight:500}
+h2{font-size:1.2rem;color:#5eead4;margin:36px 0 14px;padding-left:12px;border-left:3px solid #5eead4}
+h3{font-size:1rem;color:#64c8ff;margin:20px 0 10px;font-weight:600}
+p{margin:10px 0;color:#c8cfd6}
+ul,ol{margin:10px 0 10px 22px;color:#c8cfd6}
+li{margin:6px 0}
+strong{color:#e8eef5;font-weight:600}
+em{color:#5eead4;font-style:normal;font-weight:500}
+code{font-family:"SF Mono",Menlo,Consolas,monospace;background:rgba(100,200,255,0.1);color:#5eead4;padding:1px 6px;border-radius:3px;font-size:0.88em}
+pre{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:14px 16px;overflow-x:auto;margin:12px 0;font-family:"SF Mono",Menlo,Consolas,monospace;font-size:0.84rem;line-height:1.55;color:#c8cfd6}
+pre code{background:none;color:inherit;padding:0;font-size:1em}
+.mermaid{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:18px;margin:14px 0;text-align:center;overflow-x:auto;cursor:zoom-in;transition:border-color 0.15s}
+.mermaid:hover{border-color:rgba(100,200,255,0.4)}
+.mermaid svg{width:100%;max-width:100%;height:auto;min-height:280px}
+.lightbox{position:fixed;inset:0;background:rgba(8,12,18,0.96);z-index:9999;display:none;align-items:center;justify-content:center;padding:24px;cursor:grab;backdrop-filter:blur(4px);overflow:hidden}
+.lightbox.open{display:flex}
+.lightbox.dragging{cursor:grabbing}
+.lightbox svg{width:auto;height:auto;max-width:96vw;max-height:92vh;transform-origin:center center;will-change:transform}
+.lightbox .hint{position:fixed;top:16px;right:20px;font-size:0.78rem;color:#7a8590;font-family:"SF Mono",Menlo,monospace;pointer-events:none}
+.callout{background:rgba(255,180,80,0.06);border-left:3px solid #ffb450;padding:12px 14px;margin:14px 0;border-radius:4px;font-size:0.94rem}
+.callout strong{color:#ffb450}
+.tradeoff{background:rgba(100,200,255,0.05);border:1px solid rgba(100,200,255,0.2);border-radius:6px;padding:12px 14px;margin:12px 0;font-size:0.94rem}
+.case{background:rgba(94,234,212,0.05);border-left:3px solid #5eead4;padding:12px 14px;margin:12px 0;border-radius:4px;font-size:0.94rem}
+.case strong{color:#5eead4}
+.nav{margin-top:50px;padding-top:24px;border-top:1px solid rgba(100,200,255,0.15);text-align:center}
+.nav a{color:#64c8ff;text-decoration:none;font-size:0.92rem;padding:8px 16px;border:1px solid rgba(100,200,255,0.3);border-radius:4px;transition:all 0.15s}
+.nav a:hover{background:rgba(100,200,255,0.1)}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:0.9rem}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid rgba(100,200,255,0.15)}
+th{color:#64c8ff;font-weight:600;background:rgba(100,200,255,0.05)}
+details{background:rgba(100,200,255,0.04);border:1px solid rgba(100,200,255,0.18);border-radius:6px;padding:12px 16px;margin:10px 0;transition:all 0.15s}
+details:hover{border-color:rgba(100,200,255,0.35)}
+details[open]{background:rgba(94,234,212,0.05);border-color:rgba(94,234,212,0.3)}
+details summary{font-weight:600;color:#e8eef5;list-style:none;outline:none;cursor:pointer;display:flex;align-items:flex-start;gap:10px;font-size:0.96rem}
+details summary::-webkit-details-marker{display:none}
+details summary::before{content:'▶';color:#64c8ff;font-size:0.75em;transition:transform 0.2s;flex-shrink:0;margin-top:5px}
+details[open] summary::before{transform:rotate(90deg);color:#5eead4}
+details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
+details .answer ul,details .answer ol{margin:6px 0 6px 22px}
+@media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+</style>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({startOnLoad:true,theme:'base',flowchart:{useMaxWidth:true,htmlLabels:true,nodeSpacing:50,rankSpacing:60},themeVariables:{primaryColor:'#1a2530',primaryTextColor:'#e8eef5',primaryBorderColor:'#64c8ff',lineColor:'#5eead4',secondaryColor:'#0e1419',tertiaryColor:'#0a0f14',background:'#0a0f14',mainBkg:'#1a2530',secondBkg:'#0e1419',textColor:'#d4dae0',fontFamily:'-apple-system,"SF Pro Display",sans-serif',fontSize:'16px'}});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const lb=document.createElement('div');lb.className='lightbox';
+  lb.innerHTML='<span class="hint">scroll = zoom · drag = pan · Esc / click bg = close</span>';
+  document.body.appendChild(lb);
+  let scale=1,panX=0,panY=0,dragging=false,moved=false,lx=0,ly=0;
+  const apply=()=>{const s=lb.querySelector('svg');if(s)s.style.transform=`translate(${panX}px,${panY}px) scale(${scale})`};
+  const reset=()=>{scale=1;panX=0;panY=0};
+  const close=()=>{lb.classList.remove('open');const s=lb.querySelector('svg');if(s)s.remove();reset()};
+  document.addEventListener('click',e=>{
+    if(e.target.closest('.lightbox')){if(moved){moved=false;return}close();return}
+    const w=e.target.closest('.mermaid');if(!w)return;
+    const svg=w.querySelector('svg');if(!svg)return;
+    const c=svg.cloneNode(true);c.removeAttribute('style');
+    c.style.maxWidth='96vw';c.style.maxHeight='92vh';
+    lb.appendChild(c);lb.classList.add('open');reset();apply();
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+  lb.addEventListener('wheel',e=>{
+    if(!lb.classList.contains('open'))return;
+    e.preventDefault();
+    const svg=lb.querySelector('svg');if(!svg)return;
+    const ns=Math.max(0.3,Math.min(10,scale*(1-e.deltaY*0.002)));
+    const r=svg.getBoundingClientRect();
+    const cx=e.clientX-(r.left+r.width/2),cy=e.clientY-(r.top+r.height/2);
+    const k=ns/scale-1;panX-=cx*k;panY-=cy*k;scale=ns;apply();
+  },{passive:false});
+  lb.addEventListener('mousedown',e=>{
+    if(!lb.classList.contains('open'))return;
+    dragging=true;moved=false;lx=e.clientX;ly=e.clientY;lb.classList.add('dragging');e.preventDefault();
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    const dx=e.clientX-lx,dy=e.clientY-ly;
+    if(Math.abs(dx)+Math.abs(dy)>3)moved=true;
+    panX+=dx;panY+=dy;lx=e.clientX;ly=e.clientY;apply();
+  });
+  document.addEventListener('mouseup',()=>{dragging=false;lb.classList.remove('dragging')});
+});
+</script>
+</head><body><div class="container">
+
+<header>
+<div class="meta">
+<span class="tag day">Day 27</span>
+<span class="tag diff">Hard</span>
+<span class="tag">Cost Engineering</span>
+<span class="tag">Capacity Planning</span>
+<span class="tag">Autoscaling</span>
+<span class="tag">FinOps</span>
+</div>
+<h1>成本与容量工程 — 在不破 SLO 的前提下把单位成本压下来<span class="en">Cost & Capacity Engineering: Planning, Attribution, Autoscaling, Efficiency</span></h1>
+</header>
+
+<h2>问题场景 + 需求约束</h2>
+<p>你接手一个<strong>月账单 $200 万、约 3000 个微服务跑在 Kubernetes 上</strong>的平台。CFO 要求 12 个月内<strong>单位成本</strong>（cost per request、cost per active user）降 <strong>30%</strong>，但任何服务的 p99 SLO 不许破。这不是「关几台机器省钱」，而是一个<em>约束优化</em>问题：在 SLO 约束下求资源效率最优。机会很大——业界在线集群的平均 CPU 利用率普遍只有 <strong>10–20%</strong>，Uber 公开把全局利用率从均值 20% 提到 31%，说明 headroom 浪费是常态。</p>
+<ul>
+<li><strong>目标</strong>：单位成本 ↓30%，且 SLO 不破（成本与延迟是对立约束）。</li>
+<li><strong>负载形状</strong>：日内峰谷 4:1，大促可达 10:1——静态按峰值买就是常年烧钱。</li>
+<li><strong>现状</strong>：平均 CPU ~15%，超额申请（request 远大于真实用量）严重。</li>
+<li><strong>归因</strong>：3000 服务、500 团队，成本必须能切到团队/产品/请求粒度。</li>
+<li><strong>时效</strong>：扩容必须在 SLO 被击穿前完成（分钟级），缩容要稳不能抖。</li>
+</ul>
+
+<h2>高层架构（成本-容量闭环）</h2>
+<pre class="mermaid">
+graph TD
+    subgraph OBS["遥测 Telemetry"]
+      M["运行指标<br/><i>CPU · QPS · p99</i>"]
+      BILL["云账单<br/><i>Billing / CUR</i>"]
+    end
+    M --> PLAN["容量规划器<br/><i>预测 + 排队论 headroom</i>"]
+    PLAN --> AS["Autoscaler<br/><i>Reactive + Predictive</i>"]
+    AS --> SCHED["调度 / Bin-packer<br/><i>Karpenter · Borg</i>"]
+    SCHED --> FLEET[("计算 Fleet<br/>RI · Savings Plan · Spot")]
+    FLEET --> M
+    BILL --> ATTR["成本归因<br/><i>Tag · 分摊</i>"]
+    ATTR --> FIN["FinOps 看板<br/><i>cost / request</i>"]
+    FIN -.单位成本反馈.-> PLAN
+
+    classDef obs fill:#0e2030,stroke:#5eead4,color:#e8eef5
+    classDef ctrl fill:#1a2530,stroke:#64c8ff,color:#e8eef5
+    classDef fleet fill:#1a1a30,stroke:#ffb450,color:#e8eef5
+    classDef fin fill:#2a1530,stroke:#ff7ab6,color:#e8eef5
+    class M,BILL obs
+    class PLAN,AS,SCHED ctrl
+    class FLEET fleet
+    class ATTR,FIN fin
+</pre>
+<p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">左半是「容量控制环」（指标→规划→扩缩→调度→fleet→回到指标），右半是「成本环」（账单→归因→看板），两环靠 <em>cost/request</em> 这个单位指标耦合。</p>
+
+<h2>关键技术点</h2>
+
+<h3>1. 容量规划：利用率不是越高越省钱</h3>
+<p><strong>原理</strong>：容量规划是在 SLO 约束下算「要多少资源」。三个输入：峰值负载（<code>avg_qps × peak_factor</code>）、单实例可承载量（压测得，不是看核数猜）、目标利用率。<em>最反直觉的点</em>：目标利用率不能设到 100%。排队论（M/M/c）告诉你，当利用率 ρ 趋近 1，排队等待 ∝ <code>1/(1-ρ)</code> 呈非线性爆炸——利用率从 70% 升到 90%，等待时间翻数倍。所以存在一个 <strong>knee（拐点）</strong>，多数在线服务把目标利用率定在 <strong>50–70%</strong>，留 headroom 吸收突发与单 AZ 故障（N+1/N+2 冗余）。</p>
+<div class="tradeoff">
+<strong>Trade-off：</strong>
+<ul>
+<li><strong>静态超额预留</strong>：✅ 简单、抗突发；❌ 利用率低、常年烧钱。</li>
+<li><strong>紧贴峰值 + 弹性</strong>：✅ 省钱；❌ 扩容有 lag，陡峭突发会击穿 SLO。</li>
+<li><strong>排队论建模定 headroom</strong>：✅ 理论最优；❌ 依赖准确的服务时间分布，重尾流量会让模型失准。</li>
+</ul></div>
+<pre><code># 容量规划: 在目标利用率下算所需实例数 (pseudo)
+peak_qps    = avg_qps * peak_factor            # 日内波峰 (如 4x)
+per_inst    = load_test_throughput             # 单实例可承载 QPS, 压测得
+target_util = 0.65                             # 不是 1.0 —— knee 之前
+need = ceil(peak_qps / (per_inst * target_util))
+need += az_redundancy                          # N+1: 容忍单 AZ 挂掉
+# 校验: 该利用率下 p99 是否仍在 SLO 内 —— 看压测曲线, 不要线性外推
+</code></pre>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Uber</strong>：Capacity Recommendation Engine (CRE) 用吞吐 + 利用率的 ML 模型做容量推荐；另有博客披露通过 Go <code>GOGC</code> 调优在 30 个核心服务上省下约 <strong>7 万核</strong>——侧证 headroom 浪费的量级。</li>
+<li><strong>Google</strong>：Autopilot 论文直言，用户因怕被 OOM kill 而<em>过量申请</em>是集群浪费的主因。</li>
+</ul></div>
+
+<h3>2. 自动扩缩容：Reactive、Predictive、Scheduled</h3>
+<p><strong>原理</strong>：自动扩缩容把「静态容量」变成「跟随负载」。三种范式：<em>Reactive</em>（看实时指标，如 K8s HPA target-tracking：指标偏离目标就调副本数）、<em>Predictive</em>（用历史预测未来负载、提前扩，如 Netflix Scryer）、<em>Scheduled</em>（已知规律，定时扩）。Reactive 的命门是 <strong>lag</strong>：指标采集 + 决策 + 实例启动 + 预热可能要几分钟，对秒杀级陡突发来不及。</p>
+<div class="tradeoff">
+<strong>Trade-off：</strong>
+<ul>
+<li><strong>Reactive (HPA)</strong>：✅ 简单通用、跟随真实负载；❌ 滞后、易震荡（flapping），冷启动期 SLO 可能破。</li>
+<li><strong>Predictive (Scryer)</strong>：✅ 提前扩、消除 lag、曲线平滑；❌ 预测错就过/欠配，依赖流量有规律。</li>
+<li><strong>Scheduled</strong>：✅ 零依赖、对可预测峰可靠；❌ 对非常规事件完全无效。</li>
+</ul></div>
+<pre><code># HPA target-tracking 核心公式
+desired = ceil(current_replicas * (current_metric / target_metric))
+# 例: 10 副本, 当前 CPU 90%, 目标 60% -> ceil(10 * 1.5) = 15 副本
+# 防震荡: scale-in 看过去 5 min 最大值 (stabilization window) + cooldown
+# 关键不对称: scale-out 要快, scale-in 要慢 —— 缩太快遇下一波突发就破 SLO
+</code></pre>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Netflix</strong>：Scryer 在 Amazon Auto Scaling 之上做<em>预测式</em>扩容，因为反应式对其早晚高峰的可预测流量来不及；生产中常 predictive 打底 + reactive 兜底叠加使用。</li>
+<li><strong>Kubernetes</strong>：HPA 是 target-tracking 的标准实现；KEDA 进一步支持按队列深度等事件指标扩缩（更贴近真实积压）。</li>
+</ul></div>
+
+<h3>3. 成本归因：没有 unit economics 就没有优化</h3>
+<p><strong>原理</strong>：3000 服务、500 团队，一张 $200 万总账单根本没法优化——必须把成本归因到团队/产品/请求。FinOps 的核心是 showback/chargeback：用资源 <code>tag</code>（team、service、env）把账单切片，再把<strong>共享成本</strong>（公用 LB、控制面、跨服务 DB、Spot 折扣）按某个 key 分摊下去。终点是 <em>unit cost</em>：cost per request、cost per active user——这才是能跨时间比较、能进决策的指标。</p>
+<div class="tradeoff">
+<strong>Trade-off（共享成本怎么分摊）：</strong>
+<ul>
+<li><strong>按用量分摊</strong>（CPU·秒 / 请求数）：✅ 公平、激励对齐；❌ 需细粒度计量，共享资源难计量。</li>
+<li><strong>均摊</strong>（按团队数平均）：✅ 简单；❌ 不公平、惩罚小团队、毫无优化激励。</li>
+<li><strong>不分摊</strong>（丢 unallocated 桶）：✅ 零成本；❌ 共享成本常占 20–30%，看不见就没人管。</li>
+</ul></div>
+<pre><code># unit economics: 把账单变成可决策指标
+team_cost = direct_cost[team] + shared_cost * (team_usage / total_usage)
+unit_cost = team_cost / team_requests        # $ / 1k req —— 可跨季度比
+# 看趋势 > 看绝对值: cost/req 环比上涨 = 有服务在变低效, 该告警
+</code></pre>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Spotify</strong>：Cost Insights 插件（开源在 Backstage）把云成本直接放进工程师日常的服务目录，按 pipeline/服务粒度归因，让<em>工程师</em>而非财务去做优化；Spotify 自述借「成本左移」省下数百万美元/年。</li>
+<li><strong>FinOps Foundation</strong>：把 showback/chargeback、unit economics 体系化，成为跨公司的通用语言。</li>
+</ul></div>
+
+<h3>4. 资源效率：rightsizing、bin-packing、采购三层</h3>
+<p><strong>原理</strong>：利用率从 15% 提到 45% 就是省 3 倍钱。四个杠杆：<strong>① Rightsizing</strong>——requests/limits 贴合真实用量（VPA、Autopilot 自动调）；<strong>② Bin-packing</strong>——调度器把 pod 紧密塞进节点、减少碎片；<strong>③ Consolidation</strong>——周期性重新打包、退掉空节点；<strong>④ 采购组合</strong>——基线用 Reserved/Savings Plan（省 ~40–60% 但锁 1–3 年）、弹性峰用 On-demand、容错批处理用 Spot（省 ~70–90% 但随时被抢占）。</p>
+<table>
+<thead><tr><th>采购类型</th><th>省多少</th><th>代价 / 适用</th></tr></thead>
+<tbody>
+<tr><td><strong>Reserved / Savings Plan</strong></td><td>~40–60%</td><td>锁定 1–3 年，架构变了会错配；放<em>稳定基线</em></td></tr>
+<tr><td><strong>On-demand</strong></td><td>0（基准价）</td><td>最贵但不被抢；放<em>弹性峰值兜底</em></td></tr>
+<tr><td><strong>Spot</strong></td><td>~70–90%</td><td>随时被回收（~2 min 通知）；只放<em>可中断/可重试</em>负载</td></tr>
+</tbody></table>
+<pre><code># 节点采购决策: 基线买承诺折扣, 弹性用 Spot 兜 On-demand
+if workload.interruptible and spot_available:
+    launch(SPOT)            # 省 70-90%, 收到抢占通知 -> 优雅迁移
+elif load &lt;= committed_baseline:
+    use(RESERVED)           # 基线锁价, 省 40-60%
+else:
+    launch(ON_DEMAND)       # 峰值兜底, 最贵但不被抢
+</code></pre>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>AWS Karpenter</strong>：consolidation 持续把负载重新打包到更便宜的实例（含 Spot-to-Spot）、退掉空节点；Spot 通常较 On-demand 省 60–90%。</li>
+<li><strong>Google Autopilot</strong>：用三闭环控制自动调每任务 CPU/内存，消除「怕 OOM 而超额申请」的浪费。</li>
+<li><strong>Dropbox</strong>：Magic Pocket 把约 90% 数据从 S3 搬回自建机房，按其 2018 年 S-1，两年节省约 <strong>$7460 万</strong>——规模够大时，自建 vs 云的效率账会翻转。</li>
+</ul></div>
+
+<h2>扩展与优化（增长后怎么演进）</h2>
+<ul>
+<li><strong>Reactive → Predictive</strong>：流量有日/周周期就上预测式，把冷启动 lag 提前消化掉。</li>
+<li><strong>提高 Spot 比例</strong>：把无状态/可重试服务迁到 Spot，用<em>多实例类型 + 多 AZ</em> 分散抢占风险，避免单一容量池被抽干。</li>
+<li><strong>成本异常检测</strong>：cost/req 接告警，新版本上线后单位成本跳变要能发现（常因内存泄漏、N+1 查询、忘关的 debug 日志）。</li>
+<li><strong>Scale-to-zero</strong>：低频/内部服务用 KEDA 缩到 0，按事件唤醒。</li>
+<li><strong>Carbon-aware</strong>：可推迟的批处理调度到电网清洁/低价时段（甚至跨区域），同时省钱省碳。</li>
+</ul>
+
+<h2>常见陷阱 + 面试问题</h2>
+<div class="callout"><strong>陷阱 1：把利用率往 100% 推。</strong> 忽略排队论 knee，p99 在 ~80% 后非线性恶化，省下的机器钱会被 SLO 违约赔回去。</div>
+<div class="callout"><strong>陷阱 2：scale-in 太激进。</strong> 缩完立刻来突发，反复 flapping，比不缩还糟；scale-out 快、scale-in 慢是铁律。</div>
+<div class="callout"><strong>陷阱 3：只看总成本不看 unit cost。</strong> 业务涨 2 倍、成本涨 2 倍是健康的；要盯 cost/req 趋势而非绝对值。</div>
+<div class="callout"><strong>陷阱 4：Spot 当 On-demand 用。</strong> 把有状态/不可中断服务放 Spot，大面积回收时丢数据/塌容量。</div>
+<div class="callout"><strong>陷阱 5：tag 不全 / 预留买太满。</strong> 20–30% 成本进 unallocated 桶则归因失效；RI 锁 3 年后架构一变，错配可能比 On-demand 还贵。</div>
+<p><strong>面试可能追问：</strong></p>
+<ol>
+<li>服务平均 CPU 15%，老板要砍一半机器，你怎么判断能砍多少？（headroom、峰值因子、排队论 knee、N+1 冗余）</li>
+<li>Reactive 和 predictive autoscaling 各自什么场景？怎么组合？冷启动 lag 怎么办？</li>
+<li>一张 $200 万账单怎么归因到 500 团队？共享成本（LB、控制面、Spot 折扣）怎么分摊才公平？</li>
+<li>什么负载适合 Spot？被抢占怎么优雅处理？怎么控制抢占风险？</li>
+<li>cost per request 突然涨 20%，怎么定位是哪个服务、什么原因？</li>
+</ol>
+
+<h2>深入资源</h2>
+<ul>
+<li><strong>《Designing Data-Intensive Applications》(Kleppmann)</strong>：第 1 章对负载参数与可扩展性的本质讨论。</li>
+<li><strong>《Autopilot: Workload Autoscaling at Google》(EuroSys 2020)</strong>：垂直自动扩缩与超额申请根因。</li>
+<li><strong>Netflix TechBlog《Scryer: Netflix's Predictive Auto Scaling Engine》</strong>：预测式扩容设计。</li>
+<li><strong>Spotify / Backstage《Cost Insights》</strong>：成本左移与团队级归因实践。</li>
+<li><strong>AWS《Optimizing Kubernetes compute costs with Karpenter consolidation》</strong>：bin-packing 与 Spot。</li>
+<li><strong>FinOps Foundation</strong>：showback/chargeback 与 unit economics 的体系化框架。</li>
+</ul>
+
+<h2>深入思考（点击展开答案）</h2>
+
+<details>
+<summary>1. 把利用率从 70% 推到 90% 省了机器，为什么 p99 反而可能让你赔更多钱？</summary>
+<div class="answer">
+<p>关键在排队论的 <code>1/(1-ρ)</code> 分母。利用率 70% 时排队因子 ∝ 1/0.3 ≈ 3.3；90% 时 ∝ 1/0.1 = 10——<strong>等待时间约翻 3 倍</strong>，而且越靠近 1 越陡。省下的机器是线性的（少买 ~22% 节点），但 p99 恶化是非线性的，很容易击穿 SLO。账要这么算：省下的实例成本 vs（SLO 违约赔付 + 超时触发的客户端重试放大 + 重试又进一步抬高 ρ 形成正反馈）。headroom 的价值正是「吸收突发、给排队留缓冲」，把它当浪费砍掉，是拿尾延迟的稳定性换账面数字。<strong>结论：利用率目标该由 SLO 下的延迟曲线反推，而不是拍一个「越高越好」。</strong></p>
+</div>
+</details>
+
+<details>
+<summary>2. predictive autoscaling 低估了突发，会怎样？怎么让它「错也安全」？</summary>
+<div class="answer">
+<p>预测式一旦欠配，扩容来不及就是 lag 期内 SLO 直接破——比纯 reactive 更糟，因为你「以为不用扩」而压低了基线。让它 fail-safe 的设计：<strong>① 不对称惩罚</strong>——over-predict 只多花点钱，under-predict 会违约，所以预测要带安全余量、宁可略微高估。<strong>② 分层兜底</strong>——predictive 只用来设容量<em>下界</em>（提前把基线抬上去），reactive 仍挂在上面负责抓住预测没料到的尖峰。<strong>③ 置信区间</strong>——预测输出带不确定度，波动大的时段自动加 headroom。<strong>④ 回退</strong>——预测信号异常（数据缺失、模型漂移）时降级为纯 reactive，绝不让一个坏预测把容量压到地板。本质是把「预测」当优化项、把「reactive + headroom」当安全网。</p>
+</div>
+</details>
+
+<details>
+<summary>3. 利用率极高、Spot 比例极高，看着很省。这套「极致效率」什么时候反咬一口？（呼应 Day 23 可靠性）</summary>
+<div class="answer">
+<p>效率与韧性是对立的。把 headroom 榨干、Spot 拉满，等于<em>系统性地移除了所有缓冲</em>：<strong>① 故障吸收能力归零</strong>——单 AZ 挂掉，剩余节点本就满载，流量一转移立刻雪崩（没有 N+1 接得住）。<strong>② Spot 容量是共享池</strong>，AWS 回收往往按实例类型/AZ 批量发生，你和无数人抢同一池子，大面积回收时容量瞬间塌方。<strong>③ 自动扩缩的 lag 在高利用率下更致命</strong>——本就没冗余，扩容那几分钟无人兜底。所以「极致效率」适合可中断的批处理，绝不适合承载 SLO 的在线主路径。正确姿势是<strong>分层</strong>：核心在线服务留 headroom + On-demand/RI 保底，弹性与离线负载吃 Spot 与高利用率。省钱要省在能承受波动的地方。</p>
+</div>
+</details>
+
+<details>
+<summary>4. cost per request 是好指标，但它什么时候会骗你？</summary>
+<div class="answer">
+<p>它是个比值，分子分母都能被玩坏。<strong>① 分母稀释</strong>——往里灌大量廉价请求（健康检查、轮询、重试），cost/req 账面下降，实际总成本没动甚至上升。<strong>② 请求不同质</strong>——一次搜索和一次静态页成本差百倍，平均值掩盖了「贵请求」，该看 P50/P99 <em>请求成本分布</em>而非单一均值。<strong>③ 固定成本在低流量时主导</strong>——控制面、最小副本数是固定的，流量低谷时 cost/req 飙高，但那不代表低效。<strong>④ 跨服务成本转移</strong>——A 把计算推给 B，A 的 cost/req 好看了，全局没变。<strong>⑤ 该看边际成本</strong>——决策「值不值得多接这波流量」要的是边际成本，不是摊薄后的平均。一句话：cost/req 适合看趋势和告警，但做决策要拆到请求类型、区分固定/边际、警惕分母游戏。</p>
+</div>
+</details>
+
+<details>
+<summary>5. 一个团队为省自己的账单，把任务全塞到 Spot 和夜间批处理。本地最优，对整个平台是好是坏？</summary>
+<div class="answer">
+<p>典型的<strong>公地悲剧 + 二阶效应</strong>。单看这个团队：用 Spot、错峰，账单确实降了，showback 数字漂亮。但放到平台尺度：<strong>① Spot 是共享容量池</strong>，大家都被激励去抢，夜间窗口很快也变成「峰」，抢占率上升、可用容量下降，最后谁都没省到预期。<strong>② 夜间批处理扎堆</strong>会把原本的低谷填平，削峰红利消失，还可能挤占夜间的备份/维护窗口。<strong>③ 激励设计的锅</strong>——如果分摊 key 让 Spot 折扣只归使用者、却不反映「抢占给别人造成的外部性」，就会鼓励过度集中。解法是把<em>全局视角</em>放进归因与调度：错峰给差异化价格信号（越拥挤的时段越贵）、平台层做跨团队的 Spot 多样化与 workload 时间打散，让局部最优与全局最优对齐。这正是成本归因里「分摊 key 怎么选」会塑造行为的体现。</p>
+</div>
+</details>
+
+</div></body></html>
