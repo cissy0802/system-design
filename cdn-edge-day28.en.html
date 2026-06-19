@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 28 · CDN & Edge — System Design Bi-daily</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"SF Pro Display","Noto Sans SC",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
+.container{max-width:820px;margin:0 auto;padding:24px 20px 60px}
+header{padding:40px 0 28px;border-bottom:1px solid rgba(100,200,255,0.15);margin-bottom:32px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem}
+.tag{padding:3px 10px;border-radius:4px;background:rgba(100,200,255,0.12);color:#64c8ff;border:1px solid rgba(100,200,255,0.25)}
+.tag.diff{background:rgba(94,234,212,0.1);color:#5eead4;border-color:rgba(94,234,212,0.3)}
+.tag.day{background:rgba(255,180,80,0.1);color:#ffb450;border-color:rgba(255,180,80,0.25)}
+h1{font-size:1.75rem;font-weight:800;background:linear-gradient(135deg,#64c8ff 0%,#5eead4 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:0.5px;line-height:1.3}
+h1 .en{display:block;font-size:1rem;color:#7a8590;-webkit-text-fill-color:#7a8590;margin-top:6px;font-weight:500}
+h2{font-size:1.2rem;color:#5eead4;margin:36px 0 14px;padding-left:12px;border-left:3px solid #5eead4}
+h3{font-size:1rem;color:#64c8ff;margin:20px 0 10px;font-weight:600}
+p{margin:10px 0;color:#c8cfd6}
+ul,ol{margin:10px 0 10px 22px;color:#c8cfd6}
+li{margin:6px 0}
+strong{color:#e8eef5;font-weight:600}
+em{color:#5eead4;font-style:normal;font-weight:500}
+code{font-family:"SF Mono",Menlo,Consolas,monospace;background:rgba(100,200,255,0.1);color:#5eead4;padding:1px 6px;border-radius:3px;font-size:0.88em}
+pre{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:14px 16px;overflow-x:auto;margin:12px 0;font-family:"SF Mono",Menlo,Consolas,monospace;font-size:0.84rem;line-height:1.55;color:#c8cfd6}
+pre code{background:none;color:inherit;padding:0;font-size:1em}
+.mermaid{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:18px;margin:14px 0;text-align:center;overflow-x:auto;cursor:zoom-in;transition:border-color 0.15s}
+.mermaid:hover{border-color:rgba(100,200,255,0.4)}
+.mermaid svg{width:100%;max-width:100%;height:auto;min-height:280px}
+.lightbox{position:fixed;inset:0;background:rgba(8,12,18,0.96);z-index:9999;display:none;align-items:center;justify-content:center;padding:24px;cursor:grab;backdrop-filter:blur(4px);overflow:hidden}
+.lightbox.open{display:flex}
+.lightbox.dragging{cursor:grabbing}
+.lightbox svg{width:auto;height:auto;max-width:96vw;max-height:92vh;transform-origin:center center;will-change:transform}
+.lightbox .hint{position:fixed;top:16px;right:20px;font-size:0.78rem;color:#7a8590;font-family:"SF Mono",Menlo,monospace;pointer-events:none}
+.callout{background:rgba(255,180,80,0.06);border-left:3px solid #ffb450;padding:12px 14px;margin:14px 0;border-radius:4px;font-size:0.94rem}
+.callout strong{color:#ffb450}
+.tradeoff{background:rgba(100,200,255,0.05);border:1px solid rgba(100,200,255,0.2);border-radius:6px;padding:12px 14px;margin:12px 0;font-size:0.94rem}
+.case{background:rgba(94,234,212,0.05);border-left:3px solid #5eead4;padding:12px 14px;margin:12px 0;border-radius:4px;font-size:0.94rem}
+.case strong{color:#5eead4}
+.nav{margin-top:50px;padding-top:24px;border-top:1px solid rgba(100,200,255,0.15);text-align:center}
+.nav a{color:#64c8ff;text-decoration:none;font-size:0.92rem;padding:8px 16px;border:1px solid rgba(100,200,255,0.3);border-radius:4px;transition:all 0.15s}
+.nav a:hover{background:rgba(100,200,255,0.1)}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:0.9rem}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid rgba(100,200,255,0.15)}
+th{color:#64c8ff;font-weight:600;background:rgba(100,200,255,0.05)}
+details{background:rgba(100,200,255,0.04);border:1px solid rgba(100,200,255,0.18);border-radius:6px;padding:12px 16px;margin:10px 0;transition:all 0.15s}
+details:hover{border-color:rgba(100,200,255,0.35)}
+details[open]{background:rgba(94,234,212,0.05);border-color:rgba(94,234,212,0.3)}
+details summary{font-weight:600;color:#e8eef5;list-style:none;outline:none;cursor:pointer;display:flex;align-items:flex-start;gap:10px;font-size:0.96rem}
+details summary::-webkit-details-marker{display:none}
+details summary::before{content:'▶';color:#64c8ff;font-size:0.75em;transition:transform 0.2s;flex-shrink:0;margin-top:5px}
+details[open] summary::before{transform:rotate(90deg);color:#5eead4}
+details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
+details .answer ul,details .answer ol{margin:6px 0 6px 22px}
+@media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+</style>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({startOnLoad:true,theme:'base',flowchart:{useMaxWidth:true,htmlLabels:true,nodeSpacing:50,rankSpacing:60},themeVariables:{primaryColor:'#1a2530',primaryTextColor:'#e8eef5',primaryBorderColor:'#64c8ff',lineColor:'#5eead4',secondaryColor:'#0e1419',tertiaryColor:'#0a0f14',background:'#0a0f14',mainBkg:'#1a2530',secondBkg:'#0e1419',textColor:'#d4dae0',fontFamily:'-apple-system,"SF Pro Display",sans-serif',fontSize:'16px'}});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const lb=document.createElement('div');lb.className='lightbox';
+  lb.innerHTML='<span class="hint">scroll = zoom · drag = pan · Esc / click bg = close</span>';
+  document.body.appendChild(lb);
+  let scale=1,panX=0,panY=0,dragging=false,moved=false,lx=0,ly=0;
+  const apply=()=>{const s=lb.querySelector('svg');if(s)s.style.transform=`translate(${panX}px,${panY}px) scale(${scale})`};
+  const reset=()=>{scale=1;panX=0;panY=0};
+  const close=()=>{lb.classList.remove('open');const s=lb.querySelector('svg');if(s)s.remove();reset()};
+  document.addEventListener('click',e=>{
+    if(e.target.closest('.lightbox')){if(moved){moved=false;return}close();return}
+    const w=e.target.closest('.mermaid');if(!w)return;
+    const svg=w.querySelector('svg');if(!svg)return;
+    const c=svg.cloneNode(true);c.removeAttribute('style');
+    c.style.maxWidth='96vw';c.style.maxHeight='92vh';
+    lb.appendChild(c);lb.classList.add('open');reset();apply();
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+  lb.addEventListener('wheel',e=>{
+    if(!lb.classList.contains('open'))return;
+    e.preventDefault();
+    const svg=lb.querySelector('svg');if(!svg)return;
+    const ns=Math.max(0.3,Math.min(10,scale*(1-e.deltaY*0.002)));
+    const r=svg.getBoundingClientRect();
+    const cx=e.clientX-(r.left+r.width/2),cy=e.clientY-(r.top+r.height/2);
+    const k=ns/scale-1;panX-=cx*k;panY-=cy*k;scale=ns;apply();
+  },{passive:false});
+  lb.addEventListener('mousedown',e=>{
+    if(!lb.classList.contains('open'))return;
+    dragging=true;moved=false;lx=e.clientX;ly=e.clientY;lb.classList.add('dragging');e.preventDefault();
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    const dx=e.clientX-lx,dy=e.clientY-ly;
+    if(Math.abs(dx)+Math.abs(dy)>3)moved=true;
+    panX+=dx;panY+=dy;lx=e.clientX;ly=e.clientY;apply();
+  });
+  document.addEventListener('mouseup',()=>{dragging=false;lb.classList.remove('dragging')});
+});
+</script>
+</head><body><div class="container">
+
+<header>
+<div class="meta">
+<span class="tag day">Day 28</span>
+<span class="tag diff">Hard</span>
+<span class="tag">CDN / Edge</span>
+<span class="tag">Anycast</span>
+<span class="tag">Tiered Cache</span>
+<span class="tag">Edge Compute</span>
+</div>
+<h1>CDN & Edge — Pushing Compute and Cache Within 50km of the User<span class="en">Anycast, Tiered Cache, Edge Invalidation, Edge Compute</span></h1>
+</header>
+
+<h2>Scenario + Requirements</h2>
+<p>You're designing the <strong>CDN + Edge layer</strong> for a global e-commerce / media site: <em>50M DAU</em> across five continents. The content is a mix of <strong>static assets (images/JS/video segments, strongly cacheable) + semi-dynamic pages (product pages, stale-tolerant for seconds) + dynamic APIs (cart, uncacheable)</strong>.</p>
+<ul>
+<li><strong>Latency SLO</strong>: static assets p95 &lt; 50ms (must hit the edge); dynamic APIs do TLS termination + routing at the edge, then ride an optimized backbone to origin.</li>
+<li><strong>Peak traffic</strong>: <em>2M RPS</em> globally during promotions, ~90% cacheable — meaning origin should see only ~200K RPS. The cache layer must absorb an order of magnitude.</li>
+<li><strong>DDoS resilience</strong>: the edge must soak up Tbps-scale attack traffic, and a single PoP going down must not take the whole site offline.</li>
+<li><strong>Invalidation latency</strong>: after a price change, global edge caches must reflect the new price within <em>seconds</em> (a wrong price = real money lost).</li>
+</ul>
+<p>The core tension: <strong>the closer you push content to the user, the higher the hit ratio and lower the latency — but the harder invalidation becomes and the weaker consistency gets</strong>. CDN design is finding the balance on this axis.</p>
+
+<h2>High-Level Architecture</h2>
+<pre class="mermaid">
+graph LR
+    U["Global users<br/><i>same Anycast IP</i>"]
+    subgraph PoP["Nearest PoP (lower tier)"]
+      EDGE["Edge node<br/>TLS term · WAF · Edge Worker"]
+      L1["Edge cache L1"]
+    end
+    UPPER["Regional upper-tier cache<br/><i>upper tier</i>"]
+    SHIELD["Origin Shield<br/><i>single fetch funnel</i>"]
+    ORG[("Origin<br/>app + object store")]
+
+    U -->|BGP picks nearest| EDGE --> L1
+    L1 -.miss.-> UPPER
+    UPPER -.miss.-> SHIELD
+    SHIELD -.miss.-> ORG
+
+    classDef client fill:#1a2530,stroke:#64c8ff,color:#e8eef5
+    classDef edge fill:#0e2030,stroke:#5eead4,color:#e8eef5
+    classDef cache fill:#1a1a30,stroke:#ffb450,color:#e8eef5
+    classDef origin fill:#2a1530,stroke:#ff7ab6,color:#e8eef5
+    class U client
+    class EDGE,L1 edge
+    class UPPER,SHIELD cache
+    class ORG origin
+</pre>
+<p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">Anycast steers users to the nearest PoP; tiering funnels misses toward origin — rightward nodes are fewer and hits more expensive</p>
+<p><strong>Component roles</strong>: the <em>edge node</em> catches traffic via Anycast, does the TLS handshake, WAF filtering, and runs Edge Workers; the <em>edge cache</em> returns directly on a hit (the vast majority of requests); on a miss it asks the <em>regional upper-tier cache</em>, then the <em>Origin Shield</em> (one designated PoP dedicated to fetching, collapsing misses from thousands of edges into a few origin requests), and only then hits origin. This "lower → upper → shield → origin" funnel is the key to hit ratio and origin protection.</p>
+
+<h2>Key Techniques</h2>
+
+<h3>1. Anycast + BGP: One IP, Nearest Ingress Worldwide</h3>
+<p>Core trade-off: <em>use the routing layer for load balancing — you get zero-config failover, but give up precise control over which node a user lands on.</em></p>
+<p><strong>Principle</strong>: the same IP prefix is <strong>announced via BGP simultaneously</strong> from hundreds of PoPs worldwide. A user's packets are routed by internet routers to the "network-nearest" PoP (per BGP metrics like AS hop count) — usually also the lowest-latency one. This gives three free wins: <strong>nearest ingress</strong> (no GeoDNS guessing), <strong>DDoS dilution</strong> (attack traffic is spread across all PoPs, so per-PoP capacity = whole-network capacity), and <strong>automatic failover</strong> (when a PoP dies it withdraws its route announcement and BGP converges traffic to the next-nearest PoP within seconds — no DNS change, no TTL wait).</p>
+<div class="tradeoff">
+<strong>Trade-off (three nearest-ingress approaches):</strong>
+<ul>
+<li><strong>Anycast</strong>: ✅ fast failover, DDoS-resilient, transparent to clients; ❌ routing is decided by carriers, you can't control exact assignment; BGP re-routing can <em>move a long-lived connection (TCP/WebSocket) mid-flight to a different PoP and break it</em> (short/stateless requests are fine).</li>
+<li><strong>GeoDNS (DNS returns different IPs by geography)</strong>: ✅ fine-grained control; ❌ subject to DNS caching / resolver location (wrong geo when a user is on 8.8.8.8), failover dragged by TTL (minutes).</li>
+<li><strong>Unicast + GSLB</strong>: ✅ most controllable; ❌ heavy ops, poor scalability.</li>
+</ul></div>
+<div class="case">
+<strong>Real-world cases:</strong>
+<ul>
+<li><strong>Cloudflare</strong>: almost entirely Anycast, one IP announced from all PoPs; it has even evolved to "<a href="https://blog.cloudflare.com/cloudflare-servers-dont-own-ips-anymore/">servers no longer own IPs</a>", with the Anycast edge as the unified ingress.</li>
+<li><strong>Google Public DNS / major authoritative DNS</strong>: 8.8.8.8 is Anycast, responding from the nearest location worldwide.</li>
+<li><strong>Major CDNs (Cloudflare/Fastly)</strong>: use Anycast so any PoP can absorb DDoS, turning "single-point defense" into "whole-network defense".</li>
+</ul></div>
+
+<h3>2. Edge Cache Key + Tiered Cache</h3>
+<p>Core trade-off: <em>more edge nodes dilute the hit ratio; tiering funnels misses and protects origin, at the cost of an extra hop.</em></p>
+<p><strong>Principle</strong>: a CDN indexes objects by <strong>cache key</strong> (default: host + path + part of the query). But when hundreds of PoPs cache independently, each must fetch from origin on its first request — the <strong>hit ratio gets "diluted"</strong> and origin still gets hit by misses amplified hundreds-fold. <strong>Tiered Cache</strong> splits PoPs into lower tier (near users) and upper tier (a few large nodes): a lower-tier miss asks the upper tier first, and only an upper-tier miss is allowed to fetch from origin. So origin sees requests from a <em>few upper-tier nodes</em>, not all edges. Combined with <strong>request coalescing</strong> (concurrent misses for the same key within a node collapse into one fetch, the rest waiting on the result), this crushes the thundering herd.</p>
+<div class="tradeoff">
+<strong>Trade-off:</strong>
+<ul>
+<li><strong>Flat cache (each PoP fetches origin)</strong>: ✅ shortest path, simplest; ❌ origin amplified by edge count, low hit ratio for long-tail content.</li>
+<li><strong>Tiered Cache</strong>: ✅ origin requests collapse by an order of magnitude, long-tail hit ratio improves; ❌ an extra "lower→upper" RTT on a lower-tier miss, needs good topology selection (which upper tier).</li>
+<li><strong>Cache key design</strong>: too fine (all query/cookies) → hit ratio collapses; too coarse (ignoring key params) → wrong content returned. Must <em>normalize explicitly</em> (sort query, strip tracking params, Vary as needed).</li>
+</ul></div>
+<pre><code># Pseudo-code: edge node handles a request (with coalescing)
+def handle(req):
+    key = cache_key(req.host, req.path, normalize(req.query))
+    obj = cache.get(key)
+    if obj and not obj.expired():
+        return obj                        # hit — the vast majority go here
+    # miss: only one fetch per key, the rest wait (single-flight)
+    with coalesce(key):
+        obj = cache.get(key)              # double-check: someone may have just filled it
+        if obj and not obj.expired():
+            return obj
+        obj = fetch_from_upper_or_origin(key)   # tiered: ask upper tier first
+        cache.set(key, obj, ttl=obj.cache_control_ttl())
+        return obj</code></pre>
+<div class="case">
+<strong>Real-world cases:</strong>
+<ul>
+<li><strong>Cloudflare Tiered Cache / Argo</strong>: splits data centers into tiers where <a href="https://blog.cloudflare.com/argo/">only the upper tier fetches origin</a>, and <a href="https://blog.cloudflare.com/tiered-cache-smart-topology/">Smart Topology</a> auto-picks the nearest upper tier per origin using latency data.</li>
+<li><strong>Netflix Open Connect</strong>: embeds cache appliances (OCAs) <em>directly inside ISP facilities</em>, pre-filling popular content off-peak so playback hits almost entirely within the ISP's network.</li>
+<li><strong>Fastly</strong>: known for "instant global purge + high hit ratio", well suited to frequently changing semi-dynamic content.</li>
+</ul></div>
+
+<h3>3. Edge Invalidation: Purge Propagation + Stale Fallback</h3>
+<p>Core trade-off: <em>active purge gives strong consistency but has propagation delay and amplification; TTL is simple but is either too stale or hammers origin.</em></p>
+<p><strong>Principle</strong>: an edge cache has hundreds of replicas, so "invalidate globally at once" is essentially a <strong>distributed broadcast</strong> problem. Three mechanisms: <strong>① TTL expiry</strong> (passive, simplest, but short TTL = more fetches, long TTL = staler data); <strong>② explicit purge</strong> (by URL / by tag / purge everything — actively pushes invalidation to all PoPs, seconds-fast but with propagation delay; purge-everything empties the cache instantly → origin gets hammered); <strong>③ stale-while-revalidate / soft purge</strong> (marked stale but still serves the old value first, refreshing asynchronously in the background) — trading "brief staleness" for "users never wait on a fetch, origin never avalanches". In production it's usually a combo of <em>long TTL + tag-based purge + SWR</em>: tags for precise invalidation, TTL as backstop, SWR for experience.</p>
+<div class="tradeoff">
+<strong>Trade-off:</strong>
+<ul>
+<li><strong>Pure short TTL</strong>: ✅ no purge infrastructure needed; ❌ origin continuously re-fetched, and still an "up to one TTL" window of inconsistency.</li>
+<li><strong>Purge by tag</strong>: ✅ invalidate a related group at once (e.g. all pages for a product); ❌ requires maintaining object→tag mapping, propagation is not instant.</li>
+<li><strong>SWR / soft purge</strong>: ✅ users always get a fast response, origin refreshes smoothly; ❌ users may briefly see stale values — be careful with prices (bypass SWR for sensitive fields).</li>
+</ul></div>
+<div class="case">
+<strong>Real-world cases:</strong>
+<ul>
+<li><strong>Fastly</strong>: known for millisecond-level <em>instant purge</em> and surrogate-key (tag) invalidation; e-commerce often uses its key-based bulk invalidation.</li>
+<li><strong>Cloudflare</strong>: supports purge by URL / tag / everything, and treats <code>stale-while-revalidate</code> as a standard directive to smooth origin spikes.</li>
+</ul></div>
+
+<h3>4. Edge Compute: Running Code at the PoP</h3>
+<p>Core trade-off: <em>isolates have near-zero startup and high density but per-request limits; containers/VMs are more capable but cold-start slowly and pack less densely.</em></p>
+<p><strong>Principle</strong>: pushing auth, A/B routing, personalization, and API aggregation from origin down to the edge saves a full origin round-trip. But "running user code at hundreds of PoPs" demands <strong>extreme density and ultra-low cold start</strong>. Two routes: <strong>V8 isolate</strong> (Cloudflare Workers) — thousands of lightweight sandboxes in a single process, with <em>near-zero cold start</em> and tiny memory overhead, but hard per-request CPU/memory caps and no arbitrary native binaries; <strong>container / micro-VM</strong> (Lambda@Edge etc.) — close to a full runtime, but cold start in the hundreds of milliseconds and low per-node density. The other hard part at the edge is <strong>state</strong>: the edge is inherently shared-nothing, so strongly consistent data must either go back to origin or use dedicated edge storage (KV is eventually consistent; Durable Objects serialize at a single point).</p>
+<div class="tradeoff">
+<strong>Trade-off:</strong>
+<table>
+<thead><tr><th>Option</th><th>Cold start</th><th>Density/cost</th><th>Limits</th></tr></thead>
+<tbody>
+<tr><td><strong>V8 Isolate</strong> (Workers)</td><td>~0 (no process boot)</td><td>very high</td><td>JS/WASM, hard CPU/mem caps</td></tr>
+<tr><td><strong>Container/micro-VM</strong> (Lambda@Edge)</td><td>hundreds of ms</td><td>low</td><td>full power but costly, fewer PoPs</td></tr>
+<tr><td><strong>Pure CDN rules</strong> (no code)</td><td>—</td><td>highest</td><td>only declarative rewrite/routing</td></tr>
+</tbody></table>
+</div>
+<div class="case">
+<strong>Real-world cases:</strong>
+<ul>
+<li><strong>Cloudflare Workers</strong>: uses V8 isolates instead of containers to achieve <a href="https://blog.cloudflare.com/cloud-computing-without-containers/">near-zero cold start</a> while running user code at the edge at scale; KV / Durable Objects provide edge state.</li>
+<li><strong>AWS Lambda@Edge / CloudFront Functions</strong>: the former runs full Lambda (heavy logic), the latter runs lightweight JS (header rewrites and other high-frequency, low-latency cases).</li>
+<li><strong>Fastly Compute</strong>: uses a WebAssembly sandbox, emphasizing secure isolation and fast instantiation.</li>
+</ul></div>
+
+<h2>Scaling & Optimization</h2>
+<ul>
+<li><strong>Dynamic content acceleration</strong>: even uncacheable APIs benefit from a CDN — after the edge terminates TLS, traffic rides the CDN's optimized backbone (persistent connections + private routes) to origin, more stable and faster than a direct public-internet hop (the Argo Smart Routing idea).</li>
+<li><strong>Origin Shield</strong>: as traffic grows, designate one funnel PoP per origin to shave origin RPS by another order of magnitude and smooth origin scaling pressure.</li>
+<li><strong>Multi-CDN</strong>: use GSLB/RUM data to steer between multiple CDNs by performance and availability, so a single CDN outage (see the Fastly incident below) doesn't take the whole site down.</li>
+<li><strong>Edge observability</strong>: instrument hit ratio, origin RPS, per-PoP p95, and purge propagation latency; a dropping hit ratio is the leading indicator of an impending origin avalanche.</li>
+</ul>
+
+<h2>Pitfalls + Interview Follow-ups</h2>
+<ul>
+<li><strong>"CDN = static asset caching only"</strong>: wrong. Modern CDNs also do TLS termination, DDoS scrubbing, edge compute, and dynamic acceleration; you should distinguish "cache" from "edge platform".</li>
+<li><strong>Including cookies/tracking params in the cache key</strong>: the hit ratio drops to zero instantly and origin gets hammered — a classic production incident. Normalize explicitly and control <code>Vary</code>.</li>
+<li><strong>Using purge-everything as a routine tool</strong>: emptying the whole network at once = origin instantly absorbs all misses = cache avalanche. Prefer tag/URL-level purge with SWR as backstop.</li>
+<li><strong>Ignoring that the edge is a "global blast radius"</strong>: one line of CDN config/rule pushes to the whole world at once. <em>Cloudflare 2019-07-02</em>: a WAF regex triggered <strong>catastrophic backtracking</strong>, pegging CPU to 100% and taking the network down for ~27 minutes with traffic down ~82% (<a href="https://blog.cloudflare.com/cloudflare-outage/">official post-mortem</a>); <em>Fastly 2021-06-08</em>: a dormant software bug triggered by one customer's config knocked out ~85% of the network for nearly an hour (<a href="https://www.fastly.com/blog/summary-of-june-8-outage">official summary</a>). The interview answer: config needs staged rollout and a kill switch too.</li>
+<li><strong>Anycast and long-lived connections</strong>: the follow-up "why can't some cases use pure Anycast" — BGP re-routing can move a TCP/WebSocket mid-flight to another PoP and break it, needing session affinity or edge forwarding.</li>
+</ul>
+
+<h2>Further Reading</h2>
+<ul>
+<li><strong>Cloudflare 2019-07-02 outage post-mortem</strong> — how a regex backtrack took down the network; a cautionary tale for staged config rollout: <a href="https://blog.cloudflare.com/cloudflare-outage/">blog.cloudflare.com/cloudflare-outage</a></li>
+<li><strong>Fastly 2021-06-08 outage summary</strong> — a dormant bug triggered by a customer config causing a global outage: <a href="https://www.fastly.com/blog/summary-of-june-8-outage">fastly.com/blog/summary-of-june-8-outage</a></li>
+<li><strong>Cloudflare: servers no longer own IPs</strong> — the engineering evolution of Anycast edge ingress: <a href="https://blog.cloudflare.com/cloudflare-servers-dont-own-ips-anymore/">blog.cloudflare.com</a></li>
+<li><strong>Cloudflare Tiered Cache Smart Topology</strong> — how tiering picks the upper tier and funnels origin fetches: <a href="https://blog.cloudflare.com/tiered-cache-smart-topology/">blog.cloudflare.com/tiered-cache-smart-topology</a></li>
+<li><strong>Cloudflare: cloud computing without containers (Workers/isolate)</strong> — why V8 isolates achieve near-zero cold start: <a href="https://blog.cloudflare.com/cloud-computing-without-containers/">blog.cloudflare.com</a></li>
+</ul>
+
+<h2>Going Deeper</h2>
+
+<details>
+<summary>1. Hit ratio is 90% and origin takes 200K RPS. If hit ratio drops to 80%, how much does origin pressure grow? Why is this a "leading" alert?</summary>
+<div class="answer">
+<p>Origin takes the <em>miss</em> traffic = total RPS × (1 − hit ratio). At 2M RPS: 90% hit → 200K misses; 80% hit → <strong>400K misses</strong>, <em>doubled</em>. Every 10-point drop in hit ratio raises origin load by far more than 10% in relative terms — it's non-linear: from 99% to 98%, misses double outright (1% → 2%).</p>
+<p>So hit ratio is a <strong>leading indicator</strong> of an origin avalanche: by the time origin CPU alarms fire, the cache layer has often been failing for a while. Common causes: cache key accidentally including params, mass purges, a new release changing Cache-Control, or hot content's TTLs all expiring together (add TTL jitter). Alert on the hit ratio itself, not just origin.</p>
+</div>
+</details>
+
+<details>
+<summary>2. A price change must be "globally consistent within seconds", but CDN purge has propagation delay. How do you design so users never see a wrong price?</summary>
+<div class="answer">
+<p>Key insight: <strong>don't bake the volatile price into strongly cacheable HTML</strong>. Separation strategy:</p>
+<ul>
+<li><strong>Separate skeleton from price</strong>: the product page skeleton (images, description) is strongly cached with long TTL; the price comes from a separate uncacheable API (or very short TTL) fetched live by edge/frontend. Then a price change needs no page purge.</li>
+<li><strong>Versioned URLs</strong>: if the price must be embedded, put a version/hash in the URL (<code>/p/123?v=789</code>); a price change swaps the URL — the old URL's cache naturally invalidates, no purge propagation wait.</li>
+<li><strong>Disable SWR for the price field</strong>: better to let this one request go to origin and wait tens of ms than to return a stale price.</li>
+</ul>
+<p>The essence: replace "cache everything then scramble to invalidate fast" with "cache what's cacheable, fetch what's volatile live". Purge always has a window; eliminating the dependency architecturally is what's robust.</p>
+</div>
+</details>
+
+<details>
+<summary>3. Why does Anycast "naturally resist DDoS" while a single data center can't? How do the capacity models differ?</summary>
+<div class="answer">
+<p>A single data center's attack-resistance capacity = the bandwidth/scrubbing of <em>that one</em> data center. An attacker just has to exceed it to overwhelm you — forcing you to provision for the "single-point peak", which is extremely expensive.</p>
+<p>With Anycast, the same IP is announced from hundreds of PoPs worldwide, and attack traffic is <strong>automatically dispersed by source geography via BGP</strong> across PoPs: attacks from Europe land on European PoPs, those from Asia on Asian PoPs. So <strong>effective attack-resistance capacity ≈ whole-network total</strong>, not a single point. To take you down, an attacker must overwhelm every PoP worldwide simultaneously. Add per-PoP scrubbing, and a single failure only loses one region (traffic shifts after BGP withdraws the route). This is why major CDNs make "Anycast + many PoPs" the foundation of DDoS defense.</p>
+<p>The cost: you lose precise control over where traffic lands, and you need the operational ability to run global BGP and a vast PoP fleet — which is exactly why CDNs exist as a dedicated business.</p>
+</div>
+</details>
+
+<details>
+<summary>4. Edge Workers use V8 isolates rather than containers. Looking at "cold start" and "multi-tenant security" together, what does this choice sacrifice?</summary>
+<div class="answer">
+<p>An isolate runs thousands of V8 sandboxes <em>within a single process</em>, eliminating the process and kernel isolation overhead of containers/VMs — so cold start is near-zero, per-machine density is very high, and cost is low. The costs:</p>
+<ul>
+<li><strong>Weaker isolation (same process)</strong>: containers rely on kernel namespaces/cgroups, micro-VMs on hardware virtualization; isolates rely only on V8's language-level isolation within one process, so a V8 sandbox-escape bug has a larger blast radius. It needs Spectre-class side-channel mitigations, re-grouping at the process level, etc.</li>
+<li><strong>Limited capabilities</strong>: only JS/WASM, no arbitrary native binaries, no local threads/filesystem, hard per-request CPU/memory caps — heavy compute / long tasks don't fit.</li>
+<li><strong>No persistent local state</strong>: isolates can be reclaimed anytime, so state must be externalized (KV eventually consistent / Durable Object single-point serialization).</li>
+</ul>
+<p>So the choice is "<em>massive lightweight short requests</em> → isolate; <em>heavy logic / full runtime needed</em> → container/micro-VM". Cloudflare bets that the vast majority of edge cases are the former.</p>
+</div>
+</details>
+
+<details>
+<summary>5. One CDN config pushes globally at once — both an advantage and a "global blast radius". How do you make edge deploys as safe as backend ones?</summary>
+<div class="answer">
+<p>Both Cloudflare 2019 and Fastly 2021 were "one change took effect globally and instantly" network-wide incidents. Govern the edge as your <em>highest-risk deploy surface</em>:</p>
+<ul>
+<li><strong>Stage config too</strong>: roll out rules/Workers/cache config by PoP or percentage (1% PoPs first → monitor → ramp), not all at once. Cloudflare's post-mortem added exactly this.</li>
+<li><strong>Kill switch / fast rollback</strong>: every edge feature has a global toggle, killable in one click, with a rollback path that doesn't depend on the failing component.</li>
+<li><strong>Resource-exhaustion guards</strong>: cap CPU/memory/regex-backtracking per rule/Worker so a single piece of logic can't drag down a node (2019 was exactly a regex pegging CPU).</li>
+<li><strong>Pre-deploy static checks</strong>: run performance/security checks on regexes and configs before release to block "catastrophic backtracking" pre-deploy.</li>
+<li><strong>Multi-CDN backstop</strong>: be able to steer away when a single CDN fails, avoiding a vendor-level single point.</li>
+</ul>
+<p>In a sentence: the edge's convenience comes from "global instant effect", and its safety comes from <strong>wrapping that global effect in staging, quotas, and switches</strong>.</p>
+</div>
+</details>
+
+<div class="nav"><a href="index.en.html">← Back to index</a></div>
+</div>
+</body></html>

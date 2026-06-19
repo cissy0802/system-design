@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 28 · CDN 与 Edge — System Design Bi-daily</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"SF Pro Display","Noto Sans SC",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
+.container{max-width:820px;margin:0 auto;padding:24px 20px 60px}
+header{padding:40px 0 28px;border-bottom:1px solid rgba(100,200,255,0.15);margin-bottom:32px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem}
+.tag{padding:3px 10px;border-radius:4px;background:rgba(100,200,255,0.12);color:#64c8ff;border:1px solid rgba(100,200,255,0.25)}
+.tag.diff{background:rgba(94,234,212,0.1);color:#5eead4;border-color:rgba(94,234,212,0.3)}
+.tag.day{background:rgba(255,180,80,0.1);color:#ffb450;border-color:rgba(255,180,80,0.25)}
+h1{font-size:1.75rem;font-weight:800;background:linear-gradient(135deg,#64c8ff 0%,#5eead4 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:0.5px;line-height:1.3}
+h1 .en{display:block;font-size:1rem;color:#7a8590;-webkit-text-fill-color:#7a8590;margin-top:6px;font-weight:500}
+h2{font-size:1.2rem;color:#5eead4;margin:36px 0 14px;padding-left:12px;border-left:3px solid #5eead4}
+h3{font-size:1rem;color:#64c8ff;margin:20px 0 10px;font-weight:600}
+p{margin:10px 0;color:#c8cfd6}
+ul,ol{margin:10px 0 10px 22px;color:#c8cfd6}
+li{margin:6px 0}
+strong{color:#e8eef5;font-weight:600}
+em{color:#5eead4;font-style:normal;font-weight:500}
+code{font-family:"SF Mono",Menlo,Consolas,monospace;background:rgba(100,200,255,0.1);color:#5eead4;padding:1px 6px;border-radius:3px;font-size:0.88em}
+pre{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:14px 16px;overflow-x:auto;margin:12px 0;font-family:"SF Mono",Menlo,Consolas,monospace;font-size:0.84rem;line-height:1.55;color:#c8cfd6}
+pre code{background:none;color:inherit;padding:0;font-size:1em}
+.mermaid{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:18px;margin:14px 0;text-align:center;overflow-x:auto;cursor:zoom-in;transition:border-color 0.15s}
+.mermaid:hover{border-color:rgba(100,200,255,0.4)}
+.mermaid svg{width:100%;max-width:100%;height:auto;min-height:280px}
+.lightbox{position:fixed;inset:0;background:rgba(8,12,18,0.96);z-index:9999;display:none;align-items:center;justify-content:center;padding:24px;cursor:grab;backdrop-filter:blur(4px);overflow:hidden}
+.lightbox.open{display:flex}
+.lightbox.dragging{cursor:grabbing}
+.lightbox svg{width:auto;height:auto;max-width:96vw;max-height:92vh;transform-origin:center center;will-change:transform}
+.lightbox .hint{position:fixed;top:16px;right:20px;font-size:0.78rem;color:#7a8590;font-family:"SF Mono",Menlo,monospace;pointer-events:none}
+.callout{background:rgba(255,180,80,0.06);border-left:3px solid #ffb450;padding:12px 14px;margin:14px 0;border-radius:4px;font-size:0.94rem}
+.callout strong{color:#ffb450}
+.tradeoff{background:rgba(100,200,255,0.05);border:1px solid rgba(100,200,255,0.2);border-radius:6px;padding:12px 14px;margin:12px 0;font-size:0.94rem}
+.case{background:rgba(94,234,212,0.05);border-left:3px solid #5eead4;padding:12px 14px;margin:12px 0;border-radius:4px;font-size:0.94rem}
+.case strong{color:#5eead4}
+.nav{margin-top:50px;padding-top:24px;border-top:1px solid rgba(100,200,255,0.15);text-align:center}
+.nav a{color:#64c8ff;text-decoration:none;font-size:0.92rem;padding:8px 16px;border:1px solid rgba(100,200,255,0.3);border-radius:4px;transition:all 0.15s}
+.nav a:hover{background:rgba(100,200,255,0.1)}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:0.9rem}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid rgba(100,200,255,0.15)}
+th{color:#64c8ff;font-weight:600;background:rgba(100,200,255,0.05)}
+details{background:rgba(100,200,255,0.04);border:1px solid rgba(100,200,255,0.18);border-radius:6px;padding:12px 16px;margin:10px 0;transition:all 0.15s}
+details:hover{border-color:rgba(100,200,255,0.35)}
+details[open]{background:rgba(94,234,212,0.05);border-color:rgba(94,234,212,0.3)}
+details summary{font-weight:600;color:#e8eef5;list-style:none;outline:none;cursor:pointer;display:flex;align-items:flex-start;gap:10px;font-size:0.96rem}
+details summary::-webkit-details-marker{display:none}
+details summary::before{content:'▶';color:#64c8ff;font-size:0.75em;transition:transform 0.2s;flex-shrink:0;margin-top:5px}
+details[open] summary::before{transform:rotate(90deg);color:#5eead4}
+details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
+details .answer ul,details .answer ol{margin:6px 0 6px 22px}
+@media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+</style>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({startOnLoad:true,theme:'base',flowchart:{useMaxWidth:true,htmlLabels:true,nodeSpacing:50,rankSpacing:60},themeVariables:{primaryColor:'#1a2530',primaryTextColor:'#e8eef5',primaryBorderColor:'#64c8ff',lineColor:'#5eead4',secondaryColor:'#0e1419',tertiaryColor:'#0a0f14',background:'#0a0f14',mainBkg:'#1a2530',secondBkg:'#0e1419',textColor:'#d4dae0',fontFamily:'-apple-system,"SF Pro Display",sans-serif',fontSize:'16px'}});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const lb=document.createElement('div');lb.className='lightbox';
+  lb.innerHTML='<span class="hint">scroll = zoom · drag = pan · Esc / click bg = close</span>';
+  document.body.appendChild(lb);
+  let scale=1,panX=0,panY=0,dragging=false,moved=false,lx=0,ly=0;
+  const apply=()=>{const s=lb.querySelector('svg');if(s)s.style.transform=`translate(${panX}px,${panY}px) scale(${scale})`};
+  const reset=()=>{scale=1;panX=0;panY=0};
+  const close=()=>{lb.classList.remove('open');const s=lb.querySelector('svg');if(s)s.remove();reset()};
+  document.addEventListener('click',e=>{
+    if(e.target.closest('.lightbox')){if(moved){moved=false;return}close();return}
+    const w=e.target.closest('.mermaid');if(!w)return;
+    const svg=w.querySelector('svg');if(!svg)return;
+    const c=svg.cloneNode(true);c.removeAttribute('style');
+    c.style.maxWidth='96vw';c.style.maxHeight='92vh';
+    lb.appendChild(c);lb.classList.add('open');reset();apply();
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+  lb.addEventListener('wheel',e=>{
+    if(!lb.classList.contains('open'))return;
+    e.preventDefault();
+    const svg=lb.querySelector('svg');if(!svg)return;
+    const ns=Math.max(0.3,Math.min(10,scale*(1-e.deltaY*0.002)));
+    const r=svg.getBoundingClientRect();
+    const cx=e.clientX-(r.left+r.width/2),cy=e.clientY-(r.top+r.height/2);
+    const k=ns/scale-1;panX-=cx*k;panY-=cy*k;scale=ns;apply();
+  },{passive:false});
+  lb.addEventListener('mousedown',e=>{
+    if(!lb.classList.contains('open'))return;
+    dragging=true;moved=false;lx=e.clientX;ly=e.clientY;lb.classList.add('dragging');e.preventDefault();
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    const dx=e.clientX-lx,dy=e.clientY-ly;
+    if(Math.abs(dx)+Math.abs(dy)>3)moved=true;
+    panX+=dx;panY+=dy;lx=e.clientX;ly=e.clientY;apply();
+  });
+  document.addEventListener('mouseup',()=>{dragging=false;lb.classList.remove('dragging')});
+});
+</script>
+</head><body><div class="container">
+
+<header>
+<div class="meta">
+<span class="tag day">Day 28</span>
+<span class="tag diff">Hard</span>
+<span class="tag">CDN / Edge</span>
+<span class="tag">Anycast</span>
+<span class="tag">Tiered Cache</span>
+<span class="tag">Edge Compute</span>
+</div>
+<h1>CDN 与 Edge — 把计算和缓存推到离用户 50 公里处<span class="en">CDN & Edge: Anycast, Tiered Cache, Edge Invalidation, Edge Compute</span></h1>
+</header>
+
+<h2>问题场景 + 需求约束</h2>
+<p>你要为一个全球性的电商 / 媒体站设计 <strong>CDN + Edge 层</strong>：<em>5000 万 DAU</em>、分布在五大洲，内容是<strong>静态资产（图片/JS/视频分片，可强缓存）+ 半动态页面（商品页，秒级可 stale）+ 动态 API（购物车，不可缓存）</strong>混合。</p>
+<ul>
+<li><strong>延迟 SLO</strong>：静态资产 p95 &lt; 50ms（必须命中边缘）；动态 API 边缘只做 TLS 终止 + 路由，回源走优化骨干网。</li>
+<li><strong>峰值流量</strong>：促销时全球瞬时 <em>200 万 RPS</em>，其中 ~90% 可缓存——这意味着 origin 只该看到 ~20 万 RPS，缓存层必须扛掉一个数量级。</li>
+<li><strong>抗 DDoS</strong>：边缘要能吸收 Tbps 级攻击流量，不能让一个 PoP 被打垮就全站不可用。</li>
+<li><strong>失效时效</strong>：商品调价后，全球边缘缓存要在 <em>数秒内</em> 反映新价格（错误价格 = 真金白银损失）。</li>
+</ul>
+<p>核心矛盾：<strong>把内容推到离用户越近、命中率越高、延迟越低，但失效越难、一致性越弱</strong>。CDN 的设计就是在这条轴上找平衡。</p>
+
+<h2>高层架构</h2>
+<pre class="mermaid">
+graph LR
+    U["全球用户<br/><i>同一个 Anycast IP</i>"]
+    subgraph PoP["最近 PoP (lower tier)"]
+      EDGE["边缘节点<br/>TLS 终止 · WAF · Edge Worker"]
+      L1["边缘缓存 L1"]
+    end
+    UPPER["区域上层缓存<br/><i>upper tier</i>"]
+    SHIELD["Origin Shield<br/><i>单点回源收敛</i>"]
+    ORG[("Origin<br/>app + 对象存储")]
+
+    U -->|BGP 选最近| EDGE --> L1
+    L1 -.miss.-> UPPER
+    UPPER -.miss.-> SHIELD
+    SHIELD -.miss.-> ORG
+
+    classDef client fill:#1a2530,stroke:#64c8ff,color:#e8eef5
+    classDef edge fill:#0e2030,stroke:#5eead4,color:#e8eef5
+    classDef cache fill:#1a1a30,stroke:#ffb450,color:#e8eef5
+    classDef origin fill:#2a1530,stroke:#ff7ab6,color:#e8eef5
+    class U client
+    class EDGE,L1 edge
+    class UPPER,SHIELD cache
+    class ORG origin
+</pre>
+<p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">Anycast 把用户引到最近 PoP；缓存分层收敛回源，越往右节点越少、命中越贵</p>
+<p><strong>组件职责</strong>：<em>边缘节点</em>用 Anycast 接住流量，做 TLS 握手、WAF 过滤、运行 Edge Worker；<em>边缘缓存</em>命中则直接返回（占绝大多数请求）；未命中向<em>区域上层缓存</em>请求，再不行才到 <em>Origin Shield</em>（一个指定 PoP 专门回源，把成千上万边缘的 miss 收敛成对 origin 的少量请求），最后才打 origin。这条「下层 → 上层 → shield → origin」的漏斗是命中率与 origin 保护的关键。</p>
+
+<h2>关键技术点</h2>
+
+<h3>1. Anycast + BGP：一个 IP，全球就近接入</h3>
+<p>核心 trade-off：<em>用路由层做负载均衡，换来零配置故障转移，但牺牲了对「用户落哪个节点」的精确控制。</em></p>
+<p><strong>原理</strong>：同一段 IP 前缀从全球几百个 PoP 用 <strong>BGP 同时宣告</strong>。用户的数据包由互联网路由器按 BGP 度量（AS 跳数等）送到「网络上最近」的 PoP——通常也是延迟最低的。这带来三个白送的好处：<strong>就近接入</strong>（无需 GeoDNS 猜测）、<strong>DDoS 稀释</strong>（攻击流量被分摊到所有 PoP，单点容量 = 全网容量）、<strong>自动 failover</strong>（PoP 宕机时撤回路由宣告，BGP 在秒级把流量收敛到次近 PoP，无需改 DNS、不等 TTL 过期）。</p>
+<div class="tradeoff">
+<strong>Trade-off（三种就近方案）：</strong>
+<ul>
+<li><strong>Anycast</strong>：✅ 故障转移快、抗 DDoS、客户端无感；❌ 路由由运营商决定，你控制不了精确归属；BGP 重路由可能让<em>长连接（TCP/WebSocket）中途换 PoP 而断连</em>（短连接/无状态请求无碍）。</li>
+<li><strong>GeoDNS（DNS 按地理返回不同 IP）</strong>：✅ 可精细控制；❌ 受 DNS 缓存/解析器位置影响（用户用 8.8.8.8 时定位错），failover 受 TTL 拖累（分钟级）。</li>
+<li><strong>Unicast + GSLB</strong>：✅ 最可控；❌ 运维重，扩展性差。</li>
+</ul></div>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Cloudflare</strong>：全网几乎全用 Anycast，单个 IP 在所有 PoP 宣告；并演进到「<a href="https://blog.cloudflare.com/cloudflare-servers-dont-own-ips-anymore/">服务器不再拥有固定 IP</a>」，由 Anycast 边缘统一接入再内部寻址。</li>
+<li><strong>Google Public DNS / 主流权威 DNS</strong>：8.8.8.8 即 Anycast，全球就近响应。</li>
+<li><strong>主流 CDN（Cloudflare/Fastly）</strong>：用 Anycast 让任意 PoP 都能吸收 DDoS，把「单点抗攻击」变成「全网抗攻击」。</li>
+</ul></div>
+
+<h3>2. 边缘缓存键 + 分层缓存（Tiered Cache）</h3>
+<p>核心 trade-off：<em>边缘节点越多命中率越分散，分层把 miss 收敛回源、保护 origin，代价是多一跳延迟。</em></p>
+<p><strong>原理</strong>：CDN 用 <strong>cache key</strong>（默认 host + path + 部分 query）索引对象。但全球几百个 PoP 各自独立缓存时，每个 PoP 第一次都要回源——<strong>命中率被「摊薄」</strong>，origin 仍会被几百倍放大的 miss 打到。<strong>Tiered Cache</strong> 把 PoP 分成下层（近用户）和上层（少数大节点）：下层 miss 先问上层，只有上层 miss 才允许回源。这样 origin 看到的是<em>少数上层节点</em>的请求，而非全部边缘。配合 <strong>request coalescing</strong>（同一 key 的并发 miss 在节点内合并成一次回源，其余请求挂起等结果），可彻底压住 thundering herd。</p>
+<div class="tradeoff">
+<strong>Trade-off：</strong>
+<ul>
+<li><strong>扁平缓存（每 PoP 独立回源）</strong>：✅ 路径最短、实现简单；❌ origin 被边缘数量放大，长尾内容命中率低。</li>
+<li><strong>Tiered Cache</strong>：✅ origin 请求收敛一个数量级、长尾命中率提升；❌ 下层 miss 时多一次「下层→上层」RTT，需要好的拓扑选择（选哪个上层）。</li>
+<li><strong>cache key 设计</strong>：key 太细（带所有 query/cookie）→ 命中率崩；太粗（忽略关键参数）→ 返回错内容。要<em>显式归一化</em>（排序 query、剔除追踪参数、按需 Vary）。</li>
+</ul></div>
+<pre><code># 伪代码：边缘节点处理请求（含 coalescing）
+def handle(req):
+    key = cache_key(req.host, req.path, normalize(req.query))
+    obj = cache.get(key)
+    if obj and not obj.expired():
+        return obj                        # 命中，绝大多数走这里
+    # miss：同 key 只放一个回源，其余等待（single-flight）
+    with coalesce(key):
+        obj = cache.get(key)              # 双检：可能别人刚填好
+        if obj and not obj.expired():
+            return obj
+        obj = fetch_from_upper_or_origin(key)   # tiered：先问上层
+        cache.set(key, obj, ttl=obj.cache_control_ttl())
+        return obj</code></pre>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Cloudflare Tiered Cache / Argo</strong>：把数据中心分上下层，<a href="https://blog.cloudflare.com/argo/">只有上层可回源</a>，<a href="https://blog.cloudflare.com/tiered-cache-smart-topology/">Smart Topology</a> 用延迟数据自动为每个 origin 选最近上层。</li>
+<li><strong>Netflix Open Connect</strong>：把缓存设备（OCA）直接<em>嵌入 ISP 机房</em>，热门内容在非高峰预填充，播放时几乎全在 ISP 内网命中。</li>
+<li><strong>Fastly</strong>：以「即时全网 purge + 高命中」著称，适合频繁变化的半动态内容。</li>
+</ul></div>
+
+<h3>3. 边缘缓存失效：purge 的传播与 stale 兜底</h3>
+<p>核心 trade-off：<em>主动 purge 一致性强但传播有延迟、有放大；TTL 简单但要么太旧要么打爆 origin。</em></p>
+<p><strong>原理</strong>：边缘缓存有几百个副本，「让全球同时失效」本质是一个<strong>分布式广播</strong>问题。三种手段：<strong>① TTL 过期</strong>（被动，最简单，但 TTL 短=回源多、TTL 长=数据旧）；<strong>② 显式 purge</strong>（按 URL / 按 tag / purge everything，主动推送失效消息到所有 PoP，秒级但有传播延迟，purge everything 会瞬间清空缓存→origin 被打爆）；<strong>③ stale-while-revalidate / soft purge</strong>（标记为陈旧但仍先返回旧值，后台异步回源刷新）——用「短暂 stale」换「永不让用户等回源、永不雪崩 origin」。生产里通常是 <em>长 TTL + tag-based purge + SWR</em> 的组合：正常靠 tag 精确失效，兜底靠 TTL，体验靠 SWR。</p>
+<div class="tradeoff">
+<strong>Trade-off：</strong>
+<ul>
+<li><strong>纯短 TTL</strong>：✅ 无需 purge 基础设施；❌ origin 持续被回源、且仍有「最多一个 TTL」的窗口期不一致。</li>
+<li><strong>Purge by tag</strong>：✅ 一次失效一组相关对象（如某商品所有页面）；❌ 需维护对象→tag 映射，传播非瞬时。</li>
+<li><strong>SWR / soft purge</strong>：✅ 用户永远拿到快速响应，origin 平滑刷新；❌ 用户可能短暂看到旧值——对价格类要谨慎（可对敏感字段绕过 SWR）。</li>
+</ul></div>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Fastly</strong>：以毫秒级 <em>instant purge</em> 和 surrogate-key（tag）失效著称，电商常用其按 key 批量失效。</li>
+<li><strong>Cloudflare</strong>：支持 purge by URL / tag / everything；并把 <code>stale-while-revalidate</code> 作为标准缓存指令降低回源毛刺。</li>
+</ul></div>
+
+<h3>4. Edge Compute：在 PoP 上跑代码</h3>
+<p>核心 trade-off：<em>isolate 启动近零、密度高但每请求受限；container/VM 能力强但冷启动慢、密度低。</em></p>
+<p><strong>原理</strong>：把鉴权、A/B 分流、个性化、API 聚合等逻辑从 origin 下沉到边缘，省一整趟回源 RTT。但「在几百个 PoP 跑用户代码」要求<strong>极高的密度和极低的冷启动</strong>。两条路线：<strong>V8 isolate</strong>（Cloudflare Workers）——单进程内跑成千上万个轻量沙箱，<em>冷启动近乎为零</em>、内存开销极小，但单请求 CPU/内存有硬上限、不能跑任意原生二进制；<strong>容器 / 微 VM</strong>（Lambda@Edge 等）——能力接近完整运行时，但冷启动以百毫秒计、单节点密度低。Edge 的另一难点是<strong>状态</strong>：边缘天然无共享状态，强一致数据要么回源、要么用专门的边缘存储（KV 最终一致、Durable Object 单点串行化）。</p>
+<div class="tradeoff">
+<strong>Trade-off：</strong>
+<table>
+<thead><tr><th>方案</th><th>冷启动</th><th>密度/成本</th><th>限制</th></tr></thead>
+<tbody>
+<tr><td><strong>V8 Isolate</strong>（Workers）</td><td>~0（无进程启动）</td><td>极高</td><td>JS/WASM、CPU/内存硬上限</td></tr>
+<tr><td><strong>容器/微 VM</strong>（Lambda@Edge）</td><td>百毫秒级</td><td>低</td><td>能力全但贵、PoP 覆盖少</td></tr>
+<tr><td><strong>纯 CDN 规则</strong>（无代码）</td><td>—</td><td>最高</td><td>只能做声明式重写/路由</td></tr>
+</tbody></table>
+</div>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Cloudflare Workers</strong>：用 V8 isolate 而非容器，<a href="https://blog.cloudflare.com/cloud-computing-without-containers/">靠近零冷启动</a>在边缘大规模跑用户代码；KV / Durable Objects 提供边缘状态。</li>
+<li><strong>AWS Lambda@Edge / CloudFront Functions</strong>：前者跑完整 Lambda（重逻辑），后者跑轻量 JS（header 改写等高频低延迟场景）。</li>
+<li><strong>Fastly Compute</strong>：用 WebAssembly 沙箱，主打安全隔离与快速实例化。</li>
+</ul></div>
+
+<h2>扩展与优化</h2>
+<ul>
+<li><strong>动态内容加速</strong>：不可缓存的 API 也能受益于 CDN——边缘做 TLS 终止后，走 CDN 优化骨干网（持久连接 + 私有路由）回源，比公网直连更稳更快（如 Argo Smart Routing 思路）。</li>
+<li><strong>Origin Shield</strong>：流量增长后为每个 origin 指定一个收敛 PoP，把回源 RPS 再压一个数量级，并平滑 origin 扩容压力。</li>
+<li><strong>多 CDN（Multi-CDN）</strong>：用 GSLB/RUM 数据在多家 CDN 间按性能与可用性切流，避免单一 CDN 故障（见下方 Fastly 事故）拖垮全站。</li>
+<li><strong>边缘可观测性</strong>：命中率、回源 RPS、各 PoP p95、purge 传播时延都要打点；命中率掉 = origin 即将雪崩的先行指标。</li>
+</ul>
+
+<h2>常见陷阱 + 面试追问</h2>
+<ul>
+<li><strong>「CDN = 只缓存静态资源」</strong>：错。现代 CDN 还做 TLS 终止、DDoS 清洗、边缘计算、动态加速；面试要能区分「缓存」与「边缘平台」。</li>
+<li><strong>cache key 把 cookie/追踪参数算进去</strong>：命中率瞬间归零，origin 被打爆——经典生产事故。要显式归一化与 <code>Vary</code> 控制。</li>
+<li><strong>用 purge everything 当常规手段</strong>：一次清空全网 = origin 瞬时承接全部 miss = 缓存雪崩。应优先 tag/URL 级 + SWR 兜底。</li>
+<li><strong>忽视边缘是「全局爆炸半径」</strong>：CDN 的一行配置/一条规则会同时推到全球。<em>Cloudflare 2019-07-02</em> 一条 WAF 正则触发<strong>灾难性回溯</strong>，CPU 打满，全网约 27 分钟、流量掉约 82%（<a href="https://blog.cloudflare.com/cloudflare-outage/">官方复盘</a>）；<em>Fastly 2021-06-08</em> 一个潜伏的软件缺陷被某客户配置触发，约 85% 网络中断近 1 小时（<a href="https://www.fastly.com/blog/summary-of-june-8-outage">官方总结</a>）。面试要答出：配置也要灰度发布、要有 kill switch。</li>
+<li><strong>Anycast 与长连接</strong>：追问「为什么有些场景不能纯 Anycast」——BGP 重路由会让 TCP/WebSocket 中途换 PoP 断连，需会话亲和或边缘转发。</li>
+</ul>
+
+<h2>深入资源</h2>
+<ul>
+<li><strong>Cloudflare 2019-07-02 outage 复盘</strong> — 正则回溯如何打垮全网，配置灰度的反面教材：<a href="https://blog.cloudflare.com/cloudflare-outage/">blog.cloudflare.com/cloudflare-outage</a></li>
+<li><strong>Fastly 2021-06-08 outage 总结</strong> — 潜伏缺陷被客户配置触发的全球中断：<a href="https://www.fastly.com/blog/summary-of-june-8-outage">fastly.com/blog/summary-of-june-8-outage</a></li>
+<li><strong>Cloudflare：服务器不再拥有 IP</strong> — Anycast 边缘接入的工程演进：<a href="https://blog.cloudflare.com/cloudflare-servers-dont-own-ips-anymore/">blog.cloudflare.com</a></li>
+<li><strong>Cloudflare Tiered Cache Smart Topology</strong> — 分层缓存如何选上层、收敛回源：<a href="https://blog.cloudflare.com/tiered-cache-smart-topology/">blog.cloudflare.com/tiered-cache-smart-topology</a></li>
+<li><strong>Cloudflare：无容器的云计算（Workers/isolate）</strong> — V8 isolate 为何能近零冷启动：<a href="https://blog.cloudflare.com/cloud-computing-without-containers/">blog.cloudflare.com</a></li>
+</ul>
+
+<h2>深入思考</h2>
+
+<details>
+<summary>1. 全网命中率 90%，origin 扛 20 万 RPS。如果命中率掉到 80%，origin 压力涨多少？为什么这是「先行告警」指标？</summary>
+<div class="answer">
+<p>origin 承接的是 <em>miss</em> 流量 = 总 RPS × (1 − 命中率)。200 万 RPS 下：命中率 90% → miss 20 万；命中率 80% → miss <strong>40 万</strong>，<em>翻倍</em>。命中率每掉 10 个百分点，origin 压力的相对增幅远大于 10%——这是非线性的：从 99% 掉到 98%，miss 直接翻倍（1% → 2%）。</p>
+<p>所以命中率是 origin 雪崩的<strong>先行指标</strong>：等到 origin CPU 报警时，缓存层往往已经失守一阵。常见诱因：cache key 误带参数、大规模 purge、新版本改了 Cache-Control、热点内容 TTL 集体过期（要加 TTL jitter）。监控应对命中率本身设阈值告警，而非只看 origin。</p>
+</div>
+</details>
+
+<details>
+<summary>2. 商品调价后要求「全球数秒内一致」，但 CDN purge 有传播延迟。怎么设计让用户绝不看到错误价格？</summary>
+<div class="answer">
+<p>关键认识：<strong>不要把易变的价格塞进可被边缘强缓存的 HTML</strong>。分离策略：</p>
+<ul>
+<li><strong>骨架与价格分离</strong>：商品页骨架（图、描述）长 TTL 强缓存；价格用单独的不可缓存 API（或极短 TTL），由边缘/前端实时拉取。这样调价无需 purge 页面。</li>
+<li><strong>版本化 URL</strong>：若价格必须内嵌，URL 带版本号/hash（<code>/p/123?v=789</code>），调价即换 URL——旧 URL 的缓存自然作废，无需等 purge 传播。</li>
+<li><strong>对价格字段禁用 SWR</strong>：宁可让这一个请求回源等几十毫秒，也不返回 stale 价格。</li>
+</ul>
+<p>本质：用「<em>缓存可缓存的、实时取易变的</em>」替代「缓存一切再想办法快速失效」。purge 永远有窗口，架构上消除依赖才是稳的。</p>
+</div>
+</details>
+
+<details>
+<summary>3. 为什么 Anycast 能「天然抗 DDoS」，而传统单数据中心不能？容量模型差在哪？</summary>
+<div class="answer">
+<p>单数据中心的抗攻击容量 = <em>那一个</em> 数据中心的带宽/清洗能力。攻击者只要打出超过它的流量就能压垮——你被迫按「单点峰值」堆容量，极其昂贵。</p>
+<p>Anycast 下，同一 IP 在全球几百个 PoP 宣告，攻击流量<strong>按源头地理被 BGP 自动分散</strong>到各 PoP：来自欧洲的攻击落欧洲 PoP，来自亚洲的落亚洲 PoP。于是<strong>有效抗攻击容量 ≈ 全网总容量</strong>，而非单点。攻击者要打垮你，得同时压垮全球所有 PoP。再叠加每 PoP 的清洗能力，单点故障也只丢一个区域（BGP 撤回路由后流量转移）。这就是为什么主流 CDN 把「Anycast + 大量 PoP」当作 DDoS 防护的地基。</p>
+<p>代价：你失去对流量落点的精确控制，且需要全球 BGP 与海量 PoP 的运营能力——这正是 CDN 作为「专门生意」存在的原因。</p>
+</div>
+</details>
+
+<details>
+<summary>4. Edge Worker 用 V8 isolate 而非容器。把「冷启动」和「多租户安全」放一起看，这个选择牺牲了什么？</summary>
+<div class="answer">
+<p>isolate 在<em>单进程内</em>跑成千上万个 V8 沙箱，省掉了容器/VM 的进程与内核隔离开销——所以冷启动近零、单机密度极高、成本低。代价：</p>
+<ul>
+<li><strong>隔离强度更弱（同进程）</strong>：容器靠内核 namespace/cgroup、微 VM 靠硬件虚拟化隔离；isolate 同进程内只靠 V8 语言级隔离，一旦 V8 出沙箱逃逸漏洞，爆炸半径更大。需要靠 Spectre 类侧信道缓解、进程级再分组等补强。</li>
+<li><strong>能力受限</strong>：只能跑 JS/WASM，不能任意原生二进制、不能开本地线程/文件系统，单请求 CPU/内存有硬上限——重计算/长任务不适合。</li>
+<li><strong>无持久本地状态</strong>：isolate 随时被回收，状态要外置（KV 最终一致 / Durable Object 串行化单点）。</li>
+</ul>
+<p>所以选型是「<em>海量轻量短请求</em> 选 isolate；<em>重逻辑/需完整运行时</em> 选容器/微 VM」。Cloudflare 赌的是边缘场景绝大多数属于前者。</p>
+</div>
+</details>
+
+<details>
+<summary>5. CDN 的一条配置能同时推全球——这既是优势也是「全局爆炸半径」。如何让边缘发布像后端一样安全？</summary>
+<div class="answer">
+<p>Cloudflare 2019、Fastly 2021 都是「一个改动瞬时全球生效」造成的全网级事故。把边缘当成<em>最高风险的发布面</em>来治理：</p>
+<ul>
+<li><strong>配置也要灰度</strong>：规则/Worker/缓存配置按 PoP 或百分比分批推（先 1% PoP→ 监控 → 放量），而不是一把推全球。Cloudflare 复盘后正是加了这一条。</li>
+<li><strong>kill switch / 快速回滚</strong>：每个边缘特性带全局开关，出事一键关，且回滚路径不依赖正在出事的组件。</li>
+<li><strong>资源耗尽防护</strong>：给规则/Worker 设 CPU/内存/正则回溯上限，单条逻辑不能拖垮整节点(2019 正是正则 CPU 打满)。</li>
+<li><strong>变更前静态校验</strong>：上线前对正则、配置做性能/安全检查，把「灾难性回溯」挡在部署前。</li>
+<li><strong>Multi-CDN 兜底</strong>：单一 CDN 故障时能切走，避免供应商级单点。</li>
+</ul>
+<p>一句话：边缘的便利来自「全局即时生效」，而安全来自<strong>给这个全局生效加上灰度、限额和开关</strong>。</p>
+</div>
+</details>
+
+<div class="nav"><a href="index.html">← 回到 index</a></div>
+</div>
+</body></html>
