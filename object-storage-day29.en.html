@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 29 · File & Object Storage — System Design Bi-daily</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"SF Pro Display","Noto Sans SC",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
+.container{max-width:820px;margin:0 auto;padding:24px 20px 60px}
+header{padding:40px 0 28px;border-bottom:1px solid rgba(100,200,255,0.15);margin-bottom:32px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem}
+.tag{padding:3px 10px;border-radius:4px;background:rgba(100,200,255,0.12);color:#64c8ff;border:1px solid rgba(100,200,255,0.25)}
+.tag.diff{background:rgba(94,234,212,0.1);color:#5eead4;border-color:rgba(94,234,212,0.3)}
+.tag.day{background:rgba(255,180,80,0.1);color:#ffb450;border-color:rgba(255,180,80,0.25)}
+h1{font-size:1.75rem;font-weight:800;background:linear-gradient(135deg,#64c8ff 0%,#5eead4 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:0.5px;line-height:1.3}
+h1 .en{display:block;font-size:1rem;color:#7a8590;-webkit-text-fill-color:#7a8590;margin-top:6px;font-weight:500}
+h2{font-size:1.2rem;color:#5eead4;margin:36px 0 14px;padding-left:12px;border-left:3px solid #5eead4}
+h3{font-size:1rem;color:#64c8ff;margin:20px 0 10px;font-weight:600}
+p{margin:10px 0;color:#c8cfd6}
+ul,ol{margin:10px 0 10px 22px;color:#c8cfd6}
+li{margin:6px 0}
+strong{color:#e8eef5;font-weight:600}
+em{color:#5eead4;font-style:normal;font-weight:500}
+code{font-family:"SF Mono",Menlo,Consolas,monospace;background:rgba(100,200,255,0.1);color:#5eead4;padding:1px 6px;border-radius:3px;font-size:0.88em}
+pre{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:14px 16px;overflow-x:auto;margin:12px 0;font-family:"SF Mono",Menlo,Consolas,monospace;font-size:0.84rem;line-height:1.55;color:#c8cfd6}
+pre code{background:none;color:inherit;padding:0;font-size:1em}
+.mermaid{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:18px;margin:14px 0;text-align:center;overflow-x:auto;cursor:zoom-in;transition:border-color 0.15s}
+.mermaid:hover{border-color:rgba(100,200,255,0.4)}
+.mermaid svg{width:100%;max-width:100%;height:auto;min-height:280px}
+.lightbox{position:fixed;inset:0;background:rgba(8,12,18,0.96);z-index:9999;display:none;align-items:center;justify-content:center;padding:24px;cursor:grab;backdrop-filter:blur(4px);overflow:hidden}
+.lightbox.open{display:flex}
+.lightbox.dragging{cursor:grabbing}
+.lightbox svg{width:auto;height:auto;max-width:96vw;max-height:92vh;transform-origin:center center;will-change:transform}
+.lightbox .hint{position:fixed;top:16px;right:20px;font-size:0.78rem;color:#7a8590;font-family:"SF Mono",Menlo,monospace;pointer-events:none}
+.callout{background:rgba(255,180,80,0.06);border-left:3px solid #ffb450;padding:12px 14px;margin:14px 0;border-radius:4px;font-size:0.94rem}
+.callout strong{color:#ffb450}
+.tradeoff{background:rgba(100,200,255,0.05);border:1px solid rgba(100,200,255,0.2);border-radius:6px;padding:12px 14px;margin:12px 0;font-size:0.94rem}
+.case{background:rgba(94,234,212,0.05);border-left:3px solid #5eead4;padding:12px 14px;margin:12px 0;border-radius:4px;font-size:0.94rem}
+.case strong{color:#5eead4}
+.nav{margin-top:50px;padding-top:24px;border-top:1px solid rgba(100,200,255,0.15);text-align:center}
+.nav a{color:#64c8ff;text-decoration:none;font-size:0.92rem;padding:8px 16px;border:1px solid rgba(100,200,255,0.3);border-radius:4px;transition:all 0.15s}
+.nav a:hover{background:rgba(100,200,255,0.1)}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:0.9rem}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid rgba(100,200,255,0.15)}
+th{color:#64c8ff;font-weight:600;background:rgba(100,200,255,0.05)}
+details{background:rgba(100,200,255,0.04);border:1px solid rgba(100,200,255,0.18);border-radius:6px;padding:12px 16px;margin:10px 0;transition:all 0.15s}
+details:hover{border-color:rgba(100,200,255,0.35)}
+details[open]{background:rgba(94,234,212,0.05);border-color:rgba(94,234,212,0.3)}
+details summary{font-weight:600;color:#e8eef5;list-style:none;outline:none;cursor:pointer;display:flex;align-items:flex-start;gap:10px;font-size:0.96rem}
+details summary::-webkit-details-marker{display:none}
+details summary::before{content:'▶';color:#64c8ff;font-size:0.75em;transition:transform 0.2s;flex-shrink:0;margin-top:5px}
+details[open] summary::before{transform:rotate(90deg);color:#5eead4}
+details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
+details .answer ul,details .answer ol{margin:6px 0 6px 22px}
+@media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+</style>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({startOnLoad:true,theme:'base',flowchart:{useMaxWidth:true,htmlLabels:true,nodeSpacing:50,rankSpacing:60},themeVariables:{primaryColor:'#1a2530',primaryTextColor:'#e8eef5',primaryBorderColor:'#64c8ff',lineColor:'#5eead4',secondaryColor:'#0e1419',tertiaryColor:'#0a0f14',background:'#0a0f14',mainBkg:'#1a2530',secondBkg:'#0e1419',textColor:'#d4dae0',fontFamily:'-apple-system,"SF Pro Display",sans-serif',fontSize:'16px'}});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const lb=document.createElement('div');lb.className='lightbox';
+  lb.innerHTML='<span class="hint">scroll = zoom · drag = pan · Esc / click bg = close</span>';
+  document.body.appendChild(lb);
+  let scale=1,panX=0,panY=0,dragging=false,moved=false,lx=0,ly=0;
+  const apply=()=>{const s=lb.querySelector('svg');if(s)s.style.transform=`translate(${panX}px,${panY}px) scale(${scale})`};
+  const reset=()=>{scale=1;panX=0;panY=0};
+  const close=()=>{lb.classList.remove('open');const s=lb.querySelector('svg');if(s)s.remove();reset()};
+  document.addEventListener('click',e=>{
+    if(e.target.closest('.lightbox')){if(moved){moved=false;return}close();return}
+    const w=e.target.closest('.mermaid');if(!w)return;
+    const svg=w.querySelector('svg');if(!svg)return;
+    const c=svg.cloneNode(true);c.removeAttribute('style');
+    c.style.maxWidth='96vw';c.style.maxHeight='92vh';
+    lb.appendChild(c);lb.classList.add('open');reset();apply();
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+  lb.addEventListener('wheel',e=>{
+    if(!lb.classList.contains('open'))return;
+    e.preventDefault();
+    const svg=lb.querySelector('svg');if(!svg)return;
+    const ns=Math.max(0.3,Math.min(10,scale*(1-e.deltaY*0.002)));
+    const r=svg.getBoundingClientRect();
+    const cx=e.clientX-(r.left+r.width/2),cy=e.clientY-(r.top+r.height/2);
+    const k=ns/scale-1;panX-=cx*k;panY-=cy*k;scale=ns;apply();
+  },{passive:false});
+  lb.addEventListener('mousedown',e=>{
+    if(!lb.classList.contains('open'))return;
+    dragging=true;moved=false;lx=e.clientX;ly=e.clientY;lb.classList.add('dragging');e.preventDefault();
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    const dx=e.clientX-lx,dy=e.clientY-ly;
+    if(Math.abs(dx)+Math.abs(dy)>3)moved=true;
+    panX+=dx;panY+=dy;lx=e.clientX;ly=e.clientY;apply();
+  });
+  document.addEventListener('mouseup',()=>{dragging=false;lb.classList.remove('dragging')});
+});
+</script>
+</head>
+<body><div class="container">
+
+<header>
+<div class="meta">
+<span class="tag day">Day 29</span>
+<span class="tag diff">Hard</span>
+<span class="tag">Object Storage</span>
+<span class="tag">Erasure Coding</span>
+<span class="tag">Multipart Upload</span>
+<span class="tag">Durability</span>
+</div>
+<h1>File & Object Storage — Trading 1.5x Space for Eleven 9s of Durability<span class="en">S3 Architecture, Erasure Coding, Multipart Upload, Durability</span></h1>
+</header>
+
+<h2>Problem & Constraints</h2>
+<p>Design an S3-like object store: serving <strong>hundreds of billions of objects, 100 PB</strong>, objects from 1 byte to 5 TB, with <strong>eleven 9s of durability</strong> (99.999999999% — fewer than 1 lost object per 10 million per year). This is the bedrock under cloud drives, backups, data lakes, and image/video origins — Dropbox, Netflix masters, and your app's avatars all live here.</p>
+<ul>
+<li><strong>Read/write ratio & size distribution</strong>: write-once-read-many, but object size is <em>extremely long-tailed</em> — 99% of objects are small (&lt;1MB), 99% of bytes live in big files. Optimize both ends separately.</li>
+<li><strong>Consistency</strong>: a GET right after a PUT must see it (read-after-write); overwrite and list consistency can be relaxed.</li>
+<li><strong>Durability ≫ availability</strong>: lost data is irreversible; a brief outage is recoverable. Durability is the first-class citizen at eleven 9s; four 9s of availability is fine.</li>
+<li><strong>Throughput</strong>: a single 5 TB object takes an hour even at 10 Gbps — you need <strong>parallel chunking + resumable upload</strong>, not one TCP stream end to end.</li>
+<li><strong>Cost</strong>: 100 PB at 3x replication is 300 PB of raw disk; erasure coding squeezes it to ~130 PB. Cost per PB per month (power, racks) is life or death.</li>
+</ul>
+
+<h2>High-Level Architecture</h2>
+<pre class="mermaid">
+graph TD
+    C["Client<br/><i>SDK / direct PUT via presigned URL</i>"]
+    LB["API layer<br/><i>S3 protocol / Auth / throttle</i>"]
+    subgraph CP["Control Plane"]
+      META["Metadata service<br/><i>key → chunk locations, sharded KV</i>"]
+    end
+    subgraph DP["Data Plane"]
+      PL["Placement / EC encoder"]
+      S1["Storage Node 1"]
+      S2["Storage Node 2"]
+      S3["Storage Node N<br/><i>raw disk + CRC</i>"]
+    end
+    BG["Background jobs<br/><i>scrub · repair · GC · tiering</i>"]
+    C --> LB
+    LB --> META
+    LB --> PL
+    PL --> S1 & S2 & S3
+    META -.index.-> DP
+    BG -.scan/repair.-> DP
+</pre>
+<p><strong>The core is control-plane / data-plane separation</strong>: the metadata service holds the "object key → which disks hold the chunks" index (small, strongly consistent, must scale to hundreds of billions of rows); the data plane just stores immutable byte chunks (large, optimized for throughput and cost). Scaling them independently is what sets object storage apart from a file system — no directory tree, no inode chains; a <strong>flat keyspace</strong> makes horizontal scaling almost unbounded. Background jobs (scrub, repair, GC) are the true source of durability, decoupled from the request path.</p>
+
+<h2>Key Techniques</h2>
+
+<h3>1. Three Storage Models — Why Object Storage Scales Without Limit</h3>
+<p>The trade-off in one line: <em>object storage gives up in-place mutation and directory semantics in exchange for a flat keyspace's unbounded horizontal scale and rock-bottom unit cost</em>.</p>
+<p><strong>Principle</strong>: Block (e.g. EBS/raw disk) gives fixed-size sectors — most flexible but you manage the filesystem yourself; File (e.g. NFS/EFS) gives a POSIX directory tree and in-place rewrites, but <strong>the directory tree is a tree that must be kept consistent</strong>, so metadata becomes the scaling bottleneck. Object (e.g. S3) treats the whole file as an immutable blob keyed by a flat string (the `/` in `a/b/c.jpg` is just a character, not a directory) — <strong>no rename, no append, no inode chain</strong>. Metadata collapses into a giant KV table that can be sharded arbitrarily by key hash.</p>
+<table>
+<tr><th>Dimension</th><th>Block</th><th>File</th><th>Object</th></tr>
+<tr><td>Access unit</td><td>sector/LBA</td><td>path + offset</td><td>whole object (key)</td></tr>
+<tr><td>Mutation</td><td>in-place random write</td><td>in-place random write</td><td>full overwrite (immutable)</td></tr>
+<tr><td>Metadata</td><td>none (raw)</td><td>dir tree/inode</td><td>flat KV</td></tr>
+<tr><td>Scale ceiling</td><td>per-volume limited</td><td>dir-tree bottleneck</td><td>near-unbounded</td></tr>
+<tr><td>Typical</td><td>EBS, local disk</td><td>EFS, NFS, HDFS</td><td>S3, GCS, R2</td></tr>
+</table>
+<div class="case"><strong>Real cases</strong>: AWS S3 stores over <strong>100 trillion objects</strong> (2021 Pi Day figure), powered by a flat keyspace + sharded metadata; POSIX-semantic workloads (e.g. mmap during training) go to FSx/Lustre instead. Dropbox's Magic Pocket likewise chops files into immutable blocks indexed by a KV (key→location), not a directory tree.</div>
+
+<h3>2. The Durability Engine — Replication vs Erasure Coding</h3>
+<p>The trade-off in one line: <em>3 replicas are simple and repair fast but cost 200% space amplification; erasure coding drops to ~30-50% amplification at the cost of encoding CPU, read amplification during repair, and being unfit for small files</em>.</p>
+<p><strong>Principle</strong>: for eleven 9s, a single disk's ~2-4% annual failure rate is nowhere near enough. 3-replication puts one copy in each of 3 AZs — any 2 can fail and you still read; brute-force simple. <strong>Erasure coding (Reed-Solomon)</strong> splits the object into k data shards, computes m parity shards, and spreads all k+m across distinct fault domains; <strong>any k shards reconstruct the object</strong>. Backblaze Vault uses 17+3: 17 data + 3 parity = 20 shards, lose any 3 and lose nothing, with only 20/17≈1.18x amplification — and it too reaches eleven 9s.</p>
+<div class="tradeoff"><strong>Why not use EC everywhere?</strong> ① Small files don't pay: split into 17 and each shard is tiny, so metadata and IOPS overhead eat the savings — hence hot/small objects often use replicas, cold/large objects use EC. ② Repair read amplification: rebuilding one shard reads k others (17 reads vs a replica's single copy), amplifying network during failure storms. ③ CPU: encode/decode burns cycles and raises write latency.</div>
+<pre><code># Reed-Solomon idea (pseudo-code, not runnable)
+# treat data shards as polynomial coefficients;
+# parity = evaluations at extra points
+data   = split(obj, k=17)              # 17 data shards
+parity = rs_encode(data, m=3)          # Vandermonde/Cauchy matrix → 3 parity
+shards = data + parity                 # 20 shards across 20 fault domains
+
+# rebuild after losing <=3 shards: solve a 17-unknown linear system
+def repair(surviving_shards):          # any 17 suffice
+    return rs_decode(surviving_shards) # matrix inverse x survivors
+</code></pre>
+<div class="case"><strong>Real cases</strong>: <strong>Backblaze</strong> open-sourced its own Reed-Solomon library; Vault uses 17+3 across 20 pods. <strong>AWS S3</strong> promises eleven 9s, redundant across ≥3 AZs with continuous CRC scrubbing of every object. <strong>Facebook f4</strong> uses EC for warm BLOBs, cutting old-photo storage amplification from 3.6x (with cross-DC replicas) to ~2.1x. <strong>Dropbox</strong>'s Magic Pocket also uses EC to drive down cross-region redundancy cost.</div>
+
+<h3>3. Large-Object Upload — Multipart + Direct Client Upload</h3>
+<p>The trade-off in one line: <em>parallel chunked upload + presigned-URL direct upload buys high throughput and resumability, at the cost of client complexity and "orphan parts" needing GC</em>.</p>
+<p><strong>Principle</strong>: 5 TB over a single TCP stream restarts from zero on any hiccup, and single-stream throughput is capped by RTT × window. Multipart upload splits the object into parts (S3 mandates 5MB–5GB/part, max 10,000 parts); <strong>each part uploads independently — parallel, retryable, with its own ETag</strong> — and a final CompleteMultipartUpload stitches the part list into the object. Paired with a <strong>presigned URL</strong>: the server signs a time-limited URL with its secret, and the client <strong>PUTs directly to the storage layer</strong>, bytes never touching your app servers — saving bandwidth and a network hop.</p>
+<pre><code># the server only issues signatures, never touches the byte stream
+def init_upload(key, size):
+    upload_id = meta.create_multipart(key)
+    n = ceil(size / PART_SIZE)                 # e.g. 64MB/part
+    urls = [presign("PUT", key, upload_id, i)  # one signed URL per part
+            for i in range(n)]
+    return upload_id, urls
+# client: PUT parts in parallel, retry only the failed part, record {part_i: etag}
+# finish: POST complete(upload_id, [(i, etag)...]) -> atomic metadata commit
+</code></pre>
+<div class="callout"><strong>Pitfall</strong>: a client that bails mid-upload leaves <strong>orphan parts</strong> occupying disk and still billing. S3's fix is <code>lifecycle rule: abort incomplete multipart upload after N days</code> — always configure it, or cost quietly leaks.</div>
+<div class="case"><strong>Real cases</strong>: S3 multipart upload + presigned URLs are the SDK's default large-file path (auto-chunked concurrency &gt;100MB). Netflix uploading masters, Dropbox syncing big files, and virtually every "browser-direct-to-S3" SaaS rely on presigned URLs to offload traffic from their own servers.</div>
+
+<h3>4. Strong Metadata Consistency & Hot Partitions</h3>
+<p>The trade-off in one line: <em>strong consistency makes read-after-write easy, but metadata must be sharded to handle hundreds of billions of keys, and sharding creates hot spots on sequential keys</em>.</p>
+<p><strong>Principle</strong>: metadata is a giant table of "key → shard locations + version + ACL" and must be sharded (by key hash). Before 2020 S3 was eventually consistent (a freshly PUT object might not appear in a list); <strong>in late 2020 S3 shipped strong read-after-write consistency</strong> — once a PUT succeeds, any GET/LIST sees it immediately, at no extra price or performance cost. The price is that the metadata layer must be strongly consistent within a shard (typically a Paxos/Raft-replicated KV). But <strong>sharding by sequential key prefix hits hot spots</strong>: if every key is a `2026-06-20/...` time prefix, writes forever slam the same shard.</p>
+<div class="callout"><strong>Interview favorite</strong>: old S3 guidance suggested adding a <strong>random (hashed) prefix</strong> to spread hot spots; since 2018 S3 auto-partitions adaptively by prefix, each prefix reaching 3,500 PUT / 5,500 GET per second — but <em>you still design key schemas to avoid monotonically increasing prefixes</em>. This is the same "database sharding hot spot" (Day 4) trap, applied to storage metadata.</div>
+<div class="case"><strong>Real cases</strong>: Google Colossus (the GFS successor) moved metadata off a single master onto a BigTable-backed shardable metadata layer, breaking GFS's single-master scaling ceiling. S3's strong-consistency overhaul likewise rebuilt the metadata subsystem into a strongly consistent KV.</div>
+
+<h2>Scaling & Optimization</h2>
+<ul>
+<li><strong>Tiering</strong>: hot data on SSD/replicas, warm on HDD/EC, cold on SMR/tape (S3 Glacier). Auto-demote by access frequency to cut cost by an order of magnitude. Dropbox specifically optimized Magic Pocket for cold storage and adopted SMR drives.</li>
+<li><strong>Versioning + soft delete</strong>: immutable objects are naturally multi-versioned; delete just writes a tombstone, with GC reclaiming later. This is also the basis for <strong>backup and ransomware defense</strong> (versioning + MFA delete + cross-region replication).</li>
+<li><strong>Continuous scrubbing</strong>: background jobs constantly recompute and compare CRCs to catch bit rot and bad disks early, repairing before data becomes unrecoverable. This — more than the request path — is what actually buys eleven 9s.</li>
+<li><strong>Cross-region replication (CRR)</strong>: asynchronously copy objects to another region for DR and data-residency compliance. Note it is <em>eventually consistent</em>; RPO is not zero.</li>
+</ul>
+
+<h2>Pitfalls + Interview Questions</h2>
+<ul>
+<li><strong>Treating object storage as a filesystem</strong>: assuming `ls` on a "directory" is cheap — it's actually a LIST prefix scan, slow and pricey at millions of keys. There's no true rename (it's copy+delete).</li>
+<li><strong>Replicating cold data</strong>: 3 replicas for cold data burns money — use EC; conversely, EC for small files is asking for trouble.</li>
+<li><strong>Forgetting orphan multiparts</strong>: skip the lifecycle abort rule and cost leaks month after month.</li>
+<li><strong>Follow-ups</strong>: ① How is eleven 9s actually computed? (a probability model over fault-domain independence + repair speed vs failure rate) ② How do you upload a 5 TB object? Resume it? ③ What does each of strong vs eventual consistency give up in object storage? ④ How do you handle hot keys — is it the same problem as database sharding? ⑤ When is space actually freed after deleting an object? (GC + tombstone)</li>
+</ul>
+
+<h2>Deep-Dive Resources</h2>
+<ul>
+<li><strong>"Designing Data-Intensive Applications"</strong> (Kleppmann) — the underlying principles of replication, partitioning, and consistency; the metadata layer is exactly these concepts applied.</li>
+<li><strong>Werner Vogels — "Building and operating a pretty big storage system called S3"</strong> (allthingsdistributed.com, 2023) — a first-hand view of S3's durability, scrubbing, and scale.</li>
+<li><strong>Dropbox Engineering — "Inside the Magic Pocket"</strong> (dropbox.tech) — EC, placement, and migration in an exabyte-scale self-built object store.</li>
+<li><strong>Backblaze — "Reed-Solomon Erasure Coding" / "Vault Architecture"</strong> (backblaze.com/blog) — 17+3 EC and an open-source implementation, the durability math made concrete.</li>
+</ul>
+
+<h2>Going Deeper</h2>
+<details><summary>How is eleven 9s of durability actually "computed", and which assumption does it lean on most?</summary><div class="answer">Durability ≈ driving the probability that "all of an object's redundant shards are lost before repair completes" extremely low. Given a disk's annual failure rate (AFR) and <strong>repair time</strong> (MTTR), you build a Markov/binomial model: under k+m coding, you only lose data if ≥ m+1 independent fault domains die within the MTTR window. The two levers are <strong>fault-domain independence</strong> and <strong>repair speed</strong> — faster repair and more independent domains shrink the loss window. The most fragile assumption is <em>failures being independent</em>: same-batch bad disks, same-rack power loss, and same-region disasters are <strong>correlated failures</strong> that instantly break the pretty probability model. That's exactly why you place across AZs/fault domains and scrub continuously (to shrink MTTR).</div></details>
+<details><summary>Why is object storage almost always "immutable" (overwrite, not in-place edit)? What does that limitation buy you?</summary><div class="answer">Immutability makes everything simpler and concurrent-safe: ① caches/CDNs can cache forever because a key's content never changes (a change mints a new version id); ② replication and EC never handle a "half-edited" intermediate state — a write either fully lands or doesn't exist; ③ no in-place writes means no read/write lock contention, so multiple copies are naturally consistent; ④ versioning and snapshots come for free. The cost is "changing one byte rewrites the whole object", so object storage is unfit for frequent small edits (that's block/file or database territory). It's the classic trade-off of <strong>restricted functionality for scalability, consistency, and cost</strong>.</div></details>
+<details><summary>S3 upgraded from eventual to strong read-after-write consistency in 2020 "at no extra price or performance cost" — what did that re-engineer?</summary><div class="answer">Eventual consistency usually stems from "metadata served by caches / async indexing". For strong consistency, the moment a PUT succeeds the authoritative metadata record must already sit where subsequent reads hit — meaning the metadata subsystem itself must be a <strong>strongly consistent sharded KV</strong> (Paxos/Raft-style), with the read path hitting the authoritative shard directly rather than a possibly-stale cache. "No performance cost" means they didn't use the naive "lock on read / read-quorum" route, but pushed consistency down into the per-partition replication protocol so ordinary reads stay single-hop. Essentially they moved the consistency cost from "every request" to a one-time "metadata architecture" investment.</div></details>
+<details><summary>For 100 PB of cold data, pick 3 replicas or 17+3 EC? Do the cost math, then say when replicas actually win.</summary><div class="answer">3 replicas: 100 PB logical → 300 PB raw. 17+3 EC: 20/17≈1.18x → ~118 PB raw. A ~180 PB gap, and at cold-storage rates of thousands of dollars per PB per month, the annual saving is in the <strong>tens of millions</strong> — EC for cold data is a near no-brainer. When do replicas still win? ① <strong>Many small files</strong>: split into 17 and each shard is a few KB, metadata rows explode and random-read IOPS gets hammered, so EC's space savings drown in ops cost. ② <strong>Latency-sensitive and frequently read</strong>: replicas read a single nearby copy; EC normal reads only fetch data shards (no decode), but any missing shard forces pulling k shards to rebuild, worsening tail latency. So reality is tiered: hot/small → replicas, cold/large → EC.</div></details>
+<details><summary>Direct presigned-URL upload bypasses your app servers — what control do you lose, and how do you make up for it?</summary><div class="answer">You lose the <strong>interception point on the request path</strong>: you can't run virus scanning, content moderation, hard quota checks, rewriting/transcoding, or fine-grained billing at the instant of write. Two remedies: ① <strong>Constrain at signing time</strong>: embed conditions in the presigned URL (content-length-range to cap size, content-type to limit type, key prefix to confine path) — the signature itself is an authorization decision. ② <strong>Event-driven post-processing</strong>: upload completion fires an event (S3 Event → Lambda/queue) to asynchronously scan, transcode, index, and reconcile, quarantining/deleting on violation. The essence is replacing "synchronous gatekeeping" with "authorization + asynchronous governance" — the standard shape of serverless media pipelines.</div></details>
+
+<div class="nav"><a href="index.en.html">← Back to index</a></div>
+</div>
+</body></html>
