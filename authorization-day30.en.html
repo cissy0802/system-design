@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 30 · Authorization & Account Systems — System Design Bi-daily</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"SF Pro Display","Noto Sans SC",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
+.container{max-width:820px;margin:0 auto;padding:24px 20px 60px}
+header{padding:40px 0 28px;border-bottom:1px solid rgba(100,200,255,0.15);margin-bottom:32px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem}
+.tag{padding:3px 10px;border-radius:4px;background:rgba(100,200,255,0.12);color:#64c8ff;border:1px solid rgba(100,200,255,0.25)}
+.tag.diff{background:rgba(94,234,212,0.1);color:#5eead4;border-color:rgba(94,234,212,0.3)}
+.tag.day{background:rgba(255,180,80,0.1);color:#ffb450;border-color:rgba(255,180,80,0.25)}
+h1{font-size:1.75rem;font-weight:800;background:linear-gradient(135deg,#64c8ff 0%,#5eead4 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:0.5px;line-height:1.3}
+h1 .en{display:block;font-size:1rem;color:#7a8590;-webkit-text-fill-color:#7a8590;margin-top:6px;font-weight:500}
+h2{font-size:1.2rem;color:#5eead4;margin:36px 0 14px;padding-left:12px;border-left:3px solid #5eead4}
+h3{font-size:1rem;color:#64c8ff;margin:20px 0 10px;font-weight:600}
+p{margin:10px 0;color:#c8cfd6}
+ul,ol{margin:10px 0 10px 22px;color:#c8cfd6}
+li{margin:6px 0}
+strong{color:#e8eef5;font-weight:600}
+em{color:#5eead4;font-style:normal;font-weight:500}
+code{font-family:"SF Mono",Menlo,Consolas,monospace;background:rgba(100,200,255,0.1);color:#5eead4;padding:1px 6px;border-radius:3px;font-size:0.88em}
+pre{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:14px 16px;overflow-x:auto;margin:12px 0;font-family:"SF Mono",Menlo,Consolas,monospace;font-size:0.84rem;line-height:1.55;color:#c8cfd6}
+pre code{background:none;color:inherit;padding:0;font-size:1em}
+.mermaid{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:18px;margin:14px 0;text-align:center;overflow-x:auto;cursor:zoom-in;transition:border-color 0.15s}
+.mermaid:hover{border-color:rgba(100,200,255,0.4)}
+.mermaid svg{width:100%;max-width:100%;height:auto;min-height:280px}
+.lightbox{position:fixed;inset:0;background:rgba(8,12,18,0.96);z-index:9999;display:none;align-items:center;justify-content:center;padding:24px;cursor:grab;backdrop-filter:blur(4px);overflow:hidden}
+.lightbox.open{display:flex}
+.lightbox.dragging{cursor:grabbing}
+.lightbox svg{width:auto;height:auto;max-width:96vw;max-height:92vh;transform-origin:center center;will-change:transform}
+.lightbox .hint{position:fixed;top:16px;right:20px;font-size:0.78rem;color:#7a8590;font-family:"SF Mono",Menlo,monospace;pointer-events:none}
+.callout{background:rgba(255,180,80,0.06);border-left:3px solid #ffb450;padding:12px 14px;margin:14px 0;border-radius:4px;font-size:0.94rem}
+.callout strong{color:#ffb450}
+.tradeoff{background:rgba(100,200,255,0.05);border:1px solid rgba(100,200,255,0.2);border-radius:6px;padding:12px 14px;margin:12px 0;font-size:0.94rem}
+.case{background:rgba(94,234,212,0.05);border-left:3px solid #5eead4;padding:12px 14px;margin:12px 0;border-radius:4px;font-size:0.94rem}
+.case strong{color:#5eead4}
+.nav{margin-top:50px;padding-top:24px;border-top:1px solid rgba(100,200,255,0.15);text-align:center}
+.nav a{color:#64c8ff;text-decoration:none;font-size:0.92rem;padding:8px 16px;border:1px solid rgba(100,200,255,0.3);border-radius:4px;transition:all 0.15s}
+.nav a:hover{background:rgba(100,200,255,0.1)}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:0.9rem}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid rgba(100,200,255,0.15)}
+th{color:#64c8ff;font-weight:600;background:rgba(100,200,255,0.05)}
+details{background:rgba(100,200,255,0.04);border:1px solid rgba(100,200,255,0.18);border-radius:6px;padding:12px 16px;margin:10px 0;transition:all 0.15s}
+details:hover{border-color:rgba(100,200,255,0.35)}
+details[open]{background:rgba(94,234,212,0.05);border-color:rgba(94,234,212,0.3)}
+details summary{font-weight:600;color:#e8eef5;list-style:none;outline:none;cursor:pointer;display:flex;align-items:flex-start;gap:10px;font-size:0.96rem}
+details summary::-webkit-details-marker{display:none}
+details summary::before{content:'▶';color:#64c8ff;font-size:0.75em;transition:transform 0.2s;flex-shrink:0;margin-top:5px}
+details[open] summary::before{transform:rotate(90deg);color:#5eead4}
+details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
+details .answer ul,details .answer ol{margin:6px 0 6px 22px}
+@media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+</style>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({startOnLoad:true,theme:'base',flowchart:{useMaxWidth:true,htmlLabels:true,nodeSpacing:50,rankSpacing:60},themeVariables:{primaryColor:'#1a2530',primaryTextColor:'#e8eef5',primaryBorderColor:'#64c8ff',lineColor:'#5eead4',secondaryColor:'#0e1419',tertiaryColor:'#0a0f14',background:'#0a0f14',mainBkg:'#1a2530',secondBkg:'#0e1419',textColor:'#d4dae0',fontFamily:'-apple-system,"SF Pro Display",sans-serif',fontSize:'16px'}});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const lb=document.createElement('div');lb.className='lightbox';
+  lb.innerHTML='<span class="hint">scroll = zoom · drag = pan · Esc / click bg = close</span>';
+  document.body.appendChild(lb);
+  let scale=1,panX=0,panY=0,dragging=false,moved=false,lx=0,ly=0;
+  const apply=()=>{const s=lb.querySelector('svg');if(s)s.style.transform=`translate(${panX}px,${panY}px) scale(${scale})`};
+  const reset=()=>{scale=1;panX=0;panY=0};
+  const close=()=>{lb.classList.remove('open');const s=lb.querySelector('svg');if(s)s.remove();reset()};
+  document.addEventListener('click',e=>{
+    if(e.target.closest('.lightbox')){if(moved){moved=false;return}close();return}
+    const w=e.target.closest('.mermaid');if(!w)return;
+    const svg=w.querySelector('svg');if(!svg)return;
+    const c=svg.cloneNode(true);c.removeAttribute('style');
+    c.style.maxWidth='96vw';c.style.maxHeight='92vh';
+    lb.appendChild(c);lb.classList.add('open');reset();apply();
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+  lb.addEventListener('wheel',e=>{
+    if(!lb.classList.contains('open'))return;
+    e.preventDefault();
+    const svg=lb.querySelector('svg');if(!svg)return;
+    const ns=Math.max(0.3,Math.min(10,scale*(1-e.deltaY*0.002)));
+    const r=svg.getBoundingClientRect();
+    const cx=e.clientX-(r.left+r.width/2),cy=e.clientY-(r.top+r.height/2);
+    const k=ns/scale-1;panX-=cx*k;panY-=cy*k;scale=ns;apply();
+  },{passive:false});
+  lb.addEventListener('mousedown',e=>{
+    if(!lb.classList.contains('open'))return;
+    dragging=true;moved=false;lx=e.clientX;ly=e.clientY;lb.classList.add('dragging');e.preventDefault();
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    const dx=e.clientX-lx,dy=e.clientY-ly;
+    if(Math.abs(dx)+Math.abs(dy)>3)moved=true;
+    panX+=dx;panY+=dy;lx=e.clientX;ly=e.clientY;apply();
+  });
+  document.addEventListener('mouseup',()=>{dragging=false;lb.classList.remove('dragging')});
+});
+</script>
+</head><body><div class="container">
+
+<header>
+<div class="meta">
+<span class="tag day">Day 30</span>
+<span class="tag diff">Hard</span>
+<span class="tag">Authorization</span>
+<span class="tag">RBAC/ABAC/ReBAC</span>
+<span class="tag">Multi-tenancy</span>
+<span class="tag">Audit Log</span>
+</div>
+<h1>Authorization & Account Systems — Graph Traversal, Isolation, Non-repudiation Behind One Check<span class="en">RBAC vs ABAC vs ReBAC · Multi-tenancy · Audit Log</span></h1>
+</header>
+
+<h2>Problem Scenario + Requirements</h2>
+<p>Design the <strong>authorization system</strong> for a B2B SaaS platform (think Notion / GitHub / Figma): the org structure is <em>Org → Team → Project → Resource</em>, four levels with cascading inheritance — an Org admin can touch everything, a Project member only their own project. It looks like a simple "can this user read this doc?", but it's <strong>the hottest path every API request must pass through</strong>: one mistake is a privilege-escalation leak, one slow check drags down the whole site.</p>
+<p>Treat it as a real system and size it:</p>
+<ul>
+<li><strong>Tenants</strong>: 100K Orgs; the largest Org has 50K users and millions of resources.</li>
+<li><strong>QPS</strong>: one page render does <em>tens to hundreds</em> of checks (one per list row), so peak <strong>authorization-check QPS exceeds 500K</strong> — an order of magnitude above business QPS.</li>
+<li><strong>Latency SLO</strong>: check p99 < 10ms (the real numbers Zanzibar/Himeji hit), or it dominates total request latency.</li>
+<li><strong>Correctness</strong>: default deny; <strong>revocation must take effect fast</strong> (a stale cache must not let an ejected user keep reading).</li>
+<li><strong>Isolation</strong>: tenant data physically/logically isolated — one tenant must never read another's data.</li>
+<li><strong>Auditability</strong>: who changed whose permission, when, and what they accessed — traceable and tamper-evident (SOC2 / GDPR).</li>
+</ul>
+<p>This issue covers four things: <em>what model expresses permissions, how to compute hierarchical inheritance fast, how to isolate tenants, and how to make the audit log non-repudiable</em>.</p>
+
+<h2>High-Level Architecture</h2>
+<pre class="mermaid">
+graph TD
+    APP["Service<br/><i>API / frontend BFF</i>"]
+    PDP["Policy Decision Point<br/><i>Check(user, perm, obj)?</i>"]
+    CACHE["Permission cache<br/><i>sharded+replicated · in-mem filter</i>"]
+    STORE["Relation store<br/><i>relation tuples · Postgres/Spanner</i>"]
+    CDC["CDC / invalidation<br/><i>binlog → Kafka</i>"]
+    AUDIT["Audit log<br/><i>append-only · hash chain</i>"]
+    APP -->|"1. check"| PDP
+    PDP -->|"2. hit"| CACHE
+    CACHE -->|"3. miss → origin"| STORE
+    STORE -->|"4. mutation"| CDC
+    CDC -->|"5. invalidate"| CACHE
+    APP -->|"6. perm change / sensitive access"| AUDIT
+</pre>
+<p>The <strong>PDP (Policy Decision Point)</strong> is the core: business code never judges permissions itself — it asks the PDP "does this subject have this permission on this object?". The PDP centralizes both the decision logic (policy) and the decision data (who's in which group, who owns what) — <strong>authorization logic pushed down to the data layer rather than scattered across every microservice</strong>, the shared centralizing philosophy of both Airbnb Himeji and Google Zanzibar. The cache layer is sharded + replicated and filters relations in memory, hitting origin only on miss; the write path turns mutations into cache-invalidation events via CDC. The audit log is a <em>side channel</em> — independent, never on the check hot path.</p>
+
+<h2>Key Technical Points</h2>
+
+<h3>① Authorization model: RBAC vs ABAC vs ReBAC — express permissions via "roles", "attributes", or "relationships"</h3>
+<p class="tradeoff"><strong>Trade-off in one line</strong>: RBAC is simple but roles explode; ABAC is flexible but hard to audit and hard to answer "who can access X"; ReBAC (Zanzibar-style) naturally expresses hierarchy and sharing but you must build a graph-traversal engine.</p>
+<p><strong>[Principle]</strong> The three models answer the same question with different data structures:</p>
+<ul>
+<li><strong>RBAC</strong>: user → role → permission. "Alice is admin, admin can delete." A decision is a table lookup.</li>
+<li><strong>ABAC</strong>: a boolean expression over attributes. "if user.dept == resource.dept && time < 18:00 then allow." A decision is <em>evaluating a policy</em> (e.g. OPA/Rego, AWS IAM policy).</li>
+<li><strong>ReBAC</strong>: model permissions as <em>relation tuples between objects</em> <code>(object#relation@subject)</code>; a decision is <strong>a reachability traversal over the relation graph</strong>. "doc:readme#viewer@user:alice", "doc:readme#viewer@group:eng#member" — a viewer can be a user or "all members of group eng", so hierarchy and sharing unfold naturally. This is Google Zanzibar's core abstraction.</li>
+</ul>
+<div class="tradeoff">
+<table>
+<tr><th>Model</th><th>Strength</th><th>Sacrifice / pitfall</th><th>Fits</th></tr>
+<tr><td>RBAC</td><td>Simple, auditable, everyone gets it</td><td>Role explosion; can't express "only this project"</td><td>Few permission dimensions, flat org</td></tr>
+<tr><td>ABAC</td><td>Highly flexible, context-aware (time/IP/attrs)</td><td>Hard to reverse "who can access X"; hard to reason about; accidental allows</td><td>Compliance/context-sensitive, dynamic rules</td></tr>
+<tr><td>ReBAC</td><td>Native hierarchy/inheritance/fine-grained sharing; reversible</td><td>Must build/adopt a graph engine; deep traversal risks latency</td><td>Multi-level, collaborative sharing (docs/code/projects)</td></tr>
+</table>
+</div>
+<p><strong>[Pseudo-code]</strong> A ReBAC check is essentially a recursive graph traversal with "userset rewrite":</p>
+<pre><code># pseudo-code — Zanzibar-style check: does obj's relation contain subject?
+def check(obj, relation, subject) -> bool:
+    for tuple in tuples(obj, relation):          # read (obj#relation@?)
+        u = tuple.subject
+        if u == subject:
+            return True                          # direct hit
+        if u.is_userset():                       # e.g. group:eng#member
+            if check(u.obj, u.relation, subject):# recursively expand userset
+                return True
+    # userset rewrite: viewer inherits from editor, owner, or parent's viewer
+    for rule in rewrite_rules(obj.type, relation):   # e.g. viewer = editor + parent.viewer
+        if check_rewrite(obj, rule, subject):
+            return True
+    return False
+</code></pre>
+<p>The magic is in <code>rewrite_rules</code>: <code>viewer = self | editor | parent→viewer</code> lets permissions cascade down the hierarchy — no need to copy permissions onto every resource.</p>
+<div class="case"><strong>Real case:</strong> Google <strong>Zanzibar</strong> unified authorization across Drive / Calendar / Cloud / Photos / YouTube with relation tuples, storing trillions of ACLs and serving millions of checks/sec, holding p95 < 10ms and >99.999% availability for 3 years (<a href="https://research.google/pubs/zanzibar-googles-consistent-global-authorization-system/" target="_blank">Zanzibar paper, USENIX ATC 2019</a>). <strong>OpenFGA</strong> (open-sourced by Auth0/Okta, donated to CNCF) packages this ReBAC + some ABAC capability into a ready-to-use engine (<a href="https://openfga.dev/docs/authorization-concepts" target="_blank">openfga.dev</a>).</div>
+
+<h3>② Hierarchical inheritance & check performance — deep traversal vs materialized reverse index</h3>
+<p class="tradeoff"><strong>Trade-off in one line</strong>: real-time recursive traversal is cheap to write but expensive to read (long latency tail on deep hierarchies); materialized expansion is fast to read but amplifies writes and adds invalidation-consistency problems.</p>
+<p><strong>[Principle]</strong> With Org→Team→Project→Doc four levels, "can Alice read this doc?" may have to climb from the doc up to the Org and expand the whole group tree — one check triggers dozens of tuple reads, and <strong>depth and fan-out determine the tail latency</strong>. Two optimization routes:</p>
+<ul>
+<li><strong>Real-time traversal + cache sub-results</strong>: cache and reuse each intermediate decision like <code>check(group:eng, member, alice)</code>; merge concurrent origin reads with single-flight. Simple, cheap writes, but p99 jitter on cold cache or deep graphs.</li>
+<li><strong>Materialized reverse index</strong>: pre-expand and store "<em>object → all users with access</em>" or "<em>user → all accessible objects</em>", so a check degrades to one lookup. Zanzibar's <strong>Leopard index</strong> precomputes flattened membership sets for deep/wide nested groups. The cost is write amplification (one group change updates a huge number of materialized rows) and invalidation complexity.</li>
+</ul>
+<p><strong>Consistency pitfall</strong>: permission <em>revocation</em> must take effect promptly, or "someone just removed from a project can still read for 5 minutes" is a security incident. Zanzibar uses a <strong>Zookie</strong> (a token carrying a timestamp) to guarantee "a permission read is no older than a given write", binding external consistency to cache freshness — the key thing that sets it apart from an ordinary cache.</p>
+<pre><code># pseudo-code — fast revocation: version + CDC invalidation, not pure TTL
+def revoke(group, member):
+    db.delete(tuple(group, "member", member))      # 1. persist
+    bump_version(group)                            # 2. bump that object's perm version
+    cdc.publish(InvalidateEvent(group))           # 3. binlog→Kafka→cache nodes drop key
+# read side: cache entries carry version; check validates version not stale, else origin
+</code></pre>
+<div class="case"><strong>Real case:</strong> Airbnb <strong>Himeji</strong> is built on Zanzibar ideas: a sharded + replicated cache layer filters in memory, missing through to Aurora; data mutations are caught by SpinalTap and invalidate the cache over Kafka. It stores tens of billions of relations, serves nearly a million entities/sec at ~12ms p99 (<a href="https://medium.com/airbnb-engineering/himeji-a-scalable-centralized-system-for-authorization-at-airbnb-341664924574" target="_blank">Airbnb Tech Blog, 2021</a>). <strong>Notion</strong> instead computes inheritance via the block tree's <em>upward parent pointer</em> — each block recognizes a single parent source, avoiding multi-parent ambiguity (<a href="https://www.notion.com/blog/data-model-behind-notion" target="_blank">The data model behind Notion's flexibility</a>).</div>
+
+<h3>③ Multi-tenant isolation — shared DB row-level vs schema-per-tenant vs DB-per-tenant</h3>
+<p class="tradeoff"><strong>Trade-off in one line</strong>: a shared DB saves cost but "miss one WHERE and you leak across tenants"; a DB-per-tenant gives the strongest isolation but ops/migration cost explodes linearly with tenant count.</p>
+<p><strong>[Principle]</strong> Three isolation tiers map to three cost tiers:</p>
+<div class="tradeoff">
+<table>
+<tr><th>Approach</th><th>Isolation</th><th>Cost/ops</th><th>Failure mode</th></tr>
+<tr><td>Shared DB + <code>tenant_id</code> row-level</td><td>Logical (weak)</td><td>Lowest; one table set for all</td><td>Forget <code>WHERE tenant_id</code> → cross-tenant leak; noisy neighbor</td></tr>
+<tr><td>Shared DB + schema-per-tenant</td><td>Medium</td><td>Medium; switch schema per connection</td><td>Thousands of schemas slow metadata/migrations</td></tr>
+<tr><td>DB-per-tenant</td><td>Strong (physical)</td><td>Highest; N databases to run</td><td>Linear blow-up; small tenants waste resources</td></tr>
+</table>
+</div>
+<p>Mainstream SaaS defaults to <strong>shared DB + row-level</strong> (cost wins) and uses <strong>Postgres Row-Level Security (RLS)</strong> to turn "forgot WHERE" from a human discipline into a database-enforced guarantee: once the policy is set and the connection sets <code>app.tenant_id</code>, the DB automatically appends the tenant filter to every query — <em>no leak even if the app forgets it</em>. Large customers (with physical-isolation compliance) then get a dedicated DB, a hybrid tiered approach.</p>
+<pre><code>-- Postgres RLS: push tenant isolation down to the database
+ALTER TABLE documents ENABLE ROW LEVEL SECURITY;
+CREATE POLICY tenant_isolation ON documents
+  USING (tenant_id = current_setting('app.tenant_id')::uuid);
+-- each connection, when entering a tenant context:
+SET app.tenant_id = '...';   -- all queries afterward are auto-filtered, no manual WHERE
+</code></pre>
+<div class="callout"><strong>Pitfall:</strong> RLS is dangerous with <em>connection-pool reuse</em> — a connection must <code>RESET</code> the tenant context before returning to the pool, or the next tenant inherits a connection still carrying the previous <code>tenant_id</code>. Also note table owner / <code>BYPASSRLS</code> roles skip policies — don't run migrations as superuser.</div>
+<div class="case"><strong>Real case:</strong> Salesforce is the classic shared-DB multi-tenant (org_id threads through the data layer); Slack, Notion and others are primarily logical isolation with stronger isolation for enterprise customers. Postgres RLS is the default multi-tenant mechanism on platforms like Supabase (<a href="https://www.postgresql.org/docs/current/ddl-rowsecurity.html" target="_blank">PostgreSQL docs · Row Security Policies</a>).</div>
+
+<h3>④ Audit log — append-only and tamper-evidence</h3>
+<p class="tradeoff"><strong>Trade-off in one line</strong>: audit must be written inside the business transaction so it isn't lost, yet must not slow/pollute the business DB; to be trustworthy it must resist tampering, but "fully immutable" conflicts with "operable".</p>
+<p><strong>[Principle]</strong> The fundamental difference from ordinary logging: an audit log is <strong>evidence</strong> and must be <em>complete (no lost events), tamper-evident (unchangeable after the fact), traceable (who/what/when/from where)</em>.</p>
+<ul>
+<li><strong>No loss</strong>: write critical events like permission changes via the <strong>Outbox pattern</strong> (see Day 7) — the audit record and the business mutation in the <em>same transaction</em>, then CDC ships it to audit storage, avoiding "business succeeded but audit lost".</li>
+<li><strong>Tamper-evident</strong>: append-only + a <strong>hash chain</strong> — each record stores <code>hash(prev_hash + payload)</code>; alter any middle record and every subsequent hash breaks, exposing the tampering. Periodically anchor the chain head to an external store (WORM / notarization) to even defend against deleting whole segments.</li>
+<li><strong>No business impact</strong>: audit goes to <em>independent storage</em> (append-optimized columnar/object store), separate from OLTP; queries are low-frequency analytics, off the business hot path.</li>
+</ul>
+<pre><code># pseudo-code — hash-chained audit, tampering detectable
+def append_audit(event):
+    prev = store.last()                  # take previous record
+    record = {
+        "actor": event.actor, "action": event.action,
+        "target": event.target, "ts": now(),
+        "prev_hash": prev.hash,
+    }
+    record["hash"] = sha256(prev.hash + canonical_json(record))
+    store.append(record)                 # append-only, never UPDATE/DELETE
+
+def verify():                            # patrol: recompute each hash, alert on break
+    for r in store.scan():
+        assert r["hash"] == sha256(r["prev_hash"] + canonical_json(strip_hash(r)))
+</code></pre>
+<div class="case"><strong>Real case:</strong> AWS CloudTrail offers log file integrity validation (hashing and signing each batch); GitHub / Stripe expose audit-log APIs to enterprise customers for compliance export. SOC2 / GDPR require "permission changes and data access be traceable" — hash chain + WORM is a common implementation.</div>
+
+<h2>Scaling & Optimization</h2>
+<ul>
+<li><strong>From embedded to centralized PDP</strong>: early on, permissions live in each service as <code>if user.role==...</code>; at scale, extract a centralized authorization service (Zanzibar/Himeji/OpenFGA) for unified model, audit, and caching.</li>
+<li><strong>Read/write split + reverse index</strong>: for "which projects can I see", use a materialized <em>user→objects</em> reverse index instead of checking each object one by one (N+1 authorization).</li>
+<li><strong>Policy as code</strong>: model ABAC with OPA/Rego to version, test, and canary policies, avoiding hand-editing rules in production.</li>
+<li><strong>Cache warming & degradation</strong>: authorization is the hottest path; warm cold starts from historical hot keys; when the PDP is unavailable, <strong>fail-closed (default deny)</strong> not fail-open — availability yields to security.</li>
+</ul>
+
+<h2>Common Pitfalls + Interview Follow-ups</h2>
+<ul>
+<li><strong>Fail-open vs fail-closed</strong>: what if the authz service dies? Fail-closed (deny) is almost always right — better to reject legitimate requests than allow escalation. But weigh it: denying all on a core read path takes the whole site down, so limited degradation may be OK for <em>low-sensitivity</em> operations.</li>
+<li><strong>N+1 authorization</strong>: 100 list rows = 100 checks, p99 amplified. Use BatchCheck or a reverse index to get the full set at once. "How do you do list-page permission filtering" is a classic.</li>
+<li><strong>Revocation lag</strong>: pure TTL caches delay revocation until expiry. You must invalidate actively via CDC/version — "how fast does ejection take effect" is a classic follow-up.</li>
+<li><strong>RLS connection-pool context leak</strong>: reusing a connection without RESET of <code>tenant_id</code> → cross-tenant read. Don't forget <code>BYPASSRLS</code> roles and migrations skipping policies.</li>
+<li><strong>Using the business DB as audit source</strong>: if a business table can UPDATE, it isn't trustworthy audit. Audit must be append-only + tamper-evident + independent storage.</li>
+<li><strong>Baking permissions into a JWT, then unable to revoke</strong>: with many permission claims inside the JWT, a permission change leaves the old token valid (see Day 24). Authorization decisions should hit the PDP live; the JWT carries identity only.</li>
+</ul>
+
+<h2>Deeper Resources</h2>
+<ul>
+<li><a href="https://research.google/pubs/zanzibar-googles-consistent-global-authorization-system/" target="_blank">Zanzibar: Google's Consistent, Global Authorization System</a> — USENIX ATC 2019, the foundational ReBAC paper (relation tuples, userset rewrite, Zookie, Leopard index).</li>
+<li><a href="https://medium.com/airbnb-engineering/himeji-a-scalable-centralized-system-for-authorization-at-airbnb-341664924574" target="_blank">Himeji: a scalable centralized system for authorization at Airbnb</a> — an industrial Zanzibar implementation (sharded cache, CDC invalidation, Aurora storage).</li>
+<li><a href="https://openfga.dev/docs/authorization-concepts" target="_blank">OpenFGA · Authorization Concepts</a> — RBAC / ABAC / ReBAC / Zanzibar concept comparison and a hands-on implementation (Auth0/Okta, CNCF).</li>
+<li><a href="https://www.notion.com/blog/data-model-behind-notion" target="_blank">The data model behind Notion's flexibility</a> — permission inheritance via block tree + parent pointer.</li>
+<li><a href="https://www.postgresql.org/docs/current/ddl-rowsecurity.html" target="_blank">PostgreSQL · Row Security Policies</a> — native database implementation of row-level multi-tenant isolation.</li>
+<li><em>Designing Data-Intensive Applications</em> (Kleppmann) — the consistency & causality chapters, to understand the external consistency behind Zookie.</li>
+</ul>
+
+<h2>Deeper Thinking</h2>
+
+<details>
+<summary>1. What problem does Zanzibar's Zookie solve that a plain TTL cannot? Why does authorization especially need it?</summary>
+<div class="answer">
+<p>A normal cache's staleness means "reading an old value"; in authorization, staleness is a <strong>security incident</strong> — a just-revoked user reading old permissions = escalation. But the subtler issue is <em>causal consistency</em>: a user first sets a doc to private (writes the ACL), then shares the link; when the recipient opens it, they must read the "now private" state, or they read a private doc as public. Pure TTL can't guarantee "this read is no older than that write".</p>
+<p>A Zookie is a token carrying a version/timestamp: writing an ACL returns a Zookie, subsequent checks carry it, and the system guarantees the <strong>snapshot used for the decision is no older than the moment the Zookie names</strong>. It turns freshness from a fuzzy TTL into a provable causal lower bound — binding cache consistency to external consistency. The cost is maintaining a global version (Zanzibar leans on Spanner's TrueTime), hard for ordinary systems to replicate, so most implementations approximate it with "version + active CDC invalidation".</p>
+</div>
+</details>
+
+<details>
+<summary>2. A celebrity has 2M followers and "all followers can see my public posts." How do you store this with ReBAC tuples? What happens if you expand it directly?</summary>
+<div class="answer">
+<p>Never expand into 2M <code>post#viewer@user:X</code> tuples — posting once inserts 2M rows, changing visibility deletes 2M rows. This is the classic fanout write amplification (see Day 14).</p>
+<p>The right move is an indirect <strong>userset reference</strong>: store one tuple <code>post#viewer@user:celeb#follower</code>, i.e. "viewer = celeb's follower set", then expand the follower relation at check time. But this shifts the cost to <em>reads</em>: each check must traverse the follower set to test membership — too slow for a 2M-member set.</p>
+<p>This is exactly where Zanzibar's <strong>Leopard index</strong> earns its keep: precompute a flattened membership bitmap for deep/wide groups, turning "is X in celeb's followers" from graph traversal into an index lookup. The trade-off returns to point ②: maintain an extra materialized index on write for O(1) reads. At heart this is fanout-on-write vs fanout-on-read replayed in the authorization context.</p>
+</div>
+</details>
+
+<details>
+<summary>3. A list page must show "the first 20 of the 1000 projects the user can access, paginated." What happens if you check each one? What's the right architecture?</summary>
+<div class="answer">
+<p>Checking each one (fetch all projects, then filter) = N+1 authorization + fetching lots of unauthorized data only to discard it, and pagination breaks (fewer than 20 after filtering). This question separates juniors from seniors.</p>
+<p>Two correct answers: ① <strong>Reverse index / materialization</strong> — maintain a <code>user → accessible_objects</code> list and query directly <code>WHERE id IN (accessible set) LIMIT 20</code>, pushing authorization into the data query, done in one shot with correct pagination. ② <strong>Authorization-aware query</strong> — compile the permission condition into SQL (RLS or a join on the permission table) so the database filters during the scan.</p>
+<p>Zanzibar provides <code>Expand</code>/reverse APIs precisely for this. The key insight: <strong>"check a single object" and "list accessible objects" are two different problems; the latter can't be solved by looping the former</strong> — one is a point query, the other needs a reverse index. Many authz performance incidents come from looping check to build lists.</p>
+</div>
+</details>
+
+<details>
+<summary>4. You run shared DB + RLS for multi-tenancy, working fine. A financial customer demands "my data must never sit in the same database as others." How do you evolve without a rewrite?</summary>
+<div class="answer">
+<p>This is the classic <strong>tiered tenancy</strong> problem. Don't migrate everyone to dedicated DBs for one customer — cost and ops explode. Instead: keep the shared DB as the default pool (the vast majority of small/mid tenants), while supporting <em>routing</em> a specific tenant to a dedicated DB/schema.</p>
+<p>The key is a <strong>routing-layer abstraction</strong>: add a <code>tenant → shard/datasource</code> mapping in the data-access layer; app code resolves to the right connection by <code>tenant_id</code>. Pooled tenants use RLS isolation, dedicated tenants get a physical DB. Onboarding a new such customer is just a routing config change, no business-code change.</p>
+<p>The hard part is <strong>cross-tier migration</strong>: moving a tenant from shared to dedicated requires online data migration (dual-write → backfill → verify → switch reads → switch writes, see Day 22's expand-contract). And unify schema evolution — the dedicated DB must not lag the shared DB's migration version. This question tests "make an exception for your most expensive customer, but don't let the exception pollute the main path".</p>
+</div>
+</details>
+
+<details>
+<summary>5. Your audit log uses a hash chain for tamper-evidence. But ops must delete a user's data (GDPR right to erasure) — deleting breaks the chain. How do you resolve this conflict?</summary>
+<div class="answer">
+<p>This is a direct clash of two compliance requirements: audit must be <em>immutably retained</em>, GDPR requires <em>deletable personal data</em>. Directly deleting an audit record breaks the hash chain and destroys non-repudiation.</p>
+<p>Common solutions: ① <strong>Crypto-shredding</strong> — don't store personal data in cleartext; encrypt it with a per-user key; to "delete" the user, destroy the key, the ciphertext is permanently undecryptable but the record (and its hash) remains, chain intact. ② <strong>Separate PII</strong> — the audit chain stores only identifiers like <code>actor_id / action / target_id</code> and event structure; real PII goes in a deletable side table, the chain stores references; deleting PII doesn't touch the chain. ③ <strong>Tombstone</strong> — don't physically delete; append a "deleted" event, changing visibility rather than the data itself.</p>
+<p>The core insight: <strong>"immutability" constrains the fact that an audit event happened; "deletability" constrains the personal-data payload within it — decouple the two layers and you satisfy both.</strong> This is why audit design must separate "event skeleton" from "PII payload" from day one.</p>
+</div>
+</details>
+
+<div class="nav"><a href="index.en.html">← Back to index</a></div>
+</div>
+</body></html>

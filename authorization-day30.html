@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 30 · 权限与账号系统 (Authorization) — System Design Bi-daily</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"SF Pro Display","Noto Sans SC",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
+.container{max-width:820px;margin:0 auto;padding:24px 20px 60px}
+header{padding:40px 0 28px;border-bottom:1px solid rgba(100,200,255,0.15);margin-bottom:32px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem}
+.tag{padding:3px 10px;border-radius:4px;background:rgba(100,200,255,0.12);color:#64c8ff;border:1px solid rgba(100,200,255,0.25)}
+.tag.diff{background:rgba(94,234,212,0.1);color:#5eead4;border-color:rgba(94,234,212,0.3)}
+.tag.day{background:rgba(255,180,80,0.1);color:#ffb450;border-color:rgba(255,180,80,0.25)}
+h1{font-size:1.75rem;font-weight:800;background:linear-gradient(135deg,#64c8ff 0%,#5eead4 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:0.5px;line-height:1.3}
+h1 .en{display:block;font-size:1rem;color:#7a8590;-webkit-text-fill-color:#7a8590;margin-top:6px;font-weight:500}
+h2{font-size:1.2rem;color:#5eead4;margin:36px 0 14px;padding-left:12px;border-left:3px solid #5eead4}
+h3{font-size:1rem;color:#64c8ff;margin:20px 0 10px;font-weight:600}
+p{margin:10px 0;color:#c8cfd6}
+ul,ol{margin:10px 0 10px 22px;color:#c8cfd6}
+li{margin:6px 0}
+strong{color:#e8eef5;font-weight:600}
+em{color:#5eead4;font-style:normal;font-weight:500}
+code{font-family:"SF Mono",Menlo,Consolas,monospace;background:rgba(100,200,255,0.1);color:#5eead4;padding:1px 6px;border-radius:3px;font-size:0.88em}
+pre{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:14px 16px;overflow-x:auto;margin:12px 0;font-family:"SF Mono",Menlo,Consolas,monospace;font-size:0.84rem;line-height:1.55;color:#c8cfd6}
+pre code{background:none;color:inherit;padding:0;font-size:1em}
+.mermaid{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:18px;margin:14px 0;text-align:center;overflow-x:auto;cursor:zoom-in;transition:border-color 0.15s}
+.mermaid:hover{border-color:rgba(100,200,255,0.4)}
+.mermaid svg{width:100%;max-width:100%;height:auto;min-height:280px}
+.lightbox{position:fixed;inset:0;background:rgba(8,12,18,0.96);z-index:9999;display:none;align-items:center;justify-content:center;padding:24px;cursor:grab;backdrop-filter:blur(4px);overflow:hidden}
+.lightbox.open{display:flex}
+.lightbox.dragging{cursor:grabbing}
+.lightbox svg{width:auto;height:auto;max-width:96vw;max-height:92vh;transform-origin:center center;will-change:transform}
+.lightbox .hint{position:fixed;top:16px;right:20px;font-size:0.78rem;color:#7a8590;font-family:"SF Mono",Menlo,monospace;pointer-events:none}
+.callout{background:rgba(255,180,80,0.06);border-left:3px solid #ffb450;padding:12px 14px;margin:14px 0;border-radius:4px;font-size:0.94rem}
+.callout strong{color:#ffb450}
+.tradeoff{background:rgba(100,200,255,0.05);border:1px solid rgba(100,200,255,0.2);border-radius:6px;padding:12px 14px;margin:12px 0;font-size:0.94rem}
+.case{background:rgba(94,234,212,0.05);border-left:3px solid #5eead4;padding:12px 14px;margin:12px 0;border-radius:4px;font-size:0.94rem}
+.case strong{color:#5eead4}
+.nav{margin-top:50px;padding-top:24px;border-top:1px solid rgba(100,200,255,0.15);text-align:center}
+.nav a{color:#64c8ff;text-decoration:none;font-size:0.92rem;padding:8px 16px;border:1px solid rgba(100,200,255,0.3);border-radius:4px;transition:all 0.15s}
+.nav a:hover{background:rgba(100,200,255,0.1)}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:0.9rem}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid rgba(100,200,255,0.15)}
+th{color:#64c8ff;font-weight:600;background:rgba(100,200,255,0.05)}
+details{background:rgba(100,200,255,0.04);border:1px solid rgba(100,200,255,0.18);border-radius:6px;padding:12px 16px;margin:10px 0;transition:all 0.15s}
+details:hover{border-color:rgba(100,200,255,0.35)}
+details[open]{background:rgba(94,234,212,0.05);border-color:rgba(94,234,212,0.3)}
+details summary{font-weight:600;color:#e8eef5;list-style:none;outline:none;cursor:pointer;display:flex;align-items:flex-start;gap:10px;font-size:0.96rem}
+details summary::-webkit-details-marker{display:none}
+details summary::before{content:'▶';color:#64c8ff;font-size:0.75em;transition:transform 0.2s;flex-shrink:0;margin-top:5px}
+details[open] summary::before{transform:rotate(90deg);color:#5eead4}
+details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
+details .answer ul,details .answer ol{margin:6px 0 6px 22px}
+@media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+</style>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({startOnLoad:true,theme:'base',flowchart:{useMaxWidth:true,htmlLabels:true,nodeSpacing:50,rankSpacing:60},themeVariables:{primaryColor:'#1a2530',primaryTextColor:'#e8eef5',primaryBorderColor:'#64c8ff',lineColor:'#5eead4',secondaryColor:'#0e1419',tertiaryColor:'#0a0f14',background:'#0a0f14',mainBkg:'#1a2530',secondBkg:'#0e1419',textColor:'#d4dae0',fontFamily:'-apple-system,"SF Pro Display",sans-serif',fontSize:'16px'}});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const lb=document.createElement('div');lb.className='lightbox';
+  lb.innerHTML='<span class="hint">scroll = zoom · drag = pan · Esc / click bg = close</span>';
+  document.body.appendChild(lb);
+  let scale=1,panX=0,panY=0,dragging=false,moved=false,lx=0,ly=0;
+  const apply=()=>{const s=lb.querySelector('svg');if(s)s.style.transform=`translate(${panX}px,${panY}px) scale(${scale})`};
+  const reset=()=>{scale=1;panX=0;panY=0};
+  const close=()=>{lb.classList.remove('open');const s=lb.querySelector('svg');if(s)s.remove();reset()};
+  document.addEventListener('click',e=>{
+    if(e.target.closest('.lightbox')){if(moved){moved=false;return}close();return}
+    const w=e.target.closest('.mermaid');if(!w)return;
+    const svg=w.querySelector('svg');if(!svg)return;
+    const c=svg.cloneNode(true);c.removeAttribute('style');
+    c.style.maxWidth='96vw';c.style.maxHeight='92vh';
+    lb.appendChild(c);lb.classList.add('open');reset();apply();
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+  lb.addEventListener('wheel',e=>{
+    if(!lb.classList.contains('open'))return;
+    e.preventDefault();
+    const svg=lb.querySelector('svg');if(!svg)return;
+    const ns=Math.max(0.3,Math.min(10,scale*(1-e.deltaY*0.002)));
+    const r=svg.getBoundingClientRect();
+    const cx=e.clientX-(r.left+r.width/2),cy=e.clientY-(r.top+r.height/2);
+    const k=ns/scale-1;panX-=cx*k;panY-=cy*k;scale=ns;apply();
+  },{passive:false});
+  lb.addEventListener('mousedown',e=>{
+    if(!lb.classList.contains('open'))return;
+    dragging=true;moved=false;lx=e.clientX;ly=e.clientY;lb.classList.add('dragging');e.preventDefault();
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    const dx=e.clientX-lx,dy=e.clientY-ly;
+    if(Math.abs(dx)+Math.abs(dy)>3)moved=true;
+    panX+=dx;panY+=dy;lx=e.clientX;ly=e.clientY;apply();
+  });
+  document.addEventListener('mouseup',()=>{dragging=false;lb.classList.remove('dragging')});
+});
+</script>
+</head><body><div class="container">
+
+<header>
+<div class="meta">
+<span class="tag day">Day 30</span>
+<span class="tag diff">Hard</span>
+<span class="tag">Authorization</span>
+<span class="tag">RBAC/ABAC/ReBAC</span>
+<span class="tag">Multi-tenancy</span>
+<span class="tag">Audit Log</span>
+</div>
+<h1>权限与账号系统 — 一次 check 背后的图遍历、隔离与不可抵赖<span class="en">Authorization & Account Systems: RBAC vs ABAC vs ReBAC, Multi-tenancy, Audit Log</span></h1>
+</header>
+
+<h2>问题场景 + 需求约束</h2>
+<p>设计一个 B2B SaaS 平台的<strong>授权系统</strong>（类似 Notion / GitHub / Figma）：组织结构是 <em>Org → Team → Project → Resource</em> 四层，权限层层继承——Org admin 能动一切，Project member 只能碰自己项目。表面只是「这个用户能不能读这个文档」，但它是<strong>每个 API 请求都要过的最热路径</strong>，错一次就是越权泄露，慢一点就拖垮整站。</p>
+<p>把它当真实系统来定规模：</p>
+<ul>
+<li><strong>租户量</strong>：10 万 Org，单 Org 最大 5 万用户、百万级 resource。</li>
+<li><strong>QPS</strong>：单次页面渲染要做 <em>几十到上百次</em> check（列表页每行一次），全站峰值 <strong>授权检查 50 万 QPS+</strong>——比业务 QPS 高一个量级。</li>
+<li><strong>延迟 SLO</strong>：check p99 < 10ms（Zanzibar/Himeji 的真实指标就在这个量级），否则它会主导整个请求延迟。</li>
+<li><strong>正确性</strong>：拒绝默认（default deny）；权限<strong>撤销后必须快速生效</strong>（不能因为缓存让被踢出的人还能读）。</li>
+<li><strong>隔离</strong>：租户数据物理/逻辑隔离，单租户绝不可读到另一租户数据。</li>
+<li><strong>可审计</strong>：谁在何时改了谁的权限、访问了什么，要可追溯、不可篡改（合规：SOC2 / GDPR）。</li>
+</ul>
+<p>本期讲四件事：<em>用什么模型表达权限、层级继承怎么算得快、租户怎么隔离、审计日志怎么做到不可抵赖</em>。</p>
+
+<h2>高层架构</h2>
+<pre class="mermaid">
+graph TD
+    APP["业务服务<br/><i>API / 前端 BFF</i>"]
+    PDP["授权决策点 PDP<br/><i>Check(user, perm, obj)?</i>"]
+    CACHE["权限缓存<br/><i>分片+复制 · 内存过滤</i>"]
+    STORE["关系存储<br/><i>relation tuples · Postgres/Spanner</i>"]
+    CDC["CDC / 失效流<br/><i>binlog → Kafka</i>"]
+    AUDIT["审计日志<br/><i>append-only · 哈希链</i>"]
+    APP -->|"1. check"| PDP
+    PDP -->|"2. 命中"| CACHE
+    CACHE -->|"3. miss 回源"| STORE
+    STORE -->|"4. 变更"| CDC
+    CDC -->|"5. 失效缓存"| CACHE
+    APP -->|"6. 权限变更/敏感访问"| AUDIT
+</pre>
+<p><strong>PDP（Policy Decision Point）</strong>是核心：业务代码不自己判断权限，而是统一问 PDP「这个 subject 对这个 object 有没有这个权限」。PDP 把判定逻辑（policy）和判定数据（谁属于哪个组、谁是谁的 owner）集中起来——<strong>授权逻辑下沉到数据层而非散落在每个微服务里</strong>，这是 Airbnb Himeji 和 Google Zanzibar 共同的中心化思路。缓存层分片+复制、内存中做关系过滤，miss 才回源；写路径用 CDC 把变更转成缓存失效事件。审计日志是<em>旁路</em>，独立链路，不在 check 热路径上。</p>
+
+<h2>关键技术点</h2>
+
+<h3>① 授权模型：RBAC vs ABAC vs ReBAC — 用「角色」「属性」还是「关系」表达权限</h3>
+<p class="tradeoff"><strong>一句话 trade-off</strong>：RBAC 简单但角色会爆炸；ABAC 灵活但难审计、难回答「谁能访问 X」；ReBAC（Zanzibar 式）天然表达层级与共享，但要自己建图遍历引擎。</p>
+<p><strong>【原理】</strong> 三种模型回答的是同一个问题、用不同的数据结构：</p>
+<ul>
+<li><strong>RBAC</strong>：用户 → 角色 → 权限。「Alice 是 admin，admin 能 delete」。判定是查表。</li>
+<li><strong>ABAC</strong>：基于属性的布尔表达式。「if user.dept == resource.dept && time < 18:00 then allow」。判定是<em>求值一段策略</em>（如 OPA/Rego、AWS IAM policy）。</li>
+<li><strong>ReBAC</strong>：把权限建模成<em>对象之间的关系元组</em> <code>(object#relation@subject)</code>，判定是<strong>在关系图上做可达性遍历</strong>。「doc:readme#viewer@user:alice」「doc:readme#viewer@group:eng#member」——viewer 可以是一个用户，也可以是「eng 组的所有成员」，于是层级与共享自然展开。这是 Google Zanzibar 的核心抽象。</li>
+</ul>
+<div class="tradeoff">
+<table>
+<tr><th>模型</th><th>强项</th><th>牺牲 / 陷阱</th><th>适合</th></tr>
+<tr><td>RBAC</td><td>简单、好审计、人人懂</td><td>角色组合爆炸（"role explosion"）；难表达"只对这个项目"</td><td>权限维度少、组织扁平</td></tr>
+<tr><td>ABAC</td><td>极灵活、能上下文（时间/IP/属性）</td><td>难反查"谁能访问 X"；策略多了难推理；易出"意外放行"</td><td>合规/上下文敏感、动态规则</td></tr>
+<tr><td>ReBAC</td><td>天然层级/继承/细粒度共享；可反查</td><td>要自建/引入图遍历引擎；深图遍历有延迟风险</td><td>多层级、协作共享（文档/代码/项目）</td></tr>
+</table>
+</div>
+<p><strong>【代码/伪代码】</strong> ReBAC 的 check 本质是带"用户集重写"的递归图遍历：</p>
+<pre><code># pseudo-code — Zanzibar 式 check：obj 上的 relation 是否包含 subject？
+def check(obj, relation, subject) -> bool:
+    for tuple in tuples(obj, relation):          # 读 (obj#relation@?)
+        u = tuple.subject
+        if u == subject:
+            return True                          # 直接命中
+        if u.is_userset():                       # 形如 group:eng#member
+            if check(u.obj, u.relation, subject):# 递归展开 userset
+                return True
+    # userset rewrite：viewer 继承自 editor、owner，或父对象的 viewer
+    for rule in rewrite_rules(obj.type, relation):   # 如 viewer = editor + parent.viewer
+        if check_rewrite(obj, rule, subject):
+            return True
+    return False
+</code></pre>
+<p>关键在 <code>rewrite_rules</code>：<code>viewer = self | editor | parent→viewer</code> 让权限沿层级向下继承——无需为每个 resource 复制权限。</p>
+<div class="case"><strong>现实案例：</strong>Google <strong>Zanzibar</strong> 用关系元组统一了 Drive / Calendar / Cloud / Photos / YouTube 的授权，存储万亿级 ACL、支撑每秒数百万次检查，3 年保持 p95 < 10ms、可用性 > 99.999%（<a href="https://research.google/pubs/zanzibar-googles-consistent-global-authorization-system/" target="_blank">Zanzibar 论文, USENIX ATC 2019</a>）。<strong>OpenFGA</strong>（Auth0/Okta 开源、已捐给 CNCF）把这套 ReBAC + 部分 ABAC 能力做成可直接用的引擎（<a href="https://openfga.dev/docs/authorization-concepts" target="_blank">openfga.dev</a>）。</div>
+
+<h3>② 层级继承与 check 性能 — 深图遍历 vs 物化反向索引</h3>
+<p class="tradeoff"><strong>一句话 trade-off</strong>：实时递归遍历写便宜读贵（深层级延迟尾巴长），物化展开读快但写放大、有失效一致性问题。</p>
+<p><strong>【原理】</strong> Org→Team→Project→Doc 四层下，"Alice 能读这个 doc 吗"可能要从 doc 往上爬到 Org 再展开整个 group 树——一次 check 触发几十次元组读，<strong>深度和扇出决定尾延迟</strong>。两条优化路线：</p>
+<ul>
+<li><strong>实时遍历 + 缓存子结果</strong>：每个中间判定 <code>check(group:eng, member, alice)</code> 缓存复用；用 single-flight 合并并发回源。简单、写便宜，但冷缓存或深图时 p99 抖动。</li>
+<li><strong>物化反向索引</strong>：预先把"<em>对象 → 所有有权访问的用户</em>"或"<em>用户 → 所有可访问对象</em>"展开存好，check 退化成一次查表。Zanzibar 的 <strong>Leopard 索引</strong>就是为深/广的 group 嵌套预计算 flatten 后的成员集合。代价是写放大（一次组变更要更新海量物化行）和失效复杂度。</li>
+</ul>
+<p><strong>一致性陷阱</strong>：权限<em>撤销</em>必须及时生效，否则"刚被移出项目的人还能读 5 分钟"就是安全事故。Zanzibar 用 <strong>Zookie</strong>（一个携带时间戳的 token）保证"读权限时不早于某次写"，把外部一致性和缓存新鲜度绑定——这是它区别于普通缓存系统的关键。</p>
+<pre><code># pseudo-code — 撤销快速生效：版本号 + CDC 失效，而非纯 TTL
+def revoke(group, member):
+    db.delete(tuple(group, "member", member))      # 1. 落库
+    bump_version(group)                            # 2. 该对象权限版本 +1
+    cdc.publish(InvalidateEvent(group))           # 3. binlog→Kafka→各缓存节点删 key
+# 读侧：缓存条目带 version；check 时校验 version 未过期，否则回源
+</code></pre>
+<div class="case"><strong>现实案例：</strong>Airbnb <strong>Himeji</strong> 基于 Zanzibar 思路自建：分片+复制的缓存层做内存过滤，miss 回 Aurora；用 SpinalTap 监听数据变更经 Kafka 失效缓存，存储数百亿关系、近百万 entity/秒、p99 约 12ms（<a href="https://medium.com/airbnb-engineering/himeji-a-scalable-centralized-system-for-authorization-at-airbnb-341664924574" target="_blank">Airbnb Tech Blog, 2021</a>）。<strong>Notion</strong> 则用 block 树的 <em>parent 向上指针</em>计算权限继承——每个 block 只认一个 parent 来源，避免多父继承的歧义（<a href="https://www.notion.com/blog/data-model-behind-notion" target="_blank">The data model behind Notion's flexibility</a>）。</div>
+
+<h3>③ 多租户隔离 — 共享库行级 vs Schema 隔离 vs 独立库</h3>
+<p class="tradeoff"><strong>一句话 trade-off</strong>：共享库省成本但"漏一个 WHERE 就跨租户泄露"；独立库最强隔离但运维/迁移成本随租户数线性爆炸。</p>
+<p><strong>【原理】</strong> 三档隔离强度对应三档成本：</p>
+<div class="tradeoff">
+<table>
+<tr><th>方案</th><th>隔离强度</th><th>成本/运维</th><th>翻车点</th></tr>
+<tr><td>共享库 + <code>tenant_id</code> 行级</td><td>逻辑（弱）</td><td>最低；一套表所有租户</td><td>忘加 <code>WHERE tenant_id</code> 就跨租户泄露；吵闹邻居</td></tr>
+<tr><td>共享库 + Schema/租户</td><td>中</td><td>中；连接切 schema</td><td>schema 数千个后元数据/迁移变慢</td></tr>
+<tr><td>独立库/租户</td><td>强（物理）</td><td>最高；N 套库要管</td><td>租户数线性爆炸；小租户浪费资源</td></tr>
+</table>
+</div>
+<p>主流 SaaS 默认<strong>共享库 + 行级</strong>（成本碾压），用 <strong>Postgres Row-Level Security (RLS)</strong> 把"漏 WHERE"从人为约束变成数据库强制约束：策略一旦建好，连接里设了 <code>app.tenant_id</code>，DB 自动给每条查询追加租户过滤——<em>应用代码忘写也不会泄露</em>。大客户（合规要求物理隔离）再单独切独立库，做混合分层。</p>
+<pre><code>-- Postgres RLS：把租户隔离下沉到数据库层
+ALTER TABLE documents ENABLE ROW LEVEL SECURITY;
+CREATE POLICY tenant_isolation ON documents
+  USING (tenant_id = current_setting('app.tenant_id')::uuid);
+-- 每个连接进入租户上下文时：
+SET app.tenant_id = '...';   -- 之后所有 query 自动被过滤，应用层无需手写 WHERE
+</code></pre>
+<div class="callout"><strong>陷阱：</strong>RLS 要小心 <em>连接池复用</em>——连接归还池子前必须 <code>RESET</code> 租户上下文，否则下一个租户复用到带着上家 <code>tenant_id</code> 的连接。还要注意表 owner / <code>BYPASSRLS</code> 角色会绕过策略，迁移脚本别用超级用户裸跑。</div>
+<div class="case"><strong>现实案例：</strong>Salesforce 是经典共享库多租户（org_id 贯穿数据层）；Slack、Notion 等也以逻辑隔离为主、对企业大客户提供更强隔离。Postgres RLS 是 Supabase 等平台多租户隔离的默认机制（<a href="https://www.postgresql.org/docs/current/ddl-rowsecurity.html" target="_blank">PostgreSQL 官方文档 · Row Security Policies</a>）。</div>
+
+<h3>④ 审计日志 — append-only 与不可抵赖（tamper-evidence）</h3>
+<p class="tradeoff"><strong>一句话 trade-off</strong>：审计要写在业务事务里才不丢，但又不能拖慢/污染业务库；要可信就得防篡改，但完全不可改与"可运维"是矛盾。</p>
+<p><strong>【原理】</strong> 审计日志和普通业务日志的根本区别：它是<strong>证据</strong>，要满足三点——<em>完整（不丢事件）、不可篡改（事后改不了）、可追溯（who/what/when/from where）</em>。</p>
+<ul>
+<li><strong>不丢</strong>：权限变更这类关键事件用 <strong>Outbox 模式</strong>（见 Day 7）——把审计记录和业务变更写在<em>同一个事务</em>里，再由 CDC 投递到审计存储，避免"业务成功但审计丢了"。</li>
+<li><strong>不可篡改</strong>：append-only + <strong>哈希链</strong>——每条记录存 <code>hash(prev_hash + payload)</code>，任何人改中间一条，后面所有 hash 对不上，篡改即暴露。再周期性把链头 hash 锚定到外部（如 WORM 存储 / 公证），连"删整段"都防住。</li>
+<li><strong>不拖业务</strong>：审计走<em>独立存储</em>（追加优化的列存/对象存储），与 OLTP 库分离；查询是低频分析，不挤占业务热路径。</li>
+</ul>
+<pre><code># pseudo-code — 哈希链审计，篡改可检测
+def append_audit(event):
+    prev = store.last()                  # 取上一条
+    record = {
+        "actor": event.actor, "action": event.action,
+        "target": event.target, "ts": now(),
+        "prev_hash": prev.hash,
+    }
+    record["hash"] = sha256(prev.hash + canonical_json(record))
+    store.append(record)                 # append-only，永不 UPDATE/DELETE
+
+def verify():                            # 巡检：重算每条 hash，断链即报警
+    for r in store.scan():
+        assert r["hash"] == sha256(r["prev_hash"] + canonical_json(strip_hash(r)))
+</code></pre>
+<div class="case"><strong>现实案例：</strong>AWS CloudTrail 提供日志文件完整性校验（log file integrity validation，对每批日志做哈希并签名）；GitHub / Stripe 等都向企业客户暴露 audit log API 供合规导出。SOC2 / GDPR 审计要求"权限变更与数据访问可追溯"，哈希链 + WORM 是常见落地方式。</div>
+
+<h2>扩展与优化</h2>
+<ul>
+<li><strong>从内嵌到中心化 PDP</strong>：早期权限散在各服务 <code>if user.role==...</code>，规模大后抽出中心化授权服务（Zanzibar/Himeji/OpenFGA），统一模型、统一审计、统一缓存。</li>
+<li><strong>读写分离 + 反向索引</strong>：列表页"我能看哪些项目"用物化的 <em>user→objects</em> 反向索引，避免对每个对象逐个 check（N+1 授权）。</li>
+<li><strong>策略即代码</strong>：ABAC 用 OPA/Rego 把策略版本化、可测试、可灰度，避免线上手改规则。</li>
+<li><strong>缓存预热与降级</strong>：授权是最热路径，冷启动用历史热点预热；PDP 不可用时<strong>fail-closed（默认拒绝）</strong>而非 fail-open——可用性让位于安全。</li>
+</ul>
+
+<h2>常见陷阱 + 面试追问</h2>
+<ul>
+<li><strong>Fail-open vs fail-closed</strong>：授权服务挂了怎么办？答 fail-closed（拒绝）几乎总是对的——宁可拒绝合法请求，不可放行越权。但要权衡：核心读路径全拒会导致全站不可用，可对<em>低敏感</em>操作做有限降级。</li>
+<li><strong>N+1 授权</strong>：列表 100 行做 100 次 check，p99 被放大。要批量 check（BatchCheck）或反向索引一次拿全集。面试常问"列表页权限过滤怎么做"。</li>
+<li><strong>撤销延迟</strong>：纯 TTL 缓存会让撤销延迟到 TTL 到期。必须 CDC/版本号主动失效——"踢人后多久生效"是经典追问。</li>
+<li><strong>RLS 连接池泄露上下文</strong>：连接复用没 RESET <code>tenant_id</code> → 跨租户读。也别忘了 <code>BYPASSRLS</code> 角色和迁移脚本绕过策略。</li>
+<li><strong>用业务库当审计源</strong>：业务表能 UPDATE，就不是可信审计。审计必须 append-only + 防篡改 + 独立存储。</li>
+<li><strong>把权限写进 JWT 然后无法撤销</strong>：JWT 内嵌大量权限 claim 后，权限一变旧 token 还有效（见 Day 24）。授权决策应实时查 PDP，JWT 只携带身份。</li>
+</ul>
+
+<h2>深入资源</h2>
+<ul>
+<li><a href="https://research.google/pubs/zanzibar-googles-consistent-global-authorization-system/" target="_blank">Zanzibar: Google's Consistent, Global Authorization System</a> — USENIX ATC 2019，ReBAC 的奠基论文（关系元组、userset rewrite、Zookie、Leopard 索引）。</li>
+<li><a href="https://medium.com/airbnb-engineering/himeji-a-scalable-centralized-system-for-authorization-at-airbnb-341664924574" target="_blank">Himeji: a scalable centralized system for authorization at Airbnb</a> — 工业界 Zanzibar 落地（缓存分片、CDC 失效、Aurora 存储）。</li>
+<li><a href="https://openfga.dev/docs/authorization-concepts" target="_blank">OpenFGA · Authorization Concepts</a> — RBAC / ABAC / ReBAC / Zanzibar 概念对比与可上手实现（Auth0/Okta，CNCF）。</li>
+<li><a href="https://www.notion.com/blog/data-model-behind-notion" target="_blank">The data model behind Notion's flexibility</a> — block 树 + parent 指针的权限继承设计。</li>
+<li><a href="https://www.postgresql.org/docs/current/ddl-rowsecurity.html" target="_blank">PostgreSQL · Row Security Policies</a> — 多租户行级隔离的数据库原生实现。</li>
+<li>《Designing Data-Intensive Applications》(Kleppmann) — 一致性与因果序章节，理解 Zookie 背后的外部一致性。</li>
+</ul>
+
+<h2>深入思考</h2>
+
+<details>
+<summary>1. Zanzibar 的 Zookie 到底解决了缓存系统里哪个普通 TTL 解决不了的问题？为什么授权特别需要它？</summary>
+<div class="answer">
+<p>普通缓存的 stale 是"读到旧值"，授权里的 stale 是<strong>安全事故</strong>——刚被撤权的人读到旧权限 = 越权。但更微妙的是<em>因果一致性</em>：用户先把文档设为私密（写 ACL），再分享链接；接收方点开时，必须读到"已私密"这个新状态，否则把私密文档当公开读了。纯 TTL 无法保证"这次读不早于那次写"。</p>
+<p>Zookie 是一个携带版本/时间戳的 token：写 ACL 返回 Zookie，后续 check 带上它，系统保证<strong>判定所用的快照不早于 Zookie 指定的时刻</strong>。它把"新鲜度"从模糊的 TTL 变成可证明的因果下界——这是把缓存一致性和外部一致性绑定。代价是要维护全局版本（Zanzibar 靠 Spanner 的 TrueTime),普通系统难复刻，所以多数实现退而用"版本号+CDC 主动失效"近似。</p>
+</div>
+</details>
+
+<details>
+<summary>2. 一个名人在你平台有 200 万 follower，"follower 都能看我的公开帖"用 ReBAC 元组怎么存？直接展开会怎样？</summary>
+<div class="answer">
+<p>千万别展开成 200 万条 <code>post#viewer@user:X</code> 元组——写一次帖要插 200 万行，改一次可见性要删 200 万行，这是经典 fanout 写放大（见 Day 14)。</p>
+<p>正确做法是用 <strong>userset 间接引用</strong>：存一条 <code>post#viewer@user:celeb#follower</code>，即"viewer = celeb 的 follower 集合"。check 时再展开 follower 关系。但这把成本转移到了<em>读</em>：每次 check 要遍历 follower 集合判断是否包含某人——对 200 万成员的集合做包含判断又太慢。</p>
+<p>这正是 Zanzibar <strong>Leopard 索引</strong>的用武之地：对深/广的 group 预计算 flatten 后的成员位图，把"X 是否属于 celeb 的 follower"从图遍历降为索引查。trade-off 回到技术点②——写时多维护一份物化索引，换读时 O(1)。这题本质是 fanout-on-write vs fanout-on-read 在授权语境的重演。</p>
+</div>
+</details>
+
+<details>
+<summary>3. 列表页要展示用户"有权访问的 1000 个项目中的前 20 个并分页"。逐个 check 会怎样？正确架构是什么？</summary>
+<div class="answer">
+<p>逐个 check（先取所有项目再过滤）= N+1 授权 + 取了大量无权数据再丢弃，分页还会错乱（过滤后不足 20 个）。这是面试里区分新手和老手的题。</p>
+<p>两条正解：① <strong>反向索引/物化</strong>——维护 <code>user → accessible_objects</code> 列表，查询直接 <code>WHERE id IN (该用户可访问集) LIMIT 20</code>，授权下推到数据查询，一次搞定且分页正确。② <strong>授权感知的查询</strong>——把权限条件编译进 SQL（如 RLS 或 join 权限表），让数据库在扫描时就过滤。</p>
+<p>Zanzibar 提供 <code>Expand</code>/反查 API 正是为此。关键洞察：<strong>"check 单个对象"和"列出可访问对象"是两个不同问题，后者不能用前者循环解决</strong>——前者是点查，后者要反向索引。很多授权系统的性能事故出在用 check 硬循环做列表。</p>
+</div>
+</details>
+
+<details>
+<summary>4. 你用共享库 + RLS 做多租户，跑得好好的。一个金融大客户要求"我的数据绝不能和别人在同一个数据库"。怎么演进而不重写？</summary>
+<div class="answer">
+<p>这是典型的<strong>分层多租户（tiered tenancy）</strong>问题。不要因为一个客户把所有人迁到独立库——成本和运维爆炸。做法：保持共享库做默认池（绝大多数中小租户），同时支持把指定租户<em>路由</em>到独立库/独立 schema。</p>
+<p>关键是<strong>路由层抽象</strong>：在数据访问层加一个 <code>tenant → shard/datasource</code> 的映射，应用代码按 <code>tenant_id</code> 解析到对应连接。共享池租户走 RLS 隔离，专属租户走物理库。新客户上线只是改路由配置，不动业务代码。</p>
+<p>难点在<strong>跨层迁移</strong>：把一个租户从共享库搬到独立库要做在线数据迁移（双写→回填→校验→切读→切写，见 Day 22 的 expand-contract）。还要统一 schema 演进——独立库不能落后于共享库的迁移版本。这题考的是"为最贵的客户做特例，但别让特例污染主路径"。</p>
+</div>
+</details>
+
+<details>
+<summary>5. 审计日志用哈希链防篡改。但运维需要删除某用户数据（GDPR 删除权）——删了链就断了。这个矛盾怎么解？</summary>
+<div class="answer">
+<p>这是合规里两条要求的直接冲突：审计要<em>不可篡改保留</em>，GDPR 要<em>可删除个人数据</em>。直接删审计记录会断哈希链、毁掉不可抵赖性。</p>
+<p>常见解法：① <strong>加密删除（crypto-shredding）</strong>——审计记录里的个人数据<em>不明文存</em>，而是用每用户一把密钥加密；要"删除"该用户时销毁密钥，密文永久不可解，但记录本身（及其 hash）仍在，链不断。② <strong>分离 PII</strong>——审计链只存 <code>actor_id / action / target_id</code> 这类标识符和事件结构，真实 PII 放可删的旁表，链上存的是引用；删 PII 不动链。③ <strong>tombstone</strong>——不物理删，追加一条"已删除"事件，把可见性而非数据本身改掉。</p>
+<p>本质洞察：<strong>"不可篡改"约束的是审计事件的发生事实，"可删除"约束的是其中的个人数据载荷——把这两层解耦，就能同时满足。</strong>这也是为什么审计设计要从一开始就区分"事件骨架"和"PII 载荷"。</p>
+</div>
+</details>
+
+<div class="nav"><a href="index.html">← 回到 index</a></div>
+</div>
+</body></html>
