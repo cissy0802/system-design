@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 31 · 混合检索与重排序 (Hybrid Search & Reranking) — System Design Bi-daily</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"SF Pro Display","Noto Sans SC",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
+.container{max-width:820px;margin:0 auto;padding:24px 20px 60px}
+header{padding:40px 0 28px;border-bottom:1px solid rgba(100,200,255,0.15);margin-bottom:32px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem}
+.tag{padding:3px 10px;border-radius:4px;background:rgba(100,200,255,0.12);color:#64c8ff;border:1px solid rgba(100,200,255,0.25)}
+.tag.diff{background:rgba(94,234,212,0.1);color:#5eead4;border-color:rgba(94,234,212,0.3)}
+.tag.day{background:rgba(255,180,80,0.1);color:#ffb450;border-color:rgba(255,180,80,0.25)}
+h1{font-size:1.75rem;font-weight:800;background:linear-gradient(135deg,#64c8ff 0%,#5eead4 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:0.5px;line-height:1.3}
+h1 .en{display:block;font-size:1rem;color:#7a8590;-webkit-text-fill-color:#7a8590;margin-top:6px;font-weight:500}
+h2{font-size:1.2rem;color:#5eead4;margin:36px 0 14px;padding-left:12px;border-left:3px solid #5eead4}
+h3{font-size:1rem;color:#64c8ff;margin:20px 0 10px;font-weight:600}
+p{margin:10px 0;color:#c8cfd6}
+ul,ol{margin:10px 0 10px 22px;color:#c8cfd6}
+li{margin:6px 0}
+strong{color:#e8eef5;font-weight:600}
+em{color:#5eead4;font-style:normal;font-weight:500}
+code{font-family:"SF Mono",Menlo,Consolas,monospace;background:rgba(100,200,255,0.1);color:#5eead4;padding:1px 6px;border-radius:3px;font-size:0.88em}
+pre{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:14px 16px;overflow-x:auto;margin:12px 0;font-family:"SF Mono",Menlo,Consolas,monospace;font-size:0.84rem;line-height:1.55;color:#c8cfd6}
+pre code{background:none;color:inherit;padding:0;font-size:1em}
+.mermaid{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:18px;margin:14px 0;text-align:center;overflow-x:auto;cursor:zoom-in;transition:border-color 0.15s}
+.mermaid:hover{border-color:rgba(100,200,255,0.4)}
+.mermaid svg{width:100%;max-width:100%;height:auto;min-height:280px}
+.lightbox{position:fixed;inset:0;background:rgba(8,12,18,0.96);z-index:9999;display:none;align-items:center;justify-content:center;padding:24px;cursor:grab;backdrop-filter:blur(4px);overflow:hidden}
+.lightbox.open{display:flex}
+.lightbox.dragging{cursor:grabbing}
+.lightbox svg{width:auto;height:auto;max-width:96vw;max-height:92vh;transform-origin:center center;will-change:transform}
+.lightbox .hint{position:fixed;top:16px;right:20px;font-size:0.78rem;color:#7a8590;font-family:"SF Mono",Menlo,monospace;pointer-events:none}
+.callout{background:rgba(255,180,80,0.06);border-left:3px solid #ffb450;padding:12px 14px;margin:14px 0;border-radius:4px;font-size:0.94rem}
+.callout strong{color:#ffb450}
+.tradeoff{background:rgba(100,200,255,0.05);border:1px solid rgba(100,200,255,0.2);border-radius:6px;padding:12px 14px;margin:12px 0;font-size:0.94rem}
+.case{background:rgba(94,234,212,0.05);border-left:3px solid #5eead4;padding:12px 14px;margin:12px 0;border-radius:4px;font-size:0.94rem}
+.case strong{color:#5eead4}
+.nav{margin-top:50px;padding-top:24px;border-top:1px solid rgba(100,200,255,0.15);text-align:center}
+.nav a{color:#64c8ff;text-decoration:none;font-size:0.92rem;padding:8px 16px;border:1px solid rgba(100,200,255,0.3);border-radius:4px;transition:all 0.15s}
+.nav a:hover{background:rgba(100,200,255,0.1)}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:0.9rem}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid rgba(100,200,255,0.15)}
+th{color:#64c8ff;font-weight:600;background:rgba(100,200,255,0.05)}
+details{background:rgba(100,200,255,0.04);border:1px solid rgba(100,200,255,0.18);border-radius:6px;padding:12px 16px;margin:10px 0;transition:all 0.15s}
+details:hover{border-color:rgba(100,200,255,0.35)}
+details[open]{background:rgba(94,234,212,0.05);border-color:rgba(94,234,212,0.3)}
+details summary{font-weight:600;color:#e8eef5;list-style:none;outline:none;cursor:pointer;display:flex;align-items:flex-start;gap:10px;font-size:0.96rem}
+details summary::-webkit-details-marker{display:none}
+details summary::before{content:'▶';color:#64c8ff;font-size:0.75em;transition:transform 0.2s;flex-shrink:0;margin-top:5px}
+details[open] summary::before{transform:rotate(90deg);color:#5eead4}
+details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
+details .answer ul,details .answer ol{margin:6px 0 6px 22px}
+@media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+</style>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({startOnLoad:true,theme:'base',flowchart:{useMaxWidth:true,htmlLabels:true,nodeSpacing:50,rankSpacing:60},themeVariables:{primaryColor:'#1a2530',primaryTextColor:'#e8eef5',primaryBorderColor:'#64c8ff',lineColor:'#5eead4',secondaryColor:'#0e1419',tertiaryColor:'#0a0f14',background:'#0a0f14',mainBkg:'#1a2530',secondBkg:'#0e1419',textColor:'#d4dae0',fontFamily:'-apple-system,"SF Pro Display",sans-serif',fontSize:'16px'}});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const lb=document.createElement('div');lb.className='lightbox';
+  lb.innerHTML='<span class="hint">scroll = zoom · drag = pan · Esc / click bg = close</span>';
+  document.body.appendChild(lb);
+  let scale=1,panX=0,panY=0,dragging=false,moved=false,lx=0,ly=0;
+  const apply=()=>{const s=lb.querySelector('svg');if(s)s.style.transform=`translate(${panX}px,${panY}px) scale(${scale})`};
+  const reset=()=>{scale=1;panX=0;panY=0};
+  const close=()=>{lb.classList.remove('open');const s=lb.querySelector('svg');if(s)s.remove();reset()};
+  document.addEventListener('click',e=>{
+    if(e.target.closest('.lightbox')){if(moved){moved=false;return}close();return}
+    const w=e.target.closest('.mermaid');if(!w)return;
+    const svg=w.querySelector('svg');if(!svg)return;
+    const c=svg.cloneNode(true);c.removeAttribute('style');
+    c.style.maxWidth='96vw';c.style.maxHeight='92vh';
+    lb.appendChild(c);lb.classList.add('open');reset();apply();
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+  lb.addEventListener('wheel',e=>{
+    if(!lb.classList.contains('open'))return;
+    e.preventDefault();
+    const svg=lb.querySelector('svg');if(!svg)return;
+    const ns=Math.max(0.3,Math.min(10,scale*(1-e.deltaY*0.002)));
+    const r=svg.getBoundingClientRect();
+    const cx=e.clientX-(r.left+r.width/2),cy=e.clientY-(r.top+r.height/2);
+    const k=ns/scale-1;panX-=cx*k;panY-=cy*k;scale=ns;apply();
+  },{passive:false});
+  lb.addEventListener('mousedown',e=>{
+    if(!lb.classList.contains('open'))return;
+    dragging=true;moved=false;lx=e.clientX;ly=e.clientY;lb.classList.add('dragging');e.preventDefault();
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    const dx=e.clientX-lx,dy=e.clientY-ly;
+    if(Math.abs(dx)+Math.abs(dy)>3)moved=true;
+    panX+=dx;panY+=dy;lx=e.clientX;ly=e.clientY;apply();
+  });
+  document.addEventListener('mouseup',()=>{dragging=false;lb.classList.remove('dragging')});
+});
+</script>
+</head><body><div class="container">
+
+<header>
+<div class="meta">
+<span class="tag day">Day 31</span>
+<span class="tag diff">Hard</span>
+<span class="tag">Search</span>
+<span class="tag">BM25 + Vector</span>
+<span class="tag">Reranking</span>
+<span class="tag">Multi-stage</span>
+</div>
+<h1>混合检索与重排序 — BM25 与向量的多阶段拼接<span class="en">Hybrid Search & Reranking: BM25 + Vector, Multi-stage Retrieval, RRF, Cross-encoder, Snippets</span></h1>
+</header>
+
+<h2>问题场景 + 需求约束</h2>
+<p>为一个 <strong>5000 万 SKU 的电商目录</strong>设计搜索：既要 <code>iPhone 15 Pro 256GB</code> 这种<em>精确型号/SKU</em> 命中，也要「适合露营的轻便保暖外套」这种<em>自然语言意图</em>命中。纯关键词搜索对第二类查询召回为零（用户没打「外套」就搜不到）；纯向量搜索对第一类又会把「iPhone 14」「iPhone 15 标准版」混进来，丢掉精确性。</p>
+<p>关键数字：peak <strong>5k QPS</strong>、p99 <strong>&lt; 150ms</strong>、每查返回 top-24、目录 50M 文档、向量 768 维。约束：召回不能漏（漏 = 用户买不到 = 直接损失 GMV），但精排预算有限（cross-encoder 很贵）。这逼出整套<strong>多阶段</strong>设计——便宜的召回拉宽，昂贵的精排收窄。</p>
+
+<h2>高层架构</h2>
+<pre class="mermaid">
+graph LR
+    Q["Query<br/><i>纠错/分词/改写</i>"]
+    BM["BM25 召回<br/><i>倒排索引 · 精确词</i>"]
+    VEC["向量召回<br/><i>HNSW ANN · 语义</i>"]
+    FUSE["融合<br/><i>RRF / 加权</i>"]
+    RANK["精排 Rerank<br/><i>cross-encoder / GBDT</i>"]
+    BIZ["业务重排<br/><i>价格/库存/广告/个性化</i>"]
+    SNIP["Snippet 高亮<br/><i>query-biased</i>"]
+    R["Top-24"]
+
+    Q --> BM --> FUSE
+    Q --> VEC --> FUSE
+    FUSE -->|top-200| RANK -->|top-50| BIZ --> SNIP --> R
+
+    classDef q fill:#1a2530,stroke:#64c8ff,color:#e8eef5
+    classDef rec fill:#0e2030,stroke:#5eead4,color:#e8eef5
+    classDef rank fill:#1a1a30,stroke:#ffb450,color:#e8eef5
+    classDef out fill:#2a1530,stroke:#ff7ab6,color:#e8eef5
+    class Q q
+    class BM,VEC,FUSE rec
+    class RANK,BIZ rank
+    class SNIP,R out
+</pre>
+<p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">漏斗：召回拉到几百（高 recall、低成本）→ 精排收到几十（高 precision、高成本）→ 业务重排定最终序</p>
+<p>核心思想：<strong>把「找全」和「排准」拆成不同阶段</strong>。召回层用两条便宜的通道（关键词 + 语义）并行拉候选，融合去重；精排层只对几百个候选跑昂贵模型；最后叠加价格、库存、广告等业务信号。每一阶段的延迟预算和候选数严格递减。</p>
+
+<h2>关键技术点</h2>
+
+<h3>1. 混合检索：BM25 vs 稠密向量，为什么必须都要</h3>
+<p>核心 trade-off：<em>词法精确 vs 语义泛化，两者的盲区正好互补</em>。</p>
+<p><strong>原理</strong>：<strong>BM25</strong>（Okapi BM25，Robertson/Spärck Jones）是 TF-IDF 的概率改良版，按词频 + 逆文档频率打分，并对文档长度归一化、对高频词做饱和（一个词出现 10 次不等于 5 次的两倍价值）。它走<em>倒排索引</em>，对精确词、罕见词（SKU、型号、人名）、否定与布尔逻辑极强。<strong>稠密向量</strong>把 query 和文档各编码成一个 768 维向量（bi-encoder，如 BERT 类双塔），算余弦相似度，捕捉<em>语义</em>——「laptop」匹配「notebook computer」，「便宜」匹配「平价」。但它对精确 token 不敏感，且会「自信地编造相关性」。</p>
+<div class="tradeoff">
+<strong>Trade-off：</strong>
+<ul>
+<li><strong>纯 BM25</strong>：✅ 零样本就能用、可解释、对长尾罕见词无敌；❌ 词汇鸿沟（vocabulary mismatch）——同义/换说法直接漏召回。</li>
+<li><strong>纯稠密向量</strong>：✅ 跨语言、抗改写、懂意图；❌ 罕见实体/数字/型号召回差、要训练/微调、解释性弱、ANN 有近似误差。</li>
+<li><strong>混合</strong>：✅ 互补覆盖，公认 recall 最高；❌ 两套索引（倒排 + ANN）、两份运维成本、融合需要调参。</li>
+</ul></div>
+<pre><code># 混合召回：两条通道并行，再融合
+def retrieve(q):
+    sparse = bm25_index.search(q.text, k=100)        # 倒排，精确词
+    dense  = ann_index.search(embed(q.text), k=100)  # HNSW，语义
+    return fuse(sparse, dense)        # 见技术点 3
+</code></pre>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Elastic</strong>：官方推混合检索，BM25 + kNN 两个 retriever 并行后 RRF 融合，「精确词匹配 SKU/罕见词 + 自然语言语义」一并拿到（<a href="https://www.elastic.co/elasticsearch/hybrid-search">elastic.co/elasticsearch/hybrid-search</a>）。</li>
+<li><strong>DoorDash</strong>：明确选「灵活的混合系统」——关键词检索保证规则可控，再叠 LLM 做文档与查询理解（<a href="https://careersatdoordash.com/blog/how-doordash-leverages-llms-for-better-search-retrieval/">careersatdoordash.com 搜索博客</a>）。</li>
+</ul></div>
+
+<h3>2. 多阶段检索：召回 / 粗排 / 精排的漏斗</h3>
+<p>核心 trade-off：<em>每阶段在「候选数」与「单条评估成本」之间做反向权衡</em>。</p>
+<p><strong>原理</strong>：不可能对 5000 万文档都跑昂贵模型。多阶段把检索建成漏斗：<strong>召回（recall）</strong>从全库拉几百个，目标是「别漏」，用最便宜的 BM25/ANN；<strong>精排（precision）</strong>只对这几百个跑重模型，目标是「排准」。关键在于<em>每阶段成本 × 候选数 ≈ 常数</em>——召回单条近乎免费但数量大，精排单条很贵但数量少，乘起来才落在延迟预算内。ANN（如 <strong>HNSW</strong> 分层可导航小世界图）就是召回阶段「用近似换速度」的代表：放弃精确 KNN，换 sub-ms 的对数级查找。</p>
+<div class="tradeoff">
+<strong>Trade-off（召回层 ANN 算法）：</strong>
+<ul>
+<li><strong>HNSW</strong>：✅ 查询快、召回高、支持增量插入；❌ 内存占用大（图结构常驻），删除/更新麻烦。</li>
+<li><strong>IVF-PQ</strong>（倒排 + 乘积量化）：✅ 内存省、适合超大规模；❌ 召回率较低、要训练码本、调 nprobe。</li>
+<li><strong>暴力精确 KNN</strong>：✅ 100% 召回；❌ O(N) 不可用于 50M 在线查询。</li>
+</ul></div>
+<pre><code># 漏斗：候选数递减、单条成本递增
+cand = hybrid_retrieve(q, k=200)        # ~亚毫秒/条，要全
+cand = rerank_cross_encoder(q, cand)[:50]  # ~ms/条，要准
+final = business_rerank(cand)[:24]      # 价格/库存/广告/个性化
+</code></pre>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Vespa</strong>：phased ranking——first-phase 用便宜函数扫全部候选，second-phase 只对 top 跑重模型（如 ColBERT MaxSim），把延迟控制住（<a href="https://docs.vespa.ai/en/ranking/phased-ranking.html">docs.vespa.ai 分阶段排序</a>）。</li>
+<li><strong>DoorDash</strong>：自建搜索引擎做多阶段检索与排序，公开称延迟下降约 50%（ByteByteGo 拆解过其架构）。</li>
+</ul></div>
+
+<h3>3. 融合与重排序：RRF vs 加权，bi-encoder vs cross-encoder</h3>
+<p>核心 trade-off：<em>融合解决「两套分数不可比」，重排序解决「双塔精度不够」，但 cross-encoder 慢两个数量级</em>。</p>
+<p><strong>原理</strong>：BM25 分数（无上界）和余弦相似度（0~1）<em>量纲不同</em>，直接加权平均会被某一路主导。<strong>RRF（Reciprocal Rank Fusion，Cormack 2009）</strong>只看<em>排名</em>不看分数：文档得分 = Σ 1/(k + rank)，k 常取 60，天然解决量纲不可比问题，且无需归一化。融合后进精排：<strong>bi-encoder</strong>（召回用的双塔）query 和文档<em>独立</em>编码、可离线建索引；<strong>cross-encoder</strong> 把 query+文档<em>拼接</em>一起喂模型，让两者 token 充分交互，精度高得多，但必须在线现算、无法预存——这正是它只能放在精排（候选已缩到几十个）的原因。</p>
+<table>
+<thead><tr><th></th><th>Bi-encoder（双塔）</th><th>Cross-encoder（交叉）</th></tr></thead>
+<tbody>
+<tr><td><strong>编码方式</strong></td><td>query / doc 各自独立编码</td><td>query+doc 拼接联合编码</td></tr>
+<tr><td><strong>能否预建索引</strong></td><td>能（文档向量离线算好）</td><td>不能（必须在线现算）</td></tr>
+<tr><td><strong>精度</strong></td><td>中</td><td>高（token 级交互）</td></tr>
+<tr><td><strong>成本</strong></td><td>低（一次向量比对）</td><td>高（每对一次前向）</td></tr>
+<tr><td><strong>用在</strong></td><td>召回（百万级）</td><td>精排（几十~几百）</td></tr>
+</tbody></table>
+<pre><code># RRF：只用排名，免归一化
+def rrf(lists, k=60):
+    score = defaultdict(float)
+    for ranked in lists:                 # 每条通道的有序结果
+        for rank, doc in enumerate(ranked):
+            score[doc] += 1.0 / (k + rank)
+    return sorted(score, key=score.get, reverse=True)
+
+# 精排：cross-encoder 现算（只跑融合后的 top-N）
+scores = cross_encoder.predict([(q, d.text) for d in candidates])
+</code></pre>
+<div class="tradeoff">
+<strong>融合 Trade-off：</strong><strong>RRF</strong> 鲁棒免调参、对异常分数不敏感，但丢掉了分数幅度信息（强匹配和弱匹配同 rank 被等同）；<strong>加权线性</strong>（α·norm(bm25)+(1-α)·cos）保留幅度、可调，但要做分数归一化、α 需按 query 类型调，易过拟合。生产里常默认 RRF，对高价值垂类再上加权或学习式融合。
+</div>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Elasticsearch</strong>：RRF 是内置 retriever，按 1/(k+rank) 融合 BM25 与 kNN 列表，官方文档详述（<a href="https://www.elastic.co/docs/reference/elasticsearch/rest-apis/reciprocal-rank-fusion">elastic.co RRF 文档</a>）。</li>
+<li><strong>Cohere Rerank</strong>：产品化的 cross-encoder——把 query 与候选文档拼接、按语义相关性重排，超长文档自动切块多次推理（<a href="https://docs.cohere.com/docs/rerank">docs.cohere.com/docs/rerank</a>）。</li>
+</ul></div>
+
+<h3>4. Snippet 生成与高亮：让结果「看起来相关」</h3>
+<p>核心 trade-off：<em>展示的是<strong>解释</strong>而非<strong>检索</strong>——选错片段，再准的排序用户也不点</em>。</p>
+<p><strong>原理</strong>：Snippet 是<em>query-biased summarization</em>：不是取文档前两句，而是选「最能体现与本次 query 相关」的窗口。经典做法滑动一个固定长度窗口，按窗口内 query 词命中数、词稀有度（IDF 高的词权重大）、词间距打分，取最高窗口并对命中词做 <code>&lt;em&gt;</code> 高亮。难点：高亮必须落在<em>渲染后</em>的原文 offset 上（分词、stemming、Unicode 归一化后位置会偏），错位会高亮错字符。</p>
+<pre><code># query-biased 片段：选命中最密集、稀有词最多的窗口
+def best_snippet(doc_tokens, q_terms, W=160):
+    qset, best, lo = set(q_terms), (-1, 0), 0
+    for i in range(0, len(doc_tokens)-W, 20):
+        win = doc_tokens[i:i+W]
+        # 命中数 + IDF 加权 + 覆盖不同 query 词的多样性
+        s = sum(idf(t) for t in win if t in qset) \
+            + 2*len({t for t in win if t in qset})
+        if s > best[0]: best, lo = (s, i), i
+    return highlight(doc_tokens[lo:lo+W], qset)  # 命中词包 &lt;em&gt;
+</code></pre>
+<div class="tradeoff">
+<strong>Trade-off：</strong>词法高亮（命中词标黄）便宜、对精确查询直观，但对语义召回的结果可能「一个 query 词都不在片段里」（是向量召回的），显得不相关；<em>抽取式 LLM 摘要</em>能解释语义相关性，但贵、有延迟、可能产生幻觉。折中：精确命中走高亮，语义命中走简短抽取式摘要。
+</div>
+<div class="case">
+<strong>现实案例：</strong>Google/Bing 的搜索结果摘要长期用 query-biased 抽取 + 高亮；现代 RAG 系统则把 snippet 直接喂给 LLM 作为「带出处的上下文」，高亮变成 citation 锚点。
+</div>
+
+<h2>扩展与优化</h2>
+<ul>
+<li><strong>学习式融合 / 学习排序（LTR）</strong>：用点击日志训练 GBDT（LambdaMART）或神经排序模型替代手调 α，把 BM25 分、向量分、CTR、价格等做特征统一打分。</li>
+<li><strong>稀疏神经检索（SPLADE）</strong>：让模型在倒排索引上做「词项扩展」，兼得 BM25 的可解释与神经的语义，省掉一套 ANN。</li>
+<li><strong>索引新鲜度</strong>：向量需重算 embedding 才能更新，文档改了要 re-embed + 重建 HNSW；用近实时（NRT）增量段 + 后台 merge，热门新品单独走快通道。</li>
+<li><strong>个性化与多目标</strong>：精排后叠加用户画像、库存、利润、广告 bid，常做成多目标加权或多塔模型，注意别让商业目标压垮相关性。</li>
+<li><strong>多区域 / 成本</strong>：cross-encoder GPU 贵，按 query 价值分级——头部高价值查询上重 reranker，长尾查询只用融合结果。</li>
+</ul>
+
+<h2>常见陷阱 + 面试问题</h2>
+<div class="callout"><strong>1. 直接把 BM25 分和余弦相似度加权平均。</strong> 量纲不可比，结果被无上界的 BM25 主导。要么 RRF（只用 rank），要么先按 query 归一化再加权。</div>
+<div class="callout"><strong>2. 用 cross-encoder 做召回。</strong> 它无法预建索引、必须在线现算，对全库跑 = 延迟爆炸。cross-encoder 只能在候选缩到几十~几百后用。</div>
+<div class="callout"><strong>3. 只看 NDCG/precision 不看 recall。</strong> 漏召回在精排阶段<em>无法补救</em>——召回没捞到的文档，精排再强也排不出来。召回层的 recall@k 是上限。</div>
+<div class="callout"><strong>4. 高亮 offset 错位。</strong> 分词/stemming/Unicode 归一化后位置漂移，CJK 尤其容易，必须在原始字节/字符串上回映射。</div>
+<p><strong>高频面试追问：</strong></p>
+<ol>
+<li>为什么不能只用向量搜索？给一个纯向量必漏、纯 BM25 必中的 query 例子，反之亦然。</li>
+<li>RRF 的 k 取 60 意味着什么？调大调小分别偏向头部还是尾部？</li>
+<li>bi-encoder 和 cross-encoder 的本质区别？为什么前者能建索引、后者不能？</li>
+<li>5000 万文档、768 维向量，HNSW 索引大概占多少内存？怎么估？</li>
+<li>召回阶段 recall@200 只有 85%，精排再好也救不回那 15%——怎么提召回？</li>
+</ol>
+
+<h2>深入资源</h2>
+<ul>
+<li><strong>Elasticsearch — Reciprocal Rank Fusion / Hybrid search</strong>：RRF 公式与混合检索官方实现（<a href="https://www.elastic.co/docs/reference/elasticsearch/rest-apis/reciprocal-rank-fusion">RRF 文档</a> · <a href="https://www.elastic.co/elasticsearch/hybrid-search">hybrid search</a>）。</li>
+<li><strong>Vespa Blog & Docs — Phased Ranking / Hybrid Search</strong>：多阶段排序与 BM25+向量融合的工程实践（<a href="https://blog.vespa.ai/redefining-hybrid-search-possibilities-with-vespa/">Vespa hybrid search</a>）。</li>
+<li><strong>Cohere — Rerank</strong>：cross-encoder 重排序的产品化与用法（<a href="https://docs.cohere.com/docs/rerank">docs.cohere.com/docs/rerank</a>）。</li>
+<li><strong>DoorDash Engineering</strong>：用 LLM 改进搜索检索的混合系统设计（<a href="https://careersatdoordash.com/blog/how-doordash-leverages-llms-for-better-search-retrieval/">careersatdoordash.com</a>）。</li>
+<li><strong>《DDIA》Ch 3</strong>（Kleppmann）：倒排索引与存储引擎的本质讨论，理解 BM25 召回的底层。</li>
+</ul>
+
+<h2>深入思考（点击展开答案）</h2>
+
+<details>
+<summary>1. 召回 recall@200=85%，精排 NDCG 很高，但线上 GMV 不涨。瓶颈在哪？怎么定位？</summary>
+<div class="answer">
+<p>瓶颈极可能在<strong>召回，不在精排</strong>。精排只能在召回捞到的 200 个里重排——那漏掉的 15% 文档<em>根本进不了候选集</em>，精排再强也无能为力。NDCG 高只说明「捞到的排得好」，掩盖了「没捞到的看不见」。</p>
+<p>定位方法：① 离线用人工标注/点击日志算 <strong>recall@k 上限</strong>——把已知应命中的文档拿去查召回，看进没进候选；② 拆 query 类型，大概率是<em>语义型/长尾</em> query 召回差（向量没覆盖好）或<em>精确型</em>被向量噪声挤掉；③ A/B 把 k 从 200 提到 500，若 GMV 涨说明召回是瓶颈。修法：扩召回通道、提 ANN 的 efSearch、引入 SPLADE，而不是继续优化精排。<strong>核心洞察：多阶段漏斗里，上游的 recall 是下游一切的天花板。</strong></p>
+</div>
+</details>
+
+<details>
+<summary>2. RRF 的 k=60 调成 k=1 或 k=1000，排序行为各自怎么变？</summary>
+<div class="answer">
+<p>RRF 得分 = Σ 1/(k+rank)。<strong>k 控制「排名差异被放大还是抹平」。</strong></p>
+<p><strong>k 很小（如 1）</strong>：1/(1+0)=1、1/(1+1)=0.5，头部名次之间差距巨大——极度偏向各通道的 rank-1，几乎是「谁家第一名谁赢」，对头部敏感、尾部几乎无贡献。<strong>k 很大（如 1000）</strong>：1/1000 vs 1/1001 几乎相等，所有名次被压平，rank 信息被稀释，退化成「在多少个通道里出现过」的计数——更看重<em>多通道共识</em>而非单通道高排名。</p>
+<p>k=60 是经验折中：既保留头部区分度，又让中段文档（在两条通道都中等排名的）能靠「共识」浮上来——这正是混合检索想要的「两边都觉得相关的更可信」。调参方向：想强调单通道强信号就减小 k，想强调跨通道一致性就增大 k。</p>
+</div>
+</details>
+
+<details>
+<summary>3. 5000 万文档、768 维 float32 向量、HNSW，内存大概多少？怎么估？</summary>
+<div class="answer">
+<p><strong>向量本身</strong>：768 维 × 4 字节 = 3072 B ≈ 3 KB/条。5e7 × 3 KB ≈ <strong>150 GB</strong>。</p>
+<p><strong>HNSW 图结构</strong>：每个节点存 M 个邻居指针（每层），常见 M=16，每个邻居 ID 约 4–8 字节，含多层开销，经验上图额外占向量的 20%–60%。按 ~50% 估约 75 GB。</p>
+<p><strong>合计 ~200–230 GB</strong>，单机内存放不下/很贵。这就是为什么大规模要么<strong>分片</strong>（按 shard 拆到多机，查询 scatter-gather），要么用 <strong>PQ/量化</strong>把 3 KB 压到几百字节（IVF-PQ 可压 8–32 倍）换召回率，要么<strong>磁盘 ANN</strong>（DiskANN）把图放 SSD。面试官想看你<em>会做数量级估算并据此选架构</em>，而不是背 HNSW 公式。</p>
+</div>
+</details>
+
+<details>
+<summary>4. 为什么 cross-encoder 精度高却不能用于召回？这背后是什么计算结构上的根本限制？</summary>
+<div class="answer">
+<p>根本在<strong>能否预计算与摊销</strong>。bi-encoder 把 query 和 doc <em>独立</em>编码成向量，文档向量可以<em>离线算好存进 ANN 索引</em>，在线只做向量比对——文档侧成本被一次性摊销。cross-encoder 把 query+doc <em>拼接</em>后整体过模型，让两者的 token 在 attention 里逐对交互（这正是它精度高的来源），但也意味着<em>结果依赖具体 query</em>，无法离线预存——每个 (query, doc) 对都得在线现跑一次完整前向。</p>
+<p>对 5000 万文档，召回阶段要评估的对数是「query × 全库」，cross-encoder 就是 5000 万次前向，秒级都打不住。所以它只能放在候选已缩到几十~几百的精排阶段。<strong>洞察：交互越充分精度越高，但交互让结果无法预计算——精度与可摊销性是一对根本矛盾，多阶段架构正是用它来分工。</strong>ColBERT 的「late interaction」就是想在两者间取中间态。</p>
+</div>
+</details>
+
+<details>
+<summary>5. 向量召回会「自信地召回不相关结果」——它永远返回最近邻，哪怕全库没有真正相关的。怎么防？</summary>
+<div class="answer">
+<p>这是稠密检索的结构性缺陷：ANN<em>总能</em>找到「最近」的 k 个，但「最近」不等于「相关」。query 落在嵌入空间的稀疏区域时，最近邻可能离得很远却仍被返回——表现为「搜一个库里根本没有的东西，也给你一堆不沾边的结果」。</p>
+<p>防御手段：① <strong>相似度阈值</strong>——余弦低于阈值的直接丢，宁可返回少或空也不返回噪声（但阈值随 query 漂移，难统一）；② <strong>用 BM25 兜底/校验</strong>——混合检索里若向量召回的文档一个 query 词都不含、BM25 分也极低，降权或剔除；③ <strong>cross-encoder 精排做守门</strong>——它能给出绝对相关性分数，把低分的滤掉；④ <strong>OOD/置信检测</strong>——监控 query 嵌入到最近邻的距离分布，异常远的判为「无好结果」走兜底文案。<strong>关键认知：向量检索给的是<em>相对</em>排序，不是<em>绝对</em>相关性判断——绝对判断要靠阈值或 cross-encoder 补。</strong></p>
+</div>
+</details>
+
+<div class="nav"><a href="index.html">← 回到 index</a></div>
+</div>
+</body></html>
