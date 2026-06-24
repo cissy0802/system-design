@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 33 · AI Product Backend — System Design Bi-daily</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"SF Pro Display","Noto Sans SC",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
+.container{max-width:820px;margin:0 auto;padding:24px 20px 60px}
+header{padding:40px 0 28px;border-bottom:1px solid rgba(100,200,255,0.15);margin-bottom:32px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem}
+.tag{padding:3px 10px;border-radius:4px;background:rgba(100,200,255,0.12);color:#64c8ff;border:1px solid rgba(100,200,255,0.25)}
+.tag.diff{background:rgba(94,234,212,0.1);color:#5eead4;border-color:rgba(94,234,212,0.3)}
+.tag.day{background:rgba(255,180,80,0.1);color:#ffb450;border-color:rgba(255,180,80,0.25)}
+h1{font-size:1.75rem;font-weight:800;background:linear-gradient(135deg,#64c8ff 0%,#5eead4 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:0.5px;line-height:1.3}
+h1 .en{display:block;font-size:1rem;color:#7a8590;-webkit-text-fill-color:#7a8590;margin-top:6px;font-weight:500}
+h2{font-size:1.2rem;color:#5eead4;margin:36px 0 14px;padding-left:12px;border-left:3px solid #5eead4}
+h3{font-size:1rem;color:#64c8ff;margin:20px 0 10px;font-weight:600}
+p{margin:10px 0;color:#c8cfd6}
+ul,ol{margin:10px 0 10px 22px;color:#c8cfd6}
+li{margin:6px 0}
+strong{color:#e8eef5;font-weight:600}
+em{color:#5eead4;font-style:normal;font-weight:500}
+code{font-family:"SF Mono",Menlo,Consolas,monospace;background:rgba(100,200,255,0.1);color:#5eead4;padding:1px 6px;border-radius:3px;font-size:0.88em}
+pre{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:14px 16px;overflow-x:auto;margin:12px 0;font-family:"SF Mono",Menlo,Consolas,monospace;font-size:0.84rem;line-height:1.55;color:#c8cfd6}
+pre code{background:none;color:inherit;padding:0;font-size:1em}
+.mermaid{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:18px;margin:14px 0;text-align:center;overflow-x:auto;cursor:zoom-in;transition:border-color 0.15s}
+.mermaid:hover{border-color:rgba(100,200,255,0.4)}
+.mermaid svg{width:100%;max-width:100%;height:auto;min-height:280px}
+.lightbox{position:fixed;inset:0;background:rgba(8,12,18,0.96);z-index:9999;display:none;align-items:center;justify-content:center;padding:24px;cursor:grab;backdrop-filter:blur(4px);overflow:hidden}
+.lightbox.open{display:flex}
+.lightbox.dragging{cursor:grabbing}
+.lightbox svg{width:auto;height:auto;max-width:96vw;max-height:92vh;transform-origin:center center;will-change:transform}
+.lightbox .hint{position:fixed;top:16px;right:20px;font-size:0.78rem;color:#7a8590;font-family:"SF Mono",Menlo,monospace;pointer-events:none}
+.callout{background:rgba(255,180,80,0.06);border-left:3px solid #ffb450;padding:12px 14px;margin:14px 0;border-radius:4px;font-size:0.94rem}
+.callout strong{color:#ffb450}
+.tradeoff{background:rgba(100,200,255,0.05);border:1px solid rgba(100,200,255,0.2);border-radius:6px;padding:12px 14px;margin:12px 0;font-size:0.94rem}
+.case{background:rgba(94,234,212,0.05);border-left:3px solid #5eead4;padding:12px 14px;margin:12px 0;border-radius:4px;font-size:0.94rem}
+.case strong{color:#5eead4}
+.nav{margin-top:50px;padding-top:24px;border-top:1px solid rgba(100,200,255,0.15);text-align:center}
+.nav a{color:#64c8ff;text-decoration:none;font-size:0.92rem;padding:8px 16px;border:1px solid rgba(100,200,255,0.3);border-radius:4px;transition:all 0.15s}
+.nav a:hover{background:rgba(100,200,255,0.1)}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:0.9rem}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid rgba(100,200,255,0.15)}
+th{color:#64c8ff;font-weight:600;background:rgba(100,200,255,0.05)}
+details{background:rgba(100,200,255,0.04);border:1px solid rgba(100,200,255,0.18);border-radius:6px;padding:12px 16px;margin:10px 0;transition:all 0.15s}
+details:hover{border-color:rgba(100,200,255,0.35)}
+details[open]{background:rgba(94,234,212,0.05);border-color:rgba(94,234,212,0.3)}
+details summary{font-weight:600;color:#e8eef5;list-style:none;outline:none;cursor:pointer;display:flex;align-items:flex-start;gap:10px;font-size:0.96rem}
+details summary::-webkit-details-marker{display:none}
+details summary::before{content:'▶';color:#64c8ff;font-size:0.75em;transition:transform 0.2s;flex-shrink:0;margin-top:5px}
+details[open] summary::before{transform:rotate(90deg);color:#5eead4}
+details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
+details .answer ul,details .answer ol{margin:6px 0 6px 22px}
+@media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+</style>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({startOnLoad:true,theme:'base',flowchart:{useMaxWidth:true,htmlLabels:true,nodeSpacing:50,rankSpacing:60},themeVariables:{primaryColor:'#1a2530',primaryTextColor:'#e8eef5',primaryBorderColor:'#64c8ff',lineColor:'#5eead4',secondaryColor:'#0e1419',tertiaryColor:'#0a0f14',background:'#0a0f14',mainBkg:'#1a2530',secondBkg:'#0e1419',textColor:'#d4dae0',fontFamily:'-apple-system,"SF Pro Display",sans-serif',fontSize:'16px'}});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const lb=document.createElement('div');lb.className='lightbox';
+  lb.innerHTML='<span class="hint">scroll = zoom · drag = pan · Esc / click bg = close</span>';
+  document.body.appendChild(lb);
+  let scale=1,panX=0,panY=0,dragging=false,moved=false,lx=0,ly=0;
+  const apply=()=>{const s=lb.querySelector('svg');if(s)s.style.transform=`translate(${panX}px,${panY}px) scale(${scale})`};
+  const reset=()=>{scale=1;panX=0;panY=0};
+  const close=()=>{lb.classList.remove('open');const s=lb.querySelector('svg');if(s)s.remove();reset()};
+  document.addEventListener('click',e=>{
+    if(e.target.closest('.lightbox')){if(moved){moved=false;return}close();return}
+    const w=e.target.closest('.mermaid');if(!w)return;
+    const svg=w.querySelector('svg');if(!svg)return;
+    const c=svg.cloneNode(true);c.removeAttribute('style');
+    c.style.maxWidth='96vw';c.style.maxHeight='92vh';
+    lb.appendChild(c);lb.classList.add('open');reset();apply();
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+  lb.addEventListener('wheel',e=>{
+    if(!lb.classList.contains('open'))return;
+    e.preventDefault();
+    const svg=lb.querySelector('svg');if(!svg)return;
+    const ns=Math.max(0.3,Math.min(10,scale*(1-e.deltaY*0.002)));
+    const r=svg.getBoundingClientRect();
+    const cx=e.clientX-(r.left+r.width/2),cy=e.clientY-(r.top+r.height/2);
+    const k=ns/scale-1;panX-=cx*k;panY-=cy*k;scale=ns;apply();
+  },{passive:false});
+  lb.addEventListener('mousedown',e=>{
+    if(!lb.classList.contains('open'))return;
+    dragging=true;moved=false;lx=e.clientX;ly=e.clientY;lb.classList.add('dragging');e.preventDefault();
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    const dx=e.clientX-lx,dy=e.clientY-ly;
+    if(Math.abs(dx)+Math.abs(dy)>3)moved=true;
+    panX+=dx;panY+=dy;lx=e.clientX;ly=e.clientY;apply();
+  });
+  document.addEventListener('mouseup',()=>{dragging=false;lb.classList.remove('dragging')});
+});
+</script>
+</head><body><div class="container">
+
+<header>
+<div class="meta">
+<span class="tag day">Day 33</span>
+<span class="tag diff">Hard</span>
+<span class="tag">AI Backend</span>
+<span class="tag">RAG</span>
+<span class="tag">Agent Loop</span>
+<span class="tag">Embedding Serving</span>
+</div>
+<h1>AI Product Backend — RAG, Agentic Loops & Human-in-the-loop<span class="en">RAG, Durable Agent Loops, Embedding Serving, Human-in-the-loop</span></h1>
+</header>
+
+<h2>Scenario + Requirements</h2>
+<p>Build a "document Q&A + agent assistant" backend for <strong>500K enterprise users</strong>: users ask questions, the system retrieves from an internal knowledge base to answer; complex tasks ("compare these three contracts into a table and email it") go to an agent for multi-step execution. This is <strong>not "wrap an LLM API"</strong>—it is simultaneously a <em>retrieval system</em>, a <em>long-running task orchestrator</em>, and an exercise in <em>fencing a non-deterministic model output inside controllable engineering boundaries</em>.</p>
+<ul>
+<li><strong>Scale</strong>: 100M chunks (~20M source docs), 1024-dim vectors; Q&A peak 2000 QPS, agent task concurrency 5000.</li>
+<li><strong>Latency</strong>: Q&A p95 <em>first token &lt; 1.5s</em> (retrieval budget ≤ 300ms); agent tasks may run seconds to minutes but must be <em>resumable</em>.</li>
+<li><strong>Correctness</strong>: answers must be <em>attributable</em> (traceable to a chunk); high-risk actions (send email, mutate data) require <em>human confirmation</em>.</li>
+<li><strong>Cost</strong>: LLM tokens dominate—the longer the retrieved context, the more expensive. Recall quality converts directly into dollars.</li>
+</ul>
+
+<h2>High-level Architecture</h2>
+<div class="mermaid">
+graph TD
+  U[User request] --> GW[API Gateway / auth·rate-limit]
+  GW --> ORCH[Orchestrator<br/>Q&amp;A or Agent route]
+  ORCH -->|Q&amp;A| RET[Retrieval]
+  subgraph RET[Retrieval ≤300ms]
+    EMB[Embedding service<br/>query vectorize] --> VDB[(Vector DB ANN)]
+    BM25[(BM25 inverted)]
+    VDB --> FUSE[RRF fusion]
+    BM25 --> FUSE
+    FUSE --> RR[Cross-encoder rerank]
+  end
+  RR --> LLM[LLM inference<br/>streaming first token]
+  ORCH -->|complex task| AG[Agent Loop<br/>durable execution]
+  AG --> TOOLS[Tool calls<br/>retrieval·DB·external API]
+  AG -.high-risk action.-> HITL[Human-in-the-loop<br/>approval queue]
+  HITL -.approve/deny.-> AG
+  AG --> LLM
+  LLM --> U
+  INGEST[Offline ingest<br/>chunk·embed·index] --> VDB
+  INGEST --> BM25
+</div>
+<p><strong>Three main flows</strong>: ① the <em>Q&A hot path</em> runs "retrieve → fuse → rerank → stream", on a tight budget; ② the <em>agent path</em> runs on a durable execution engine that can run long and resume after interruption; ③ <em>offline ingest</em> turns documents into searchable vectors+inverted index, decoupled from online. Four key points below.</p>
+
+<h2>Key Technical Points</h2>
+
+<h3>① RAG retrieval quality — bad recall can't be saved by a smarter model</h3>
+<p>One-line trade-off: <strong>naive chunk-embedding is cheap but recalls poorly</strong>; contextual + hybrid + rerank recalls well but is costly and slower.</p>
+<p>[Principle] The RAG bottleneck is almost never generation—it's <em>retrieval recall</em>. The model can only answer from the chunks you feed it; <strong>what isn't retrieved doesn't exist</strong>. The naive approach splits docs into 512-token chunks and embeds each in isolation, but chunking strips context: a passage says "this approach cut latency 40%", yet which approach, in which doc, is invisible from the isolated chunk—so semantic search misses. Anthropic's <em>Contextual Retrieval</em> prepends an LLM-generated "what this chunk is about" summary before embedding, and adds BM25 keyword retrieval for hybrid recall.</p>
+<div class="tradeoff"><strong>Three recall strategies:</strong>
+<table>
+<tr><th>Approach</th><th>Recall quality</th><th>Cost</th></tr>
+<tr><td>Naive chunk embedding</td><td>Baseline</td><td>Cheapest; misses long-tail / proper nouns</td></tr>
+<tr><td>Contextual + Hybrid + Rerank</td><td>Failure rate ↓ sharply</td><td>+1 LLM call per chunk at ingest + 1 rerank online</td></tr>
+<tr><td>Stuff full corpus into context</td><td>No retrieval error</td><td>Token cost explodes, blows the window; impossible at 100M chunks</td></tr>
+</table>
+</div>
+<pre><code># Online retrieval: hybrid recall + rerank (pseudocode)
+q_vec = embed(query)                      # vectorize query
+dense = vdb.ann_search(q_vec, k=100)      # semantic recall top-100
+sparse = bm25.search(query, k=100)        # keyword recall top-100
+fused = rrf(dense, sparse)                # reciprocal rank fusion, dedup
+top = cross_encoder.rerank(query, fused)[:8]  # keep 8 most relevant
+context = "\n\n".join(c.text for c in top)
+answer = llm.stream(prompt(query, context))   # stream w/ citations</code></pre>
+<div class="case"><strong>Real case:</strong> Anthropic <a href="https://www.anthropic.com/news/contextual-retrieval">Contextual Retrieval</a> reports this reduces retrieval failures by ~49%, and ~67% combined with reranking. The original <em>RAG</em> paradigm is from Lewis et al. 2020 (NeurIPS), combining parametric knowledge with an external non-parametric retrieval store. More on retrieval and reranking in Day 31 "Hybrid Search & Reranking".</div>
+
+<h3>② Agent loop as a service — turn a long, crash-prone loop into a resumable workflow</h3>
+<p>One-line trade-off: <strong>an in-memory loop is simple but loses everything on crash</strong>; durable execution is resumable but must persist every step.</p>
+<p>[Principle] An agent is a loop: <em>call model → model requests a tool → run the tool → feed result back → call model again</em>, until done. The problem: this loop may run minutes and dozens of steps, during which any step can hit a deploy restart, tool timeout, or model 503. If state lives only in memory, one crash restarts the whole task from scratch—after burning real tokens on every step. The fix is <strong>durable execution</strong>: persist each step's input/output as an event, and on crash replay from the last successful step without re-running completed tool calls (via idempotency keys). This is exactly the value of engines like Temporal / AWS Step Functions.</p>
+<div class="tradeoff"><strong>Three agent execution models:</strong>
+<ul>
+<li><strong>In-memory loop</strong> (a while loop on the request thread): 5 minutes to build, fine for &lt;10s tasks; lost on restart/autoscale, unusable for long tasks.</li>
+<li><strong>Durable execution engine</strong> (Temporal-style): each step persisted, auto-retry, resume after crash, can pause for days awaiting approval; cost is writing agent logic as a deterministic workflow with all side effects in activities.</li>
+<li><strong>Stateless + full replay</strong>: store no intermediate state, on recovery re-feed history to "re-walk" it; saves storage but replay burns tokens and is dangerous with side-effecting tools (re-sending email).</li>
+</ul>
+</div>
+<pre><code># Durable agent loop (durable workflow pseudocode)
+def agent_workflow(task):
+    history = [user_msg(task)]
+    for step in range(MAX_STEPS):             # hard cap against runaway
+        resp = activity.call_llm(history)     # persisted; replay won't recompute
+        if resp.is_final:
+            return resp.text
+        for call in resp.tool_calls:
+            # idempotency key = (workflow_id, step, tool, args_hash)
+            result = activity.run_tool(call, idem_key=key(step, call))
+            history.append(tool_result(call, result))
+    raise StepLimitExceeded   # trigger degrade / handoff to human</code></pre>
+<div class="case"><strong>Real case:</strong> Anthropic <a href="https://www.anthropic.com/engineering/building-effective-agents">Building Effective Agents</a> distinguishes <em>workflows</em> (predefined orchestration) from <em>agents</em> (model dynamically directs its path), and stresses "don't build an agent if a simpler solution works"—agents trade latency and cost for flexibility. In production, agent orchestration commonly sits on durable execution engines like Temporal / Step Functions (same lineage as Day 39 "Workflow Engines").</div>
+
+<h3>③ Embedding service design — model version and index version must be locked together</h3>
+<p>One-line trade-off: <strong>online real-time embedding is low-latency but pricey</strong>, batch embedding is high-throughput but delayed; the biggest trap is <em>changing the model = re-embedding the whole corpus</em>.</p>
+<p>[Principle] The embedding service has two traffic classes: online (query vectorization, must be fast, cacheable) and offline (batch-embedding 100M chunks, needs throughput). They should be <em>deployed separately</em>: online for small low-latency batches, offline for large GPU-saturating batches. The key constraint is the <strong>same vector space</strong>—query and doc must be embedded by the <em>same model</em>, or vectors can't be compared. So once you upgrade the embedding model, <strong>the entire index must be rebuilt with the new model</strong>, with old and new coexisting during a gradual cutover—never mixed mid-flight (mixing utterly distorts similarity).</p>
+<div class="callout"><strong>Fatal trap:</strong> embedding the query with the new model while the docs are still in the old index—the computed similarity is <em>noise</em>, recall is all wrong but nothing errors out (nothing crashes, answers just get worse). Always tag the index with <code>model_version</code> and have the query side assert consistency.</div>
+<pre><code># Offline ingest: batch embed + dual-index canary (pseudocode)
+for batch in chunks.stream(size=256):         # large batch saturates GPU
+    vecs = embed_offline(batch, model="v3")   # same model family as online
+    new_index.upsert(batch.ids, vecs, meta={"model":"v3"})
+# On model change: build v3 in background → validate recall → atomic cutover → drop v2
+# Online query side:
+@cache(ttl="1h")                              # cache hot query vectors
+def embed_query(q): return embed_online(q, model=current_index_model())</code></pre>
+<div class="tradeoff"><strong>Online vs offline embedding:</strong> online suits queries (high QPS, short text, high cache hit); offline suits ingest (large volume, tolerates minute-level latency, batching saves money). Don't run a full re-embed on the online service—it will wreck online query latency.</div>
+<div class="case"><strong>Real case:</strong> vector DBs (pgvector / Pinecone / Milvus, etc.) commonly use HNSW for ANN; the recall/latency trade-off is in Day 12 "Search Systems". OpenAI / Cohere embedding APIs explicitly version their models, and their docs stress rebuilding the index on a version change—an industry-wide constraint, not one vendor's quirk.</div>
+
+<h3>④ Human-in-the-loop — fence high-risk actions behind an approval gate</h3>
+<p>One-line trade-off: <strong>synchronous blocking is simple but holds a connection/thread</strong>; async suspend scales but must persist the whole agent state.</p>
+<p>[Principle] Models make mistakes, so <em>irreversible high-risk actions</em> (send email, transfer money, delete data, change prod config) can't be left to the agent's own call. The pattern is <strong>human-in-the-loop</strong>: when the agent reaches a high-risk tool, instead of executing it, it <em>pauses</em>, pushes "I intend to do X" to an approval queue, and continues only after approval. The hard part is that "wait for a human" may take hours or days—you can't have a thread/connection idle-waiting. So it must build on the durable execution of point ②: persist agent state, release all resources, and on the approval callback <em>resume from the pause point</em>.</p>
+<div class="tradeoff"><strong>Three ways to wait:</strong>
+<ul>
+<li><strong>Synchronous blocking</strong>: the request thread holds while awaiting approval—simplest, but waiting hours exhausts the connection pool; never for long waits.</li>
+<li><strong>Polling / short-timeout retry</strong>: periodically check approval status—simple, but with latency and wasted poll overhead.</li>
+<li><strong>Durable suspend + event wake</strong>: the workflow persists and releases resources, woken on the approval event—can wait arbitrarily long with zero resource hold, at the cost of depending on a durable engine and correct resume semantics.</li>
+</ul>
+</div>
+<pre><code># High-risk tool → suspend for approval (durable pseudocode)
+def run_tool(call):
+    if call.tool in HIGH_RISK:
+        approval_id = approvals.create(call)        # push to approval queue
+        decision = workflow.wait_for_signal(         # durable suspend, can wait days
+            approval_id, timeout="3d")
+        if decision != "approved":
+            return refused(call)                     # don't execute if denied
+    return execute(call)                             # execute only if approved/low-risk</code></pre>
+<div class="case"><strong>Real case:</strong> Anthropic <a href="https://www.anthropic.com/engineering/building-effective-agents">Building Effective Agents</a> lists "human checkpoints at key steps" as a core practice for agentic systems—especially when actions are irreversible or high-cost. This complements the Saga compensation idea from Day 7 "Distributed Transactions": compensable actions run automatically, non-compensable ones (an already-sent email) go through human approval.</div>
+
+<h2>Scaling & Optimization</h2>
+<ul>
+<li><strong>Semantic cache</strong>: reuse answers for similar queries (return on vector-neighbor hit); high-frequency FAQs skip the whole retrieve+generate chain, saving money and latency. Mind invalidation—knowledge-base updates must expire the cache.</li>
+<li><strong>Retrieval sharding</strong>: 100M vectors won't fit one machine; shard by tenant/topic, route queries to relevant shards, avoid full-corpus scans (see Day 4 "Sharding").</li>
+<li><strong>Multi-tier model routing</strong>: simple questions to a small model, complex tasks to a large one, routing by difficulty to cut cost (see Day 32 "LLM Serving").</li>
+<li><strong>Incremental reindex</strong>: route doc updates through CDC, re-embed only changed chunks rather than rebuilding the whole corpus.</li>
+<li><strong>Eval loop</strong>: maintain a fixed golden set of "question → expected source", run regression on every retrieval/model change, holding quality with recall/answer-correctness instead of tuning by vibes.</li>
+</ul>
+
+<h2>Common Pitfalls + Interview Follow-ups</h2>
+<ul>
+<li><strong>"Blame model hallucination when recall is the problem"</strong>: 80% of bad RAG answers are failures to retrieve the right chunk, not the model making things up. Measure retrieval recall first, then talk generation.</li>
+<li><strong>"Query and doc use different embedding models"</strong>: similarity becomes noise, recall all wrong, and nothing alarms—the invisible killer noted above.</li>
+<li><strong>"Agent state only in memory"</strong>: any deploy/autoscale event restarts every running task from scratch, tokens burned for nothing. Long tasks must be persisted.</li>
+<li><strong>"Agent infinite loop"</strong>: no step cap, the model keeps calling tools without converging, blowing the budget. Need a hard cap + degrade to human.</li>
+<li><strong>"Irreversible high-risk action executed automatically"</strong>: a wrong email or deletion can't be rolled back. Irreversible actions always go human-in-the-loop.</li>
+<li><strong>Follow-up</strong>: "Retrieval budget is only 300ms—what if hybrid+rerank can't finish?" → parallelize dense/sparse recall, rerank only top-N, use a distilled small cross-encoder, route hot queries to the semantic cache.</li>
+</ul>
+
+<h2>Deep-dive Resources</h2>
+<ul>
+<li><a href="https://www.anthropic.com/engineering/building-effective-agents">Anthropic — Building Effective Agents</a>: workflow vs agent, when to use an agent, human checkpoints, and other practices.</li>
+<li><a href="https://www.anthropic.com/news/contextual-retrieval">Anthropic — Contextual Retrieval</a>: contextual embedding + BM25 + rerank cuts retrieval failures by ~49%/67%.</li>
+<li>Lewis et al. 2020, <em>Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks</em> (NeurIPS): the original RAG paper.</li>
+<li><em>Designing Data-Intensive Applications</em> (Kleppmann): the fundamentals of idempotency, state machines, and recoverable execution—the basis for durable agent execution.</li>
+<li>This series Day 31 (Hybrid Search & Reranking), Day 32 (LLM Serving), Day 39 (Workflow Engines)—this issue is where those three converge for AI products.</li>
+</ul>
+
+<h2>Going Deeper</h2>
+
+<details><summary>1. "Long-context models keep getting cheaper—stuff the whole knowledge base into context and RAG is obsolete." Where is this right and wrong?</summary>
+<div class="answer">
+<p>Wrong. Even with a huge, cheap context window, RAG remains irreplaceable for three reasons: <strong>① cost and latency stay linear in tokens</strong>—stuffing 100M chunks into every request explodes both cost and first-token latency; retrieval compresses it to top-8; <strong>② lost in the middle</strong>—in very long contexts a model's use of mid-context information drops markedly, and putting relevant content up front (which is what retrieval does) is more accurate; <strong>③ attributability and freshness</strong>—RAG naturally yields "this answer came from this chunk", and knowledge-base updates take effect instantly without retraining/reloading the model.</p>
+<p>The right part: retrieval <em>granularity</em> can get coarser—no need for 512-token chunks; you can retrieve whole sections/docs into a large window, reducing the "chunking strips context" problem. So the trend is RAG and long-context <em>fusing</em> (coarse recall + large-window reading), not one replacing the other.</p>
+</div>
+</details>
+
+<details><summary>2. Your agent succeeded at the "send email" tool on step 7, but the process crashed before step 8 persisted. How do you avoid sending the email twice on recovery?</summary>
+<div class="answer">
+<p>The core is <strong>idempotency</strong>, not "remembering we already sent it". Durable execution recovers by <em>replay</em>: re-execute from the last successfully persisted step. If step 7's tool result <em>was persisted</em>, replay returns the cached result without re-running the tool—no duplicate email. The danger window is "tool succeeded but result not yet persisted before crash": replay will then call the tool again.</p>
+<p>Defense is a <em>tool-side idempotency key</em>: every tool call carries <code>idem_key=(workflow_id, step, args_hash)</code>, and the email service dedups on it—the same key arriving twice returns the first result without actually sending. This is the same idea as Day 17 "Payment Systems" idempotent recovery points: <strong>external side effects must be idempotent themselves; the orchestration engine's bookkeeping isn't enough</strong>, because a gap between side effect and persistence always exists.</p>
+</div>
+</details>
+
+<details><summary>3. The knowledge base ingests 100K docs/day, but you've switched embedding models and must re-embed the whole corpus (100M chunks, ~8 hours). What happens to user queries during the rebuild?</summary>
+<div class="answer">
+<p>You can't take an outage, and you can't query a mixed old/new index (vector spaces are incompatible). The standard approach is <strong>dual index + atomic cutover</strong>: the old index (v2) keeps serving all queries; the new index (v3) is rebuilt in the background with the new model, while queries still go to v2 and are embedded with the v2 model (keeping the space consistent). Once v3 is built, run the golden eval set to confirm recall hasn't regressed, then <em>atomically</em> cut all traffic (including the query embedding model) to v3, and finally drop v2.</p>
+<p>The hard part is <em>incremental updates during the rebuild</em>: the 100K docs arriving in those 8 hours must be written to <em>both</em> indexes (v2 with the old model, v3 with the new), i.e. <strong>dual-write</strong>, or v3 will be missing that data at cutover. Dual-write must handle failure consistency (retry/compensate if one write fails). Cost-wise, the rebuild is a one-off large offline job—use spot/batch GPUs to crush cost, don't take from online resources.</p>
+</div>
+</details>
+
+<details><summary>4. Why is "agent observability harder than traditional microservices"? What should you instrument?</summary>
+<div class="answer">
+<p>The difficulty is <strong>non-determinism + multi-step + high cost</strong>. A traditional service has one trace per request and reproducible behavior; an agent task is a dynamically unfolding tree of dozens of steps that may take a different path next time on the same input, burning tokens at every step—so when something breaks you must answer not just "which step was slow/wrong" but "why did the model decide to go this way" and "how much did this step cost".</p>
+<p>Instrument: <strong>① a full trace per step</strong> (model input/output, which tool was chosen, tool latency and result); <strong>② token and cost attribution</strong> by task/user/tool; <strong>③ replayable decisions</strong>—store each step's prompt+response to debug "why this decision"; <strong>④ quality signals</strong>—retrieval recall, whether answers carry citations, human approval pass rate, runaway rate (fraction hitting the step cap). This is the metrics/logs/traces trio of Day 21 "Observability", plus two extra dimensions: cost and decision.</p>
+</div>
+</details>
+
+<details><summary>5. After launching a semantic cache (reuse answers for similar queries), hit rate is 30% and saves a lot—but two weeks later users complain about "stale / off-topic answers". What likely went wrong?</summary>
+<div class="answer">
+<p>Two classic traps. <strong>① Missing invalidation</strong>: the knowledge base updated, but the old answers in the semantic cache didn't expire, so users get conclusions based on old docs. Semantic-cache invalidation is harder than plain KV cache—you don't know which chunks a cached answer depended on, so either use short TTLs, bump by knowledge-base version, or record an answer's source chunks and invalidate targeted when those chunks update.</p>
+<p><strong>② Similarity threshold too loose</strong>: "off-topic" means queries that aren't <em>similar enough</em> were judged as hits. "What's our refund policy" and "what's our return policy" are close in vector space but have different answers. Too loose mismatches; too tight drops hit rate. Tune the threshold on real query pairs, and for <em>high-risk/precise</em> queries (money, policy, personal data) <strong>disable</strong> the semantic cache, enabling it only for broad FAQs. This is exactly Day 2 "Caching"—"how long can you tolerate stale" and "cache invalidation is hard"—replayed in an AI setting.</p>
+</div>
+</details>
+
+<div class="nav"><a href="index.en.html">← Back to index</a></div>
+</div>
+</body></html>
