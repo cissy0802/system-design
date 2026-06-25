@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 34 · Real-time Systems — System Design Bi-daily</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"SF Pro Display","Noto Sans SC",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
+.container{max-width:820px;margin:0 auto;padding:24px 20px 60px}
+header{padding:40px 0 28px;border-bottom:1px solid rgba(100,200,255,0.15);margin-bottom:32px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem}
+.tag{padding:3px 10px;border-radius:4px;background:rgba(100,200,255,0.12);color:#64c8ff;border:1px solid rgba(100,200,255,0.25)}
+.tag.diff{background:rgba(94,234,212,0.1);color:#5eead4;border-color:rgba(94,234,212,0.3)}
+.tag.day{background:rgba(255,180,80,0.1);color:#ffb450;border-color:rgba(255,180,80,0.25)}
+h1{font-size:1.75rem;font-weight:800;background:linear-gradient(135deg,#64c8ff 0%,#5eead4 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:0.5px;line-height:1.3}
+h1 .en{display:block;font-size:1rem;color:#7a8590;-webkit-text-fill-color:#7a8590;margin-top:6px;font-weight:500}
+h2{font-size:1.2rem;color:#5eead4;margin:36px 0 14px;padding-left:12px;border-left:3px solid #5eead4}
+h3{font-size:1rem;color:#64c8ff;margin:20px 0 10px;font-weight:600}
+p{margin:10px 0;color:#c8cfd6}
+ul,ol{margin:10px 0 10px 22px;color:#c8cfd6}
+li{margin:6px 0}
+strong{color:#e8eef5;font-weight:600}
+em{color:#5eead4;font-style:normal;font-weight:500}
+code{font-family:"SF Mono",Menlo,Consolas,monospace;background:rgba(100,200,255,0.1);color:#5eead4;padding:1px 6px;border-radius:3px;font-size:0.88em}
+pre{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:14px 16px;overflow-x:auto;margin:12px 0;font-family:"SF Mono",Menlo,Consolas,monospace;font-size:0.84rem;line-height:1.55;color:#c8cfd6}
+pre code{background:none;color:inherit;padding:0;font-size:1em}
+.mermaid{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:18px;margin:14px 0;text-align:center;overflow-x:auto;cursor:zoom-in;transition:border-color 0.15s}
+.mermaid:hover{border-color:rgba(100,200,255,0.4)}
+.mermaid svg{width:100%;max-width:100%;height:auto;min-height:280px}
+.lightbox{position:fixed;inset:0;background:rgba(8,12,18,0.96);z-index:9999;display:none;align-items:center;justify-content:center;padding:24px;cursor:grab;backdrop-filter:blur(4px);overflow:hidden}
+.lightbox.open{display:flex}
+.lightbox.dragging{cursor:grabbing}
+.lightbox svg{width:auto;height:auto;max-width:96vw;max-height:92vh;transform-origin:center center;will-change:transform}
+.lightbox .hint{position:fixed;top:16px;right:20px;font-size:0.78rem;color:#7a8590;font-family:"SF Mono",Menlo,monospace;pointer-events:none}
+.callout{background:rgba(255,180,80,0.06);border-left:3px solid #ffb450;padding:12px 14px;margin:14px 0;border-radius:4px;font-size:0.94rem}
+.callout strong{color:#ffb450}
+.tradeoff{background:rgba(100,200,255,0.05);border:1px solid rgba(100,200,255,0.2);border-radius:6px;padding:12px 14px;margin:12px 0;font-size:0.94rem}
+.case{background:rgba(94,234,212,0.05);border-left:3px solid #5eead4;padding:12px 14px;margin:12px 0;border-radius:4px;font-size:0.94rem}
+.case strong{color:#5eead4}
+.nav{margin-top:50px;padding-top:24px;border-top:1px solid rgba(100,200,255,0.15);text-align:center}
+.nav a{color:#64c8ff;text-decoration:none;font-size:0.92rem;padding:8px 16px;border:1px solid rgba(100,200,255,0.3);border-radius:4px;transition:all 0.15s}
+.nav a:hover{background:rgba(100,200,255,0.1)}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:0.9rem}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid rgba(100,200,255,0.15)}
+th{color:#64c8ff;font-weight:600;background:rgba(100,200,255,0.05)}
+details{background:rgba(100,200,255,0.04);border:1px solid rgba(100,200,255,0.18);border-radius:6px;padding:12px 16px;margin:10px 0;transition:all 0.15s}
+details:hover{border-color:rgba(100,200,255,0.35)}
+details[open]{background:rgba(94,234,212,0.05);border-color:rgba(94,234,212,0.3)}
+details summary{font-weight:600;color:#e8eef5;list-style:none;outline:none;cursor:pointer;display:flex;align-items:flex-start;gap:10px;font-size:0.96rem}
+details summary::-webkit-details-marker{display:none}
+details summary::before{content:'▶';color:#64c8ff;font-size:0.75em;transition:transform 0.2s;flex-shrink:0;margin-top:5px}
+details[open] summary::before{transform:rotate(90deg);color:#5eead4}
+details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
+details .answer ul,details .answer ol{margin:6px 0 6px 22px}
+@media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+</style>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({startOnLoad:true,theme:'base',flowchart:{useMaxWidth:true,htmlLabels:true,nodeSpacing:50,rankSpacing:60},themeVariables:{primaryColor:'#1a2530',primaryTextColor:'#e8eef5',primaryBorderColor:'#64c8ff',lineColor:'#5eead4',secondaryColor:'#0e1419',tertiaryColor:'#0a0f14',background:'#0a0f14',mainBkg:'#1a2530',secondBkg:'#0e1419',textColor:'#d4dae0',fontFamily:'-apple-system,"SF Pro Display",sans-serif',fontSize:'16px'}});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const lb=document.createElement('div');lb.className='lightbox';
+  lb.innerHTML='<span class="hint">scroll = zoom · drag = pan · Esc / click bg = close</span>';
+  document.body.appendChild(lb);
+  let scale=1,panX=0,panY=0,dragging=false,moved=false,lx=0,ly=0;
+  const apply=()=>{const s=lb.querySelector('svg');if(s)s.style.transform=`translate(${panX}px,${panY}px) scale(${scale})`};
+  const reset=()=>{scale=1;panX=0;panY=0};
+  const close=()=>{lb.classList.remove('open');const s=lb.querySelector('svg');if(s)s.remove();reset()};
+  document.addEventListener('click',e=>{
+    if(e.target.closest('.lightbox')){if(moved){moved=false;return}close();return}
+    const w=e.target.closest('.mermaid');if(!w)return;
+    const svg=w.querySelector('svg');if(!svg)return;
+    const c=svg.cloneNode(true);c.removeAttribute('style');
+    c.style.maxWidth='96vw';c.style.maxHeight='92vh';
+    lb.appendChild(c);lb.classList.add('open');reset();apply();
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+  lb.addEventListener('wheel',e=>{
+    if(!lb.classList.contains('open'))return;
+    e.preventDefault();
+    const svg=lb.querySelector('svg');if(!svg)return;
+    const ns=Math.max(0.3,Math.min(10,scale*(1-e.deltaY*0.002)));
+    const r=svg.getBoundingClientRect();
+    const cx=e.clientX-(r.left+r.width/2),cy=e.clientY-(r.top+r.height/2);
+    const k=ns/scale-1;panX-=cx*k;panY-=cy*k;scale=ns;apply();
+  },{passive:false});
+  lb.addEventListener('mousedown',e=>{
+    if(!lb.classList.contains('open'))return;
+    dragging=true;moved=false;lx=e.clientX;ly=e.clientY;lb.classList.add('dragging');e.preventDefault();
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    const dx=e.clientX-lx,dy=e.clientY-ly;
+    if(Math.abs(dx)+Math.abs(dy)>3)moved=true;
+    panX+=dx;panY+=dy;lx=e.clientX;ly=e.clientY;apply();
+  });
+  document.addEventListener('mouseup',()=>{dragging=false;lb.classList.remove('dragging')});
+});
+</script>
+</head><body><div class="container">
+
+<header>
+<div class="meta">
+<span class="tag day">Day 34</span>
+<span class="tag diff">Hard</span>
+<span class="tag">Real-time</span>
+<span class="tag">UDP/WebRTC</span>
+<span class="tag">Game Netcode</span>
+<span class="tag">CRDT</span>
+</div>
+<h1>Real-time Systems — Keeping the World Consistent Within 100ms<span class="en">Transport, Game Netcode, Authoritative State, Collaborative Sync</span></h1>
+</header>
+
+<h2>Problem Scenario + Constraints</h2>
+<p>Design the backend for a <strong>real-time multiplayer battle with 100k concurrent players</strong> (<code>.io</code>-style / lightweight FPS): players in the same room move and shoot, and everyone must see everyone else's actions "almost instantly." This is a different species from a request-response web backend. Its SLO isn't "p99 &lt; 200ms" — it's <strong>end-to-end p95 &lt; 100ms with bounded jitter</strong>, because the human eye is extremely sensitive to input lag above ~50ms and to position teleports.</p>
+<ul>
+<li><strong>Latency SLO</strong>: local input response &lt; 16ms (one frame); a peer's action visible &lt; 100ms. <em>Jitter is deadlier than absolute latency.</em></li>
+<li><strong>Update rate</strong>: server tick 20–60Hz, each room broadcasts state 20–60 times/sec; 20–100 players per room.</li>
+<li><strong>Scale</strong>: 100k players ÷ 50 per room = 2000 concurrent rooms; 30Hz × 50 players ≈ 1500 outbound packets/sec/room, millions of pps globally.</li>
+<li><strong>Consistency</strong>: games need an <em>authoritative server</em> (anti-cheat); collaborative editing needs <em>eventual consistency</em> (never drop a keystroke). The two flavors of real-time have completely different consistency models.</li>
+<li><strong>Reliability</strong>: dropping one position packet is fine (next tick overwrites it); dropping a "fire" event is an incident — reliable and unreliable channels must be separated.</li>
+</ul>
+
+<h2>High-Level Architecture</h2>
+<pre class="mermaid">
+graph TD
+    C["Client<br/><i>local prediction + render interp.</i>"]
+    MM["Matchmaker<br/><i>HTTPS · assign room/region</i>"]
+    GW["Edge Gateway<br/><i>terminate UDP/WebRTC · nearest PoP</i>"]
+    GS["Authoritative Game Server<br/><i>room process · tick loop</i>"]
+    R[("Redis<br/>session/room state")]
+    DB[("Persistent DB<br/>results/leaderboard")]
+
+    C -->|① find match HTTPS| MM
+    MM -->|② return server+token| C
+    C <-->|③ realtime bidir UDP| GW
+    GW <-->|④ forward| GS
+    GS -.room state.-> R
+    GS -.async persist.-> DB
+
+    classDef client fill:#1a2530,stroke:#64c8ff,color:#e8eef5
+    classDef edge fill:#0e2030,stroke:#5eead4,color:#e8eef5
+    classDef core fill:#1a1a30,stroke:#ffb450,color:#e8eef5
+    classDef store fill:#2a1530,stroke:#ff7ab6,color:#e8eef5
+    class C client
+    class MM,GW edge
+    class GS core
+    class R,DB store
+</pre>
+<p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">Control plane (matchmaking, login) goes over HTTPS; the data plane (real-time state) uses a dedicated low-latency channel — the two paths are decoupled</p>
+<p><strong>Responsibilities</strong>: the <em>Matchmaker</em> is a plain stateless web service that assigns players to rooms in the nearest region by geography and skill, returning a server address + auth token. The <em>Edge Gateway</em> terminates UDP/WebRTC within ~30ms of the user, handles NAT traversal and DDoS protection. The <em>Game Server</em> is a stateful room process running a fixed-rate tick loop: collect all player inputs this tick → advance physics → broadcast a new snapshot. State lives in memory; Redis only does crash recovery and cross-process coordination; the DB asynchronously records results. <strong>The key is to fully separate the "real-time data plane" from the "durable control plane."</strong></p>
+
+<h2>Key Technical Points</h2>
+
+<h3>1. Transport Choice: Why Real-time Systems Flee TCP</h3>
+<p>Core trade-off: <em>TCP's reliable ordering is precisely the poison for real-time systems.</em></p>
+<p><strong>Principle</strong>: TCP guarantees the byte stream arrives <strong>in order</strong> — which means once a packet is lost, packets that have already arrived must <strong>queue in the kernel buffer waiting for retransmission</strong>; the application can't read them. This is <strong>Head-of-Line (HoL) blocking</strong>. In a game, if position packet #100 is lost, #101 and #102 have arrived but are stuck; by the time #100 is retransmitted, they are already stale — you paid an RTT of stutter for data nobody wanted. A real-time system would rather <em>drop stale data and move on</em> than stay in order. So native games use <strong>UDP</strong> (implementing selective reliability on top), browsers use <strong>WebRTC DataChannel</strong> (UDP-based, configurable <code>unreliable/unordered</code>) or the newer <strong>WebTransport (QUIC)</strong> — QUIC implements multiple streams in user space, so loss on one stream doesn't block others, sidestepping kernel TCP's HoL blocking.</p>
+<div class="tradeoff">
+<strong>Trade-off:</strong>
+<table>
+<thead><tr><th>Channel</th><th>Reliable/Ordered</th><th>HoL Blocking</th><th>Use case</th></tr></thead>
+<tbody>
+<tr><td><strong>TCP / WebSocket</strong></td><td>reliable+ordered</td><td>yes (fatal)</td><td>chat, collab editing, control plane</td></tr>
+<tr><td><strong>UDP (raw)</strong></td><td>neither</td><td>none</td><td>native games, self-built reliability</td></tr>
+<tr><td><strong>WebRTC DataChannel</strong></td><td>configurable</td><td>can disable</td><td>browser real-time games/P2P</td></tr>
+<tr><td><strong>WebTransport (QUIC)</strong></td><td>per-stream independent</td><td>none across streams</td><td>modern browser real-time data</td></tr>
+</tbody></table>
+</div>
+<p>The practical approach is <strong>dual channels</strong>: position/orientation over unreliable UDP (drop = no problem, next tick overwrites); "fire/pickup/death" critical events over a reliable channel (custom ACK retransmit, or WebRTC's reliable mode).</p>
+<div class="case">
+<strong>Real-world cases:</strong>
+<ul>
+<li><strong>Valve Source engine</strong>: a custom UDP-based protocol distinguishing reliable/unreliable data, with authoritative server-side simulation (<a href="https://developer.valvesoftware.com/wiki/Source_Multiplayer_Networking">Source Multiplayer Networking</a>).</li>
+<li><strong>Discord voice</strong>: uses WebRTC (UDP underneath); the client is a C++ media engine built on the WebRTC native library, because voice equally cannot tolerate HoL blocking (<a href="https://discord.com/blog/how-discord-handles-two-and-half-million-concurrent-voice-users-using-webrtc">Discord Engineering</a>).</li>
+<li><strong>QUIC/HTTP3</strong>: one of QUIC's design goals was eliminating TCP's HoL blocking; today's WebTransport opens this capability to real-time web apps.</li>
+</ul></div>
+
+<h3>2. Client-Side Prediction + Server Reconciliation: Hiding the Speed of Light</h3>
+<p>Core trade-off: <em>trade optimistic local simulation (that may need rollback) for zero-perceived-latency feel.</em></p>
+<p><strong>Principle</strong>: even at 50ms RTT, "press → send to server → wait for reply → then move" feels sluggish. The fix is a trio: <strong>① Client-side prediction</strong> — move locally immediately on input without waiting for the server, while sending the <em>sequence-numbered</em> input. <strong>② Server reconciliation</strong> — the server is authoritative; its reply carries "processed up to input #N + authoritative position." The client takes that position as the baseline and <em>replays</em> all local inputs after #N that haven't yet been acknowledged, arriving at a corrected current position. If the prediction was right, the screen doesn't move; if interrupted (e.g. hit a wall), it corrects smoothly. <strong>③ Entity interpolation</strong> — other players' states arrive discretely per tick; the client <em>deliberately renders ~100ms behind</em>, interpolating between two known snapshots for smoothness instead of teleporting. The cost: the "others" you see are always 100ms in the past — which is what <strong>lag compensation</strong> solves: when resolving a shot, the server <em>rewinds</em> the target to where the shooter actually saw it before computing the hit.</p>
+<pre><code># Client prediction + reconciliation (pseudocode)
+pending = []                      # unacknowledged local inputs
+def on_input(cmd):
+    cmd.seq = next_seq()
+    apply_local(cmd)              # ① move locally now, zero-latency feel
+    pending.append(cmd)
+    net.send(cmd)                 # send seq-numbered input to authoritative server
+
+def on_server_snapshot(snap):
+    me.pos = snap.pos             # ② trust authoritative position
+    # drop inputs already confirmed by the server
+    pending = [c for c in pending if c.seq > snap.last_processed_seq]
+    for c in pending:             # replay still-unconfirmed inputs
+        apply_local(c)            # → right prediction: no jump; wrong: smooth correction
+
+# other players: buffer two frames, interpolate at render_time = now - 100ms (③)
+</code></pre>
+<div class="case">
+<strong>Real-world cases:</strong>
+<ul>
+<li><strong>Gabriel Gambetta's series</strong> is the canonical tutorial for this paradigm, demonstrating prediction/reconciliation/interpolation/lag compensation in &lt;500 lines of JS with a live demo (<a href="https://www.gabrielgambetta.com/client-server-game-architecture.html">Fast-Paced Multiplayer</a>).</li>
+<li><strong>Valve</strong>: lag compensation in CS/Source games keeps ~1 second of player position history and rewinds the world by the shooter's ping when resolving hits (<a href="https://developer.valvesoftware.com/wiki/Lag_Compensation">Valve: Lag Compensation</a>) — hit detection must be server-authoritative, or the client can cheat.</li>
+</ul></div>
+
+<h3>3. Authoritative Server &amp; State Sync: Ticks, Snapshots, Interest Management</h3>
+<p>Core trade-off: <em>sync fidelity vs bandwidth/CPU</em> — sending "the whole world" to everyone every tick gets killed by both bandwidth and CPU.</p>
+<p><strong>Principle</strong>: the authoritative server runs a fixed-rate <strong>tick loop</strong> (e.g. 30Hz): absorb all inputs this tick → advance deterministic physics → produce new world state → broadcast. The broadcast has three layers of optimization: <strong>① Delta compression</strong> — send only changes relative to the last snapshot this client acknowledged; static objects cost no bandwidth. <strong>② Interest management (AOI, Area of Interest)</strong> — players only need nearby entities; using a grid/quadtree spatial index, each player receives only updates within their view. A 100-player room broadcasting to all is O(n²)=10k messages/tick; with AOI each player sees only ~10 nearby, dropping to O(n·k). <strong>③ Priority/rate tiering</strong> — nearby entities update at high frequency, distant ones lower or not at all. This turns "full state every tick" from a bandwidth disaster into an engineerable, stable stream.</p>
+<div class="tradeoff">
+<strong>Trade-off (sync models):</strong>
+<ul>
+<li><strong>Lockstep</strong>: sync only <em>inputs</em>; each side deterministically re-simulates the same world. ✅ tiny bandwidth (RTS with thousands of units only sends commands); ❌ requires <em>bit-exact determinism</em> (even floats must match), one laggy player stalls the room, and cheaters can see the whole map.</li>
+<li><strong>State sync</strong>: server computes <em>state</em> and pushes it down. ✅ authoritative anti-cheat, tolerates packet loss, free join/leave; ❌ bandwidth grows with entity count, compressed via delta+AOI. Mainstream for FPS/MMO.</li>
+<li><strong>Full snapshot vs Delta</strong>: full is simple and recovers from any loss but costly; delta saves bandwidth but must track "which frame each client acknowledged" as a baseline — more complex.</li>
+</ul>
+</div>
+<div class="case">
+<strong>Real-world cases:</strong>
+<ul>
+<li><strong>Discord voice</strong> uses an <em>SFU (Selective Forwarding Unit)</em> rather than a P2P mesh: in large rooms P2P connection count is O(n²) and explodes, so a server selectively forwards instead, letting one server handle huge concurrency — 850+ voice servers across 13 regions support 2.6M concurrent voice users (<a href="https://discord.com/blog/how-discord-handles-two-and-half-million-concurrent-voice-users-using-webrtc">Discord Engineering</a>) — the "central fan-out + interest pruning" idea applied to audio/video.</li>
+<li><strong>Valve Source</strong>: the server maintains the authoritative world per tick and sends incremental updates to each client, which does prediction and interpolation (<a href="https://developer.valvesoftware.com/wiki/Source_Multiplayer_Networking">Source Networking</a>).</li>
+</ul></div>
+
+<h3>4. Collaborative Sync: The Other Real-time — Eventual, Not Authoritative</h3>
+<p>Core trade-off: <em>OT's centralized simplicity vs CRDT's decentralized freedom.</em></p>
+<p><strong>Principle</strong>: games want "authoritative + anti-cheat," but Figma/Notion/Google Docs <strong>collaborative editing</strong> is a different real-time: it must work offline, allow concurrent edits to the same document, never drop a keystroke, and eventually converge everyone to the same state. Two schools: <strong>OT (Operational Transformation)</strong> — transform concurrent operations against each other to preserve intent (you insert at position 5, I delete at position 3, OT adjusts your index); relies heavily on a central server for ordering, complex logic but compact state (Google Docs). <strong>CRDT (Conflict-free Replicated Data Type)</strong> — design the data so it is <em>mathematically commutative</em> and converges regardless of apply order, naturally supporting P2P and offline, but with large metadata overhead (each character carries a unique ID and tombstone). <strong>LWW (Last-Write-Wins)</strong> is the simplest CRDT form: each field independent, the last writer wins.</p>
+<pre><code># LWW register (simplest CRDT): a total order on (timestamp, replica_id) decides
+def merge(local, remote):
+    if (remote.ts, remote.node) > (local.ts, local.node):
+        return remote          # "newer" write wins; merge is commutative/idempotent
+    return local
+# The hard part isn't merge, it's the GRANULARITY of LWW:
+# whole object? edits overwrite each other and get lost;
+# per-attribute? concurrent edits to different attrs never conflict — Figma chose the latter
+</code></pre>
+<div class="case">
+<strong>Real-world cases:</strong>
+<ul>
+<li><strong>Figma</strong>: by their own account "inspired by CRDTs but <em>not</em> a true CRDT" — a central server + a per-object, per-property <em>LWW register</em>, so concurrent edits to different properties of an object don't interfere, while edits to the same property are "last writer wins"; tree structure is kept consistent via a parent pointer + the server rejecting cycle-creating operations; transport is WebSocket (<a href="https://www.figma.com/blog/how-figmas-multiplayer-technology-works/">How Figma's multiplayer technology works</a>).</li>
+<li><strong>Google Docs</strong> is the OT exemplar, ordering operations via a central server. <strong>CRDTs</strong> are common in local-first/offline-first and collaboration libraries (e.g. the Yjs/Automerge ecosystem).</li>
+</ul></div>
+
+<h2>Scaling &amp; Optimization</h2>
+<ul>
+<li><strong>Room sharding &amp; nearest access</strong>: route players to the geographically nearest region (GeoDNS / Anycast ingress); cross-region matches use relays. A room is a natural shard unit — a single room can't be split, so scale horizontally by adding machines for more rooms.</li>
+<li><strong>Elasticity of stateful services</strong>: game servers are stateful; you can't kill processes freely like stateless web. Use <em>draining</em>: stop assigning new rooms and let existing matches finish before retiring.</li>
+<li><strong>Crash recovery</strong>: when a room process crashes, all in-memory state is lost. Periodically checkpoint critical state (score, key events) to Redis to rebuild an approximate state; pure position state is acceptable to lose.</li>
+<li><strong>Anti-cheat</strong>: <em>never trust the client</em>. Validate movement server-side (speed caps, wall-clip detection); hit detection is server-authoritative, the client only "renders + predicts."</li>
+<li><strong>Bandwidth keeps growing</strong>: beyond delta, add <em>quantized compression</em> (positions as fixed-point not float), bit-packing, distance-based precision reduction.</li>
+</ul>
+
+<h2>Common Pitfalls + Interview Follow-ups</h2>
+<div class="callout"><strong>1. Using TCP/WebSocket for high-frequency game sync.</strong> HoL blocking creates cascading stutter on loss. Low-frequency turn-based is fine; a 30Hz action game must use a UDP-class channel. Chat/collab editing, conversely, should use a reliable channel.</div>
+<div class="callout"><strong>2. Trusting the client.</strong> "If the client says it hit, it hit" = cheater paradise. Authoritative decisions live on the server; client prediction is only for feel.</div>
+<div class="callout"><strong>3. Treating absolute latency as the only metric.</strong> A steady 80ms beats a connection jittering between 30–150ms. Monitor jitter and loss, and smooth with a receiver-side jitter buffer.</div>
+<div class="callout"><strong>4. Full broadcast + O(n²) fan-out.</strong> A 100-player room without AOI/delta blows up bandwidth and CPU. Spatial index + interest management is the lifeline for large rooms.</div>
+<div class="callout"><strong>5. Whole-document LWW for collaborative editing.</strong> Too coarse a granularity overwrites and loses edits. Define merge at field/character level and think through the conflict semantics (Figma per-property, text editors per-character).</div>
+<p><strong>Frequent interview questions</strong>: ① Why don't games use TCP? How exactly does HoL blocking hurt? ② How do you correct a wrong prediction without it looking jarring? ③ How do you keep bandwidth from exploding with 100 players per room per tick? ④ Why must hit detection be server-authoritative, and how does lag compensation stay fair? ⑤ How do the consistency models of Figma collaboration and an FPS match differ, and why?</p>
+
+<h2>Deeper Resources</h2>
+<ul>
+<li><strong>Gabriel Gambetta — Fast-Paced Multiplayer series</strong>: prediction/reconciliation/interpolation/lag compensation in four steps, with a runnable demo (<a href="https://www.gabrielgambetta.com/client-server-game-architecture.html">gabrielgambetta.com</a>).</li>
+<li><strong>Valve Developer Community — Source Multiplayer Networking &amp; Lag Compensation</strong>: first-hand docs on industrial-grade authoritative-server netcode.</li>
+<li><strong>Discord Engineering — Handling 2.5M Concurrent Voice Users with WebRTC</strong>: SFU, regionalization, silence optimization, large-scale real-time A/V experience.</li>
+<li><strong>Figma Blog — How Figma's multiplayer technology works</strong>: LWW register, tree consistency, why not a true CRDT.</li>
+<li><strong>Designing Data-Intensive Applications</strong> (Kleppmann), Ch. 5: replication and concurrent write conflicts — the foundation for understanding LWW/CRDT convergence.</li>
+</ul>
+
+<h2>Deeper Thinking (click to expand)</h2>
+
+<details>
+<summary>1. Prediction lets "me" move with zero latency, but the others I see are 100ms in the past. When I shoot, whose view should win? What fairness trade-off is hiding here?</summary>
+<div class="answer">
+<p>This is the <strong>core tension of lag compensation</strong>. The server has two choices: (a) judge against the "now" world — but the shooter aimed where the target was 100ms ago, so they often miss, and <em>high-ping players are penalized</em>; (b) <em>rewind</em> the world to what the shooter actually saw at the moment of firing (Valve's approach, keeping ~1s of position history) — "what you see is what you get" for the shooter, which is fair to the shooting side.</p>
+<p>The cost shifts to the victim: you've already ducked behind a wall, yet because of the opponent's high ping you were still standing in the open in their "past moment," so you get "shot behind cover." So this doesn't eliminate unfairness — it <strong>transfers it from shooter to victim</strong>. Most action games choose (b) because "if I aimed, it should hit" matters more to feel. Designs cap the rewind window (e.g. ≤200ms) to bound the unfairness from extreme ping.</p>
+</div>
+</details>
+
+<details>
+<summary>2. Raising the tick rate from 30Hz to 60Hz — how do latency and bandwidth each change? Is higher always better?</summary>
+<div class="answer">
+<p><strong>Latency</strong>: the server processes input only once per tick, so the average "input waiting to be processed" time is about half a tick. 30Hz≈33ms/tick → ~16ms avg wait; 60Hz≈16ms → ~8ms. Raising the rate does cut this component, making it feel more responsive.</p>
+<p><strong>Bandwidth &amp; CPU</strong>: broadcast frequency doubles, so outbound packets and pps roughly double (each packet has fixed IP/UDP header overhead, amortized worse when small packets dominate); the server runs twice the physics ticks/sec, so CPU doubles too. 2000 rooms × doubling = a meaningful jump in operating cost.</p>
+<p><strong>Not always better</strong>: diminishing returns — 30→60Hz cutting 8ms is worth it, 60→120Hz cuts only 4 more ms while doubling cost again. And client rendering/network jitter is often the larger latency source. Competitive FPS often use 64/128 tick; casual games are fine at 20–30Hz. This is the classic <em>feel vs cost</em> engineering trade-off, decided by genre.</p>
+</div>
+</details>
+
+<details>
+<summary>3. CRDTs naturally support offline & P2P and never conflict, so why did Figma — a "must be strongly collaborative" product — choose a central server + LWW instead of pure CRDT?</summary>
+<div class="answer">
+<p>Several practical reasons: <strong>① Metadata overhead</strong> — general CRDTs (especially sequences/text) must carry per-element unique IDs, version vectors, and tombstones (deletes can't truly delete, or concurrent merges break), so metadata bloats as the document is edited — costly for Figma's massive vector-object scenario.</p>
+<p><strong>② With a central server, the hardest problem vanishes</strong>: CRDT complexity mostly exists to handle "no authoritative orderer." Figma already has an online server that can arbitrate a total order, so most fields degrade to a simple LWW register — no need to carry CRDT's full baggage.</p>
+<p><strong>③ Controllable conflict semantics matter more</strong>: Figma does LWW "per object per property," so concurrent edits to different properties don't interfere and same-property edits are last-writer-wins — this deterministic, user-understandable outcome is more controllable than a CRDT's auto-merged "semantically correct but surprising" result. The tree uses parent pointers + server rejection of cycles — again trading central authority for simplicity.</p>
+<p>Conclusion: <em>CRDTs solve the "no-center" problem; as long as you're willing and able to keep a center, OT/LWW is often cheaper and more controllable.</em> CRDT's true home is local-first / offline-first.</p>
+</div>
+</details>
+
+<details>
+<summary>4. A room process crashes and all 50 players' in-memory match state is lost. How do you design so you neither lose critical data nor let checkpointing drag down the 30Hz tick?</summary>
+<div class="answer">
+<p>The key is to <strong>distinguish "must persist" from "discardable" state</strong>, tiered by importance:</p>
+<ul>
+<li><strong>Position/orientation (high-frequency, droppable)</strong>: don't checkpoint at all. After a crash and reconnect, clients re-report and it converges within a few frames; the loss is negligible.</li>
+<li><strong>Critical events/score (low-frequency, must not drop)</strong>: events that "change the outcome" — hits, scores, item pickups — write asynchronously to Redis/an event log, <em>not synchronously persisted in the tick main loop</em> — use a separate IO thread/queue to avoid blocking the 30Hz physics.</li>
+<li><strong>Periodic checkpoint</strong>: every few seconds, snapshot the compressed critical state to Redis; after a crash, the new process loads the latest checkpoint + replays the subsequent event log to rebuild an approximate match.</li>
+</ul>
+<p>This is essentially <em>tiered RPO</em>: position state can have "infinite" RPO (just recompute), score state needs RPO near 0. Keeping expensive persistence off the tick hot path is the universal technique for stateful real-time services that mustn't drop frames. Competitive scenarios also demand "a crash doesn't break judgment fairness," so authoritative state should be made deterministically replayable.</p>
+</div>
+</details>
+
+<details>
+<summary>5. Both are "real-time," so why should chat/collab editing use TCP/WebSocket while action games must use UDP? What happens if you swap the channels?</summary>
+<div class="answer">
+<p>The dividing line is <strong>which matters more: the data's timeliness or its undroppability</strong>:</p>
+<ul>
+<li><strong>Action games</strong>: position data is <em>high-frequency and self-overwriting</em> — frame N's position is garbage once stale, replaced by the next frame. Here "drop a stale packet and move on" beats "wait for retransmit of a value nobody wants." TCP creates cascading stutter on loss, wrecking feel.</li>
+<li><strong>Collab editing/chat</strong>: each operation is <em>undroppable and order-sensitive</em> — lose a character or reorder operations and the document is wrong, never converging. Here you want exactly TCP's reliable ordering; the occasional tens of ms of latency is imperceptible to humans (typing isn't a 60Hz operation).</li>
+</ul>
+<p><strong>Consequences of swapping</strong>: a game on TCP → stutters on loss, gets outplayed; collab editing on raw UDP → dropped op = lost text, reordering = corrupted document, and you'd have to reimplement TCP's reliable ordering at the app layer anyway — wasted effort. <em>So "real-time" isn't a single requirement; first ask "is dropping one datum a non-issue or an incident?" — the answer directly decides the channel.</em> This is why many game backends use <strong>both</strong> channels: position over UDP, critical events/chat over a reliable one.</p>
+</div>
+</details>
+
+<div class="nav"><a href="index.en.html">← Back to index</a></div>
+</div>
+</body></html>
