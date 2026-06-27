@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 35 · IoT & Edge — System Design Bi-daily</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"SF Pro Display","Noto Sans SC",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
+.container{max-width:820px;margin:0 auto;padding:24px 20px 60px}
+header{padding:40px 0 28px;border-bottom:1px solid rgba(100,200,255,0.15);margin-bottom:32px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem}
+.tag{padding:3px 10px;border-radius:4px;background:rgba(100,200,255,0.12);color:#64c8ff;border:1px solid rgba(100,200,255,0.25)}
+.tag.diff{background:rgba(94,234,212,0.1);color:#5eead4;border-color:rgba(94,234,212,0.3)}
+.tag.day{background:rgba(255,180,80,0.1);color:#ffb450;border-color:rgba(255,180,80,0.25)}
+h1{font-size:1.75rem;font-weight:800;background:linear-gradient(135deg,#64c8ff 0%,#5eead4 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:0.5px;line-height:1.3}
+h1 .en{display:block;font-size:1rem;color:#7a8590;-webkit-text-fill-color:#7a8590;margin-top:6px;font-weight:500}
+h2{font-size:1.2rem;color:#5eead4;margin:36px 0 14px;padding-left:12px;border-left:3px solid #5eead4}
+h3{font-size:1rem;color:#64c8ff;margin:20px 0 10px;font-weight:600}
+p{margin:10px 0;color:#c8cfd6}
+ul,ol{margin:10px 0 10px 22px;color:#c8cfd6}
+li{margin:6px 0}
+strong{color:#e8eef5;font-weight:600}
+em{color:#5eead4;font-style:normal;font-weight:500}
+code{font-family:"SF Mono",Menlo,Consolas,monospace;background:rgba(100,200,255,0.1);color:#5eead4;padding:1px 6px;border-radius:3px;font-size:0.88em}
+pre{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:14px 16px;overflow-x:auto;margin:12px 0;font-family:"SF Mono",Menlo,Consolas,monospace;font-size:0.84rem;line-height:1.55;color:#c8cfd6}
+pre code{background:none;color:inherit;padding:0;font-size:1em}
+.mermaid{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:18px;margin:14px 0;text-align:center;overflow-x:auto;cursor:zoom-in;transition:border-color 0.15s}
+.mermaid:hover{border-color:rgba(100,200,255,0.4)}
+.mermaid svg{width:100%;max-width:100%;height:auto;min-height:280px}
+.lightbox{position:fixed;inset:0;background:rgba(8,12,18,0.96);z-index:9999;display:none;align-items:center;justify-content:center;padding:24px;cursor:grab;backdrop-filter:blur(4px);overflow:hidden}
+.lightbox.open{display:flex}
+.lightbox.dragging{cursor:grabbing}
+.lightbox svg{width:auto;height:auto;max-width:96vw;max-height:92vh;transform-origin:center center;will-change:transform}
+.lightbox .hint{position:fixed;top:16px;right:20px;font-size:0.78rem;color:#7a8590;font-family:"SF Mono",Menlo,monospace;pointer-events:none}
+.callout{background:rgba(255,180,80,0.06);border-left:3px solid #ffb450;padding:12px 14px;margin:14px 0;border-radius:4px;font-size:0.94rem}
+.callout strong{color:#ffb450}
+.tradeoff{background:rgba(100,200,255,0.05);border:1px solid rgba(100,200,255,0.2);border-radius:6px;padding:12px 14px;margin:12px 0;font-size:0.94rem}
+.case{background:rgba(94,234,212,0.05);border-left:3px solid #5eead4;padding:12px 14px;margin:12px 0;border-radius:4px;font-size:0.94rem}
+.case strong{color:#5eead4}
+.nav{margin-top:50px;padding-top:24px;border-top:1px solid rgba(100,200,255,0.15);text-align:center}
+.nav a{color:#64c8ff;text-decoration:none;font-size:0.92rem;padding:8px 16px;border:1px solid rgba(100,200,255,0.3);border-radius:4px;transition:all 0.15s}
+.nav a:hover{background:rgba(100,200,255,0.1)}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:0.9rem}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid rgba(100,200,255,0.15)}
+th{color:#64c8ff;font-weight:600;background:rgba(100,200,255,0.05)}
+details{background:rgba(100,200,255,0.04);border:1px solid rgba(100,200,255,0.18);border-radius:6px;padding:12px 16px;margin:10px 0;transition:all 0.15s}
+details:hover{border-color:rgba(100,200,255,0.35)}
+details[open]{background:rgba(94,234,212,0.05);border-color:rgba(94,234,212,0.3)}
+details summary{font-weight:600;color:#e8eef5;list-style:none;outline:none;cursor:pointer;display:flex;align-items:flex-start;gap:10px;font-size:0.96rem}
+details summary::-webkit-details-marker{display:none}
+details summary::before{content:'▶';color:#64c8ff;font-size:0.75em;transition:transform 0.2s;flex-shrink:0;margin-top:5px}
+details[open] summary::before{transform:rotate(90deg);color:#5eead4}
+details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
+details .answer ul,details .answer ol{margin:6px 0 6px 22px}
+@media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+</style>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({startOnLoad:true,theme:'base',flowchart:{useMaxWidth:true,htmlLabels:true,nodeSpacing:50,rankSpacing:60},themeVariables:{primaryColor:'#1a2530',primaryTextColor:'#e8eef5',primaryBorderColor:'#64c8ff',lineColor:'#5eead4',secondaryColor:'#0e1419',tertiaryColor:'#0a0f14',background:'#0a0f14',mainBkg:'#1a2530',secondBkg:'#0e1419',textColor:'#d4dae0',fontFamily:'-apple-system,"SF Pro Display",sans-serif',fontSize:'16px'}});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const lb=document.createElement('div');lb.className='lightbox';
+  lb.innerHTML='<span class="hint">scroll = zoom · drag = pan · Esc / click bg = close</span>';
+  document.body.appendChild(lb);
+  let scale=1,panX=0,panY=0,dragging=false,moved=false,lx=0,ly=0;
+  const apply=()=>{const s=lb.querySelector('svg');if(s)s.style.transform=`translate(${panX}px,${panY}px) scale(${scale})`};
+  const reset=()=>{scale=1;panX=0;panY=0};
+  const close=()=>{lb.classList.remove('open');const s=lb.querySelector('svg');if(s)s.remove();reset()};
+  document.addEventListener('click',e=>{
+    if(e.target.closest('.lightbox')){if(moved){moved=false;return}close();return}
+    const w=e.target.closest('.mermaid');if(!w)return;
+    const svg=w.querySelector('svg');if(!svg)return;
+    const c=svg.cloneNode(true);c.removeAttribute('style');
+    c.style.maxWidth='96vw';c.style.maxHeight='92vh';
+    lb.appendChild(c);lb.classList.add('open');reset();apply();
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+  lb.addEventListener('wheel',e=>{
+    if(!lb.classList.contains('open'))return;
+    e.preventDefault();
+    const svg=lb.querySelector('svg');if(!svg)return;
+    const ns=Math.max(0.3,Math.min(10,scale*(1-e.deltaY*0.002)));
+    const r=svg.getBoundingClientRect();
+    const cx=e.clientX-(r.left+r.width/2),cy=e.clientY-(r.top+r.height/2);
+    const k=ns/scale-1;panX-=cx*k;panY-=cy*k;scale=ns;apply();
+  },{passive:false});
+  lb.addEventListener('mousedown',e=>{
+    if(!lb.classList.contains('open'))return;
+    dragging=true;moved=false;lx=e.clientX;ly=e.clientY;lb.classList.add('dragging');e.preventDefault();
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    const dx=e.clientX-lx,dy=e.clientY-ly;
+    if(Math.abs(dx)+Math.abs(dy)>3)moved=true;
+    panX+=dx;panY+=dy;lx=e.clientX;ly=e.clientY;apply();
+  });
+  document.addEventListener('mouseup',()=>{dragging=false;lb.classList.remove('dragging')});
+});
+</script>
+</head><body><div class="container">
+
+<header>
+<div class="meta">
+<span class="tag day">Day 35</span>
+<span class="tag diff">Hard</span>
+<span class="tag">IoT</span>
+<span class="tag">MQTT</span>
+<span class="tag">Edge</span>
+<span class="tag">Time-Series DB</span>
+</div>
+<h1>IoT & Edge — Throughput Engineering for 10M Devices Pinging Every 10s<span class="en">Ingestion at Scale, MQTT, Edge Compute, Time-Series Storage</span></h1>
+</header>
+
+<h2>Scenario + Constraints</h2>
+<p>Design the telemetry backend for <strong>10 million connected devices</strong> (an EV fleet / industrial sensors / smart meters): each reports 20 metrics — battery, temperature, GPS, current — every <strong>10 seconds</strong>. This is a different species from a request-response web backend: it is <em>write-dominated</em> (99% writes), connections are <em>long-lived</em> not short requests, the network is <em>unreliable</em> (a car enters a tunnel, a sensor loses power), and data is <em>append-only</em> — written once, almost never updated.</p>
+<ul>
+<li><strong>Write QPS</strong>: 10M ÷ 10s × 20 metrics = <strong>20M points/s</strong>. Peak (a fleet booting up at rush hour) is another 2-3×.</li>
+<li><strong>Connection scale</strong>: tens of millions of concurrent long-lived connections; ~1M per broker node, so a cluster of a dozen-plus brokers.</li>
+<li><strong>Storage</strong>: ~2 bytes/point compressed (16 bytes raw) → 20M/s × 2B ≈ <strong>3.5 TB/day</strong> compressed; hot queries in ms, cold data archived to object storage.</li>
+<li><strong>Latency SLO</strong>: ingest p99 &lt; 1s (alerting path), dashboard aggregation p95 &lt; 500ms — but <em>device-side alert decisions must be &lt; 100ms</em>, which forces edge compute.</li>
+<li><strong>Reliability</strong>: dropping a temperature sample is fine (next frame overwrites it); dropping a "battery overheating" alert is an incident — QoS must be tiered.</li>
+</ul>
+
+<h2>High-Level Architecture</h2>
+<pre class="mermaid">
+graph LR
+    D["Devices / Sensors<br/><i>tens of millions</i>"]
+    EG["Edge Gateway<br/><i>filter · aggregate · local alert</i>"]
+    BR["MQTT Broker Cluster<br/><i>EMQX · 1M conns/node</i>"]
+    K["Kafka Buffer<br/><i>peak shaving · decouple</i>"]
+    SP["Stream Processing<br/><i>Flink · dedup/downsample</i>"]
+    TSDB[("Time-Series DB<br/>hot · compressed")]
+    OBJ[("Object Storage<br/>cold · Parquet")]
+    AL["Alerting / Dashboards"]
+
+    D -->|MQTT| EG -->|MQTT/QoS| BR
+    BR --> K --> SP
+    SP --> TSDB
+    SP --> OBJ
+    TSDB --> AL
+
+    classDef dev fill:#1a2530,stroke:#64c8ff,color:#e8eef5
+    classDef edge fill:#0e2030,stroke:#5eead4,color:#e8eef5
+    classDef pipe fill:#1a1a30,stroke:#ffb450,color:#e8eef5
+    classDef store fill:#2a1530,stroke:#ff7ab6,color:#e8eef5
+    class D dev
+    class EG,BR edge
+    class K,SP pipe
+    class TSDB,OBJ,AL store
+</pre>
+<p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">Four stages, distinct jobs: edge <em>reduces volume</em>, broker <em>absorbs connections</em>, Kafka <em>shaves peaks & decouples</em>, TSDB <em>compresses & stores</em>. Any stage writing directly to the next gets flooded.</p>
+<p>The core idea is <strong>reduce and decouple at every layer</strong>. The edge gateway aggregates raw samples into summaries locally, cutting ~90% of backhaul bandwidth; the MQTT broker is dedicated to maintaining massive long-lived connections and QoS delivery; Kafka is the critical <strong>peak-shaving reservoir</strong> — broker output is bursty (3× at rush hour) while TSDB write throughput is constant, and Kafka absorbs the difference; stream processing dedups, reorders out-of-order events, and downsamples before persisting.</p>
+
+<h2>Key Technical Points</h2>
+
+<h3>1. Device Protocol: MQTT vs HTTP vs CoAP</h3>
+<p><strong>In one line</strong>: MQTT's long connection + pub/sub trades <em>connection reuse</em> for a <em>stateful server</em> — the default for fleets of low-power devices.</p>
+<p><strong>Principle</strong>: HTTP is <em>request-response with a fresh TCP/TLS handshake each time</em>. For a device sending a 2-byte temperature every 10s, the handshake overhead (several KB) is a thousand times the payload, and the server cannot push (to close a valve remotely, the device must poll). <strong>MQTT</strong> is an OASIS-standard <em>publish-subscribe</em> protocol: a device holds one long connection to a broker and publishes by topic (e.g. <code>fleet/car42/battery</code>); the header is as little as 2 bytes; it supports server push, Last Will (auto-notify on disconnect), and retained messages. The cost: the broker must <em>statefully</em> maintain millions of connections and per-device sessions.</p>
+<div class="tradeoff">
+<strong>Trade-offs:</strong>
+<ul>
+<li><strong>MQTT</strong>: ✅ long connection saves handshakes, bidirectional push, tiered QoS, low power; ❌ stateful broker is hard to scale, connection migration is complex, not for large files (OTA firmware uses HTTP).</li>
+<li><strong>HTTP/REST</strong>: ✅ stateless and easy to scale, mature ecosystem, firewall-friendly; ❌ massively wasteful for frequent small packets, no server push, battery killer. Good for <em>low-frequency batch</em> reporting (hourly).</li>
+<li><strong>CoAP</strong>: ✅ UDP-based, lighter than MQTT, fits extremely constrained devices (a few KB RAM); ❌ UDP unreliability must be handled yourself, small ecosystem, hard NAT traversal.</li>
+</ul></div>
+<pre><code># MQTT QoS: three delivery guarantees, pick by data importance
+# QoS 0 (at-most-once): fire and forget, no retransmit  -> high-freq temperature
+# QoS 1 (at-least-once): success on PUBACK, may duplicate -> ordinary events
+# QoS 2 (exactly-once): 4-way PUBREC/PUBREL/PUBCOMP        -> billing/alerts
+client.publish("fleet/car42/temp",  payload, qos=0)   # losing one is fine
+client.publish("fleet/car42/alert", payload, qos=1)   # at-least-once + downstream idempotent dedup
+# WARNING: QoS 2 is the most expensive (double round-trip + broker state); never use it for everything
+</code></pre>
+<div class="case">
+<strong>Real-world:</strong>
+<ul>
+<li><strong>EMQX</strong>: a distributed MQTT broker written in Erlang/OTP, reaching tens of millions of connections per cluster and ~1M per node — Erlang's lightweight-process model is a natural fit for massive long connections (see <a href="https://www.emqx.com/en/blog/mqtt-vs-http">EMQ's MQTT vs HTTP comparison</a>).</li>
+<li><strong>HiveMQ / AWS IoT Core</strong>: both center on MQTT; <a href="https://www.hivemq.com/blog/mqtt-vs-http-protocols-in-iot-iiot/">HiveMQ's comparison</a> shows MQTT throughput far exceeding HTTP in multi-message scenarios.</li>
+<li><strong>Facebook Messenger</strong>: early mobile push used MQTT, precisely for the power savings and low-latency delivery of a long connection.</li>
+</ul></div>
+
+<h3>2. Edge Compute: Process Where Data Is Born</h3>
+<p><strong>In one line</strong>: the edge trades <em>local compute</em> for <em>backhaul bandwidth + response latency</em>, but introduces ops and consistency pain.</p>
+<p><strong>Principle</strong>: not all data is worth shipping. A car produces MB/s of sensor streams, but the cloud really needs <em>summaries</em> (per-minute averages) and <em>anomalies</em> (temperature over threshold). The <strong>edge gateway</strong> (a vehicle compute unit / factory gateway) does three things locally: ① <em>filter & downsample</em> — 20 raw samples into 1 summary; ② <em>local decisions</em> — cut power immediately on overheating, without waiting 200ms for a cloud round-trip; ③ <em>offline buffering</em> — store to disk when the car is in a tunnel, backfill on reconnect. This turns "centralized cloud processing" into "edge-cloud collaboration".</p>
+<div class="tradeoff">
+<strong>Trade-offs:</strong>
+<ul>
+<li><strong>All-cloud</strong>: ✅ centralized logic, easy to update, simple devices; ❌ bandwidth cost explodes, paralyzed when offline, control-loop latency too high (no safety e-stop).</li>
+<li><strong>All-edge</strong>: ✅ low latency, offline-resilient, bandwidth-thrifty; ❌ deploying/upgrading thousands of edge nodes is a nightmare, model updates lag, limited edge compute.</li>
+<li><strong>Edge-cloud collaboration (mainstream)</strong>: edge handles real-time reduction + safety decisions, cloud handles training + global optimization + long-term storage. ✅ best of both; ❌ you must manage "which logic runs where", and cross-layer debugging is hard.</li>
+</ul></div>
+<pre><code># Edge gateway: local aggregation + anomaly fast-path + offline buffer (pseudo-code)
+buf = RingBuffer(maxlen=10000)          # local buffer, no loss while offline
+def on_sample(s):
+    if s.value &gt; THRESHOLD:             # anomaly: act locally + report at high QoS
+        actuator.shutdown()             # e-stop in &lt;100ms, no cloud round-trip
+        publish(s, qos=1)
+    window.add(s)
+    if window.full():                   # normal: one aggregate per minute, -90% bandwidth
+        agg = window.summary()          # min/max/avg/p95
+        if online: publish(agg, qos=0)
+        else:      buf.append(agg)       # offline: store now, backfill on reconnect
+</code></pre>
+<div class="case">
+<strong>Real-world:</strong>
+<ul>
+<li><strong>Tesla Fleet Telemetry</strong>: the open-source <a href="https://github.com/teslamotors/fleet-telemetry">teslamotors/fleet-telemetry</a> uses vehicle-side config to control which fields and frequency are reported (reduction at the edge); the cloud ingests via a WebSocket/MQTT frontend into Kafka.</li>
+<li><strong>Industrial IoT (PLC + gateway)</strong>: factory gateways run a rules engine locally for safety interlocks with millisecond shutdowns; the cloud only receives aggregated KPIs.</li>
+<li><strong>CDN edge (same idea)</strong>: Cloudflare Workers / Lambda@Edge push compute closest to the user — edge compute is the same philosophy in Web and IoT.</li>
+</ul></div>
+
+<h3>3. Ingestion Pipeline: Peak Shaving, Decoupling, Backpressure</h3>
+<p><strong>In one line</strong>: there must be a Kafka <em>buffer</em> between broker and TSDB, or write spikes will backpressure and break the whole chain.</p>
+<p><strong>Principle</strong>: the core tension in ingestion is <em>bursty input</em> (a fleet booting at rush hour, 3× instantaneous) vs <em>constant downstream throughput</em> (TSDB write capacity is fixed). If the broker writes the TSDB directly, a peak fills the TSDB → backpressure to the broker → connection pile-up → device reconnect storm → avalanche. <strong>Kafka as a reservoir</strong>: the broker writes Kafka at full speed (sequential write, very fast), and consumers pull at the rate the TSDB can sustain. Kafka also <em>decouples</em> — the same data is consumed independently by alerting, TSDB persistence, and ML training consumer groups. Partition by <code>device_id</code> to keep per-device data ordered.</p>
+<div class="tradeoff">
+<strong>Trade-offs:</strong>
+<ul>
+<li><strong>Broker writes TSDB directly</strong>: ✅ simple, low latency; ❌ no peak shaving, no decoupling — a peak backpressures into an avalanche. Only for small scale.</li>
+<li><strong>Kafka buffer (mainstream)</strong>: ✅ peak shaving, decoupling, replayable (replay to fix a buggy consumer); ❌ one extra hop (tens of ms), Kafka itself needs ops and scaling.</li>
+<li><strong>Backpressure vs shedding</strong>: when downstream can't keep up, either backpressure (slow the upstream — but IoT devices can't be slowed, they just drop connections) or <em>actively shed low-priority data</em> (QoS 0 temperature samples droppable, QoS 1 alerts must stay).</li>
+</ul></div>
+<div class="case">
+<strong>Real-world:</strong>
+<ul>
+<li><strong>Tesla</strong>: fleet telemetry flows through a WebSocket frontend → Kafka cluster for peak shaving → downstream Cassandra/analytics pipelines; public talks cite trillions of IoT messages per day through Kafka.</li>
+<li><strong>Uber</strong>: driver/rider app location reports likewise go through a Kafka buffer before fanning out to dispatch, ETA, and risk consumer groups.</li>
+<li><strong>LinkedIn</strong>: Kafka's birthplace — built precisely to solve "how to decouple high-throughput multi-source data and distribute it to many consumers".</li>
+</ul></div>
+
+<h3>4. Time-Series DB: Compression, Downsampling, Cardinality</h3>
+<p><strong>In one line</strong>: the specifics of time-series (write-heavy, time-monotonic, neighboring values similar) let a purpose-built store save ~10× over a general DB.</p>
+<p><strong>Principle</strong>: telemetry has strong regularity — <em>timestamps are near-arithmetic</em>, <em>adjacent values change little</em> (temperature won't jump from 25 to 5000). Facebook's <strong>Gorilla</strong> (VLDB 2015) exploits both: timestamps use <em>delta-of-delta</em> (the second difference of evenly-spaced samples is almost always 0), values use <em>XOR compression</em> (XOR of adjacent floats leaves high bits zero, store only significant bits), shrinking each point from 16 bytes to an average of <strong>1.37 bytes (~12×)</strong> — enabling all-in-memory storage and queries dozens of times faster. <strong>TimescaleDB</strong> takes another path: built on Postgres, it uses <em>hypertables</em> that auto-partition into time chunks, converts old chunks to compressed columnar (~10×), and keeps the full SQL ecosystem.</p>
+<table>
+<thead><tr><th></th><th>TimescaleDB</th><th>InfluxDB</th><th>Prometheus</th></tr></thead>
+<tbody>
+<tr><td><strong>Model</strong></td><td>Postgres extension (SQL)</td><td>Purpose-built TSDB (columnar/Parquet)</td><td>Pull model</td></tr>
+<tr><td><strong>Writes</strong></td><td>High, via chunk partitioning</td><td>Very high throughput</td><td>Medium (monitoring scale)</td></tr>
+<tr><td><strong>Compression</strong></td><td>Columnar ~10x</td><td>Columnar + encoding</td><td>delta+XOR (Gorilla-like)</td></tr>
+<tr><td><strong>Best for</strong></td><td>Need SQL/JOIN/relational</td><td>Pure time-series, huge scale</td><td>Infra monitoring</td></tr>
+</tbody></table>
+<pre><code>-- TimescaleDB: create hypertable + auto-compression policy
+SELECT create_hypertable('telemetry', 'ts',
+       chunk_time_interval =&gt; INTERVAL '1 day');
+-- chunks older than 7 days auto-compress to columnar (~10x)
+ALTER TABLE telemetry SET (timescaledb.compress,
+       timescaledb.compress_segmentby = 'device_id');
+SELECT add_compression_policy('telemetry', INTERVAL '7 days');
+-- continuous aggregates: pre-downsample so dashboards query minute-level, not raw seconds
+SELECT add_retention_policy('telemetry', INTERVAL '90 days'); -- archive cold data</code></pre>
+<div class="callout">
+<strong>Cardinality Explosion</strong>: the number-one killer of time-series DBs. Each unique tag combination (<code>device_id × metric × region</code>) is a separate series, indexed in memory. 10M devices × 20 metrics = 200M series — blowing out the in-memory index. <em>Fix</em>: never put high-cardinality fields (e.g. <code>trip_id</code>, random UUIDs) in tags/labels — put them in fields; aggregate devices into buckets. Early InfluxDB was notorious for cardinality issues.
+</div>
+<div class="case">
+<strong>Real-world:</strong>
+<ul>
+<li><strong>Facebook Gorilla</strong>: the <a href="https://dl.acm.org/doi/10.14778/2824032.2824078">VLDB 2015 paper</a>, delta-of-delta + XOR shrinking 16B to 1.37B, open-sourced as Beringei; its compression is borrowed by nearly every TSDB since.</li>
+<li><strong>TimescaleDB</strong>: <a href="https://www.tigerdata.com/blog/timescaledb-vs-influxdb-for-time-series-data-timescale-influx-sql-nosql-36489299877">Timescale's official comparison</a> details the hypertable/chunk/columnar-compression design, pitching "time-series + full SQL".</li>
+<li><strong>Prometheus</strong>: the de facto monitoring standard; its local TSDB uses Gorilla-like delta+XOR encoding with 2-hour blocks.</li>
+</ul></div>
+
+<h2>Scaling & Optimization</h2>
+<ul>
+<li><strong>Tiered storage (hot/warm/cold)</strong>: last 7 days hot in the TSDB (SSD/memory), 7-90 days downsampled and warm, 90+ days to Parquet in object storage (S3) queried via Trino/Athena. An order-of-magnitude cost drop.</li>
+<li><strong>Downsampling pyramid</strong>: raw seconds → minutes → hours via continuous aggregates; dashboards auto-pick granularity by time window, never scanning huge raw sets.</li>
+<li><strong>Horizontal connection scaling</strong>: cluster the MQTT brokers, sharding devices across nodes with consistent hashing; an L4 load balancer + connection migration so devices reconnect to a healthy node on failure.</li>
+<li><strong>OTA & Device Shadow</strong>: devices are often offline, so the cloud keeps a "shadow" (desired vs reported) that the device syncs on reconnect — AWS IoT Device Shadow is exactly this pattern.</li>
+<li><strong>Multi-region</strong>: devices attach to the nearest regional broker; telemetry lands locally and asynchronously aggregates to a global analytics layer, cutting cross-ocean latency.</li>
+</ul>
+
+<h2>Common Pitfalls + Interview Follow-ups</h2>
+<div class="callout"><strong>1. QoS 2 for everything</strong>: slapping exactly-once on every message forces the broker to keep four-way-handshake state per message — millions of devices crush it. Tiering by data value is table stakes.</div>
+<div class="callout"><strong>2. High-cardinality tags</strong>: putting <code>trip_id</code>/timestamps/random IDs in tags explodes the series count and OOMs the TSDB. A must-ask in any TSDB interview.</div>
+<div class="callout"><strong>3. Broker writes the DB with no buffer</strong>: forgetting Kafka peak shaving leads to a rush-hour backpressure avalanche. Interviewers love "what if traffic triples?"</div>
+<div class="callout"><strong>4. Ignoring clocks and out-of-order data</strong>: bad device clocks and offline backfill cause out-of-order arrival. Use event-time + watermarks (see Day 20), never write by arrival order.</div>
+<div class="callout"><strong>5. Reconnect storm (thundering herd)</strong>: a broker restart or network blip makes millions of devices reconnect at once and kill the cluster. Reconnects must use random backoff + jitter.</div>
+<div class="callout"><strong>6. Not separating "droppable" from "must-keep"</strong>: temperature samples are droppable, alerts/billing are not. Downstream consumers must be idempotent (dedup by <code>device_id + ts</code>).</div>
+
+<h2>Deeper Resources</h2>
+<ul>
+<li><strong>"Gorilla: A Fast, Scalable, In-Memory Time Series Database"</strong> (<a href="https://dl.acm.org/doi/10.14778/2824032.2824078">VLDB 2015</a>): the foundational work on time-series compression — delta-of-delta + XOR is a must-read.</li>
+<li><strong>HiveMQ MQTT Essentials / <a href="https://www.hivemq.com/blog/mqtt-vs-http-protocols-in-iot-iiot/">MQTT vs HTTP</a></strong>: the most systematic tutorial on the MQTT protocol, QoS, and session mechanics.</li>
+<li><strong><a href="https://github.com/teslamotors/fleet-telemetry">teslamotors/fleet-telemetry</a></strong>: a production-grade open-source fleet telemetry ingestion layer — see real edge config + Kafka landing.</li>
+<li><strong><a href="https://www.tigerdata.com/blog/timescaledb-vs-influxdb-for-time-series-data-timescale-influx-sql-nosql-36489299877">TimescaleDB vs InfluxDB</a></strong>: hypertable/chunk/compression and cardinality trade-offs.</li>
+<li><strong>"Designing Data-Intensive Applications"</strong> (Kleppmann, stream-processing & storage chapters): the underlying principles of ingestion pipelines and backpressure.</li>
+</ul>
+
+<h2>Food for Thought (click to expand)</h2>
+
+<details>
+<summary>1. 20M points/s, 3.5TB/day compressed, but the client wants "any device at any moment, sub-second lookup". All-hot won't fit, all-archived is too slow. How?</summary>
+<div class="answer">
+<p>The key is <strong>tiering + pre-aggregation</strong>, designed around access pattern not "keep everything": hot tier (7 days, SSD) keeps raw seconds and serves 95% of queries; warm tier (7-90 days, compressed chunks) keeps only minute-level downsamples, 60× smaller; cold tier (90+ days, S3 Parquet) archives raw seconds.</p>
+<p>"Any device sub-second lookup" hinges on <strong>partition pruning</strong>: the cold tier hash-buckets by <code>device_id</code> and partitions by day, so a single-device single-day query scans one small Parquet file and returns in seconds — no full scan. The cost is slow <em>cross-device aggregation</em> (many files), but that's an analytical query and minute-level latency is acceptable. The essence: archive raw cold + keep aggregates hot, decoupling cost from latency.</p>
+</div>
+</details>
+
+<details>
+<summary>2. A city blackout: hundreds of thousands of smart meters disconnect at once, then reconnect together when power returns. What happens? How do you prevent it?</summary>
+<div class="answer">
+<p><strong>A double hit of reconnect storm + backfill flood:</strong></p>
+<ul>
+<li><strong>Reconnect storm</strong>: hundreds of thousands of devices start TCP+TLS handshakes in the same second; broker CPU (TLS handshakes are CPU-heavy) maxes out instantly, handshakes queue and time out → devices retry → worse.</li>
+<li><strong>Backfill flood</strong>: each device buffered N records while offline and dumps them all on reconnect; instantaneous writes are dozens of times normal, breaking the downstream of Kafka.</li>
+</ul>
+<p><strong>Defenses:</strong> ① <em>client random backoff</em> — reconnect delay = <code>base × 2^n + random(0, jitter)</code>, spreading reconnects over minutes (must be in firmware); ② <em>broker admission limiting</em> — a token bucket at the connection layer rejects over-rate handshakes to protect established connections; ③ <em>backfill rate-limit + stagger</em>, relying on Kafka to absorb the flood; ④ <em>graceful degradation</em> — shed QoS 0 historical samples during the flood, keep only QoS 1 critical events.</p>
+<p>This is Day 23's "retries must carry jitter" amplified for IoT — the device count turns any synchronized behavior into a DDoS.</p>
+</div>
+</details>
+
+<details>
+<summary>3. Why is an MQTT broker hard to scale horizontally while a stateless HTTP service just adds machines? What must adding a broker node solve?</summary>
+<div class="answer">
+<p>The root cause is that a broker is <strong>stateful</strong>: it maintains a TCP long connection, session state, subscriptions, and unacknowledged QoS 1/2 messages per connection. HTTP is stateless — any request routes to any node identically, so adding machines scales. Adding a broker node must solve:</p>
+<ul>
+<li><strong>Connection ownership</strong>: device A connects to node 1 and wants to message device B (subscribed to the same topic, connected to node 3); nodes must <em>route/forward</em> between each other — requiring a shared cluster-wide subscription table (EMQX uses a distributed routing table).</li>
+<li><strong>Session migration</strong>: node 1 dies, A reconnects to node 2, and its persistent session (offline messages, subscriptions) must recover — requiring externalized or cluster-replicated session state.</li>
+<li><strong>Sticky load balancing</strong>: not simple round-robin; the same device should land on the same node stably (connections are long-lived), commonly via consistent hashing.</li>
+</ul>
+<p>This is exactly why EMQX chose <strong>Erlang/OTP</strong> — its lightweight processes (one per connection, a few KB each) + built-in distribution (transparent inter-node messaging) are built for "massive stateful long connections". In a thread-model language, the context switching for a million connections would crush you first.</p>
+</div>
+</details>
+
+<details>
+<summary>4. The edge gateway runs a rule "temp > 80 → cut power". Now change the threshold to 75. Why is this seemingly one-line change a hard problem at 10M-device scale?</summary>
+<div class="answer">
+<p>Because it's a <strong>staged config rollout across tens of thousands of edge nodes</strong>, not a one-line code edit:</p>
+<ul>
+<li><strong>Devices are often offline</strong>: you can't assume all are online; use a device shadow — store "desired threshold = 75" in the cloud shadow, and devices pull and reconcile on connect.</li>
+<li><strong>No all-at-once push</strong>: millions pulling new config simultaneously self-inflicts a request storm; you must stage (1% → observe → ramp) and be able to roll back.</li>
+<li><strong>Safety logic must fail-safe</strong>: if a push fails or config is corrupt, the device falls back to a safe default (rather over-stop than under-stop) — it must not stop protecting just because it can't fetch config.</li>
+</ul>
+<p>The essence: the edge swaps "deploy once" for "deploy N times", degrading ops from centralized easy-updates into distributed staging/consistency/rollback — the biggest hidden cost of the edge.</p>
+</div>
+</details>
+
+<details>
+<summary>5. Device clocks are routinely wrong (cheap RTC drift, offline backfill), so "event time" arrives out of order. What breaks if you write the TSDB by arrival order? What to do?</summary>
+<div class="answer">
+<p><strong>What writing by arrival order (processing-time) breaks:</strong></p>
+<ul>
+<li><strong>Wrong aggregation windows</strong>: a car backfills data from "an hour ago" after reconnecting; counting it into the current minute window pollutes the average and creates fake spikes in trend charts.</li>
+<li><strong>Misaligned downsampling</strong>: continuous aggregates bucket by arrival time, scattering data from the same real moment across buckets, scrambling the timeline on lookup.</li>
+<li><strong>False alerts</strong>: a late old "overheating" event is treated as real-time, triggering an already-meaningless action.</li>
+</ul>
+<p><strong>The fix (see Day 20 stream processing):</strong> ① use <em>event-time</em> (the device's timestamp) not arrival time for windowing; ② <em>watermarks</em> tolerate out-of-order — define "allow N minutes late", close a window only after the watermark passes, and route over-late data to a side output for separate correction; ③ periodic NTP sync to correct drift; ④ idempotent dedup with <code>device_id + event_ts</code> as the key, so backfilled duplicates overwrite rather than append.</p>
+<p>Core insight: IoT "time" is two things — when it happened and when it arrived, possibly hours apart. Aggregation/alerting/billing must all go by <em>event time</em>.</p>
+</div>
+</details>
+
+<div class="nav"><a href="index.en.html">← Back to index</a></div>
+</div>
+</body></html>

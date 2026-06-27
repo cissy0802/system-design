@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 35 · 物联网与边缘 (IoT & Edge) — System Design Bi-daily</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"SF Pro Display","Noto Sans SC",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
+.container{max-width:820px;margin:0 auto;padding:24px 20px 60px}
+header{padding:40px 0 28px;border-bottom:1px solid rgba(100,200,255,0.15);margin-bottom:32px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem}
+.tag{padding:3px 10px;border-radius:4px;background:rgba(100,200,255,0.12);color:#64c8ff;border:1px solid rgba(100,200,255,0.25)}
+.tag.diff{background:rgba(94,234,212,0.1);color:#5eead4;border-color:rgba(94,234,212,0.3)}
+.tag.day{background:rgba(255,180,80,0.1);color:#ffb450;border-color:rgba(255,180,80,0.25)}
+h1{font-size:1.75rem;font-weight:800;background:linear-gradient(135deg,#64c8ff 0%,#5eead4 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:0.5px;line-height:1.3}
+h1 .en{display:block;font-size:1rem;color:#7a8590;-webkit-text-fill-color:#7a8590;margin-top:6px;font-weight:500}
+h2{font-size:1.2rem;color:#5eead4;margin:36px 0 14px;padding-left:12px;border-left:3px solid #5eead4}
+h3{font-size:1rem;color:#64c8ff;margin:20px 0 10px;font-weight:600}
+p{margin:10px 0;color:#c8cfd6}
+ul,ol{margin:10px 0 10px 22px;color:#c8cfd6}
+li{margin:6px 0}
+strong{color:#e8eef5;font-weight:600}
+em{color:#5eead4;font-style:normal;font-weight:500}
+code{font-family:"SF Mono",Menlo,Consolas,monospace;background:rgba(100,200,255,0.1);color:#5eead4;padding:1px 6px;border-radius:3px;font-size:0.88em}
+pre{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:14px 16px;overflow-x:auto;margin:12px 0;font-family:"SF Mono",Menlo,Consolas,monospace;font-size:0.84rem;line-height:1.55;color:#c8cfd6}
+pre code{background:none;color:inherit;padding:0;font-size:1em}
+.mermaid{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:18px;margin:14px 0;text-align:center;overflow-x:auto;cursor:zoom-in;transition:border-color 0.15s}
+.mermaid:hover{border-color:rgba(100,200,255,0.4)}
+.mermaid svg{width:100%;max-width:100%;height:auto;min-height:280px}
+.lightbox{position:fixed;inset:0;background:rgba(8,12,18,0.96);z-index:9999;display:none;align-items:center;justify-content:center;padding:24px;cursor:grab;backdrop-filter:blur(4px);overflow:hidden}
+.lightbox.open{display:flex}
+.lightbox.dragging{cursor:grabbing}
+.lightbox svg{width:auto;height:auto;max-width:96vw;max-height:92vh;transform-origin:center center;will-change:transform}
+.lightbox .hint{position:fixed;top:16px;right:20px;font-size:0.78rem;color:#7a8590;font-family:"SF Mono",Menlo,monospace;pointer-events:none}
+.callout{background:rgba(255,180,80,0.06);border-left:3px solid #ffb450;padding:12px 14px;margin:14px 0;border-radius:4px;font-size:0.94rem}
+.callout strong{color:#ffb450}
+.tradeoff{background:rgba(100,200,255,0.05);border:1px solid rgba(100,200,255,0.2);border-radius:6px;padding:12px 14px;margin:12px 0;font-size:0.94rem}
+.case{background:rgba(94,234,212,0.05);border-left:3px solid #5eead4;padding:12px 14px;margin:12px 0;border-radius:4px;font-size:0.94rem}
+.case strong{color:#5eead4}
+.nav{margin-top:50px;padding-top:24px;border-top:1px solid rgba(100,200,255,0.15);text-align:center}
+.nav a{color:#64c8ff;text-decoration:none;font-size:0.92rem;padding:8px 16px;border:1px solid rgba(100,200,255,0.3);border-radius:4px;transition:all 0.15s}
+.nav a:hover{background:rgba(100,200,255,0.1)}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:0.9rem}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid rgba(100,200,255,0.15)}
+th{color:#64c8ff;font-weight:600;background:rgba(100,200,255,0.05)}
+details{background:rgba(100,200,255,0.04);border:1px solid rgba(100,200,255,0.18);border-radius:6px;padding:12px 16px;margin:10px 0;transition:all 0.15s}
+details:hover{border-color:rgba(100,200,255,0.35)}
+details[open]{background:rgba(94,234,212,0.05);border-color:rgba(94,234,212,0.3)}
+details summary{font-weight:600;color:#e8eef5;list-style:none;outline:none;cursor:pointer;display:flex;align-items:flex-start;gap:10px;font-size:0.96rem}
+details summary::-webkit-details-marker{display:none}
+details summary::before{content:'▶';color:#64c8ff;font-size:0.75em;transition:transform 0.2s;flex-shrink:0;margin-top:5px}
+details[open] summary::before{transform:rotate(90deg);color:#5eead4}
+details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
+details .answer ul,details .answer ol{margin:6px 0 6px 22px}
+@media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+</style>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({startOnLoad:true,theme:'base',flowchart:{useMaxWidth:true,htmlLabels:true,nodeSpacing:50,rankSpacing:60},themeVariables:{primaryColor:'#1a2530',primaryTextColor:'#e8eef5',primaryBorderColor:'#64c8ff',lineColor:'#5eead4',secondaryColor:'#0e1419',tertiaryColor:'#0a0f14',background:'#0a0f14',mainBkg:'#1a2530',secondBkg:'#0e1419',textColor:'#d4dae0',fontFamily:'-apple-system,"SF Pro Display",sans-serif',fontSize:'16px'}});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const lb=document.createElement('div');lb.className='lightbox';
+  lb.innerHTML='<span class="hint">scroll = zoom · drag = pan · Esc / click bg = close</span>';
+  document.body.appendChild(lb);
+  let scale=1,panX=0,panY=0,dragging=false,moved=false,lx=0,ly=0;
+  const apply=()=>{const s=lb.querySelector('svg');if(s)s.style.transform=`translate(${panX}px,${panY}px) scale(${scale})`};
+  const reset=()=>{scale=1;panX=0;panY=0};
+  const close=()=>{lb.classList.remove('open');const s=lb.querySelector('svg');if(s)s.remove();reset()};
+  document.addEventListener('click',e=>{
+    if(e.target.closest('.lightbox')){if(moved){moved=false;return}close();return}
+    const w=e.target.closest('.mermaid');if(!w)return;
+    const svg=w.querySelector('svg');if(!svg)return;
+    const c=svg.cloneNode(true);c.removeAttribute('style');
+    c.style.maxWidth='96vw';c.style.maxHeight='92vh';
+    lb.appendChild(c);lb.classList.add('open');reset();apply();
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+  lb.addEventListener('wheel',e=>{
+    if(!lb.classList.contains('open'))return;
+    e.preventDefault();
+    const svg=lb.querySelector('svg');if(!svg)return;
+    const ns=Math.max(0.3,Math.min(10,scale*(1-e.deltaY*0.002)));
+    const r=svg.getBoundingClientRect();
+    const cx=e.clientX-(r.left+r.width/2),cy=e.clientY-(r.top+r.height/2);
+    const k=ns/scale-1;panX-=cx*k;panY-=cy*k;scale=ns;apply();
+  },{passive:false});
+  lb.addEventListener('mousedown',e=>{
+    if(!lb.classList.contains('open'))return;
+    dragging=true;moved=false;lx=e.clientX;ly=e.clientY;lb.classList.add('dragging');e.preventDefault();
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    const dx=e.clientX-lx,dy=e.clientY-ly;
+    if(Math.abs(dx)+Math.abs(dy)>3)moved=true;
+    panX+=dx;panY+=dy;lx=e.clientX;ly=e.clientY;apply();
+  });
+  document.addEventListener('mouseup',()=>{dragging=false;lb.classList.remove('dragging')});
+});
+</script>
+</head><body><div class="container">
+
+<header>
+<div class="meta">
+<span class="tag day">Day 35</span>
+<span class="tag diff">Hard</span>
+<span class="tag">IoT</span>
+<span class="tag">MQTT</span>
+<span class="tag">Edge</span>
+<span class="tag">Time-Series DB</span>
+</div>
+<h1>物联网与边缘 — 千万设备每 10 秒一次心跳的吞吐工程<span class="en">IoT & Edge: Ingestion at Scale, MQTT, Edge Compute, Time-Series Storage</span></h1>
+</header>
+
+<h2>问题场景 + 需求约束</h2>
+<p>设计一个 <strong>1000 万台联网设备</strong>的遥测后端（电动车队 / 工业传感器 / 智能电表）：每台设备每 <strong>10 秒</strong>上报一次电池、温度、GPS、电流等 20 个指标。这类系统和请求-响应 Web 后端是两种物种——<em>写远多于读</em>（99% 是写入），连接是<em>长连接</em>而非短请求，网络<em>不可靠</em>（车进隧道、传感器断电），且数据<em>一旦写入几乎不改</em>。</p>
+<ul>
+<li><strong>写入 QPS</strong>：1000 万 ÷ 10s × 20 指标 = <strong>2000 万 points/s</strong>。峰值（车队早高峰同时上线）再翻 2-3 倍。</li>
+<li><strong>连接规模</strong>：千万级并发长连接，单 broker 节点扛百万连接，需要十几台 broker 集群。</li>
+<li><strong>存储量</strong>：每 point 压缩后约 2 字节，原始 16 字节 → 2000 万/s × 2B ≈ <strong>3.5 TB/天</strong>（压缩后）；热数据查询要 ms 级，冷数据归档对象存储。</li>
+<li><strong>延迟 SLO</strong>：摄取 p99 &lt; 1s（告警链路），仪表盘聚合查询 p95 &lt; 500ms；但<em>设备侧的告警判断要 &lt; 100ms</em>——所以要边缘计算。</li>
+<li><strong>可靠性</strong>：丢一个温度采样无所谓（下一帧覆盖），丢一个"电池过热"告警是事故——QoS 要分级。</li>
+</ul>
+
+<h2>高层架构</h2>
+<pre class="mermaid">
+graph LR
+    D["设备 / 传感器<br/><i>千万级</i>"]
+    EG["边缘网关<br/><i>过滤 · 聚合 · 本地告警</i>"]
+    BR["MQTT Broker 集群<br/><i>EMQX · 百万连接/节点</i>"]
+    K["Kafka 缓冲<br/><i>削峰 · 解耦</i>"]
+    SP["流处理<br/><i>Flink · 去重/降采样</i>"]
+    TSDB[("时序 DB<br/>热数据 · 压缩")]
+    OBJ[("对象存储<br/>冷数据 · Parquet")]
+    AL["告警 / 仪表盘"]
+
+    D -->|MQTT| EG -->|MQTT/QoS| BR
+    BR --> K --> SP
+    SP --> TSDB
+    SP --> OBJ
+    TSDB --> AL
+
+    classDef dev fill:#1a2530,stroke:#64c8ff,color:#e8eef5
+    classDef edge fill:#0e2030,stroke:#5eead4,color:#e8eef5
+    classDef pipe fill:#1a1a30,stroke:#ffb450,color:#e8eef5
+    classDef store fill:#2a1530,stroke:#ff7ab6,color:#e8eef5
+    class D dev
+    class EG,BR edge
+    class K,SP pipe
+    class TSDB,OBJ,AL store
+</pre>
+<p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">四段职责分明：边缘<em>减量</em>、broker <em>收连接</em>、Kafka <em>削峰解耦</em>、TSDB <em>压缩存储</em>。任何一段直连下游都会被流量打爆。</p>
+<p>核心思路是<strong>层层减量、层层解耦</strong>。边缘网关把原始采样本地聚合成摘要，砍 90% 回传带宽；MQTT broker 专职维持海量长连接、做 QoS 投递；Kafka 是关键的<strong>削峰蓄水池</strong>——broker 输出抖动剧烈（早高峰 3 倍）而 TSDB 写入恒定，Kafka 吸收差值；流处理做去重、乱序重排、降采样后落库。</p>
+
+<h2>关键技术点</h2>
+
+<h3>1. 设备协议：MQTT vs HTTP vs CoAP</h3>
+<p><strong>1 句话</strong>：长连接 + pub/sub 的 MQTT 用<em>连接复用</em>换<em>有状态服务器</em>，是海量低功耗设备的默认选择。</p>
+<p><strong>原理</strong>：HTTP 是<em>请求-响应 + 每次新建 TCP/TLS</em>，对每 10 秒发一个 2 字节温度的设备，握手开销（几 KB）是 payload 的上千倍，还无法服务端主动推送（要远程关阀门只能让设备轮询）。<strong>MQTT</strong> 是 OASIS 标准的<em>发布-订阅</em>协议：设备与 broker 建一条长连接，按 topic（如 <code>fleet/car42/battery</code>）发布；header 最小仅 2 字节；支持服务端主动下发、遗嘱消息（Last Will，设备掉线自动通知）、保留消息。代价是 broker 必须<em>有状态</em>地维持千万连接与每设备的会话。</p>
+<div class="tradeoff">
+<strong>选型 Trade-off：</strong>
+<ul>
+<li><strong>MQTT</strong>：✅ 长连接省握手、双向推送、QoS 分级、低功耗；❌ broker 有状态难扩、连接迁移复杂、不适合大文件（OTA 固件走 HTTP）。</li>
+<li><strong>HTTP/REST</strong>：✅ 无状态易扩、生态成熟、防火墙友好；❌ 高频小包浪费惊人、无服务端推送、电池杀手。适合<em>低频批量</em>上报（每小时一次）。</li>
+<li><strong>CoAP</strong>：✅ 基于 UDP、比 MQTT 更轻、适合极受限设备（几 KB RAM）；❌ UDP 不可靠要自己补、生态小、NAT 穿透难。</li>
+</ul></div>
+<pre><code># MQTT QoS：投递保证分三级，按数据重要性选
+# QoS 0 (at-most-once)：发了就忘，丢了不重传 —— 高频温度采样
+# QoS 1 (at-least-once)：收到 PUBACK 才算成功，可能重复 —— 普通事件
+# QoS 2 (exactly-once)：四次握手 PUBREC/PUBREL/PUBCOMP，不重不漏 —— 计费/告警
+client.publish("fleet/car42/temp",  payload, qos=0)   # 丢一个无所谓
+client.publish("fleet/car42/alert", payload, qos=1)   # 至少一次 + 下游幂等去重
+# ⚠️ QoS 2 最贵（双倍往返 + broker 存状态），千万设备别全用 2
+</code></pre>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>EMQX</strong>：Erlang/OTP 写的分布式 MQTT broker，单集群可达千万级连接、单节点百万连接——Erlang 的轻量进程模型天生适合海量长连接（参见 <a href="https://www.emqx.com/en/blog/mqtt-vs-http">EMQ 的 MQTT vs HTTP 对比</a>）。</li>
+<li><strong>HiveMQ / AWS IoT Core</strong>：均以 MQTT 为核心协议，<a href="https://www.hivemq.com/blog/mqtt-vs-http-protocols-in-iot-iiot/">HiveMQ 的对比文章</a>实测多消息场景下 MQTT 吞吐远超 HTTP。</li>
+<li><strong>Facebook Messenger</strong>：早年移动端推送就用 MQTT，正是看中长连接省电、低延迟下发的特性。</li>
+</ul></div>
+
+<h3>2. 边缘计算：在数据产生地就近处理</h3>
+<p><strong>1 句话</strong>：边缘用<em>本地算力</em>换<em>回传带宽 + 响应延迟</em>，但引入运维与一致性难题。</p>
+<p><strong>原理</strong>：不是所有数据都值得回传云端。一台车每秒产生 MB 级传感器流，但云端真正需要的是<em>摘要</em>（每分钟均值）和<em>异常</em>（温度超阈值）。<strong>边缘网关</strong>（车载计算单元 / 工厂网关）在本地做三件事：① <em>过滤降采样</em>——20 个原始采样聚合成 1 条；② <em>本地决策</em>——过热立即断电，不等云端 200ms 往返；③ <em>断网缓冲</em>——车进隧道时本地存盘，重连后补传。这把"云端集中处理"变成"边缘-云协同"。</p>
+<div class="tradeoff">
+<strong>选型 Trade-off：</strong>
+<ul>
+<li><strong>全云端</strong>：✅ 逻辑集中、易更新、设备简单；❌ 带宽成本爆炸、断网即瘫、控制回路延迟高（不能做安全急停）。</li>
+<li><strong>全边缘</strong>：✅ 低延迟、抗断网、省带宽；❌ 数千边缘节点的部署/升级是噩梦、模型更新滞后、边缘算力受限。</li>
+<li><strong>边缘-云协同（主流）</strong>：边缘做实时减量 + 安全决策，云做训练 + 全局优化 + 长期存储。✅ 兼顾；❌ 需要管理"哪段逻辑在哪"，调试跨层困难。</li>
+</ul></div>
+<pre><code># 边缘网关：本地聚合 + 异常直传 + 断网缓冲（伪代码）
+buf = RingBuffer(maxlen=10000)          # 本地缓冲，断网时不丢
+def on_sample(s):
+    if s.value &gt; THRESHOLD:             # 异常：本地立即动作 + 高 QoS 上报
+        actuator.shutdown()             # 不等云端，&lt;100ms 急停
+        publish(s, qos=1)
+    window.add(s)
+    if window.full():                   # 正常：每分钟聚合一条，砍 90% 带宽
+        agg = window.summary()          # min/max/avg/p95
+        if online: publish(agg, qos=0)
+        else:      buf.append(agg)       # 断网先存，重连补传
+</code></pre>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Tesla Fleet Telemetry</strong>：开源的 <a href="https://github.com/teslamotors/fleet-telemetry">teslamotors/fleet-telemetry</a> 用车端配置控制上报哪些字段、频率，车端先减量；云端经 WebSocket/MQTT 前端接入后落 Kafka。</li>
+<li><strong>工业 IoT（PLC + 网关）</strong>：工厂网关本地跑规则引擎做安全联锁，毫秒级停机，云端只收聚合 KPI。</li>
+<li><strong>CDN 边缘（同构思路）</strong>：Cloudflare Workers / Lambda@Edge 把计算下沉到离用户最近处——边缘计算在 Web 与 IoT 是同一哲学。</li>
+</ul></div>
+
+<h3>3. 摄取管道：削峰、解耦、背压</h3>
+<p><strong>1 句话</strong>：broker 和 TSDB 之间必须有 Kafka 这层<em>缓冲</em>，否则写入抖动会反压击穿整条链路。</p>
+<p><strong>原理</strong>：摄取的本质矛盾是<em>输入抖动</em>（早高峰车队同时上线，瞬时 3 倍）vs <em>下游恒定吞吐</em>（TSDB 写入能力固定）。若 broker 直写 TSDB，峰值时 TSDB 写满 → 反压到 broker → broker 连接堆积 → 设备重连风暴 → 雪崩。<strong>Kafka 作蓄水池</strong>：broker 全速写 Kafka（顺序写，极快），消费者按 TSDB 能承受的速率拉取。Kafka 还提供<em>解耦</em>——同一份数据可被告警、TSDB 落库、ML 训练多个消费组独立消费，互不影响。分区键用 <code>device_id</code> 保证同设备数据有序。</p>
+<div class="tradeoff">
+<strong>选型 Trade-off：</strong>
+<ul>
+<li><strong>broker 直写 TSDB</strong>：✅ 架构简单、延迟低；❌ 无削峰、无解耦，峰值反压即雪崩。仅适合小规模。</li>
+<li><strong>Kafka 缓冲（主流）</strong>：✅ 削峰、解耦、可重放（消费者出 bug 可回放修复）；❌ 多一跳延迟（几十 ms）、Kafka 自身要运维扩容。</li>
+<li><strong>背压 vs 丢弃</strong>：下游撑不住时，要么背压（让上游慢下来，但 IoT 设备无法被减速，只会丢连接），要么<em>主动降级丢低优先级数据</em>（QoS 0 的温度采样可丢，QoS 1 的告警必留）。</li>
+</ul></div>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Tesla</strong>：车队遥测经 WebSocket 前端 → Kafka 集群削峰 → 下游 Cassandra/分析管道；据公开分享其 Kafka 日处理 IoT 消息量达万亿级。</li>
+<li><strong>Uber</strong>：司机/乘客 App 的位置上报同样走 Kafka 缓冲再分发给派单、ETA、风控多个消费组。</li>
+<li><strong>LinkedIn</strong>：Kafka 的发源地，正是为解决"多源高吞吐数据如何解耦分发给多个消费者"而生。</li>
+</ul></div>
+
+<h3>4. 时序数据库：压缩、降采样、基数爆炸</h3>
+<p><strong>1 句话</strong>：时序场景的特殊性（写多改少、时间递增、数值相邻相似）让专用压缩比通用 DB 省 10 倍存储。</p>
+<p><strong>原理</strong>：遥测数据有强规律——<em>时间戳近似等差</em>、<em>相邻数值变化小</em>（温度不会从 25 跳到 5000）。Facebook 的 <strong>Gorilla</strong>（VLDB 2015）利用这两点：时间戳用 <em>delta-of-delta</em>（存二阶差，等间隔采样的差几乎全是 0），数值用 <em>XOR 压缩</em>（相邻浮点 XOR 后高位全 0，只存有效位），把每个 point 从 16 字节压到平均 <strong>1.37 字节（约 12 倍）</strong>，从而能全内存存储、查询提速数十倍。<strong>TimescaleDB</strong> 走另一条路：基于 Postgres，用 <em>hypertable</em> 按时间自动切 chunk，旧 chunk 转列存压缩（约 10 倍），保留完整 SQL 生态。</p>
+<table>
+<thead><tr><th></th><th>TimescaleDB</th><th>InfluxDB</th><th>Prometheus</th></tr></thead>
+<tbody>
+<tr><td><strong>模型</strong></td><td>Postgres 扩展 (SQL)</td><td>专用 TSDB (列存/Parquet)</td><td>拉模型 (pull)</td></tr>
+<tr><td><strong>写入</strong></td><td>高，靠 chunk 分区</td><td>极高吞吐</td><td>中（监控量级）</td></tr>
+<tr><td><strong>压缩</strong></td><td>列存 ~10x</td><td>列存 + 编码</td><td>delta+XOR (类 Gorilla)</td></tr>
+<tr><td><strong>适合</strong></td><td>要 SQL/JOIN/关系数据</td><td>纯时序、超大规模</td><td>基础设施监控</td></tr>
+</tbody></table>
+<pre><code>-- TimescaleDB：建 hypertable + 自动压缩策略
+SELECT create_hypertable('telemetry', 'ts',
+       chunk_time_interval =&gt; INTERVAL '1 day');
+-- 7 天前的 chunk 自动列存压缩（约 10x）
+ALTER TABLE telemetry SET (timescaledb.compress,
+       timescaledb.compress_segmentby = 'device_id');
+SELECT add_compression_policy('telemetry', INTERVAL '7 days');
+-- 连续聚合：预降采样，仪表盘查的是分钟级而非原始秒级
+SELECT add_retention_policy('telemetry', INTERVAL '90 days'); -- 冷数据归档</code></pre>
+<div class="callout">
+<strong>基数爆炸（Cardinality Explosion）</strong>：时序 DB 的头号杀手。每个唯一的 tag 组合（<code>device_id × metric × region</code>）是一条独立 series，索引在内存。1000 万设备 × 20 指标 = 2 亿 series，内存索引直接撑爆。<em>解法</em>：别把高基数字段（如 <code>trip_id</code>、随机 UUID）塞进 tag/label，放 field；用设备分桶聚合。InfluxDB 早期版本就因基数问题臭名昭著。
+</div>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Facebook Gorilla</strong>：<a href="https://dl.acm.org/doi/10.14778/2824032.2824078">VLDB 2015 论文</a>，delta-of-delta + XOR 把 16B 压到 1.37B，开源版为 Beringei；其压缩算法被后来几乎所有 TSDB 借鉴。</li>
+<li><strong>TimescaleDB</strong>：<a href="https://www.tigerdata.com/blog/timescaledb-vs-influxdb-for-time-series-data-timescale-influx-sql-nosql-36489299877">Timescale 官方对比</a>详述 hypertable/chunk/列存压缩设计，主打"时序 + 完整 SQL"。</li>
+<li><strong>Prometheus</strong>：监控领域事实标准，本地 TSDB 用类 Gorilla 的 delta+XOR 编码 + 2 小时 block。</li>
+</ul></div>
+
+<h2>扩展与优化</h2>
+<ul>
+<li><strong>分层存储（热温冷）</strong>：近 7 天热数据在 TSDB（SSD/内存），7-90 天降采样后温存，90 天以上转 Parquet 进对象存储（S3），查询走 Trino/Athena。成本下降一个数量级。</li>
+<li><strong>降采样金字塔</strong>：原始秒级 → 分钟级 → 小时级连续聚合，仪表盘按时间窗自动选粒度，避免扫海量原始点。</li>
+<li><strong>连接层水平扩展</strong>：MQTT broker 集群化，用一致性哈希把设备分到节点；前置 L4 负载均衡 + 连接迁移，单节点故障时设备重连到健康节点。</li>
+<li><strong>OTA 与设备影子（Device Shadow）</strong>：设备常离线，云端维护"影子"状态（期望 vs 实际），设备上线后同步——AWS IoT Device Shadow 即此模式。</li>
+<li><strong>多区域</strong>：设备就近接入区域 broker，遥测本地落库 + 异步汇聚到全局分析层，降低跨洋延迟。</li>
+</ul>
+
+<h2>常见陷阱 + 面试追问</h2>
+<div class="callout"><strong>1. 全用 QoS 2</strong>：图省心给所有消息上 exactly-once，broker 要为每条消息存四次握手状态，千万设备直接压垮。按数据价值分级是基本功。</div>
+<div class="callout"><strong>2. 高基数 tag</strong>：把 <code>trip_id</code>/时间戳/随机 ID 当 tag，series 数量爆炸，TSDB 内存 OOM。这是面试 TSDB 必问的坑。</div>
+<div class="callout"><strong>3. broker 直写 DB 无缓冲</strong>：忘了 Kafka 削峰，早高峰反压雪崩。面试官爱问"流量突增 3 倍怎么办"。</div>
+<div class="callout"><strong>4. 忽略时钟与乱序</strong>：设备时钟不准、断网补传导致数据乱序到达。要用 event-time + watermark（见 Day 20），不能按到达顺序写。</div>
+<div class="callout"><strong>5. 重连风暴（Thundering Herd）</strong>：broker 重启或网络抖动，千万设备同时重连握手把集群打死。重连必须带<em>随机退避 + jitter</em>。</div>
+<div class="callout"><strong>6. 没区分"丢得起"与"丢不起"</strong>：温度采样可丢，告警/计费不可丢。下游消费必须幂等（用 <code>device_id + ts</code> 去重）。</div>
+
+<h2>深入资源</h2>
+<ul>
+<li><strong>《Gorilla: A Fast, Scalable, In-Memory Time Series Database》</strong>（<a href="https://dl.acm.org/doi/10.14778/2824032.2824078">VLDB 2015</a>）：时序压缩的奠基之作，delta-of-delta + XOR 必读。</li>
+<li><strong>HiveMQ MQTT Essentials / <a href="https://www.hivemq.com/blog/mqtt-vs-http-protocols-in-iot-iiot/">MQTT vs HTTP</a></strong>：MQTT 协议、QoS、会话机制最系统的教程。</li>
+<li><strong><a href="https://github.com/teslamotors/fleet-telemetry">teslamotors/fleet-telemetry</a></strong>：开源生产级车队遥测接入层，看真实的边缘配置 + Kafka 落地。</li>
+<li><strong><a href="https://www.tigerdata.com/blog/timescaledb-vs-influxdb-for-time-series-data-timescale-influx-sql-nosql-36489299877">TimescaleDB vs InfluxDB</a></strong>：hypertable/chunk/压缩与基数权衡。</li>
+<li><strong>《Designing Data-Intensive Applications》</strong>（Kleppmann，流处理与存储章节）：摄取管道与背压的底层原理。</li>
+</ul>
+
+<h2>深入思考（点击展开答案）</h2>
+
+<details>
+<summary>1. 2000 万 points/s、压缩后 3.5TB/天，但客户要求"任意设备任意时刻可秒级回查"。全留热存放不下，全归档查不动，怎么设计?</summary>
+<div class="answer">
+<p>核心是<strong>分层 + 预聚合</strong>，按访问模式而非"全都要"设计：热层（7 天，SSD）留原始秒级，命中 95% 查询；温层（7-90 天，压缩 chunk）只留分钟级降采样，体量缩 60 倍；冷层（90 天+，S3 Parquet）原始秒级归档。</p>
+<p>"任意设备秒级回查"的关键是<strong>分区裁剪</strong>：冷层按 <code>device_id</code> 哈希分桶 + 按天分区，查单设备单日只扫一个小 Parquet 文件，秒级返回。代价是<em>跨设备聚合</em>慢（要扫多文件），但那是分析查询，可接受分钟级。本质：原始数据冷归档 + 聚合数据热常驻，把成本和延迟解耦。</p>
+</div>
+</details>
+
+<details>
+<summary>2. 一个城市突发大停电，几十万智能电表同时断网又同时恢复供电重连。会发生什么? 怎么防?</summary>
+<div class="answer">
+<p><strong>会发生重连风暴 + 补传洪峰的双重打击：</strong></p>
+<ul>
+<li><strong>重连风暴</strong>：几十万设备在供电恢复的同一秒发起 TCP+TLS 握手，broker CPU（TLS 握手极耗 CPU）瞬间打满，握手排队超时 → 设备重试 → 雪上加霜。</li>
+<li><strong>补传洪峰</strong>：每台设备断网期间本地缓冲了 N 条数据，重连后一次性全推，瞬时写入是平时的几十倍，击穿 Kafka 下游。</li>
+</ul>
+<p><strong>防御：</strong> ① <em>客户端随机退避</em>——重连延迟 = <code>base × 2^n + random(0, jitter)</code>，把同时重连摊到几分钟窗口（固件层必做）；② <em>broker 接纳限速</em>——连接层令牌桶，超速握手先拒绝以保护已建连接；③ <em>补传限速 + 错峰</em>，靠 Kafka 削峰吸收洪峰；④ <em>优雅降级</em>——洪峰期丢 QoS 0 历史采样，只保 QoS 1 关键事件。</p>
+<p>这就是 Day 23"重试必带 jitter"在 IoT 的放大版——设备数量让任何同步行为都变成 DDoS。</p>
+</div>
+</details>
+
+<details>
+<summary>3. 为什么 MQTT broker 难水平扩展，而无状态 HTTP 服务加机器就行? 加一个 broker 节点要解决什么?</summary>
+<div class="answer">
+<p>根因是 broker <strong>有状态</strong>：它要为每个连接维持 TCP 长连接、会话状态、订阅关系、QoS 1/2 的未确认消息。HTTP 无状态，任何请求路由到任何节点都一样，加机器即扩容。broker 加节点要解决：</p>
+<ul>
+<li><strong>连接归属</strong>：设备 A 连在节点 1，要发消息给订阅了同 topic 的设备 B（连在节点 3），节点间必须<em>路由转发</em>——需要集群内的 topic 订阅表共享（EMQX 用分布式路由表）。</li>
+<li><strong>会话迁移</strong>：节点 1 挂了，A 重连到节点 2，它的 persistent session（离线消息、订阅）要能恢复——需要会话状态外置或集群复制。</li>
+<li><strong>负载均衡的粘性</strong>：不能简单轮询，同一设备最好稳定落同一节点（连接是长期的），常用一致性哈希。</li>
+</ul>
+<p>这正是 EMQX 选 <strong>Erlang/OTP</strong> 的原因——其轻量进程（每连接一进程，开销几 KB）+ 内置分布式（节点间透明消息传递）天生为"海量有状态长连接"设计。换成线程模型的语言，百万连接的上下文切换就先把自己拖垮了。</p>
+</div>
+</details>
+
+<details>
+<summary>4. 边缘网关本地跑了"温度 &gt; 80 就断电"的规则，现在要把阈值改成 75。这个看似一行的改动，在千万设备规模下为什么是难题?</summary>
+<div class="answer">
+<p>因为这是<strong>分布式配置在数万边缘节点的灰度下发问题</strong>，不是改一行代码：</p>
+<ul>
+<li><strong>设备常离线</strong>：下发不能假设全在线，要用 device shadow——把"期望阈值=75"存云端影子，设备上线时拉取对齐。</li>
+<li><strong>不能一次全推</strong>：千万设备同时拉新配置 = 自造请求风暴，必须灰度（1% → 观察 → 放量）且可回滚。</li>
+<li><strong>安全逻辑要 fail-safe</strong>：下发失败或配置损坏时回退到安全默认值（宁可误停不漏停），不能因拿不到配置就不保护。</li>
+</ul>
+<p>本质：边缘把"一处部署"换成"N 处部署"，运维从中心化的易更新退化成分布式的灰度/一致性/回滚——这是边缘最大的隐性成本。</p>
+</div>
+</details>
+
+<details>
+<summary>5. 设备时钟普遍不准（廉价 RTC 漂移、断网补传），数据"事件时间"乱序到达。直接按到达顺序写 TSDB 会错在哪? 怎么办?</summary>
+<div class="answer">
+<p><strong>按到达顺序（processing-time）写的错误：</strong></p>
+<ul>
+<li><strong>聚合窗口算错</strong>：一台车断网 1 小时后补传，这批"1 小时前"的数据若算进当前分钟窗口，会让当前均值被历史值污染，趋势图出现假尖峰。</li>
+<li><strong>降采样错位</strong>：连续聚合按到达时间分桶，同一真实时刻的数据散落在不同桶，回查时间线错乱。</li>
+<li><strong>告警误判</strong>：迟到的旧"过热"事件被当成实时告警，触发已经无意义的动作。</li>
+</ul>
+<p><strong>正解（见 Day 20 流处理）：</strong> ① 用 <em>event-time</em>（设备打的时间戳）而非到达时间分窗；② <em>Watermark</em> 容忍乱序——定义"允许迟到 N 分钟"，窗口等 watermark 越过才闭合，超期迟到数据走侧输出单独修正；③ 设备定期 NTP 对时校正漂移；④ 用 <code>device_id + event_ts</code> 做主键<em>幂等去重</em>，补传重复时覆盖而非追加。</p>
+<p>核心认知：IoT 的"时间"有两个——发生时间和到达时间，可能差几小时。聚合/告警/计费都必须以<em>发生时间</em>为准。</p>
+</div>
+</details>
+
+<div class="nav"><a href="index.html">← 回到 index</a></div>
+</div>
+</body></html>
