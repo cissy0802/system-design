@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 36 · Blockchain & Distributed Ledger — System Design Bi-daily</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"SF Pro Display","Noto Sans SC",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
+.container{max-width:820px;margin:0 auto;padding:24px 20px 60px}
+header{padding:40px 0 28px;border-bottom:1px solid rgba(100,200,255,0.15);margin-bottom:32px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem}
+.tag{padding:3px 10px;border-radius:4px;background:rgba(100,200,255,0.12);color:#64c8ff;border:1px solid rgba(100,200,255,0.25)}
+.tag.diff{background:rgba(94,234,212,0.1);color:#5eead4;border-color:rgba(94,234,212,0.3)}
+.tag.day{background:rgba(255,180,80,0.1);color:#ffb450;border-color:rgba(255,180,80,0.25)}
+h1{font-size:1.75rem;font-weight:800;background:linear-gradient(135deg,#64c8ff 0%,#5eead4 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:0.5px;line-height:1.3}
+h1 .en{display:block;font-size:1rem;color:#7a8590;-webkit-text-fill-color:#7a8590;margin-top:6px;font-weight:500}
+h2{font-size:1.2rem;color:#5eead4;margin:36px 0 14px;padding-left:12px;border-left:3px solid #5eead4}
+h3{font-size:1rem;color:#64c8ff;margin:20px 0 10px;font-weight:600}
+p{margin:10px 0;color:#c8cfd6}
+ul,ol{margin:10px 0 10px 22px;color:#c8cfd6}
+li{margin:6px 0}
+strong{color:#e8eef5;font-weight:600}
+em{color:#5eead4;font-style:normal;font-weight:500}
+code{font-family:"SF Mono",Menlo,Consolas,monospace;background:rgba(100,200,255,0.1);color:#5eead4;padding:1px 6px;border-radius:3px;font-size:0.88em}
+pre{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:14px 16px;overflow-x:auto;margin:12px 0;font-family:"SF Mono",Menlo,Consolas,monospace;font-size:0.84rem;line-height:1.55;color:#c8cfd6}
+pre code{background:none;color:inherit;padding:0;font-size:1em}
+.mermaid{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:18px;margin:14px 0;text-align:center;overflow-x:auto;cursor:zoom-in;transition:border-color 0.15s}
+.mermaid:hover{border-color:rgba(100,200,255,0.4)}
+.mermaid svg{width:100%;max-width:100%;height:auto;min-height:280px}
+.lightbox{position:fixed;inset:0;background:rgba(8,12,18,0.96);z-index:9999;display:none;align-items:center;justify-content:center;padding:24px;cursor:grab;backdrop-filter:blur(4px);overflow:hidden}
+.lightbox.open{display:flex}
+.lightbox.dragging{cursor:grabbing}
+.lightbox svg{width:auto;height:auto;max-width:96vw;max-height:92vh;transform-origin:center center;will-change:transform}
+.lightbox .hint{position:fixed;top:16px;right:20px;font-size:0.78rem;color:#7a8590;font-family:"SF Mono",Menlo,monospace;pointer-events:none}
+.callout{background:rgba(255,180,80,0.06);border-left:3px solid #ffb450;padding:12px 14px;margin:14px 0;border-radius:4px;font-size:0.94rem}
+.callout strong{color:#ffb450}
+.tradeoff{background:rgba(100,200,255,0.05);border:1px solid rgba(100,200,255,0.2);border-radius:6px;padding:12px 14px;margin:12px 0;font-size:0.94rem}
+.case{background:rgba(94,234,212,0.05);border-left:3px solid #5eead4;padding:12px 14px;margin:12px 0;border-radius:4px;font-size:0.94rem}
+.case strong{color:#5eead4}
+.nav{margin-top:50px;padding-top:24px;border-top:1px solid rgba(100,200,255,0.15);text-align:center}
+.nav a{color:#64c8ff;text-decoration:none;font-size:0.92rem;padding:8px 16px;border:1px solid rgba(100,200,255,0.3);border-radius:4px;transition:all 0.15s}
+.nav a:hover{background:rgba(100,200,255,0.1)}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:0.9rem}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid rgba(100,200,255,0.15)}
+th{color:#64c8ff;font-weight:600;background:rgba(100,200,255,0.05)}
+details{background:rgba(100,200,255,0.04);border:1px solid rgba(100,200,255,0.18);border-radius:6px;padding:12px 16px;margin:10px 0;transition:all 0.15s}
+details:hover{border-color:rgba(100,200,255,0.35)}
+details[open]{background:rgba(94,234,212,0.05);border-color:rgba(94,234,212,0.3)}
+details summary{font-weight:600;color:#e8eef5;list-style:none;outline:none;cursor:pointer;display:flex;align-items:flex-start;gap:10px;font-size:0.96rem}
+details summary::-webkit-details-marker{display:none}
+details summary::before{content:'▶';color:#64c8ff;font-size:0.75em;transition:transform 0.2s;flex-shrink:0;margin-top:5px}
+details[open] summary::before{transform:rotate(90deg);color:#5eead4}
+details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
+details .answer ul,details .answer ol{margin:6px 0 6px 22px}
+@media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+</style>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({startOnLoad:true,theme:'base',flowchart:{useMaxWidth:true,htmlLabels:true,nodeSpacing:50,rankSpacing:60},themeVariables:{primaryColor:'#1a2530',primaryTextColor:'#e8eef5',primaryBorderColor:'#64c8ff',lineColor:'#5eead4',secondaryColor:'#0e1419',tertiaryColor:'#0a0f14',background:'#0a0f14',mainBkg:'#1a2530',secondBkg:'#0e1419',textColor:'#d4dae0',fontFamily:'-apple-system,"SF Pro Display",sans-serif',fontSize:'16px'}});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const lb=document.createElement('div');lb.className='lightbox';
+  lb.innerHTML='<span class="hint">scroll = zoom · drag = pan · Esc / click bg = close</span>';
+  document.body.appendChild(lb);
+  let scale=1,panX=0,panY=0,dragging=false,moved=false,lx=0,ly=0;
+  const apply=()=>{const s=lb.querySelector('svg');if(s)s.style.transform=`translate(${panX}px,${panY}px) scale(${scale})`};
+  const reset=()=>{scale=1;panX=0;panY=0};
+  const close=()=>{lb.classList.remove('open');const s=lb.querySelector('svg');if(s)s.remove();reset()};
+  document.addEventListener('click',e=>{
+    if(e.target.closest('.lightbox')){if(moved){moved=false;return}close();return}
+    const w=e.target.closest('.mermaid');if(!w)return;
+    const svg=w.querySelector('svg');if(!svg)return;
+    const c=svg.cloneNode(true);c.removeAttribute('style');
+    c.style.maxWidth='96vw';c.style.maxHeight='92vh';
+    lb.appendChild(c);lb.classList.add('open');reset();apply();
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+  lb.addEventListener('wheel',e=>{
+    if(!lb.classList.contains('open'))return;
+    e.preventDefault();
+    const svg=lb.querySelector('svg');if(!svg)return;
+    const ns=Math.max(0.3,Math.min(10,scale*(1-e.deltaY*0.002)));
+    const r=svg.getBoundingClientRect();
+    const cx=e.clientX-(r.left+r.width/2),cy=e.clientY-(r.top+r.height/2);
+    const k=ns/scale-1;panX-=cx*k;panY-=cy*k;scale=ns;apply();
+  },{passive:false});
+  lb.addEventListener('mousedown',e=>{
+    if(!lb.classList.contains('open'))return;
+    dragging=true;moved=false;lx=e.clientX;ly=e.clientY;lb.classList.add('dragging');e.preventDefault();
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    const dx=e.clientX-lx,dy=e.clientY-ly;
+    if(Math.abs(dx)+Math.abs(dy)>3)moved=true;
+    panX+=dx;panY+=dy;lx=e.clientX;ly=e.clientY;apply();
+  });
+  document.addEventListener('mouseup',()=>{dragging=false;lb.classList.remove('dragging')});
+});
+</script>
+</head><body><div class="container">
+
+<header>
+<div class="meta">
+<span class="tag day">Day 36</span>
+<span class="tag diff">Hard</span>
+<span class="tag">Blockchain</span>
+<span class="tag">Consensus</span>
+<span class="tag">Smart Contract</span>
+<span class="tag">Decentralized Storage</span>
+</div>
+<h1>Blockchain & Distributed Ledger — Replicating One State Machine Nobody Can Rewrite, Across Untrusting Nodes<span class="en">Consensus, Smart Contracts, Decentralized Storage, the Trilemma</span></h1>
+</header>
+
+<h2>Problem & Constraints</h2>
+<p>Design a <strong>cross-institution settlement ledger</strong> (many banks, multiple regulators, nobody willing to be the central party): replicate, across <em>mutually distrusting</em> hundreds of nodes, one transaction history that <em>everyone agrees on and no one can unilaterally alter</em>. This is a different threat model from classic distributed systems — Day 5's replication assumes nodes only crash (crash fault), whereas here nodes may <strong>actively lie, forge, and collude</strong> (Byzantine fault), with no trusted coordinator. Consensus shifts from "make the live replicas agree" to "make a crowd of potential liars agree."</p>
+<ul>
+<li><strong>Trust model</strong>: no trusted third party; nodes can act Byzantine; tolerate at most 1/3 (BFT) or &lt;50% of hash power/stake (Nakamoto consensus) being malicious.</li>
+<li><strong>Throughput vs security</strong>: Bitcoin ~7 TPS, Ethereum ~15-30 TPS, versus Visa's peak of tens of thousands TPS — three orders of magnitude slower is the tax paid for security.</li>
+<li><strong>Finality</strong>: how long until a transaction is "irreversible"? PoW gives probabilistic finality (wait ~6 blocks ≈ 1 hour); BFT gives deterministic finality (one block settles it).</li>
+<li><strong>Data size</strong>: full nodes store all history (Bitcoin &gt; 600GB, Ethereum archive node &gt; 15TB); on-chain storage is brutally expensive (dollars per KB).</li>
+<li><strong>Tamper-evident + auditable</strong>: any third party can independently verify the whole chain without trusting the publisher.</li>
+</ul>
+
+<h2>High-Level Architecture</h2>
+<pre class="mermaid">
+graph TD
+    C["Client / Wallet<br/><i>signs tx with private key</i>"]
+    MP["Mempool<br/><i>pending tx pool</i>"]
+    subgraph P2P["P2P node network (gossip broadcast)"]
+      V1["Validator node<br/><i>execute+consensus</i>"]
+      V2["Validator node"]
+      V3["Validator node"]
+    end
+    EVM["State machine / VM<br/><i>EVM · deterministic exec</i>"]
+    LDG[("Blockchain ledger<br/>hash chain + Merkle tree")]
+    OFF[("Off-chain storage<br/>IPFS / Arweave")]
+
+    C -->|1 signed tx| MP --> P2P
+    P2P -->|2 consensus picks leader| EVM
+    EVM -->|3 state transition| LDG
+    EVM -.large blobs store only hash.-> OFF
+    V1 <-.gossip.-> V2 <-.gossip.-> V3
+
+    classDef client fill:#1a2530,stroke:#64c8ff,color:#e8eef5
+    classDef net fill:#0e2030,stroke:#5eead4,color:#e8eef5
+    classDef exec fill:#1a1a30,stroke:#ffb450,color:#e8eef5
+    classDef store fill:#2a1530,stroke:#ff7ab6,color:#e8eef5
+    class C client
+    class V1,V2,V3,MP net
+    class EVM exec
+    class LDG,OFF store
+</pre>
+<p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">Transactions enter the mempool → P2P network → consensus picks a block producer → the VM deterministically executes to a new state → the hash chain appends. Every full node replays all transactions to verify independently, trusting no producer.</p>
+
+<h2>Key Technical Points</h2>
+
+<h3>1. Consensus: PoW vs PoS vs BFT — trading security and decentralization for throughput</h3>
+<p><strong>Principle</strong>: reaching agreement under Byzantine conditions requires <em>scarce voting power</em>, otherwise an attacker spins up endless fake identities (<em>Sybil attack</em>) to swing votes. <strong>PoW</strong> uses hash power as the scarce resource (solve a hash puzzle; whoever solves first produces the block). <strong>PoS</strong> uses staked capital (a stake-weighted random pick of the producer; misbehave and your stake is slashed). <strong>BFT-style</strong> (PBFT / Tendermint) runs two voting rounds (pre-vote / pre-commit) within a <em>known validator set</em> and commits deterministically once 2/3+ agree.</p>
+<table>
+<thead><tr><th></th><th>PoW (Bitcoin)</th><th>PoS (Ethereum)</th><th>BFT (Tendermint)</th></tr></thead>
+<tbody>
+<tr><td><strong>Scarce resource</strong></td><td>hash power</td><td>staked capital</td><td>known identity + stake</td></tr>
+<tr><td><strong>Finality</strong></td><td>probabilistic (~6 blocks)</td><td>~2 epochs</td><td>1 block</td></tr>
+<tr><td><strong>Node scale</strong></td><td>permissionless, tens of thousands</td><td>permissionless, 100k+ validators</td><td>usually &lt;200 (O(n²) voting)</td></tr>
+<tr><td><strong>Energy</strong></td><td>very high</td><td>very low</td><td>very low</td></tr>
+<tr><td><strong>Cost</strong></td><td>slow, power-hungry, 51% attack</td><td>nothing-at-stake, rich-get-richer</td><td>scale-limited, needs gated identity</td></tr>
+</tbody></table>
+<div class="tradeoff">
+<strong>Trade-off:</strong>
+<ul>
+<li><strong>PoW</strong>: ✅ most battle-tested; Sybil resistance is pure physical hash power; ❌ slow, staggering energy use, mining-pool centralization, only probabilistic finality (reorgs are theoretically possible).</li>
+<li><strong>PoS</strong>: ✅ ~99.95% less energy, slashing punishes misbehavior, more stake = higher attack cost; ❌ "nothing-at-stake" (low marginal cost to cheat, needs slashing to fix), long-range attacks, capital concentration.</li>
+<li><strong>BFT</strong>: ✅ instant finality, low latency, high throughput; ❌ O(n²) vote communication caps node count — fundamentally a <em>permissioned</em> stance, trading open decentralization.</li>
+</ul></div>
+<pre><code># PoW block production: brute-force a nonce meeting the difficulty (pseudo-code)
+def mine(block, difficulty):
+    target = 2 ** (256 - difficulty)
+    nonce = 0
+    while True:
+        h = sha256(sha256(block.header + nonce))  # Bitcoin double SHA-256
+        if int(h, 16) < target:                   # enough leading zeros
+            return nonce                            # found -> broadcast block
+        nonce += 1
+# Verification is a single hash (O(1)); production needs ~2^difficulty tries.
+# Difficulty auto-adjusts every 2016 blocks, locking ~10-min block interval.
+</code></pre>
+<div class="case">
+<strong>Real cases:</strong>
+<ul>
+<li><strong>Bitcoin</strong>: PoW Nakamoto consensus, ~10-min blocks, ~7 TPS; security rides on total network hash power, never 51%-attacked to date (smaller coins are, repeatedly). See the Nakamoto 2008 whitepaper.</li>
+<li><strong>Ethereum</strong>: "The Merge" on 2022-09-15 switched PoW → PoS, cutting <a href="https://ethereum.org/roadmap/merge/">energy by ~99.95%</a>; validators stake 32 ETH and get slashed for misbehavior.</li>
+<li><strong>Cosmos / Tendermint</strong>: BFT instant finality, the consensus base for the IBC cross-chain ecosystem; bounded validator set but ~1s blocks.</li>
+<li><strong>Solana</strong>: Proof of History (a cryptographic clock that pre-orders transactions) + PoS chasing high TPS — but suffered repeated network-wide halts in 2022 from congestion/bugs (see Scalability below).</li>
+</ul></div>
+
+<h3>2. Smart contracts: deterministic state machine + gas metering — making the halting problem pay per opcode</h3>
+<p><strong>Principle</strong>: a smart contract is code <em>deployed on-chain and re-executed by every node</em>. Each full node must compute the <em>exact same</em> result, or the state forks — demanding strict <strong>determinism</strong>: no true randomness, no reading wall-clock/network, avoid floating point. The EVM is a 256-bit stack machine. Because code may loop forever (the halting problem is undecidable), <strong>gas</strong> prices every opcode; the caller prepays gas, and running out reverts — both a DoS guard and a price on computation.</p>
+<div class="tradeoff">
+<strong>Trade-off: the mutability dilemma</strong>
+<ul>
+<li><strong>Immutable</strong>: ✅ truly trustless, users are certain the rules won't change; ❌ bugs can't be fixed (The DAO is the textbook case), only abandoned and migrated.</li>
+<li><strong>Upgradeable proxy</strong>: ✅ can patch bugs; ❌ reintroduces an "admin can swap the logic" centralization — itself an attack surface.</li>
+<li><strong>Off-chain compute + on-chain verify</strong>: ✅ saves gas, runs heavy compute; ❌ needs a trusted oracle or ZK proof, high complexity.</li>
+</ul></div>
+<pre><code>// reentrancy bug: transfer before zeroing balance -> recursive re-entry (The DAO 2016)
+function withdraw() public {
+    uint bal = balances[msg.sender];
+    (bool ok,) = msg.sender.call{value: bal}("");  // ⚠️ callback re-enters withdraw()
+    balances[msg.sender] = 0;                        // too late! re-entered before zeroing
+}
+// Fix — Checks-Effects-Interactions: change state first, then call out
+function withdraw() public {
+    uint bal = balances[msg.sender];
+    balances[msg.sender] = 0;        // ✅ zero first (Effect)
+    (bool ok,) = msg.sender.call{value: bal}("");  // then transfer (Interaction)
+    require(ok);
+}
+</code></pre>
+<div class="case">
+<strong>Real cases:</strong>
+<ul>
+<li><strong>The DAO (2016)</strong>: a <a href="https://www.gemini.com/cryptopedia/the-dao-hack-makerdao">reentrancy bug drained ~3.6M ETH (~$60M at the time)</a>; Ethereum hard-forked to reverse it, splitting off Ethereum Classic (the no-fork camp).</li>
+<li><strong>Ethereum EVM</strong>: stack-based 256-bit VM + gas metering — the de facto standard that Polygon, BNB Chain, Avalanche and many others stay compatible with.</li>
+<li><strong>Solana</strong>: uses BPF/SBF (not EVM) and an account model rather than EVM's contract-storage model, optimized for parallel execution.</li>
+<li><strong>Hyperledger Fabric</strong>: a permissioned chain; chaincode runs in Docker containers, and its execute-order-validate flow tolerates non-determinism by filtering after.</li>
+</ul></div>
+
+<h3>3. Data integrity: hash chain + Merkle tree + off-chain storage — compressing "trust" into a 32-byte root</h3>
+<p><strong>Principle</strong>: tamper-evidence comes from two hashing layers. A <em>hash chain</em>: each block header contains the previous block's hash, so altering any historical block invalidates every hash after it — the cost to tamper equals redoing all subsequent PoW/consensus. A <em>Merkle tree</em>: the thousands of transactions in a block are pairwise-hashed into a tree whose root goes into the header — so a light node (SPV) needs only an O(log n) Merkle proof to verify "this transaction is in this block" without downloading the full block. That lets a phone wallet skip storing 600GB.</p>
+<div class="tradeoff">
+<strong>Trade-off: where does data live?</strong>
+<ul>
+<li><strong>Fully on-chain</strong>: ✅ strongest tamper-evidence + availability; ❌ every node stores a copy — absurdly expensive (hundreds of dollars per MB), never store images/video.</li>
+<li><strong>Off-chain + hash on-chain</strong>: ✅ cheap, scalable; ❌ availability falls back to the off-chain system (IPFS content nobody pins disappears) — tamper-evident but able to vanish.</li>
+<li><strong>Permanent storage (Arweave)</strong>: ✅ pay once, stored forever; ❌ the economic model rests on long-term endowment-yield assumptions.</li>
+</ul></div>
+<pre><code># Merkle proof verification: recompute the root from O(log n) sibling hashes (pseudo-code)
+def verify(leaf, proof, root):
+    h = sha256(leaf)
+    for sibling, is_left in proof:        # bottom-up
+        h = sha256(sibling + h) if is_left else sha256(h + sibling)
+    return h == root      # root matches -> leaf is in the tree and untampered
+# For one tx in a million-tx block, the proof is only ~20 hashes ≈ 640 bytes.
+</code></pre>
+<div class="case">
+<strong>Real cases:</strong>
+<ul>
+<li><strong>Bitcoin SPV</strong>: light wallets verify transactions via Merkle proofs without storing the full chain — exactly the design in Section 8 of the Nakamoto whitepaper.</li>
+<li><strong>IPFS / Filecoin</strong>: content addressing (CID = content hash); NFT metadata/large files often live on IPFS with only the CID on-chain; Filecoin adds economic incentives so someone keeps storing it.</li>
+<li><strong>Arweave</strong>: a "permanent storage" play — pay once, blockweave structure — used by many NFT projects as a durable image layer.</li>
+<li><strong>Certificate Transparency</strong>: Google's CT logs use Merkle trees for an auditable certificate ledger — a non-cryptocurrency application of blockchain ideas.</li>
+</ul></div>
+
+<h3>4. The scalability trilemma: Layer 2 Rollups — don't compute on the main chain, just throw the proof back at it</h3>
+<p><strong>Principle</strong>: the "blockchain trilemma" (per Vitalik) says <em>decentralization, security, scalability</em> are hard to have all at once — raising throughput tends to either shrink the node set (lose decentralization) or relax verification (lose security). The mainstream scaling path is the <strong>Layer 2 Rollup</strong>: execute hundreds-to-thousands of transactions off-chain in a batch, and submit only <em>compressed data + a validity guarantee</em> back to L1, which acts as the settlement and data-availability layer. Two schools: <em>Optimistic Rollup</em> trusts by default but keeps a challenge window (~7 days) for fraud proofs; <em>ZK Rollup</em> uses zero-knowledge proofs (SNARK/STARK) to mathematically prove correct execution, so the main chain finalizes on one verification.</p>
+<div class="tradeoff">
+<strong>Trade-off: Optimistic vs ZK Rollup</strong>
+<ul>
+<li><strong>Optimistic</strong>: ✅ great EVM compatibility, simple to build; ❌ withdrawals wait the ~7-day challenge window; security rests on "at least one honest verifier will challenge."</li>
+<li><strong>ZK Rollup</strong>: ✅ cryptographic instant finality, fast withdrawals, no need to trust challengers; ❌ proof generation is compute-heavy, and EVM compatibility (zkEVM) is brutally hard engineering.</li>
+<li><strong>Sharding / DA layer</strong>: ✅ scales data-availability bandwidth horizontally (Ethereum's danksharding direction); ❌ cross-shard transactions are complex, cross-shard atomicity is hard.</li>
+</ul></div>
+<div class="case">
+<strong>Real cases:</strong>
+<ul>
+<li><strong>Arbitrum / Optimism</strong>: the mainstream Ethereum Optimistic Rollups, cutting gas costs by one-to-two orders of magnitude and absorbing heavy DeFi traffic.</li>
+<li><strong>zkSync / StarkNet / Polygon zkEVM</strong>: the ZK Rollup route, compressing via STARK/SNARK proofs, with withdrawals that skip the challenge window.</li>
+<li><strong>Ethereum</strong>: the official roadmap is explicitly "rollup-centric" — L1 retreats to settlement + data availability, scaling delegated to L2.</li>
+<li><strong>Bitcoin Lightning Network</strong>: a different approach (payment channels, not rollups), moving high-frequency micropayments into bidirectional off-chain channels, touching the chain only to open/close.</li>
+</ul></div>
+
+<h2>Scalability & Optimization (what happens as it grows)</h2>
+<ul>
+<li><strong>Throughput wall</strong>: don't just enlarge main-chain blocks (bigger blocks = higher full-node hardware bar = decentralization decay — the core of Bitcoin's "block size war"); push TPS onto L2 rollups.</li>
+<li><strong>State bloat</strong>: full-node state grows without bound (Ethereum state &gt; hundreds of GB); introduce state expiry / statelessness (stateless clients verify via witness data) to lower the new-node bar.</li>
+<li><strong>Data availability</strong>: a rollup's bottleneck shifts from execution to "posting data back to L1"; danksharding / blobs (EIP-4844) reserve cheap data bandwidth for L2.</li>
+<li><strong>Cross-chain interop</strong>: multi-chain ecosystems need bridges, but bridges are the <em>#1 hacking hotspot</em> (huge locked value, fragile trust assumptions); prefer light-client verification over multisig custody.</li>
+</ul>
+
+<h2>Common Pitfalls + Interview Questions</h2>
+<div class="callout"><strong>1. "Immutable" ≠ "correct".</strong> The chain only guarantees that what's written can't be changed (tamper-evident); it does not guarantee that what was written is true (garbage in, garbage forever). Oracles feed off-chain truth on-chain and are the weakest, most-manipulated link in the trust chain (DeFi oracle price-manipulation attacks are common).</div>
+<div class="callout"><strong>2. What does a 51% attack actually attack?</strong> Not "stealing others' coins" (signatures can't be forged) but <em>double-spending</em>: with majority hash power the attacker can reorg the chain and reverse their own confirmed transactions. Low-cap PoW coins, with cheap hash power, get hit repeatedly.</div>
+<div class="callout"><strong>3. The private key is everything.</strong> There is no "reset password": lose the key = assets locked forever, leak the key = assets gone instantly. This is the fundamental UX-vs-security tension; account abstraction (AA) / social recovery are filling the gap.</div>
+<div class="callout"><strong>4. Finality isn't "confirmed = safe".</strong> PoW is probabilistic finality — more blocks lower the reorg probability but never to zero; only BFT is deterministic finality. Exchanges requiring many confirmations for large deposits do so for exactly this reason.</div>
+<div class="callout"><strong>5. Frequent interview follow-ups:</strong> (1) Why is PoS's attack cost higher than PoW's? (2) Where does the withdrawal-latency gap between Optimistic and ZK rollups come from? (3) Why not store a user avatar on-chain? (4) Why is BFT node count limited, and where does the O(n²) come from? (5) Soft fork vs hard fork compatibility difference?</div>
+
+<h2>Deeper Resources</h2>
+<ul>
+<li><strong>Bitcoin Whitepaper</strong> (Nakamoto, 2008): the origin of PoW, Merkle, and SPV — Nakamoto consensus explained in 9 pages.</li>
+<li><strong>"Designing Data-Intensive Applications"</strong> (Kleppmann) Ch. 8-9: Byzantine faults, consensus, and consistency from a systems view, placing blockchain back in the distributed-systems lineage.</li>
+<li><strong><a href="https://ethereum.org/roadmap/merge/">ethereum.org — The Merge</a></strong>: the official account of the PoS switch, energy, and slashing.</li>
+<li><strong>Vitalik Buterin's blog</strong> (vitalik.eth.limo): first-hand writing on the trilemma, the rollup-centric roadmap, and PoS design.</li>
+</ul>
+
+<h2>Going Deeper (click to expand)</h2>
+
+<details>
+<summary>1. What exactly is PoS's "nothing-at-stake" problem? Why does PoW not have it naturally, and why does PoS need slashing to fix it?</summary>
+<div class="answer">
+<p><strong>The essence</strong>: during a fork, a PoW miner's hash power is <em>physically exclusive</em> — the same rig mining chain A can't simultaneously mine chain B, so betting on a fork splits hash power and carries a real opportunity cost. A PoS validator, however, can sign votes on <em>every fork at near-zero cost</em> (signing barely consumes resources), so the rational strategy is "vote on all of them" to collect rewards no matter which chain wins. The result: nothing converges to a single chain and consensus collapses.</p>
+<p><strong>The fix, slashing</strong>: the protocol declares "signing two conflicting blocks" a cryptographically provable offense; once reported, the validator's <em>stake is confiscated and they are ejected</em>, turning "vote-on-all is free" into "vote-on-all gets you bankrupted" and restoring the opportunity cost. <em>Second-order effect</em>: validators now risk "fat-fingered double-signing" (misconfig, bugs), which spawned Distributed Validator Technology (DVT) to reduce single-point mis-slashing.</p>
+</div>
+</details>
+
+<details>
+<summary>2. Why did Bitcoin choose ~10-minute blocks while Solana chases 400ms? Is faster always better? What does speed cost in a distributed system?</summary>
+<div class="answer">
+<p><strong>The core constraint is network propagation latency.</strong> Broadcasting a block across a global P2P network takes time (seconds). If the block interval approaches propagation latency, two miners produce blocks "before receiving each other's" → <em>frequent forks (orphan/stale blocks)</em>. Nakamoto deliberately set the interval to 10 minutes, far above propagation latency, so forks are rare and the chain converges cleanly — at the cost of being slow.</p>
+<p><strong>How Solana hits 400ms</strong>: Proof of History pre-orders transactions (a cryptographic clock), cutting the "whose turn is it now" coordination overhead, while requiring validators to run high-spec hardware. <em>The cost</em>: a high hardware bar → fewer nodes → decentralization decay; thin fault-tolerance margin, with repeated <strong>network-wide halts for hours</strong> in 2022 from traffic surges/bugs. This is the trilemma in the flesh: throughput bought with decentralization and stability — fast blocks are spent safety margin.</p>
+</div>
+</details>
+
+<details>
+<summary>3. Smart contracts require "every node computes the exact same result." Which everyday programming habits does this determinism constraint forbid, and what happens if you break it?</summary>
+<div class="answer">
+<ul>
+<li><strong>True randomness</strong>: <code>random()</code> differs per node → state fork. On-chain "randomness" can only use reproducible pseudo-randomness (e.g. block hash), which miners can manipulate (MEV).</li>
+<li><strong>Reading system time</strong>: wall clocks differ per node; you can only use the <em>block timestamp</em> (an approximate value the producer fills), accurate to seconds and slightly manipulable.</li>
+<li><strong>Floating point</strong>: IEEE 754 can differ subtly across architectures/compilers → the EVM has integers only, with amounts in the smallest integer unit (wei).</li>
+<li><strong>External I/O / network</strong>: a contract can't directly HTTP-fetch data (not reproducible). External data must come via an <em>oracle</em> writing the value into a transaction, so all nodes replay the same fixed value.</li>
+<li><strong>Unbounded gas loops</strong>: a loop length driven by external input can exhaust gas and revert, becoming a denial-of-service surface.</li>
+</ul>
+<p>Breaking determinism doesn't throw an error — it makes <em>different nodes reach different state roots</em>, so consensus can't align → the chain splits. That's why the EVM cuts these sources out at the instruction-set level.</p>
+</div>
+</details>
+
+<details>
+<summary>4. Storing data on IPFS with only the hash on-chain claims "decentralized + immutable." Where's the availability trap, and how is it fundamentally different from "store on S3, keep the URL"?</summary>
+<div class="answer">
+<p><strong>The trap: immutable ≠ won't disappear.</strong> The on-chain hash permanently guarantees "if the content for this CID exists, it is the original content" (tamper-evident), but <em>nobody guarantees that content stays stored</em>. IPFS is content-addressed; content is online only while some node actively <code>pin</code>s it — if every pinning node goes offline, the content is <em>unretrievable</em>: the hash is still on-chain, pointing into the void. Many early NFT "images disappearing" was exactly the project stopping its pinning service.</p>
+<p><strong>vs S3+URL</strong>: an S3 URL is <em>location addressing</em> — content can be silently swapped while the URL stays the same — not tamper-evident. An IPFS CID is <em>content addressing</em> — change the content and the CID changes — so tamper-evident but equally without availability guarantees. Both need a "someone keeps storing it" incentive; the only difference is "can tampering be detected." <em>True durability</em> requires Filecoin (storage proofs + incentives) or Arweave (pay once, stored forever), which fold storage availability into the incentive.</p>
+</div>
+</details>
+
+<details>
+<summary>5. A banking consortium wants a cross-bank settlement ledger and an engineer suggests "put it on Ethereum mainnet." As the architect, would you object? When do you truly need a permissionless public chain?</summary>
+<div class="answer">
+<p><strong>Most likely yes, object to mainnet.</strong> The consortium wants "members share one tamper-evident, auditable ledger and skip reconciliation," but members are <em>known and regulated</em> — which is precisely where you <em>don't need</em> a permissionless chain's most expensive property: Sybil- and censorship-resistant open consensus. On a public chain you'd also hit: privacy (all transactions public, breaking financial confidentiality), throughput (~15 TPS nowhere near enough), fee volatility, and uncontrollable compliance (assets on an uncontrolled public network).</p>
+<p><strong>What to use instead</strong>: a <em>permissioned / consortium chain</em> (Hyperledger Fabric, R3 Corda, Quorum) — BFT consensus among known validators for deterministic finality, with orders-of-magnitude higher throughput, private channels, and controllable governance. In essence it gives up "trust no one" for "decentralize within a gated, small trust circle."</p>
+<p><strong>When you genuinely need a public chain</strong>: when participants <em>can't be determined in advance, distrust each other, and need censorship-/single-shutdown-resistance</em> — e.g. public asset issuance to any global user, trustless cross-border value transfer. A litmus test: if you can write a whitelist of "who may write," you probably don't need a permissionless public chain.</p>
+</div>
+</details>
+
+<div class="nav"><a href="index.en.html">← Back to index</a></div>
+</div>
+</body></html>

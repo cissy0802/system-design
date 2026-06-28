@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 36 · 区块链与分布式账本 (Blockchain & Distributed Ledger) — System Design Bi-daily</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"SF Pro Display","Noto Sans SC",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
+.container{max-width:820px;margin:0 auto;padding:24px 20px 60px}
+header{padding:40px 0 28px;border-bottom:1px solid rgba(100,200,255,0.15);margin-bottom:32px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem}
+.tag{padding:3px 10px;border-radius:4px;background:rgba(100,200,255,0.12);color:#64c8ff;border:1px solid rgba(100,200,255,0.25)}
+.tag.diff{background:rgba(94,234,212,0.1);color:#5eead4;border-color:rgba(94,234,212,0.3)}
+.tag.day{background:rgba(255,180,80,0.1);color:#ffb450;border-color:rgba(255,180,80,0.25)}
+h1{font-size:1.75rem;font-weight:800;background:linear-gradient(135deg,#64c8ff 0%,#5eead4 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:0.5px;line-height:1.3}
+h1 .en{display:block;font-size:1rem;color:#7a8590;-webkit-text-fill-color:#7a8590;margin-top:6px;font-weight:500}
+h2{font-size:1.2rem;color:#5eead4;margin:36px 0 14px;padding-left:12px;border-left:3px solid #5eead4}
+h3{font-size:1rem;color:#64c8ff;margin:20px 0 10px;font-weight:600}
+p{margin:10px 0;color:#c8cfd6}
+ul,ol{margin:10px 0 10px 22px;color:#c8cfd6}
+li{margin:6px 0}
+strong{color:#e8eef5;font-weight:600}
+em{color:#5eead4;font-style:normal;font-weight:500}
+code{font-family:"SF Mono",Menlo,Consolas,monospace;background:rgba(100,200,255,0.1);color:#5eead4;padding:1px 6px;border-radius:3px;font-size:0.88em}
+pre{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:14px 16px;overflow-x:auto;margin:12px 0;font-family:"SF Mono",Menlo,Consolas,monospace;font-size:0.84rem;line-height:1.55;color:#c8cfd6}
+pre code{background:none;color:inherit;padding:0;font-size:1em}
+.mermaid{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:18px;margin:14px 0;text-align:center;overflow-x:auto;cursor:zoom-in;transition:border-color 0.15s}
+.mermaid:hover{border-color:rgba(100,200,255,0.4)}
+.mermaid svg{width:100%;max-width:100%;height:auto;min-height:280px}
+.lightbox{position:fixed;inset:0;background:rgba(8,12,18,0.96);z-index:9999;display:none;align-items:center;justify-content:center;padding:24px;cursor:grab;backdrop-filter:blur(4px);overflow:hidden}
+.lightbox.open{display:flex}
+.lightbox.dragging{cursor:grabbing}
+.lightbox svg{width:auto;height:auto;max-width:96vw;max-height:92vh;transform-origin:center center;will-change:transform}
+.lightbox .hint{position:fixed;top:16px;right:20px;font-size:0.78rem;color:#7a8590;font-family:"SF Mono",Menlo,monospace;pointer-events:none}
+.callout{background:rgba(255,180,80,0.06);border-left:3px solid #ffb450;padding:12px 14px;margin:14px 0;border-radius:4px;font-size:0.94rem}
+.callout strong{color:#ffb450}
+.tradeoff{background:rgba(100,200,255,0.05);border:1px solid rgba(100,200,255,0.2);border-radius:6px;padding:12px 14px;margin:12px 0;font-size:0.94rem}
+.case{background:rgba(94,234,212,0.05);border-left:3px solid #5eead4;padding:12px 14px;margin:12px 0;border-radius:4px;font-size:0.94rem}
+.case strong{color:#5eead4}
+.nav{margin-top:50px;padding-top:24px;border-top:1px solid rgba(100,200,255,0.15);text-align:center}
+.nav a{color:#64c8ff;text-decoration:none;font-size:0.92rem;padding:8px 16px;border:1px solid rgba(100,200,255,0.3);border-radius:4px;transition:all 0.15s}
+.nav a:hover{background:rgba(100,200,255,0.1)}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:0.9rem}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid rgba(100,200,255,0.15)}
+th{color:#64c8ff;font-weight:600;background:rgba(100,200,255,0.05)}
+details{background:rgba(100,200,255,0.04);border:1px solid rgba(100,200,255,0.18);border-radius:6px;padding:12px 16px;margin:10px 0;transition:all 0.15s}
+details:hover{border-color:rgba(100,200,255,0.35)}
+details[open]{background:rgba(94,234,212,0.05);border-color:rgba(94,234,212,0.3)}
+details summary{font-weight:600;color:#e8eef5;list-style:none;outline:none;cursor:pointer;display:flex;align-items:flex-start;gap:10px;font-size:0.96rem}
+details summary::-webkit-details-marker{display:none}
+details summary::before{content:'▶';color:#64c8ff;font-size:0.75em;transition:transform 0.2s;flex-shrink:0;margin-top:5px}
+details[open] summary::before{transform:rotate(90deg);color:#5eead4}
+details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
+details .answer ul,details .answer ol{margin:6px 0 6px 22px}
+@media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+</style>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({startOnLoad:true,theme:'base',flowchart:{useMaxWidth:true,htmlLabels:true,nodeSpacing:50,rankSpacing:60},themeVariables:{primaryColor:'#1a2530',primaryTextColor:'#e8eef5',primaryBorderColor:'#64c8ff',lineColor:'#5eead4',secondaryColor:'#0e1419',tertiaryColor:'#0a0f14',background:'#0a0f14',mainBkg:'#1a2530',secondBkg:'#0e1419',textColor:'#d4dae0',fontFamily:'-apple-system,"SF Pro Display",sans-serif',fontSize:'16px'}});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const lb=document.createElement('div');lb.className='lightbox';
+  lb.innerHTML='<span class="hint">scroll = zoom · drag = pan · Esc / click bg = close</span>';
+  document.body.appendChild(lb);
+  let scale=1,panX=0,panY=0,dragging=false,moved=false,lx=0,ly=0;
+  const apply=()=>{const s=lb.querySelector('svg');if(s)s.style.transform=`translate(${panX}px,${panY}px) scale(${scale})`};
+  const reset=()=>{scale=1;panX=0;panY=0};
+  const close=()=>{lb.classList.remove('open');const s=lb.querySelector('svg');if(s)s.remove();reset()};
+  document.addEventListener('click',e=>{
+    if(e.target.closest('.lightbox')){if(moved){moved=false;return}close();return}
+    const w=e.target.closest('.mermaid');if(!w)return;
+    const svg=w.querySelector('svg');if(!svg)return;
+    const c=svg.cloneNode(true);c.removeAttribute('style');
+    c.style.maxWidth='96vw';c.style.maxHeight='92vh';
+    lb.appendChild(c);lb.classList.add('open');reset();apply();
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+  lb.addEventListener('wheel',e=>{
+    if(!lb.classList.contains('open'))return;
+    e.preventDefault();
+    const svg=lb.querySelector('svg');if(!svg)return;
+    const ns=Math.max(0.3,Math.min(10,scale*(1-e.deltaY*0.002)));
+    const r=svg.getBoundingClientRect();
+    const cx=e.clientX-(r.left+r.width/2),cy=e.clientY-(r.top+r.height/2);
+    const k=ns/scale-1;panX-=cx*k;panY-=cy*k;scale=ns;apply();
+  },{passive:false});
+  lb.addEventListener('mousedown',e=>{
+    if(!lb.classList.contains('open'))return;
+    dragging=true;moved=false;lx=e.clientX;ly=e.clientY;lb.classList.add('dragging');e.preventDefault();
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    const dx=e.clientX-lx,dy=e.clientY-ly;
+    if(Math.abs(dx)+Math.abs(dy)>3)moved=true;
+    panX+=dx;panY+=dy;lx=e.clientX;ly=e.clientY;apply();
+  });
+  document.addEventListener('mouseup',()=>{dragging=false;lb.classList.remove('dragging')});
+});
+</script>
+</head><body><div class="container">
+
+<header>
+<div class="meta">
+<span class="tag day">Day 36</span>
+<span class="tag diff">Hard</span>
+<span class="tag">Blockchain</span>
+<span class="tag">Consensus</span>
+<span class="tag">Smart Contract</span>
+<span class="tag">Decentralized Storage</span>
+</div>
+<h1>区块链与分布式账本 — 在无信任节点间复制一份谁也改不了的状态机<span class="en">Blockchain & Distributed Ledger: Consensus, Smart Contracts, Decentralized Storage, Trilemma</span></h1>
+</header>
+
+<h2>问题场景 + 需求约束</h2>
+<p>设计一个<strong>跨机构清结算账本</strong>（多家银行、多国监管、没谁愿当中心方）：要在<em>互不信任</em>的几百个节点间，复制一份<em>所有人都认账、谁也单方面改不了</em>的交易历史。这和传统分布式系统是两种威胁模型——Day 5 的 replication 假设节点只会宕机（crash fault），这里却假设节点会<strong>主动作恶、伪造、合谋</strong>（Byzantine fault），且没有可信协调者。共识的本质从「让活着的副本达成一致」升级为「让一群可能撒谎的人达成一致」。</p>
+<ul>
+<li><strong>信任模型</strong>：无 trusted third party，节点可拜占庭作恶，最多容忍 1/3（BFT）或 &lt;50% 算力/质押（中本聪共识）的恶意方。</li>
+<li><strong>吞吐 vs 安全</strong>：Bitcoin ~7 TPS、Ethereum ~15-30 TPS，对比 Visa 峰值数万 TPS——慢 3 个数量级是为安全付的税。</li>
+<li><strong>最终性（finality）</strong>：交易多久「不可逆」？PoW 是概率最终性（等 6 个块 ≈ 1 小时），BFT 是确定性最终性（一个块即定）。</li>
+<li><strong>数据规模</strong>：全节点要存全部历史（Bitcoin 已 &gt; 600GB，Ethereum archive node &gt; 15TB），on-chain 存储极贵（每 KB 上链成本可达数美元）。</li>
+<li><strong>不可篡改 + 可审计</strong>：任意第三方能独立验证整条链，无需信任发布者。</li>
+
+</ul>
+
+<h2>高层架构</h2>
+<pre class="mermaid">
+graph TD
+    C["客户端 / 钱包<br/><i>私钥签名交易</i>"]
+    MP["Mempool<br/><i>待打包交易池</i>"]
+    subgraph P2P["P2P 节点网络（gossip 广播）"]
+      V1["验证者节点<br/><i>执行+共识</i>"]
+      V2["验证者节点"]
+      V3["验证者节点"]
+    end
+    EVM["状态机 / 虚拟机<br/><i>EVM · 确定性执行</i>"]
+    LDG[("区块链账本<br/>哈希链 + Merkle 树")]
+    OFF[("链下存储<br/>IPFS / Arweave")]
+
+    C -->|①签名 tx| MP --> P2P
+    P2P -->|②共识选 leader 出块| EVM
+    EVM -->|③状态转移| LDG
+    EVM -.大对象只存 hash.-> OFF
+    V1 <-.gossip.-> V2 <-.gossip.-> V3
+
+    classDef client fill:#1a2530,stroke:#64c8ff,color:#e8eef5
+    classDef net fill:#0e2030,stroke:#5eead4,color:#e8eef5
+    classDef exec fill:#1a1a30,stroke:#ffb450,color:#e8eef5
+    classDef store fill:#2a1530,stroke:#ff7ab6,color:#e8eef5
+    class C client
+    class V1,V2,V3,MP net
+    class EVM exec
+    class LDG,OFF store
+</pre>
+<p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">交易经 mempool 进入 P2P 网络 → 共识选出块者 → 虚拟机确定性执行得到新状态 → 哈希链追加。每个全节点重放所有交易独立验证，不信任出块者。</p>
+
+<h2>关键技术点</h2>
+
+<h3>1. 共识算法：PoW vs PoS vs BFT — 拿安全和去中心化换吞吐</h3>
+<p><strong>原理</strong>：拜占庭环境下达成一致需要「投票权稀缺」，否则攻击者能用海量假身份（<em>Sybil 攻击</em>）操纵投票。<strong>PoW</strong> 用算力当稀缺资源（解哈希难题，谁先解出谁出块）；<strong>PoS</strong> 用质押的资本当稀缺资源（按质押量加权随机选出块者，作恶则没收质押 = slashing）；<strong>BFT 类</strong>（PBFT / Tendermint）则在<em>已知验证者集合</em>内做两轮投票（pre-vote / pre-commit），凑齐 2/3+ 即确定性提交。</p>
+<table>
+<thead><tr><th></th><th>PoW (Bitcoin)</th><th>PoS (Ethereum)</th><th>BFT (Tendermint)</th></tr></thead>
+<tbody>
+<tr><td><strong>稀缺资源</strong></td><td>算力</td><td>质押资本</td><td>已知身份+质押</td></tr>
+<tr><td><strong>最终性</strong></td><td>概率（等 6 块）</td><td>~2 个 epoch 确定</td><td>1 块确定</td></tr>
+<tr><td><strong>节点规模</strong></td><td>无许可、上万</td><td>无许可、数十万验证者</td><td>通常 &lt;200（投票 O(n²)）</td></tr>
+<tr><td><strong>能耗</strong></td><td>极高</td><td>极低</td><td>极低</td></tr>
+<tr><td><strong>代价</strong></td><td>慢、耗电、51% 攻击</td><td>nothing-at-stake、富者愈富</td><td>规模受限、需身份准入</td></tr>
+</tbody></table>
+<div class="tradeoff">
+<strong>Trade-off：</strong>
+<ul>
+<li><strong>PoW</strong>：✅ 最久经考验、Sybil 抗性纯靠物理算力；❌ 慢、能耗惊人、矿池中心化（少数池占多数算力）、只有概率最终性（理论上可被重组）。</li>
+<li><strong>PoS</strong>：✅ 能耗降 ~99.95%、可 slashing 惩罚作恶、质押越多攻击成本越高；❌「nothing-at-stake」（作恶边际成本低，需靠 slashing 补）、长程攻击、资本集中度问题。</li>
+<li><strong>BFT</strong>：✅ 即时确定性、低延迟、高吞吐；❌ 投票通信 O(n²) 限制节点数，本质是<em>许可链</em>取向，牺牲开放去中心化。</li>
+</ul></div>
+<pre><code># PoW 出块核心：暴力找满足难度的 nonce（pseudo-code）
+def mine(block, difficulty):
+    target = 2 ** (256 - difficulty)
+    nonce = 0
+    while True:
+        h = sha256(sha256(block.header + nonce))  # Bitcoin 双 SHA-256
+        if int(h, 16) < target:                   # 前导零足够多
+            return nonce                            # 找到 → 广播出块
+        nonce += 1
+# 验证只需一次哈希（O(1)），但生成需 ~期望 2^difficulty 次尝试
+# 全网难度每 2016 个块自动调整，锁定 ~10 分钟出块间隔
+</code></pre>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Bitcoin</strong>：PoW 中本聪共识，~10 分钟出块、~7 TPS，安全靠全网算力，至今未被 51% 攻破（小币种屡被攻破）。见 Nakamoto 2008 白皮书。</li>
+<li><strong>Ethereum</strong>：2022-09-15「The Merge」从 PoW 切到 PoS，<a href="https://ethereum.org/roadmap/merge/">能耗骤降 ~99.95%</a>，验证者需质押 32 ETH，作恶被 slash。</li>
+<li><strong>Cosmos / Tendermint</strong>：BFT 即时最终性，跨链 IBC 生态的共识底座，验证者集合有限但出块 ~1s。</li>
+<li><strong>Solana</strong>：Proof of History（密码学时钟给交易预排序）+ PoS 追求高 TPS，但 2022 年多次因拥塞/bug 全网停摆（见下文性能权衡）。</li>
+</ul></div>
+
+<h3>2. 智能合约架构：确定性状态机 + gas 计量 — 图灵完备的代价是要给停机问题收费</h3>
+<p><strong>原理</strong>：智能合约是<em>部署在链上、由所有节点重复执行</em>的代码。每个全节点必须算出<em>完全相同</em>的结果，否则状态分叉——这要求执行<strong>严格确定性</strong>：禁止真随机、禁止读系统时间/网络、浮点也要规避。EVM 是个 256 位的栈式虚拟机。因为代码可能死循环（停机问题不可判定），用 <strong>gas</strong> 给每个操作码定价，调用者预付 gas，执行耗尽即回滚——既防 DoS 又给计算定价。</p>
+<div class="tradeoff">
+<strong>Trade-off：合约可变性的两难</strong>
+<ul>
+<li><strong>不可升级（immutable）</strong>：✅ 真正去信任、用户确信规则不变；❌ 有 bug 改不了（The DAO 就是活例），只能弃用迁移。</li>
+<li><strong>代理可升级（proxy pattern）</strong>：✅ 能修 bug；❌ 引入「管理员能换逻辑」的中心化信任，又成了攻击面。</li>
+<li><strong>链下计算 + 链上验证</strong>：✅ 省 gas、能跑重计算；❌ 需要可信预言机或 ZK 证明，复杂度高。</li>
+</ul></div>
+<pre><code>// reentrancy 漏洞：先转账后扣余额 → 被递归重入（The DAO 2016）
+function withdraw() public {
+    uint bal = balances[msg.sender];
+    (bool ok,) = msg.sender.call{value: bal}("");  // ⚠️ 回调里又调 withdraw()
+    balances[msg.sender] = 0;                        // 太晚！余额还没清零就被重入
+}
+// 修法 Checks-Effects-Interactions：先改状态，再做外部调用
+function withdraw() public {
+    uint bal = balances[msg.sender];
+    balances[msg.sender] = 0;        // ✅ 先清零（Effect）
+    (bool ok,) = msg.sender.call{value: bal}("");  // 再转账（Interaction）
+    require(ok);
+}
+</code></pre>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>The DAO（2016）</strong>：<a href="https://www.gemini.com/cryptopedia/the-dao-hack-makerdao">reentrancy 漏洞被抽走 ~360 万 ETH（当时约 6000 万美元）</a>，最终 Ethereum 硬分叉回滚，社区分裂出 Ethereum Classic（不分叉派）。</li>
+<li><strong>Ethereum EVM</strong>：栈式 256 位 VM + gas 计量，是 Polygon、BNB Chain、Avalanche 等众多链兼容的事实标准。</li>
+<li><strong>Solana</strong>：用 BPF/SBF（非 EVM），账户模型而非 EVM 的合约存储模型，为并行执行优化。</li>
+<li><strong>Hyperledger Fabric</strong>：许可链，chaincode 跑在 Docker 容器里，execute-order-validate 架构允许非确定性后再筛。</li>
+</ul></div>
+
+<h3>3. 数据完整性：哈希链 + Merkle 树 + 链下存储 — 把「信任」压缩成一个 32 字节的根</h3>
+<p><strong>原理</strong>：不可篡改靠两层哈希。<em>哈希链</em>：每个区块头含前一块的哈希，改任意历史块会让其后所有块哈希失效，篡改成本 = 重做其后全部 PoW/共识。<em>Merkle 树</em>：把块内成千上万交易两两哈希成一棵树，根哈希进块头——轻节点（SPV）只需 O(log n) 的 Merkle proof 就能验证「某笔交易在某块里」，无需下载全块。这让手机钱包不必存 600GB 全链。</p>
+<div class="tradeoff">
+<strong>Trade-off：数据存哪？</strong>
+<ul>
+<li><strong>全上链（on-chain）</strong>：✅ 最强不可篡改+可用性；❌ 每节点存一份、贵到离谱（大文件每 MB 上链可达数百美元），绝不存图片/视频。</li>
+<li><strong>链下 + 链上存 hash</strong>：✅ 便宜、可扩展；❌ 数据可用性回到链下系统（IPFS 上的内容没人 pin 就会消失），不可篡改但可「失踪」。</li>
+<li><strong>永久存储（Arweave）</strong>：✅ 一次付费永久存；❌ 经济模型依赖捐赠基金长期收益假设。</li>
+</ul></div>
+<pre><code># Merkle proof 验证：用 O(log n) 个兄弟哈希重算根（pseudo-code）
+def verify(leaf, proof, root):
+    h = sha256(leaf)
+    for sibling, is_left in proof:        # 自底向上
+        h = sha256(sibling + h) if is_left else sha256(h + sibling)
+    return h == root      # 根匹配 → 该 leaf 确在树中，且未被篡改
+# 一笔交易在百万交易的块里，proof 仅 ~20 个哈希 ≈ 640 字节
+</code></pre>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Bitcoin SPV</strong>：轻钱包靠 Merkle proof 验证交易，不存全链，中本聪白皮书第 8 节即此设计。</li>
+<li><strong>IPFS / Filecoin</strong>：内容寻址（CID = 内容哈希），NFT 元数据/大文件常存 IPFS、链上只放 CID；Filecoin 加经济激励保证有人持续存。</li>
+<li><strong>Arweave</strong>：「永久存储」定位，一次性付费、blockweave 结构，被不少 NFT 项目用作图片持久层。</li>
+<li><strong>Certificate Transparency</strong>：Google 的 CT 日志用 Merkle 树做可审计的证书账本——区块链思想的非加密货币应用。</li>
+</ul></div>
+
+<h3>4. 可扩展性三难：Layer 2 Rollup — 不在主链上算，只把证明丢回主链</h3>
+<p><strong>原理</strong>：「区块链三难」（Vitalik 提出）指<em>去中心化、安全、可扩展</em>三者难以兼得——提高吞吐往往要么减少节点（牺牲去中心化）、要么放松验证（牺牲安全）。主流扩容路线是 <strong>Layer 2 Rollup</strong>：把成百上千笔交易在链下批量执行，只把<em>压缩后的数据 + 一个有效性保证</em>提交回 L1，L1 当结算与数据可用层。两种流派：<em>Optimistic Rollup</em> 默认相信、留挑战期（~7 天）让人提交欺诈证明；<em>ZK Rollup</em> 用零知识证明（SNARK/STARK）数学上证明执行正确，主链一验即终。</p>
+<div class="tradeoff">
+<strong>Trade-off：Optimistic vs ZK Rollup</strong>
+<ul>
+<li><strong>Optimistic</strong>：✅ EVM 兼容好、实现简单；❌ 提现要等 ~7 天挑战期、安全靠「至少一个诚实验证者会挑战」假设。</li>
+<li><strong>ZK Rollup</strong>：✅ 密码学即时最终性、提现快、无需信任挑战者；❌ 证明生成计算重、EVM 兼容（zkEVM）工程极难。</li>
+<li><strong>Sharding / DA 层</strong>：✅ 横向扩数据可用性带宽（Ethereum danksharding 思路）；❌ 跨分片交易复杂、状态原子性难保证。</li>
+</ul></div>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Arbitrum / Optimism</strong>：以太坊主流 Optimistic Rollup，把 gas 成本降一两个数量级，承接大量 DeFi 流量。</li>
+<li><strong>zkSync / StarkNet / Polygon zkEVM</strong>：ZK Rollup 路线，靠 STARK/SNARK 证明压缩，提现无需等挑战期。</li>
+<li><strong>Ethereum</strong>：官方 roadmap 明确「rollup-centric」——L1 退守结算+数据可用，扩容交给 L2。</li>
+<li><strong>Bitcoin Lightning Network</strong>：另一思路（支付通道，非 rollup），把高频小额支付移到链下双向通道，只在开关通道时上链。</li>
+</ul></div>
+
+<h2>扩展与优化（增长后怎么办）</h2>
+<ul>
+<li><strong>吞吐撞墙</strong>：主链不要硬扩块（扩块 = 全节点硬件门槛升高 = 去中心化退化，比特币「区块大小之争」的核心），把 TPS 推给 L2 rollup。</li>
+<li><strong>状态膨胀</strong>：全节点状态无限增长（Ethereum state &gt; 数百 GB），引入 state expiry / statelessness（无状态客户端靠见证数据验证），降低新节点门槛。</li>
+<li><strong>数据可用性</strong>：rollup 的瓶颈从执行转移到「把数据发回 L1」，danksharding / blob（EIP-4844）专门给 L2 留便宜的数据带宽。</li>
+<li><strong>跨链互操作</strong>：多链生态需要桥（bridge），但桥是<em>头号被黑重灾区</em>（锁仓巨大、信任假设脆弱），优先用轻客户端验证而非多签托管。</li>
+</ul>
+
+<h2>常见陷阱 + 面试问题</h2>
+<div class="callout"><strong>1. 「区块链不可篡改」≠「数据一定正确」。</strong> 链只保证写入后改不了（防篡改），不保证写入的是真话（garbage in, garbage forever）。预言机（oracle）把链下真值喂上链，是整个信任链最薄弱、最常被操纵的一环（DeFi 预言机价格操纵攻击频发）。</div>
+<div class="callout"><strong>2. 51% 攻击攻击的是什么？</strong> 不是「偷走别人的币」（改不了签名），而是<em>双花</em>：攻击者控制多数算力后可重组链、撤销自己已确认的交易。小市值 PoW 币因算力便宜屡遭此劫。</div>
+<div class="callout"><strong>3. 私钥即一切。</strong> 没有「找回密码」：私钥丢 = 资产永久锁死，私钥泄 = 瞬间归零。这是 UX 与安全的根本矛盾，账户抽象（AA）/ 社交恢复在补这个坑。</div>
+<div class="callout"><strong>4. 最终性不是「确认了就安全」。</strong> PoW 是概率最终性，等的块越多被重组概率越低但永不为零；BFT 才是确定性最终性。交易所对大额充值要求多确认正是为此。</div>
+<div class="callout"><strong>5. 面试高频追问：</strong>（1）为什么 PoS 比 PoW 安全成本更高？（2）Optimistic 和 ZK rollup 的提现延迟差异来自哪？（3）为什么不把用户头像存上链？（4）BFT 为什么节点数受限、O(n²) 出在哪？（5）软分叉 vs 硬分叉的兼容性区别？</div>
+
+<h2>深入资源</h2>
+<ul>
+<li><strong>Bitcoin Whitepaper</strong>（Nakamoto, 2008）：PoW、Merkle、SPV 的原点，9 页讲清中本聪共识。</li>
+<li><strong>《Designing Data-Intensive Applications》</strong>（Kleppmann）第 8-9 章：拜占庭故障、共识与一致性的系统视角，把区块链放回分布式系统脉络。</li>
+<li><strong><a href="https://ethereum.org/roadmap/merge/">ethereum.org — The Merge</a></strong>：PoS 切换、能耗、slashing 官方说明。</li>
+<li><strong>Vitalik Buterin 博客</strong>（vitalik.eth.limo）：区块链三难、rollup-centric roadmap、PoS 设计的一手论述。</li>
+</ul>
+
+<h2>深入思考（点击展开答案）</h2>
+
+<details>
+<summary>1. PoS 的「nothing-at-stake」问题到底指什么？为什么 PoW 天然没有，PoS 要靠 slashing 才能补？</summary>
+<div class="answer">
+<p><strong>问题本质</strong>：链分叉时，PoW 矿工的算力是<em>物理排他</em>的——同一台矿机在 A 链挖就不能同时在 B 链挖，押注分叉要分摊算力、有真实机会成本。PoS 验证者却可以「零成本」在<em>每一条分叉上都签名投票</em>（签名几乎不耗资源），理性策略是「全押」以确保不管哪条链赢都拿奖励。结果没人收敛到单一链，共识瓦解。</p>
+<p><strong>修法 slashing</strong>：协议规定「在冲突的两个块上都签名」是可被密码学证明的罪证，一旦被举报就<em>没收质押并踢出</em>，把「全押无成本」变成「全押会被罚到破产」，恢复了机会成本。<em>二阶效应</em>：验证者由此有了「手滑双签被罚」的风险，催生分布式验证者技术（DVT）降低单点误罚。</p>
+</div>
+</details>
+
+<details>
+<summary>2. 为什么 Bitcoin 选 ~10 分钟出块、Solana 追求 400ms？出块越快越好吗？快了在分布式系统上付什么代价？</summary>
+<div class="answer">
+<p><strong>核心约束是网络传播延迟。</strong> 块在全球 P2P 网络广播需要时间（秒级）。如果出块间隔接近传播延迟，两个矿工会在「还没收到对方块」时各自出块 → <em>频繁分叉（orphan/stale block）</em>。中本聪故意把间隔设到 10 分钟，远大于传播延迟，让分叉罕见、链收敛清晰，代价是慢。</p>
+<p><strong>Solana 的 400ms</strong>：靠 Proof of History 预先给交易排好时序（密码学时钟），减少「现在轮到谁」的协调开销，并要求验证者跑高配硬件。<em>代价</em>：硬件门槛高 → 节点少 → 去中心化退化；容错余量小，2022 年多次因流量洪峰/bug <strong>全网停摆数小时</strong>。这正是三难写照：拿去中心化和稳定性换了吞吐——出块快是把安全余量花掉了。</p>
+</div>
+</details>
+
+<details>
+<summary>3. 智能合约要求「所有节点算出完全相同结果」。这个确定性约束具体禁掉了哪些日常编程习惯？违反会怎样？</summary>
+<div class="answer">
+<ul>
+<li><strong>真随机数</strong>：<code>random()</code> 各节点结果不同 → 状态分叉。链上「随机」只能用可复现的伪随机（如块哈希），但又可被矿工操纵（MEV）。</li>
+<li><strong>读系统时间</strong>：墙钟各节点不同，只能用<em>区块时间戳</em>（出块者填的近似值），精度到秒且可被小幅操纵。</li>
+<li><strong>浮点运算</strong>：IEEE 754 在不同架构/编译器可能有微小差异 → EVM 干脆只有整数，金额用最小单位整数（wei）表示。</li>
+<li><strong>外部 I/O / 网络请求</strong>：合约不能直接 HTTP 拉数据（不可复现）。要外部数据必须经<em>预言机</em>把值写进交易，让所有节点重放时看到同一个固化值。</li>
+<li><strong>不可控 gas 循环</strong>：循环长度依赖外部输入可能耗尽 gas 回滚，成为拒绝服务面。</li>
+</ul>
+<p>违反确定性的后果不是报错，而是<em>不同节点得到不同状态根</em>，共识无法对齐 → 链分裂。所以 EVM 从指令集层面就阉割掉了这些来源。</p>
+</div>
+</details>
+
+<details>
+<summary>4. 把数据存 IPFS、链上只放 hash，号称「去中心化+不可篡改」。这个方案的可用性陷阱在哪？和「存 S3 只记 URL」本质区别是什么？</summary>
+<div class="answer">
+<p><strong>陷阱：不可篡改 ≠ 不会消失。</strong> 链上的 hash 永久保证「这个 CID 对应的内容若存在，必然是原始内容」（防篡改），但<em>没人保证那份内容一直有人存着</em>。IPFS 是内容寻址网络，只有当某个节点主动 <code>pin</code> 住，内容才在线；所有 pin 它的节点都下线，内容就<em>无法取回</em>——hash 还在链上，但指向虚空。很多早期 NFT「图片消失」正是项目方停了 pinning 服务。</p>
+<p><strong>与 S3+URL 的本质区别</strong>：S3 的 URL 是<em>位置寻址</em>，内容可被悄悄替换而 URL 不变——不防篡改。IPFS 的 CID 是<em>内容寻址</em>，内容一改 CID 就变，所以防篡改但同样不保证可用性。两者都需要「有人持续存储」的激励，区别只在「篡改能否被发现」。<em>真正持久</em>要靠 Filecoin（存储证明+激励）或 Arweave（一次付费永久存）这类把存储可用性纳入激励的方案。</p>
+</div>
+</details>
+
+<details>
+<summary>5. 一家银行联盟要做跨行清算账本，工程师建议「上以太坊主网」。作为架构师你会反对吗？什么场景才真正需要无许可公链？</summary>
+<div class="answer">
+<p><strong>多半会反对上公链主网。</strong> 银行联盟的诉求是「成员间共享一份防篡改、可审计的账本，免去对账」，但成员<em>身份已知且受监管</em>——这恰恰<em>不需要</em>无许可公链最贵的那个属性：抗 Sybil + 抗审查的开放共识。在公链上还会撞上：隐私（交易全公开，违反金融保密）、吞吐（~15 TPS 远不够）、手续费波动、合规不可控（资产在不受控的公共网络）。</p>
+<p><strong>该用什么</strong>：<em>许可链 / 联盟链</em>（Hyperledger Fabric、R3 Corda、Quorum），用 BFT 共识在已知验证者间达成确定性最终，吞吐高数量级、可做隐私通道、治理可控。本质上它放弃了「无需信任任何人」，换成「在一个有准入的小信任圈里去中心化」。</p>
+<p><strong>什么时候才真要公链</strong>：当参与方<em>无法事先确定、互不信任、且需要抗审查/抗单点关停</em>——如面向全球任意用户的公开资产发行、去信任的跨境价值转移。一个判据：如果你能列出一份「谁有权写入」的白名单，你大概率不需要无许可公链。</p>
+</div>
+</details>
+
+<div class="nav"><a href="index.html">← 回到 index</a></div>
+</div>
+</body></html>
