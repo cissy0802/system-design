@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 37 · 多租户 SaaS 架构 (Multi-tenant SaaS) — System Design Bi-daily</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"SF Pro Display","Noto Sans SC",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
+.container{max-width:820px;margin:0 auto;padding:24px 20px 60px}
+header{padding:40px 0 28px;border-bottom:1px solid rgba(100,200,255,0.15);margin-bottom:32px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem}
+.tag{padding:3px 10px;border-radius:4px;background:rgba(100,200,255,0.12);color:#64c8ff;border:1px solid rgba(100,200,255,0.25)}
+.tag.diff{background:rgba(94,234,212,0.1);color:#5eead4;border-color:rgba(94,234,212,0.3)}
+.tag.day{background:rgba(255,180,80,0.1);color:#ffb450;border-color:rgba(255,180,80,0.25)}
+h1{font-size:1.75rem;font-weight:800;background:linear-gradient(135deg,#64c8ff 0%,#5eead4 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:0.5px;line-height:1.3}
+h1 .en{display:block;font-size:1rem;color:#7a8590;-webkit-text-fill-color:#7a8590;margin-top:6px;font-weight:500}
+h2{font-size:1.2rem;color:#5eead4;margin:36px 0 14px;padding-left:12px;border-left:3px solid #5eead4}
+h3{font-size:1rem;color:#64c8ff;margin:20px 0 10px;font-weight:600}
+p{margin:10px 0;color:#c8cfd6}
+ul,ol{margin:10px 0 10px 22px;color:#c8cfd6}
+li{margin:6px 0}
+strong{color:#e8eef5;font-weight:600}
+em{color:#5eead4;font-style:normal;font-weight:500}
+code{font-family:"SF Mono",Menlo,Consolas,monospace;background:rgba(100,200,255,0.1);color:#5eead4;padding:1px 6px;border-radius:3px;font-size:0.88em}
+pre{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:14px 16px;overflow-x:auto;margin:12px 0;font-family:"SF Mono",Menlo,Consolas,monospace;font-size:0.84rem;line-height:1.55;color:#c8cfd6}
+pre code{background:none;color:inherit;padding:0;font-size:1em}
+.mermaid{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:18px;margin:14px 0;text-align:center;overflow-x:auto;cursor:zoom-in;transition:border-color 0.15s}
+.mermaid:hover{border-color:rgba(100,200,255,0.4)}
+.mermaid svg{width:100%;max-width:100%;height:auto;min-height:280px}
+.lightbox{position:fixed;inset:0;background:rgba(8,12,18,0.96);z-index:9999;display:none;align-items:center;justify-content:center;padding:24px;cursor:grab;backdrop-filter:blur(4px);overflow:hidden}
+.lightbox.open{display:flex}
+.lightbox.dragging{cursor:grabbing}
+.lightbox svg{width:auto;height:auto;max-width:96vw;max-height:92vh;transform-origin:center center;will-change:transform}
+.lightbox .hint{position:fixed;top:16px;right:20px;font-size:0.78rem;color:#7a8590;font-family:"SF Mono",Menlo,monospace;pointer-events:none}
+.callout{background:rgba(255,180,80,0.06);border-left:3px solid #ffb450;padding:12px 14px;margin:14px 0;border-radius:4px;font-size:0.94rem}
+.callout strong{color:#ffb450}
+.tradeoff{background:rgba(100,200,255,0.05);border:1px solid rgba(100,200,255,0.2);border-radius:6px;padding:12px 14px;margin:12px 0;font-size:0.94rem}
+.case{background:rgba(94,234,212,0.05);border-left:3px solid #5eead4;padding:12px 14px;margin:12px 0;border-radius:4px;font-size:0.94rem}
+.case strong{color:#5eead4}
+.nav{margin-top:50px;padding-top:24px;border-top:1px solid rgba(100,200,255,0.15);text-align:center}
+.nav a{color:#64c8ff;text-decoration:none;font-size:0.92rem;padding:8px 16px;border:1px solid rgba(100,200,255,0.3);border-radius:4px;transition:all 0.15s}
+.nav a:hover{background:rgba(100,200,255,0.1)}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:0.9rem}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid rgba(100,200,255,0.15)}
+th{color:#64c8ff;font-weight:600;background:rgba(100,200,255,0.05)}
+details{background:rgba(100,200,255,0.04);border:1px solid rgba(100,200,255,0.18);border-radius:6px;padding:12px 16px;margin:10px 0;transition:all 0.15s}
+details:hover{border-color:rgba(100,200,255,0.35)}
+details[open]{background:rgba(94,234,212,0.05);border-color:rgba(94,234,212,0.3)}
+details summary{font-weight:600;color:#e8eef5;list-style:none;outline:none;cursor:pointer;display:flex;align-items:flex-start;gap:10px;font-size:0.96rem}
+details summary::-webkit-details-marker{display:none}
+details summary::before{content:'▶';color:#64c8ff;font-size:0.75em;transition:transform 0.2s;flex-shrink:0;margin-top:5px}
+details[open] summary::before{transform:rotate(90deg);color:#5eead4}
+details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
+details .answer ul,details .answer ol{margin:6px 0 6px 22px}
+@media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+</style>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({startOnLoad:true,theme:'base',flowchart:{useMaxWidth:true,htmlLabels:true,nodeSpacing:50,rankSpacing:60},themeVariables:{primaryColor:'#1a2530',primaryTextColor:'#e8eef5',primaryBorderColor:'#64c8ff',lineColor:'#5eead4',secondaryColor:'#0e1419',tertiaryColor:'#0a0f14',background:'#0a0f14',mainBkg:'#1a2530',secondBkg:'#0e1419',textColor:'#d4dae0',fontFamily:'-apple-system,"SF Pro Display",sans-serif',fontSize:'16px'}});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const lb=document.createElement('div');lb.className='lightbox';
+  lb.innerHTML='<span class="hint">scroll = zoom · drag = pan · Esc / click bg = close</span>';
+  document.body.appendChild(lb);
+  let scale=1,panX=0,panY=0,dragging=false,moved=false,lx=0,ly=0;
+  const apply=()=>{const s=lb.querySelector('svg');if(s)s.style.transform=`translate(${panX}px,${panY}px) scale(${scale})`};
+  const reset=()=>{scale=1;panX=0;panY=0};
+  const close=()=>{lb.classList.remove('open');const s=lb.querySelector('svg');if(s)s.remove();reset()};
+  document.addEventListener('click',e=>{
+    if(e.target.closest('.lightbox')){if(moved){moved=false;return}close();return}
+    const w=e.target.closest('.mermaid');if(!w)return;
+    const svg=w.querySelector('svg');if(!svg)return;
+    const c=svg.cloneNode(true);c.removeAttribute('style');
+    c.style.maxWidth='96vw';c.style.maxHeight='92vh';
+    lb.appendChild(c);lb.classList.add('open');reset();apply();
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+  lb.addEventListener('wheel',e=>{
+    if(!lb.classList.contains('open'))return;
+    e.preventDefault();
+    const svg=lb.querySelector('svg');if(!svg)return;
+    const ns=Math.max(0.3,Math.min(10,scale*(1-e.deltaY*0.002)));
+    const r=svg.getBoundingClientRect();
+    const cx=e.clientX-(r.left+r.width/2),cy=e.clientY-(r.top+r.height/2);
+    const k=ns/scale-1;panX-=cx*k;panY-=cy*k;scale=ns;apply();
+  },{passive:false});
+  lb.addEventListener('mousedown',e=>{
+    if(!lb.classList.contains('open'))return;
+    dragging=true;moved=false;lx=e.clientX;ly=e.clientY;lb.classList.add('dragging');e.preventDefault();
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    const dx=e.clientX-lx,dy=e.clientY-ly;
+    if(Math.abs(dx)+Math.abs(dy)>3)moved=true;
+    panX+=dx;panY+=dy;lx=e.clientX;ly=e.clientY;apply();
+  });
+  document.addEventListener('mouseup',()=>{dragging=false;lb.classList.remove('dragging')});
+});
+</script>
+</head><body><div class="container">
+
+<header>
+<div class="meta">
+<span class="tag day">Day 37</span>
+<span class="tag diff">Hard</span>
+<span class="tag">Multi-tenant</span>
+<span class="tag">租户隔离</span>
+<span class="tag">数据分区</span>
+<span class="tag">资源配额</span>
+<span class="tag">用量计费</span>
+</div>
+<h1>多租户 SaaS 架构 — 一套系统服务一万个互不信任的租户<span class="en">Multi-tenant SaaS: Tenant Isolation, Data Partitioning, Quotas & Metered Billing</span></h1>
+</header>
+
+<h2>问题场景 + 需求约束</h2>
+<p>设计一个 B2B 协作 SaaS（类 Notion / 类 Figma），<strong>1 万个企业租户、共 500 万用户、单库存不下</strong>。租户从 5 人小团队到 5 万人大客户，体量差三个数量级。核心矛盾：<em>一套基础设施服务所有人换取成本效率，但任意两个租户互不信任</em>——A 租户绝不能读到 B 的数据，A 的批量导入也不能拖垮 B 的在线请求。</p>
+<ul>
+<li><strong>隔离</strong>：数据强隔离（合规：GDPR、SOC2、部分客户要求数据驻留特定区域）；性能隔离（噪声邻居不能传染）。</li>
+<li><strong>规模</strong>：写 QPS 峰值 ~50k，单租户数据 1MB~2TB，<strong>分布极度倾斜</strong>（top 1% 租户占 50% 数据）。</li>
+<li><strong>SLO</strong>：读 p99 &lt; 100ms；大客户要 99.95% 可用；onboarding 新租户 &lt; 1 分钟。</li>
+<li><strong>计费</strong>：按席位 + 按用量（API 调用、存储）混合计费，账单误差零容忍。</li>
+</ul>
+<p>本期讲四件事：<em>隔离模型怎么选、数据怎么分区、噪声邻居怎么治、用量怎么算钱</em>。</p>
+
+<h2>高层架构</h2>
+<div class="mermaid">
+graph TD
+  C[租户请求] --> GW[API Gateway<br/>解析 tenant_id]
+  GW --> AUTH[AuthN/AuthZ<br/>注入 tenant context]
+  AUTH --> RL[Per-tenant 限流/配额]
+  RL --> APP[共享应用层<br/>无状态]
+  APP --> ROUTER[Tenant Router<br/>tenant_id 到 shard 映射]
+  ROUTER --> S1[(Shard 1<br/>pool 小租户)]
+  ROUTER --> S2[(Shard 2<br/>pool 小租户)]
+  ROUTER --> SILO[(Silo DB<br/>大客户独享)]
+  APP --> MET[用量事件<br/>metering pipeline]
+  MET --> BILL[计费/账单<br/>Stripe]
+  ROUTER -.查.-> CAT[(Tenant Catalog<br/>路由+配置元数据)]
+</div>
+<p><strong>组件职责</strong>：网关从 subdomain / JWT 解出 <code>tenant_id</code>，<em>贯穿全链路</em>成为一等公民；<strong>Tenant Catalog</strong> 是控制平面，存每个租户的 shard 归属、隔离级别、配额、计费计划；数据平面按 catalog 路由——小租户混在共享 shard（pool），大客户切到独享库（silo）。用量事件旁路异步流向计费。</p>
+
+<h2>关键技术点</h2>
+
+<h3>1. 隔离模型：Silo vs Pool vs Bridge — 安全与成本的连续光谱</h3>
+<p><strong>核心 trade-off：每多一分隔离，多一分安全/合规，少一分成本效率与运维可扩展性。</strong></p>
+<p>【原理】多租户隔离不是布尔值而是<em>光谱</em>。AWS 的术语把它分三档：<strong>Silo</strong>（每租户独享栈/库，物理隔离）、<strong>Pool</strong>（所有租户共享资源，靠应用层逻辑隔离）、<strong>Bridge</strong>（混合：该独享的独享、该共享的共享）。关键洞察是<em>隔离边界可以逐层选择</em>——计算层 pool、存储层对大客户 silo，完全合法。</p>
+<div class="tradeoff">
+<strong>Silo</strong>：每租户独立 DB/集群。✅ 爆炸半径小、合规简单、噪声邻居天然消失、计费=直接看资源账单。❌ 成本随租户线性增长、1 万个库的 schema 迁移是噩梦、资源利用率低（小租户也占一整套）。<br>
+<strong>Pool</strong>：共享表，靠 <code>tenant_id</code> 列 + 行级隔离。✅ 成本效率极高、一次迁移全覆盖、利用率高。❌ <em>一个漏 WHERE 就是跨租户数据泄露</em>、噪声邻居、爆炸半径=全员。<br>
+<strong>Bridge</strong>：默认 pool，大客户/高合规客户 silo。✅ 80% 成本效率 + 20% 客户的强隔离卖点。❌ 两套代码路径、路由复杂度。
+</div>
+<div class="case"><strong>现实案例</strong>：<a href="https://docs.aws.amazon.com/whitepapers/latest/saas-tenant-isolation-strategies/welcome.html">AWS《SaaS Tenant Isolation Strategies》白皮书</a>系统化了 silo/pool/bridge 三模型，是行业事实标准词汇。Salesforce 是经典 pool（共享元数据驱动的 schema 服务海量租户）；多数成熟 SaaS 最终演进成 bridge——免费/小客户 pool、企业版 silo。</div>
+
+<h3>2. 数据分区：按 tenant_id 分片 + 行级隔离 — 倾斜是头号敌人</h3>
+<p><strong>核心 trade-off：共享 schema 省成本但隔离全靠代码纪律；schema/DB-per-tenant 隔离硬但运维不可扩展。</strong></p>
+<p>【原理】pool 模型下三种粒度：<strong>① 共享表 + tenant_id 列</strong>（最省，靠 Postgres RLS 兜底防漏查）；<strong>② schema-per-tenant</strong>（一租户一 schema）；<strong>③ database-per-tenant</strong>（=silo）。SaaS 数据天然以 <code>tenant_id</code> 为分片键——同租户数据落同一物理 shard，绝大多数查询带 tenant_id，<em>不产生跨 shard 扇出</em>，这是 SaaS 相比通用分片的巨大优势。</p>
+<p>难点是<strong>倾斜</strong>：随机 hash(tenant_id) 到 shard，但一个巨型租户可能塞爆单 shard。解法是<em>把热租户单独 isolate 到专属 shard</em>。</p>
+<pre><code># Postgres RLS：纵深防御，即便应用漏写 WHERE tenant_id 也兜底
+ALTER TABLE docs ENABLE ROW LEVEL SECURITY;
+CREATE POLICY tenant_iso ON docs
+  USING (tenant_id = current_setting('app.tenant_id')::uuid);
+
+# 每个请求开头注入 tenant context（连接池复用要在事务内 set local）
+SET LOCAL app.tenant_id = '...';   # 之后所有查询自动被 RLS 过滤
+
+# 路由：默认 hash 分片，热租户查 catalog 覆盖
+def route(tenant_id):
+    t = catalog.get(tenant_id)
+    if t.dedicated_shard:        # 大客户 isolate
+        return t.dedicated_shard
+    return shards[hash(tenant_id) % len(shards)]
+</code></pre>
+<div class="case"><strong>现实案例</strong>：<a href="https://www.notion.com/blog/the-great-re-shard">Notion『The Great Re-shard』</a>——按 workspace ID 分区，同 workspace 全部数据落同一 shard，扩容时从 32 库 reshard 到 96 库零停机。<a href="https://www.figma.com/blog/how-figmas-databases-team-lived-to-tell-the-scale/">Figma</a>把『逻辑分片』（应用层 + view）与『物理分片』（Postgres 层）解耦，先低风险铺逻辑分片再做物理切换，并自建 DBProxy 路由。<a href="https://aws.amazon.com/blogs/database/multi-tenant-data-isolation-with-postgresql-row-level-security/">AWS</a> 详述用 Postgres RLS 做租户隔离的范式。</div>
+
+<h3>3. 噪声邻居与资源配额 — 公平性是 pool 模型的命门</h3>
+<p><strong>核心 trade-off：硬隔离（独享资源）杜绝传染但浪费；软配额（共享 + 公平调度）省钱但要主动治理。</strong></p>
+<p>【原理】pool 下，A 租户一次百万行批量导入会吃光连接池/CPU，B 租户的在线请求被饿死——<em>噪声邻居</em>。三道防线：<strong>① 入口限流</strong>（per-tenant token bucket，按计费计划分级）；<strong>② 资源配额</strong>（每租户最大连接数、查询超时、存储上限）；<strong>③ 公平调度</strong>（独立队列轮询，而非 FIFO 共享队列让大租户插队）。关键是<em>配额要按租户而非全局</em>——全局限流挡不住单租户打爆。</p>
+<pre><code># Per-tenant 令牌桶 + 公平队列（避免单租户独占 worker）
+def admit(tenant_id, cost):
+    bucket = buckets[tenant_id]            # 按计费计划设容量
+    if not bucket.try_consume(cost):
+        raise RateLimited(tenant_id)        # 429，带 Retry-After
+    enqueue(tenant_queues[tenant_id])       # 每租户独立队列
+
+def dispatch():                             # worker 轮询而非抢占
+    for q in round_robin(tenant_queues):    # 大租户也只能拿到公平份额
+        if (job := q.poll()): run(job)
+</code></pre>
+<div class="case"><strong>现实案例</strong>：<a href="https://stripe.com/blog/rate-limiters">Stripe</a> 公开过多层 rate limiter（含按用户/load shedding 分级），核心思想就是隔离突发租户保护整体。AWS SaaS Lens 把『noisy neighbor』列为 pool 模型头号风险并推荐 per-tenant throttling + usage-based quota。</div>
+
+<h3>4. 用量计量与计费集成 — 账单错一分钱都是事故</h3>
+<p><strong>核心 trade-off：实时精确计量成本高；批量近似省钱但对账困难。账单要求 exactly-once 语义。</strong></p>
+<p>【原理】混合计费（席位 + 用量）的难点在<em>用量</em>：每次 API 调用/存储增量是一个 usage event，要<strong>不丢不重</strong>地聚合成账单。流水线：应用埋点 → 事件队列 → 聚合（按 tenant×metric×时间窗）→ 推送给 Stripe metered billing。关键设计：<strong>每个 usage event 带幂等键</strong>（防重试重复计费）、聚合用 <em>at-least-once 投递 + 下游幂等去重</em>、用量数据是<em>财务真相源</em>要持久化可重算（出账争议时能回放）。</p>
+<pre><code># 幂等用量事件：idempotency_key 防止重试导致重复计费
+event = {
+  "idempotency_key": f"{tenant}:{request_id}",   # 唯一
+  "tenant_id": tenant, "metric": "api_call",
+  "qty": 1, "ts": now,
+}
+emit(usage_topic, event)        # at-least-once 投递
+
+# 聚合：按 (tenant, metric, hour) 累加，去重靠 idempotency_key
+INSERT INTO usage_agg(tenant_id, metric, window, qty)
+SELECT tenant_id, metric, date_trunc('hour', ts), sum(qty)
+FROM (SELECT DISTINCT ON (idempotency_key) * FROM raw_events) d
+GROUP BY 1,2,3;
+</code></pre>
+<div class="case"><strong>现实案例</strong>：<a href="https://docs.stripe.com/billing">Stripe usage-based / metered billing</a> 提供带幂等键的用量上报 API，正是为防重复计费设计；席位+用量混合是 SaaS 标配（Notion/Figma 按编辑席位、API 类产品按调用量）。AWS SaaS 架构强调 metering 必须与 tenant context 绑定，否则无法归因到租户出账。</div>
+
+<h2>扩展与优化</h2>
+<ul>
+<li><strong>从 pool 起步，bridge 演进</strong>：早期全 pool 求速度，企业客户来了再把它 isolate 到 silo（lift-and-shift 单租户数据到专属库）。</li>
+<li><strong>倾斜治理</strong>：监控每 shard 的租户体量，热租户自动 isolate；resharding 用『双写 + 校验 + 切流』（参考 Notion/Figma）。</li>
+<li><strong>数据驻留</strong>：合规客户要 EU/US 数据不出境——catalog 增加 region 维度，租户级路由到对应区域集群（multi-region 控制平面）。</li>
+<li><strong>Per-tenant 可观测性</strong>：所有 metrics/logs/traces 打 tenant_id 标签，否则故障时无法回答『是哪个租户在搞事』。基数会爆炸，高基数 label 要谨慎。</li>
+</ul>
+
+<h2>常见陷阱 + 面试问题</h2>
+<div class="callout"><strong>1. 漏写 WHERE tenant_id = 跨租户数据泄露</strong>：pool 模型最致命的 bug，且测试很难覆盖。纵深防御：RLS 兜底 + ORM 强制注入 tenant scope + 自动化测试模拟跨租户访问。</div>
+<div class="callout"><strong>2. 连接池被单租户耗尽</strong>：共享连接池下，一个慢查询/大事务的租户会饿死全部。要 per-tenant 连接配额或语句超时。</div>
+<div class="callout"><strong>3. 全局唯一约束在分片后失效</strong>：邮箱唯一、序号自增在跨 shard 后不再全局成立。要么把唯一性限定在租户内，要么用全局 ID 服务（见 Day 11 Snowflake）。</div>
+<div class="callout"><strong>4. 用量事件丢失/重复</strong>：at-most-once 漏算少收钱、无幂等的 at-least-once 重复多收钱被投诉。必须幂等键 + 可重算。</div>
+<p><strong>面试追问：</strong></p>
+<ol>
+<li>silo / pool / bridge 怎么选？什么信号触发把一个租户从 pool 迁到 silo？</li>
+<li>pool 模型如何在代码层和 DB 层双重防止跨租户数据泄露？</li>
+<li>一个巨型租户占了单 shard 80% 容量，怎么办？resharding 怎么做到零停机？</li>
+<li>设计 per-tenant 限流，免费版和企业版配额不同，热点租户突发怎么不影响别人？</li>
+<li>按用量计费的流水线如何保证账单 exactly-once、出账争议时可回放？</li>
+</ol>
+
+<h2>深入资源</h2>
+<ul>
+<li><strong><a href="https://docs.aws.amazon.com/whitepapers/latest/saas-tenant-isolation-strategies/welcome.html">AWS《SaaS Tenant Isolation Strategies》白皮书</a></strong>：silo/pool/bridge 三模型的权威定义与实现模式。</li>
+<li><strong><a href="https://www.notion.com/blog/the-great-re-shard">Notion『The Great Re-shard』</a></strong>：按 workspace 分片 + 零停机扩容的实战复盘。</li>
+<li><strong><a href="https://www.figma.com/blog/how-figmas-databases-team-lived-to-tell-the-scale/">Figma Databases Team</a></strong>：逻辑/物理分片解耦 + DBProxy 路由。</li>
+<li><strong><a href="https://aws.amazon.com/blogs/database/multi-tenant-data-isolation-with-postgresql-row-level-security/">AWS: Multi-tenant data isolation with Postgres RLS</a></strong>：行级安全做租户隔离的范式。</li>
+<li><strong>《Designing Data-Intensive Applications》</strong>（Kleppmann）分片与一致性章节：分区键选择、倾斜与 rebalancing 的底层原理。</li>
+</ul>
+
+<h2>深入思考（点击展开答案）</h2>
+
+<details>
+<summary>1. pool 模型省成本，为什么大客户反而常常要求 silo？这背后是技术问题还是商业问题？</summary>
+<div class="answer">
+<p>两者都是，且常常以商业理由包装技术诉求。</p>
+<ul>
+<li><strong>合规/审计</strong>：金融、医疗客户的 SOC2/HIPAA 审计要求『可证明的隔离』，pool 的逻辑隔离虽然安全，但向审计员『证明』一行漏查不会泄露，远比指着一个独立数据库难。silo 是<em>可审计性</em>的捷径。</li>
+<li><strong>数据驻留</strong>：『我的数据必须在欧盟境内』在 pool 下要按行路由，silo 直接整库放在某区域。</li>
+<li><strong>爆炸半径</strong>：大客户不想和别人共担风险——别的租户被攻破或触发 bug，不应影响自己。</li>
+<li><strong>性能 SLA</strong>：独享资源=可承诺的性能下限，pool 永远有噪声邻居的不确定性。</li>
+<li><strong>商业杠杆</strong>：silo 是<em>溢价卖点</em>。厂商乐意——既满足客户、又能多收钱补偿成本。所以 bridge 几乎是所有成熟 SaaS 的终局。</li>
+</ul>
+</div>
+</details>
+
+<details>
+<summary>2. 你用 hash(tenant_id) 均匀分片，但生产中某 shard 的 p99 持续比别人高 3 倍。可能原因？</summary>
+<div class="answer">
+<p>hash 让<em>租户数量</em>均匀，但不让<em>负载</em>均匀——这是 SaaS 倾斜的本质。</p>
+<ul>
+<li><strong>体量倾斜</strong>：一个 5 万人大租户和几百个小租户 hash 到同一 shard，数据量和 QPS 完全压垮它。这是最常见原因。</li>
+<li><strong>行为倾斜</strong>：某租户刚跑了批量导入/全量导出，临时打满该 shard。</li>
+<li><strong>大 key/大事务</strong>：某租户单文档巨大、或长事务持锁，拖慢同 shard 所有人。</li>
+<li><strong>修法</strong>：监控 per-shard + per-tenant 负载，把热租户 isolate 到专属 shard（catalog 覆盖路由）；对超大租户考虑租户内二级分片。<em>注意</em>：盲目加 shard 数不解决问题，因为热点是单租户造成的，rehash 后它还是和别人挤在一起。</li>
+</ul>
+</div>
+</details>
+
+<details>
+<summary>3. 全局限流（如整体 10万 QPS）已经存在，为什么还必须 per-tenant 限流？两者关系？</summary>
+<div class="answer">
+<p>全局限流保护<em>系统不被打挂</em>，per-tenant 限流保护<em>租户之间的公平性</em>——两个正交目标。</p>
+<ul>
+<li>只有全局限流：单个租户可以合法地占满 10 万 QPS 的 99%，其他所有租户被它挤到 429。系统没挂，但对其余租户=不可用。这就是噪声邻居在限流层的体现。</li>
+<li>per-tenant 限流给每个租户一个上限（按计费计划分级），保证任意单租户无法独占全局容量。</li>
+<li><strong>关系</strong>：两层叠加。per-tenant 是第一道（公平），全局是兜底（保命，应对所有租户同时突发的极端情况 + load shedding）。理想还要有<em>动态公平份额</em>：系统空闲时允许租户超出基础配额（突发友好），系统繁忙时回落到保证份额（weighted fair queuing 思路）。</li>
+</ul>
+</div>
+</details>
+
+<details>
+<summary>4. 用量计费要 exactly-once，但分布式系统做不到真正的 exactly-once 投递。怎么办？</summary>
+<div class="answer">
+<p>用『at-least-once 投递 + 下游幂等去重』组合出 <em>effectively-once</em> 的效果——这是分布式计费的标准范式（和 Day 8 消息队列、Day 17 支付幂等同源）。</p>
+<ul>
+<li><strong>投递保证 at-least-once</strong>：宁可重复也不能丢（丢=少收钱，账对不上）。生产者重试、队列持久化。</li>
+<li><strong>幂等去重</strong>：每个 usage event 带全局唯一 <code>idempotency_key</code>（如 <code>tenant:request_id</code>），聚合时按 key 去重（DISTINCT / upsert），重复事件被吸收。</li>
+<li><strong>可重算（真相源）</strong>：原始 usage events 持久化保留（不只存聚合值）。出账争议、聚合 bug、迟到事件时，能从原始流回放重算账单。聚合值是<em>派生</em>的，raw events 才是财务真相。</li>
+<li><strong>时间窗 + 迟到处理</strong>：用 watermark 处理跨小时边界的迟到事件（参考 Day 20 流处理），避免把昨天的用量算进今天。</li>
+</ul>
+</div>
+</details>
+
+<details>
+<summary>5. 一个 pool shard 上有 5000 个租户共享一张表，你要给其中一个租户做 schema 迁移（加一列+回填）。这比单租户系统难在哪？</summary>
+<div class="answer">
+<p>难点不在『加列』，而在<em>共享表上的操作会波及无关租户</em>。</p>
+<ul>
+<li><strong>回填波及全员</strong>：加列后回填，UPDATE 扫的是整张共享表（5000 租户的数据），不是目标租户那部分——锁、IO、复制延迟全员买单，违反隔离。要分批回填 + 限速，且 WHERE 必须带 tenant_id 只回填目标租户（但加列本身是表级 DDL，避不开）。</li>
+<li><strong>DDL 是表级的</strong>：Postgres 加列即使是 metadata-only 也要短暂表级锁，会卡住<em>所有 5000 个租户</em>的写。要用 online DDL 工具或选低峰、设短 lock_timeout 重试。</li>
+<li><strong>不能只给一个租户改 schema</strong>：pool 共享 schema，加的列对全员可见——这是 pool 的根本约束。如果一个租户要定制字段，要么用 JSONB 扩展列、要么这就是把它迁到 silo 的信号。</li>
+<li><strong>对比单租户</strong>：单租户系统迁移只影响自己，可随意停机窗口；pool 下任何 DDL 都是对全体租户的<em>共享变更</em>，风险和协调成本指数级上升。这正是 silo 在『定制化/迁移灵活性』上的隐藏优势。</li>
+</ul>
+</div>
+</details>
+
+</div></body></html>
