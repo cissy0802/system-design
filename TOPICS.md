@@ -1,6 +1,9 @@
 # Topics Roadmap
 
-源是仓库中的文件本身（`ls *-{day,week,book,issue}*.html`）。本文件只是主题查找表：N → 主题。超过现有编号时 routine 会 append 新主题。
+源是仓库中的文件本身（`ls *-{day,week,book,issue}*.html`）。本文件是主题查找表：N → 主题。
+
+**本路线图已收口：Day 1–48 封顶，不再自动续写。** Day 45–48 为查漏补缺补齐的分布式系统硬核（共识协调 / 数据库内部 / 网络基础 / 容器编排）——此前只有 CAP 与区块链 PoW/PoS，缺真正的 Raft/Paxos 协调层。
+（注：仅改本文件不阻止 routine 在 day48 之后再 append；停止续写需在 routine prompt / cron 侧设上限或暂停。）
 
 - Day 1: Scalability 基础 — Vertical vs Horizontal scaling, Load balancing, Stateless services, 容量规划
 - Day 2: 缓存 (Caching) — Cache layers, LRU/LFU/ARC, Cache-aside vs Write-through vs Write-back, Cache invalidation
@@ -46,3 +49,9 @@
 - Day 42: 隐私与合规架构 — GDPR 删除权, 数据脱敏, 审计追踪, 同意管理
 - Day 43: 混沌工程与韧性测试 — 故障注入, 游戏日, 韧性验证, 金丝雀深化
 - Day 44: 协作编辑系统 — OT vs CRDT, 冲突解决, 离线同步, Figma/Notion 架构
+
+<!-- ↓ 查漏补缺追加（Day 45–48）：分布式系统硬核 -->
+- Day 45: 分布式共识与协调 — Raft/Paxos, Leader election 选主, 分布式锁, Zookeeper/etcd, Quorum 与脑裂
+- Day 46: 数据库内部与存储引擎 — B-tree vs LSM-tree, WAL 与崩溃恢复, MVCC, 索引内部与查询优化器
+- Day 47: 网络基础 — TCP/UDP, HTTP/1.1·2·3·QUIC, DNS, TLS 握手, L4 vs L7 负载均衡
+- Day 48: 容器与编排 — 容器原理(namespace/cgroup), Kubernetes 核心对象, Service Mesh(Envoy/Istio), 调度与自愈
