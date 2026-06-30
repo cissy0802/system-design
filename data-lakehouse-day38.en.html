@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 38 · Data Lake & Lakehouse — System Design Bi-daily</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"SF Pro Display","Noto Sans SC",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
+.container{max-width:820px;margin:0 auto;padding:24px 20px 60px}
+header{padding:40px 0 28px;border-bottom:1px solid rgba(100,200,255,0.15);margin-bottom:32px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem}
+.tag{padding:3px 10px;border-radius:4px;background:rgba(100,200,255,0.12);color:#64c8ff;border:1px solid rgba(100,200,255,0.25)}
+.tag.diff{background:rgba(94,234,212,0.1);color:#5eead4;border-color:rgba(94,234,212,0.3)}
+.tag.day{background:rgba(255,180,80,0.1);color:#ffb450;border-color:rgba(255,180,80,0.25)}
+h1{font-size:1.75rem;font-weight:800;background:linear-gradient(135deg,#64c8ff 0%,#5eead4 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:0.5px;line-height:1.3}
+h1 .en{display:block;font-size:1rem;color:#7a8590;-webkit-text-fill-color:#7a8590;margin-top:6px;font-weight:500}
+h2{font-size:1.2rem;color:#5eead4;margin:36px 0 14px;padding-left:12px;border-left:3px solid #5eead4}
+h3{font-size:1rem;color:#64c8ff;margin:20px 0 10px;font-weight:600}
+p{margin:10px 0;color:#c8cfd6}
+ul,ol{margin:10px 0 10px 22px;color:#c8cfd6}
+li{margin:6px 0}
+strong{color:#e8eef5;font-weight:600}
+em{color:#5eead4;font-style:normal;font-weight:500}
+code{font-family:"SF Mono",Menlo,Consolas,monospace;background:rgba(100,200,255,0.1);color:#5eead4;padding:1px 6px;border-radius:3px;font-size:0.88em}
+pre{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:14px 16px;overflow-x:auto;margin:12px 0;font-family:"SF Mono",Menlo,Consolas,monospace;font-size:0.84rem;line-height:1.55;color:#c8cfd6}
+pre code{background:none;color:inherit;padding:0;font-size:1em}
+.mermaid{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:18px;margin:14px 0;text-align:center;overflow-x:auto;cursor:zoom-in;transition:border-color 0.15s}
+.mermaid:hover{border-color:rgba(100,200,255,0.4)}
+.mermaid svg{width:100%;max-width:100%;height:auto;min-height:280px}
+.lightbox{position:fixed;inset:0;background:rgba(8,12,18,0.96);z-index:9999;display:none;align-items:center;justify-content:center;padding:24px;cursor:grab;backdrop-filter:blur(4px);overflow:hidden}
+.lightbox.open{display:flex}
+.lightbox.dragging{cursor:grabbing}
+.lightbox svg{width:auto;height:auto;max-width:96vw;max-height:92vh;transform-origin:center center;will-change:transform}
+.lightbox .hint{position:fixed;top:16px;right:20px;font-size:0.78rem;color:#7a8590;font-family:"SF Mono",Menlo,monospace;pointer-events:none}
+.callout{background:rgba(255,180,80,0.06);border-left:3px solid #ffb450;padding:12px 14px;margin:14px 0;border-radius:4px;font-size:0.94rem}
+.callout strong{color:#ffb450}
+.tradeoff{background:rgba(100,200,255,0.05);border:1px solid rgba(100,200,255,0.2);border-radius:6px;padding:12px 14px;margin:12px 0;font-size:0.94rem}
+.case{background:rgba(94,234,212,0.05);border-left:3px solid #5eead4;padding:12px 14px;margin:12px 0;border-radius:4px;font-size:0.94rem}
+.case strong{color:#5eead4}
+.nav{margin-top:50px;padding-top:24px;border-top:1px solid rgba(100,200,255,0.15);text-align:center}
+.nav a{color:#64c8ff;text-decoration:none;font-size:0.92rem;padding:8px 16px;border:1px solid rgba(100,200,255,0.3);border-radius:4px;transition:all 0.15s}
+.nav a:hover{background:rgba(100,200,255,0.1)}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:0.9rem}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid rgba(100,200,255,0.15)}
+th{color:#64c8ff;font-weight:600;background:rgba(100,200,255,0.05)}
+details{background:rgba(100,200,255,0.04);border:1px solid rgba(100,200,255,0.18);border-radius:6px;padding:12px 16px;margin:10px 0;transition:all 0.15s}
+details:hover{border-color:rgba(100,200,255,0.35)}
+details[open]{background:rgba(94,234,212,0.05);border-color:rgba(94,234,212,0.3)}
+details summary{font-weight:600;color:#e8eef5;list-style:none;outline:none;cursor:pointer;display:flex;align-items:flex-start;gap:10px;font-size:0.96rem}
+details summary::-webkit-details-marker{display:none}
+details summary::before{content:'▶';color:#64c8ff;font-size:0.75em;transition:transform 0.2s;flex-shrink:0;margin-top:5px}
+details[open] summary::before{transform:rotate(90deg);color:#5eead4}
+details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
+details .answer ul,details .answer ol{margin:6px 0 6px 22px}
+@media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+</style>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({startOnLoad:true,theme:'base',flowchart:{useMaxWidth:true,htmlLabels:true,nodeSpacing:50,rankSpacing:60},themeVariables:{primaryColor:'#1a2530',primaryTextColor:'#e8eef5',primaryBorderColor:'#64c8ff',lineColor:'#5eead4',secondaryColor:'#0e1419',tertiaryColor:'#0a0f14',background:'#0a0f14',mainBkg:'#1a2530',secondBkg:'#0e1419',textColor:'#d4dae0',fontFamily:'-apple-system,"SF Pro Display",sans-serif',fontSize:'16px'}});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const lb=document.createElement('div');lb.className='lightbox';
+  lb.innerHTML='<span class="hint">scroll = zoom · drag = pan · Esc / click bg = close</span>';
+  document.body.appendChild(lb);
+  let scale=1,panX=0,panY=0,dragging=false,moved=false,lx=0,ly=0;
+  const apply=()=>{const s=lb.querySelector('svg');if(s)s.style.transform=`translate(${panX}px,${panY}px) scale(${scale})`};
+  const reset=()=>{scale=1;panX=0;panY=0};
+  const close=()=>{lb.classList.remove('open');const s=lb.querySelector('svg');if(s)s.remove();reset()};
+  document.addEventListener('click',e=>{
+    if(e.target.closest('.lightbox')){if(moved){moved=false;return}close();return}
+    const w=e.target.closest('.mermaid');if(!w)return;
+    const svg=w.querySelector('svg');if(!svg)return;
+    const c=svg.cloneNode(true);c.removeAttribute('style');
+    c.style.maxWidth='96vw';c.style.maxHeight='92vh';
+    lb.appendChild(c);lb.classList.add('open');reset();apply();
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+  lb.addEventListener('wheel',e=>{
+    if(!lb.classList.contains('open'))return;
+    e.preventDefault();
+    const svg=lb.querySelector('svg');if(!svg)return;
+    const ns=Math.max(0.3,Math.min(10,scale*(1-e.deltaY*0.002)));
+    const r=svg.getBoundingClientRect();
+    const cx=e.clientX-(r.left+r.width/2),cy=e.clientY-(r.top+r.height/2);
+    const k=ns/scale-1;panX-=cx*k;panY-=cy*k;scale=ns;apply();
+  },{passive:false});
+  lb.addEventListener('mousedown',e=>{
+    if(!lb.classList.contains('open'))return;
+    dragging=true;moved=false;lx=e.clientX;ly=e.clientY;lb.classList.add('dragging');e.preventDefault();
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    const dx=e.clientX-lx,dy=e.clientY-ly;
+    if(Math.abs(dx)+Math.abs(dy)>3)moved=true;
+    panX+=dx;panY+=dy;lx=e.clientX;ly=e.clientY;apply();
+  });
+  document.addEventListener('mouseup',()=>{dragging=false;lb.classList.remove('dragging')});
+});
+</script>
+</head><body><div class="container">
+
+<header>
+<div class="meta">
+<span class="tag day">Day 38</span>
+<span class="tag diff">Hard</span>
+<span class="tag">Lakehouse</span>
+<span class="tag">Iceberg/Delta/Hudi</span>
+<span class="tag">Metadata</span>
+<span class="tag">Batch+Stream</span>
+</div>
+<h1>Data Lake & Lakehouse — Growing a Database on Object Storage<span class="en">Open Table Formats, Metadata, Unified Batch/Stream</span></h1>
+</header>
+
+<h2>Scenario + Requirements</h2>
+<p>Design a <strong>PB-scale analytics platform</strong>: ingest <strong>100TB/day</strong> of behavioral logs plus CDC changes from upstream OLTP databases, feeding three consumer classes at once — BI dashboards (needing <em>minute-level freshness</em>), ML features/training (full history, replayable to any point in time), and analyst ad-hoc SQL (scan tens of TB, return in seconds).</p>
+<p>The old way runs <em>a data lake (a pile of Parquet on S3) plus a warehouse (Snowflake/Redshift)</em> side by side: the lake is cheap and holds raw data but has no transactions and rewrites an entire partition to change one row; the warehouse queries fast but is expensive, and data must be ETL'd over, so <strong>freshness always lags by hours</strong>. Two systems, two copies, double the cost, and they drift apart.</p>
+<ul>
+<li><strong>Scale</strong>: ~10PB total; largest table ~500TB / trillions of rows; write peak ~2GB/s.</li>
+<li><strong>Freshness SLO</strong>: CDC-to-queryable &lt; 5 min; BI dashboard P95 &lt; 3s.</li>
+<li><strong>Correctness</strong>: <em>ACID</em> — concurrent writes must not clobber each other, reads must not see half-written data (dirty reads); time travel for audit and model reproducibility.</li>
+<li><strong>Cost</strong>: store on object storage (S3/GCS, ~$0.023/GB·month), spin compute up/down on demand — escape the warehouse's always-on coupled-storage-and-compute bill.</li>
+</ul>
+<p>Four topics: <em>lake vs warehouse vs lakehouse, how open table formats do ACID on S3, how the metadata layer makes queries fast and time-travel possible, and how one table serves both batch and stream</em>.</p>
+
+<h2>High-level Architecture (Lakehouse layering)</h2>
+<pre class="mermaid">
+graph TD
+    SRC["Data sources<br/><i>OLTP CDC · logs · event streams</i>"]
+    ING["Ingest layer<br/><i>Spark / Flink / Kafka Connect</i>"]
+    subgraph LH["Lakehouse storage (object store S3/GCS)"]
+      META["Table-format metadata<br/><i>Iceberg / Delta / Hudi</i>"]
+      DATA["Data files<br/><i>Parquet / ORC columnar</i>"]
+    end
+    CAT["Catalog<br/><i>table → current snapshot pointer</i>"]
+    ENG["Query/compute engines<br/><i>Spark · Trino · Flink · DuckDB</i>"]
+    BI["BI dashboards"]
+    ML["ML training/features"]
+    AD["Ad-hoc SQL"]
+
+    SRC --> ING --> META
+    META -.points to.-> DATA
+    CAT -.atomic swap of current snapshot.-> META
+    ENG -->|read metadata→prune→read only relevant files| META
+    ENG --> BI & ML & AD
+
+    classDef src fill:#1a2530,stroke:#64c8ff,color:#e8eef5
+    classDef store fill:#1a1a30,stroke:#ffb450,color:#e8eef5
+    classDef eng fill:#0e2030,stroke:#5eead4,color:#e8eef5
+    class SRC,ING src
+    class META,DATA,CAT store
+    class ENG,BI,ML,AD eng
+</pre>
+<p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">Key insight: <strong>storage is still open columnar files on object storage</strong>, but a layer of <strong>transactional metadata</strong> on top lets many engines operate on it like a database</p>
+
+<h2>Key Technical Points</h2>
+
+<h3>1. Lake vs Warehouse vs Lakehouse: splitting the database into "files + metadata"</h3>
+<p><strong>Principle</strong>: a classic <em>warehouse</em> is schema-on-write, storage-compute-coupled and closed — model first, proprietary format, fast but expensive and locked in. A <em>data lake</em> is schema-on-read — raw files dumped on S3, cheap, open, ML-friendly, but with <strong>no transactions, no indexes, no schema-evolution guarantees</strong>; changing one row rewrites a whole partition directory, and concurrent writes clobber each other. The <em>lakehouse</em> keeps the lake's open columnar files (Parquet) and adds a layer of <strong>transactional metadata</strong> on top, so one copy of data gets the lake's cost/openness and the warehouse's ACID/performance. Databricks systematically argued this in the CIDR 2021 Lakehouse paper.</p>
+<table>
+<thead><tr><th></th><th>Warehouse</th><th>Data Lake</th><th>Lakehouse</th></tr></thead>
+<tbody>
+<tr><td><strong>Storage</strong></td><td>proprietary, coupled</td><td>object store + open files</td><td>object store + open files</td></tr>
+<tr><td><strong>Transactions</strong></td><td>✅ ACID</td><td>❌ none</td><td>✅ ACID (via metadata)</td></tr>
+<tr><td><strong>Schema</strong></td><td>enforced on write</td><td>interpreted on read</td><td>evolution + optional enforce</td></tr>
+<tr><td><strong>Cost</strong></td><td>high (always-on)</td><td>low</td><td>low (on-demand compute)</td></tr>
+<tr><td><strong>ML/openness</strong></td><td>weak (export)</td><td>strong</td><td>strong (multi-engine direct read)</td></tr>
+</tbody></table>
+<div class="tradeoff">
+<strong>Trade-off:</strong>
+<ul>
+<li><strong>Pure warehouse</strong>: ✅ peak query performance, mature governance; ❌ expensive, locked in, ETL latency, ML-unfriendly. Snowflake/BigQuery still win for compliance reporting.</li>
+<li><strong>Pure data lake</strong>: ✅ cheapest, most open; ❌ no ACID means a "data swamp" — dirty reads, orphan files, unmanaged schema drift.</li>
+<li><strong>Lakehouse</strong>: ✅ one dataset, many engines, low cost + ACID; ❌ the metadata layer is new complexity and a chokepoint (catalog consistency, small-file management, compaction ops); peak BI latency may still trail a dedicated MPP warehouse.</li>
+</ul></div>
+<div class="case">
+<strong>Real-world:</strong>
+<ul>
+<li><strong>Netflix</strong>: after the Hive table format buckled at PB scale, built <strong>Apache Iceberg</strong> (Apache top-level project in 2020) to get file-level atomic commits and partition evolution.</li>
+<li><strong>Databricks</strong>: coined <em>Lakehouse</em> and open-sourced <strong>Delta Lake</strong>; the CIDR 2021 paper is the architecture's foundational text.</li>
+<li><strong>Uber</strong>: built <strong>Apache Hudi</strong> for CDC incremental ingestion, powering a transactional data lake at trillion-record scale.</li>
+</ul></div>
+
+<h3>2. Open table formats: three schools for doing ACID on S3</h3>
+<p><strong>Principle</strong>: object storage guarantees only <em>single-object PUT atomicity</em> — no cross-file transactions, no atomic rename (S3 rename = copy+delete). The table-format trick: all data files are <strong>append-only, immutable</strong>; every write produces new files, then <strong>atomically swaps a single "current snapshot" pointer</strong> — a reader sees either the entire old snapshot or the entire new one, never a partial state. That's <em>snapshot isolation</em>. The big three (Iceberg / Delta / Hudi) share this idea; they differ in metadata organization and write-optimization focus.</p>
+<pre><code># Optimistic concurrency control (OCC) commit, common to all three
+def commit(table, new_files):
+    while True:
+        base = catalog.current_snapshot(table)      # read current snapshot
+        snap = base.add(new_files)                   # new snapshot (old + new files)
+        # atomic CAS: swap pointer only if current still equals base
+        if catalog.compare_and_swap(table,
+                                    expected=base,
+                                    new=snap):
+            return                                   # committed
+        # someone committed first → check conflict → retry/fail
+        if conflicts(base, snap): raise ConflictError
+</code></pre>
+<div class="tradeoff">
+<strong>Trade-off (format orientation):</strong>
+<ul>
+<li><strong>Iceberg</strong>: ✅ engine-neutral, cleanest design (hidden partitioning, partition evolution, file-level metadata), broadest multi-engine ecosystem; ❌ high-frequency small upserts aren't its strength (analytics-batch oriented).</li>
+<li><strong>Delta Lake</strong>: ✅ deep Spark/Databricks integration, simple ordered-JSON transaction log (<code>_delta_log</code>); ❌ historically best on Databricks, openness still catching up.</li>
+<li><strong>Hudi</strong>: ✅ built for <em>CDC upsert / streaming incremental</em>, with primary-key indexing and MoR; ❌ many concepts (COW/MoR, timeline, compaction), heaviest operational burden.</li>
+</ul></div>
+<div class="case">
+<strong>Real-world:</strong>
+<ul>
+<li><strong>Apple, LinkedIn, Netflix</strong>: large-scale Iceberg adoption for analytics, valuing engine-neutrality and partition evolution.</li>
+<li><strong>Uber</strong>: Hudi for CDC incremental ETL — run logic only on the delta then upsert, saving huge compute (see Uber's Lakehouse blog).</li>
+</ul></div>
+
+<h3>3. Metadata management: layered manifests for pruning + time travel</h3>
+<p><strong>Principle</strong>: a table format organizes metadata into a <strong>multi-level manifest tree</strong>. In Iceberg: <code>metadata file</code> (schema, partition spec, list of all snapshots) → <code>manifest list</code> (which manifests a snapshot contains, with partition value ranges) → <code>manifest file</code> (each data file's path + <strong>column-level stats</strong>: min/max, null count, row count). At query time the engine reads metadata top-down and uses partition ranges and column min/max to <em>prune</em>, skipping the vast majority of files and only opening relevant Parquet. <strong>No directory scans, no S3 LIST</strong> (the old Hive bottleneck). Each commit produces a new snapshot while old ones are retained, so <em>time travel</em> is just reading a historical snapshot pointer.</p>
+<pre><code>-- Iceberg time travel: audit / model reproduction / undelete
+SELECT * FROM events
+  FOR SYSTEM_TIME AS OF '2026-06-29 00:00:00';   -- by time
+SELECT * FROM events FOR SYSTEM_VERSION AS OF 4912;  -- by snapshot id
+
+-- File pruning: WHERE hits partition/stats → read 3 files not 80000
+-- manifest: file_a: dt∈[06-28,06-28], user_id min=10 max=99
+-- query dt='06-30' AND user_id=5 → ranges disjoint → skip whole file</code></pre>
+<div class="callout">
+<strong>The small-file problem (the lakehouse's #1 ops pain):</strong> streaming/CDC high-frequency writes produce a flood of small files, one manifest entry each, causing <strong>metadata explosion + thousands of tiny IOs per query</strong> — a performance cliff. You must periodically <em>compact</em> (merge small files into large ones) and <em>expire snapshots</em> (reclaim storage from old snapshots and orphan files). This is a standing background job, not optional.
+</div>
+<div class="case">
+<strong>Real-world:</strong>
+<ul>
+<li><strong>Netflix Iceberg</strong>: hidden partitioning — a user writes <code>WHERE ts &gt; ...</code> and the engine auto-prunes on <code>day(ts)</code> partitions; <em>users need not know the physical partition column</em>, and the partition scheme can evolve without rewriting history.</li>
+<li><strong>Apache Hudi</strong>: built-in clustering and compaction services that continuously merge incremental small files to keep read performance.</li>
+</ul></div>
+
+<h3>4. Unified batch/stream: one table for stream writes and batch reads (COW vs MoR)</h3>
+<p><strong>Principle</strong>: classic Lambda architecture maintains <em>a batch layer plus a speed layer — two codebases, two results, then a merge</em> — complex and prone to drift. The lakehouse lets stream and batch <strong>write the same table</strong>: Flink/Spark Streaming continuously append-commit snapshots while batch jobs read the same table's snapshots — a <em>Kappa-ification</em>. The key engineering trade-off is how updates land: <strong>Copy-on-Write (COW)</strong> merges changes into new data files at write time (fast reads, high write amplification); <strong>Merge-on-Read (MoR)</strong> only appends a delta log at write time and merges at read time (fast writes, an extra merge on read). Pick MoR for high-frequency CDC upserts, COW for analytics-heavy reads.</p>
+<table>
+<thead><tr><th></th><th>Copy-on-Write</th><th>Merge-on-Read</th></tr></thead>
+<tbody>
+<tr><td><strong>one-row update</strong></td><td>rewrite the whole data file</td><td>append one delta record</td></tr>
+<tr><td><strong>write amplification</strong></td><td>high</td><td>low</td></tr>
+<tr><td><strong>read latency</strong></td><td>low (direct read)</td><td>high (base + delta merge)</td></tr>
+<tr><td><strong>freshness</strong></td><td>bounded by compaction cadence</td><td>near real-time</td></tr>
+<tr><td><strong>best for</strong></td><td>read-heavy, analytics</td><td>CDC, frequent upserts</td></tr>
+</tbody></table>
+<pre><code># Hudi incremental read: pull only changes after a commit (core of incremental ETL)
+df = (spark.read.format("hudi")
+      .option("hoodie.datasource.query.type", "incremental")
+      .option("hoodie.read.begin.instanttime", last_commit)  # last watermark
+      .load(table_path))
+# run business logic only on the delta, then upsert downstream → compute scales
+# with "amount of change", not "full volume"
+</code></pre>
+<div class="tradeoff">
+<strong>Trade-off:</strong> unified batch/stream removes one codebase, but <em>exactly-once</em> ingestion still requires "idempotent commits + checkpoint-aligned snapshots" (Flink checkpoint two-phase-bound to the table commit); MoR shifts cost from write to read — if compaction can't keep up, deltas pile up on the read side and queries get slower.
+</div>
+<div class="case">
+<strong>Real-world:</strong>
+<ul>
+<li><strong>Uber</strong>: Hudi incremental ETL — incoming CDC computes only on the delta then upserts, collapsing Lambda's dual pipelines into one and saving substantial compute (Uber Lakehouse engineering blog).</li>
+<li><strong>Netflix / Flink + Iceberg</strong>: streaming sink continuously commits Iceberg snapshots; downstream batch and ad-hoc read the same table, unifying batch and stream semantics.</li>
+</ul></div>
+
+<h2>Scaling & Optimization</h2>
+<ul>
+<li><strong>Catalog becomes the bottleneck</strong>: every commit CASes the same table pointer; a hot table with high write concurrency conflicts and retries often. Use a REST Catalog (Iceberg REST, Polaris, Unity) for service-side commits, or split tables by sub-partition to shrink the write-conflict domain.</li>
+<li><strong>Query acceleration</strong>: add <em>sorting/clustering (Z-order)</em> so related data is physically adjacent, boosting min/max pruning; columnar already does predicate pushdown and dictionary encoding.</li>
+<li><strong>Compaction governance</strong>: automate "small-file merge + expire snapshots + orphan-file cleanup" as standing jobs; monitor "average file size" and "files opened per query".</li>
+<li><strong>Multi-engine consistency</strong>: one table written by Spark, read by Trino, stream-written by Flink — rely on the catalog for unified snapshot semantics, avoiding stale metadata from per-engine caches.</li>
+<li><strong>Partition evolution</strong>: as the business grows, partition granularity must change (day→hour); Iceberg evolves partitions <em>without rewriting history</em> — old data by old rules, new data by new rules.</li>
+</ul>
+
+<h2>Pitfalls + Interview Questions</h2>
+<div class="callout">
+<strong>1. Using the lakehouse as OLTP.</strong> Table formats are <em>analytical</em>: snapshot-level ACID, batch/columnar scans — <strong>not row-level low-latency point lookups or high-frequency transactions</strong>. Tens of thousands of single-row updates per second belong in Postgres, not Iceberg.</div>
+<div class="callout">
+<strong>2. Ignoring small files and compaction.</strong> Stream into the lake for three months with no governance and one table has millions of small files; queries degrade from 3s to 3 minutes. Schedule compaction + expire snapshots from day one.</div>
+<div class="callout">
+<strong>3. Assuming "open format" means freely mixing engines.</strong> Catalog consistency is a hidden landmine: engine A just committed a new snapshot, engine B cached the old metadata pointer and reads stale data. Unify the catalog and understand each engine's metadata-refresh semantics.</div>
+<div class="callout">
+<strong>4. Treating time travel as a free lunch.</strong> Every retained snapshot pins its referenced data files from reclamation, so <em>longer retention = higher storage cost</em>; expiring breaks replay to that point. The retention window is an <em>audit-need vs storage-cost</em> trade-off — set it explicitly.</div>
+<div class="callout">
+<strong>5. Common interview questions:</strong> ① On S3, which only guarantees single-object atomicity, how do you implement multi-file transactions? (immutable files + atomic snapshot-pointer swap + OCC) ② Write/read amplification of COW vs MoR — which for CDC? ③ Why is Hive slow and how does Iceberg fix it (directory LIST vs metadata pruning)? ④ Storage cost and reclamation strategy of time travel? ⑤ How do concurrent multi-engine writes avoid clobbering each other?</div>
+
+<h2>Resources</h2>
+<ul>
+<li><strong>"Lakehouse: A New Generation of Open Platforms"</strong> (Armbrust, Ghodsi, Xin, Zaharia, CIDR 2021): the foundational paper, arguing storage-compute separation + open formats + a metadata layer.</li>
+<li><strong>Apache Iceberg docs / table spec</strong>: authoritative definition of the metadata→manifest list→manifest structure, hidden partitioning, and partition evolution.</li>
+<li><strong>Uber Engineering: "Uber's Lakehouse Architecture" / Hudi blog</strong>: hands-on CDC incremental ETL, COW/MoR, trillion-record scale.</li>
+<li><strong>"Designing Data-Intensive Applications"</strong> (Kleppmann): the underlying principles of columnar storage, batch and stream processing, and Lambda/Kappa (relevant chapters).</li>
+</ul>
+
+<h2>Going Deeper (click to expand)</h2>
+
+<details>
+<summary>1. Object storage guarantees only single-object PUT atomicity, no cross-file transactions, no atomic rename. How can a table format deliver ACID? Where's the bottleneck?</summary>
+<div class="answer">
+<p><strong>Two core moves</strong>: ① data files are <em>immutable</em> — updates/deletes write new files, old ones retained; ② a write's entire visibility rides on <em>one</em> atomic op: swapping the "current snapshot" pointer. A reader sees the full file list that pointer references — either the whole old set or the whole new set, no in-between. That's snapshot isolation.</p>
+<p><strong>The atomic swap</strong> relies on the catalog providing compare-and-swap ("swap to v5 only if current is still v4"). A service-type catalog (REST / Hive Metastore / DynamoDB) implements CAS via a conditional update of one record.</p>
+<p><strong>Bottleneck</strong>: all commits serialize on the CAS of the <em>same table pointer</em>. A hot table with high write concurrency → frequent OCC conflicts → retry storms, throughput bounded by the single catalog's commit rate. Mitigate by splitting tables/partitions to shrink the conflict domain, batching commits, and using a scalable service-side catalog. That's why the lakehouse suits "batch/medium-frequency writes," not "tens of thousands of single-row transactions per second."</p>
+</div>
+</details>
+
+<details>
+<summary>2. Hive tables are also Parquet on S3 — why do they become unusable at PB scale? Which root cause does Iceberg eliminate?</summary>
+<div class="answer">
+<p><strong>Hive's root cause</strong>: table = directory, partition = subdirectory, and <em>which files belong to the table is inferred by LIST-ing the filesystem</em>. On S3, LIST is <strong>slow, eventually consistent, and billed per request</strong>; with hundreds of thousands of partitions and tens of millions of files, just listing takes minutes and may list a partial set (consistency). With no file-level stats, pruning only reaches partition-directory granularity. Concurrent writes rely on directory conventions with no true atomic commit, easily producing dirty reads and orphan files.</p>
+<p><strong>Iceberg's fix</strong>: change "which files the table has" from <em>filesystem LIST</em> to <em>reading metadata manifests</em> — manifests explicitly list each file path + column-level min/max stats. So: ① no more S3 LIST, query planning reads only a few metadata objects; ② pruning drops to file level (even row-group level), skipping most files; ③ commits atomically swap snapshots, giving native ACID and a consistent file set. The cost is maintaining this metadata tree and running compaction/expire.</p>
+</div>
+</details>
+
+<details>
+<summary>3. A MoR table takes tens of thousands of streaming CDC upserts per second. What happens if compaction pauses for a week? How do you design so it doesn't collapse?</summary>
+<div class="answer">
+<p><strong>What happens</strong>: MoR only appends delta logs (log/delete files) at write time, never touching the base. With compaction stopped, each file group's deltas pile up. The read side must merge base + a week of deltas in memory every time, so <em>read latency degrades linearly with delta thickness</em>, eventually timing out and blowing up memory. Small files/deltas explode in count, bloating metadata until even planning slows down.</p>
+<p><strong>Design points</strong>: ① treat compaction as a <em>standing service</em> merging incrementally per file group, not "an occasional batch job"; ② threshold-triggered (compact when delta size/count exceeds a limit) + rate-limited to avoid starving ingestion; ③ monitor "delta bytes per file group" and "read amplification" with alerts; ④ for read-heavy cases consider COW, or periodically materialize MoR into a COW snapshot for BI. In essence: MoR shifts cost from write to read, and compaction is the steady mechanism that <em>shifts it back</em> — it can't stop.</p>
+</div>
+</details>
+
+<details>
+<summary>4. The lakehouse claims "one dataset, many engines" removes ETL. But if the BI team wants Snowflake-grade sub-second latency, how do you weigh it?</summary>
+<div class="answer">
+<p><strong>Acknowledge the limit first</strong>: querying open columnar files on object storage is bounded by S3's high-latency random reads and file-granularity metadata, so <em>peak point-lookup / high-concurrency sub-second BI may still trail a dedicated MPP warehouse</em> (local SSD, proprietary indexes, materialized views, result caching). Openness and peak latency trade off.</p>
+<p><strong>Options</strong>: ① push hot queries to seconds with clustering/Z-order + small-file governance + engine local caching — enough for most BI; ② <em>tier it</em>: lakehouse as the single source of truth and detail/ML, while materializing/syncing high-frequency BI aggregates into an OLAP store (ClickHouse/Druid) for sub-second dashboards — but this partly returns to two systems, trading sync latency; ③ use an MPP that reads lakehouse formats directly (Trino/StarRocks on Iceberg) to balance openness and performance. <strong>No silver bullet</strong>: either sacrifice some latency for openness/cost, or accept an extra serving replica for sub-second BI — laying this trade-off out explicitly for the business is the architect's job.</p>
+</div>
+</details>
+
+<details>
+<summary>5. In unified batch/stream, Flink streams writes into Iceberg with exactly-once. How do you align checkpoints and table commits so nothing is dropped or duplicated?</summary>
+<div class="answer">
+<p><strong>The problem</strong>: Flink continuously writes data into Iceberg data files and commits snapshots. If the process crashes between "files written but snapshot not committed" or "committed but checkpoint didn't record it," recovery either drops data or re-commits the same batch.</p>
+<p><strong>Alignment (two-phase commit)</strong>: bind the Iceberg commit to the Flink checkpoint barrier. ① <em>pre-commit</em>: within each checkpoint cycle the sink writes data files (not yet in any snapshot, invisible) and stores the "pending file list" as operator state in the checkpoint; ② on checkpoint success, trigger <em>commit</em>: an idempotent snapshot commit atomically adds the batch to the table. On crash recovery, replay from the last successful checkpoint: uncommitted file lists remain in state and are committed once; already-committed ones aren't re-added because the Iceberg commit carries an idempotency marker (e.g. an application/operation id).</p>
+<p><strong>Key point</strong>: the visibility boundary = the checkpoint boundary, so downstream freshness is <em>checkpoint-interval</em>-level (e.g. 1 min), not per-record. Shortening checkpoints lowers latency but committing too often creates small files — back to the compaction problem.</p>
+</div>
+</details>
+
+<div class="nav"><a href="index.en.html">← Back to index</a></div>
+</div>
+</body></html>

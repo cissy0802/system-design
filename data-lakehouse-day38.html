@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 38 · 数据湖与湖仓 (Data Lake & Lakehouse) — System Design Bi-daily</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"SF Pro Display","Noto Sans SC",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
+.container{max-width:820px;margin:0 auto;padding:24px 20px 60px}
+header{padding:40px 0 28px;border-bottom:1px solid rgba(100,200,255,0.15);margin-bottom:32px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem}
+.tag{padding:3px 10px;border-radius:4px;background:rgba(100,200,255,0.12);color:#64c8ff;border:1px solid rgba(100,200,255,0.25)}
+.tag.diff{background:rgba(94,234,212,0.1);color:#5eead4;border-color:rgba(94,234,212,0.3)}
+.tag.day{background:rgba(255,180,80,0.1);color:#ffb450;border-color:rgba(255,180,80,0.25)}
+h1{font-size:1.75rem;font-weight:800;background:linear-gradient(135deg,#64c8ff 0%,#5eead4 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:0.5px;line-height:1.3}
+h1 .en{display:block;font-size:1rem;color:#7a8590;-webkit-text-fill-color:#7a8590;margin-top:6px;font-weight:500}
+h2{font-size:1.2rem;color:#5eead4;margin:36px 0 14px;padding-left:12px;border-left:3px solid #5eead4}
+h3{font-size:1rem;color:#64c8ff;margin:20px 0 10px;font-weight:600}
+p{margin:10px 0;color:#c8cfd6}
+ul,ol{margin:10px 0 10px 22px;color:#c8cfd6}
+li{margin:6px 0}
+strong{color:#e8eef5;font-weight:600}
+em{color:#5eead4;font-style:normal;font-weight:500}
+code{font-family:"SF Mono",Menlo,Consolas,monospace;background:rgba(100,200,255,0.1);color:#5eead4;padding:1px 6px;border-radius:3px;font-size:0.88em}
+pre{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:14px 16px;overflow-x:auto;margin:12px 0;font-family:"SF Mono",Menlo,Consolas,monospace;font-size:0.84rem;line-height:1.55;color:#c8cfd6}
+pre code{background:none;color:inherit;padding:0;font-size:1em}
+.mermaid{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:18px;margin:14px 0;text-align:center;overflow-x:auto;cursor:zoom-in;transition:border-color 0.15s}
+.mermaid:hover{border-color:rgba(100,200,255,0.4)}
+.mermaid svg{width:100%;max-width:100%;height:auto;min-height:280px}
+.lightbox{position:fixed;inset:0;background:rgba(8,12,18,0.96);z-index:9999;display:none;align-items:center;justify-content:center;padding:24px;cursor:grab;backdrop-filter:blur(4px);overflow:hidden}
+.lightbox.open{display:flex}
+.lightbox.dragging{cursor:grabbing}
+.lightbox svg{width:auto;height:auto;max-width:96vw;max-height:92vh;transform-origin:center center;will-change:transform}
+.lightbox .hint{position:fixed;top:16px;right:20px;font-size:0.78rem;color:#7a8590;font-family:"SF Mono",Menlo,monospace;pointer-events:none}
+.callout{background:rgba(255,180,80,0.06);border-left:3px solid #ffb450;padding:12px 14px;margin:14px 0;border-radius:4px;font-size:0.94rem}
+.callout strong{color:#ffb450}
+.tradeoff{background:rgba(100,200,255,0.05);border:1px solid rgba(100,200,255,0.2);border-radius:6px;padding:12px 14px;margin:12px 0;font-size:0.94rem}
+.case{background:rgba(94,234,212,0.05);border-left:3px solid #5eead4;padding:12px 14px;margin:12px 0;border-radius:4px;font-size:0.94rem}
+.case strong{color:#5eead4}
+.nav{margin-top:50px;padding-top:24px;border-top:1px solid rgba(100,200,255,0.15);text-align:center}
+.nav a{color:#64c8ff;text-decoration:none;font-size:0.92rem;padding:8px 16px;border:1px solid rgba(100,200,255,0.3);border-radius:4px;transition:all 0.15s}
+.nav a:hover{background:rgba(100,200,255,0.1)}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:0.9rem}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid rgba(100,200,255,0.15)}
+th{color:#64c8ff;font-weight:600;background:rgba(100,200,255,0.05)}
+details{background:rgba(100,200,255,0.04);border:1px solid rgba(100,200,255,0.18);border-radius:6px;padding:12px 16px;margin:10px 0;transition:all 0.15s}
+details:hover{border-color:rgba(100,200,255,0.35)}
+details[open]{background:rgba(94,234,212,0.05);border-color:rgba(94,234,212,0.3)}
+details summary{font-weight:600;color:#e8eef5;list-style:none;outline:none;cursor:pointer;display:flex;align-items:flex-start;gap:10px;font-size:0.96rem}
+details summary::-webkit-details-marker{display:none}
+details summary::before{content:'▶';color:#64c8ff;font-size:0.75em;transition:transform 0.2s;flex-shrink:0;margin-top:5px}
+details[open] summary::before{transform:rotate(90deg);color:#5eead4}
+details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
+details .answer ul,details .answer ol{margin:6px 0 6px 22px}
+@media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+</style>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({startOnLoad:true,theme:'base',flowchart:{useMaxWidth:true,htmlLabels:true,nodeSpacing:50,rankSpacing:60},themeVariables:{primaryColor:'#1a2530',primaryTextColor:'#e8eef5',primaryBorderColor:'#64c8ff',lineColor:'#5eead4',secondaryColor:'#0e1419',tertiaryColor:'#0a0f14',background:'#0a0f14',mainBkg:'#1a2530',secondBkg:'#0e1419',textColor:'#d4dae0',fontFamily:'-apple-system,"SF Pro Display",sans-serif',fontSize:'16px'}});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const lb=document.createElement('div');lb.className='lightbox';
+  lb.innerHTML='<span class="hint">scroll = zoom · drag = pan · Esc / click bg = close</span>';
+  document.body.appendChild(lb);
+  let scale=1,panX=0,panY=0,dragging=false,moved=false,lx=0,ly=0;
+  const apply=()=>{const s=lb.querySelector('svg');if(s)s.style.transform=`translate(${panX}px,${panY}px) scale(${scale})`};
+  const reset=()=>{scale=1;panX=0;panY=0};
+  const close=()=>{lb.classList.remove('open');const s=lb.querySelector('svg');if(s)s.remove();reset()};
+  document.addEventListener('click',e=>{
+    if(e.target.closest('.lightbox')){if(moved){moved=false;return}close();return}
+    const w=e.target.closest('.mermaid');if(!w)return;
+    const svg=w.querySelector('svg');if(!svg)return;
+    const c=svg.cloneNode(true);c.removeAttribute('style');
+    c.style.maxWidth='96vw';c.style.maxHeight='92vh';
+    lb.appendChild(c);lb.classList.add('open');reset();apply();
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+  lb.addEventListener('wheel',e=>{
+    if(!lb.classList.contains('open'))return;
+    e.preventDefault();
+    const svg=lb.querySelector('svg');if(!svg)return;
+    const ns=Math.max(0.3,Math.min(10,scale*(1-e.deltaY*0.002)));
+    const r=svg.getBoundingClientRect();
+    const cx=e.clientX-(r.left+r.width/2),cy=e.clientY-(r.top+r.height/2);
+    const k=ns/scale-1;panX-=cx*k;panY-=cy*k;scale=ns;apply();
+  },{passive:false});
+  lb.addEventListener('mousedown',e=>{
+    if(!lb.classList.contains('open'))return;
+    dragging=true;moved=false;lx=e.clientX;ly=e.clientY;lb.classList.add('dragging');e.preventDefault();
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    const dx=e.clientX-lx,dy=e.clientY-ly;
+    if(Math.abs(dx)+Math.abs(dy)>3)moved=true;
+    panX+=dx;panY+=dy;lx=e.clientX;ly=e.clientY;apply();
+  });
+  document.addEventListener('mouseup',()=>{dragging=false;lb.classList.remove('dragging')});
+});
+</script>
+</head><body><div class="container">
+
+<header>
+<div class="meta">
+<span class="tag day">Day 38</span>
+<span class="tag diff">Hard</span>
+<span class="tag">Lakehouse</span>
+<span class="tag">Iceberg/Delta/Hudi</span>
+<span class="tag">元数据</span>
+<span class="tag">批流一体</span>
+</div>
+<h1>数据湖与湖仓 — 在对象存储上长出一个数据库<span class="en">Data Lake & Lakehouse: Open Table Formats, Metadata, Unified Batch/Stream</span></h1>
+</header>
+
+<h2>问题场景 + 需求约束</h2>
+<p>设计一个 <strong>PB 级分析平台</strong>：每天摄入 <strong>100TB</strong> 行为日志 + 上游 OLTP 库的 CDC 变更，要同时喂三类消费者——BI 报表（要求<em>分钟级新鲜度</em>）、ML 特征/训练（要全历史、可回放任意时间点）、数据分析师 ad-hoc SQL（扫描几十 TB 也得几秒返回）。</p>
+<p>老路子是 <em>数据湖（S3 一堆 Parquet）+ 数仓（Snowflake/Redshift）</em> 并存：湖便宜能存原始数据但没事务、改一行要重写整个分区；仓查询快但贵，数据还要 ETL 搬一遍，<strong>新鲜度永远落后几小时</strong>。两套系统、两份数据、两倍成本，还对不齐。</p>
+<ul>
+<li><strong>规模</strong>：数据总量 ~10PB，单表最大 ~500TB / 万亿行；写入峰值 ~2GB/s。</li>
+<li><strong>新鲜度 SLO</strong>：CDC 入湖到可查 &lt; 5 分钟；BI 报表 P95 &lt; 3s。</li>
+<li><strong>正确性</strong>：要 <em>ACID</em>——并发写不能互相覆盖、读不能看到半截写入（脏读）；要能按时间点回放（time travel）做审计和模型复现。</li>
+<li><strong>成本</strong>：存储用对象存储（S3/GCS，$0.023/GB·月），算力按需起停，避免数仓那种『存算绑定』的常驻账单。</li>
+</ul>
+<p>本期讲四件事：<em>湖/仓/湖仓怎么选、开放表格式怎么在 S3 上做 ACID、元数据层怎么让查询又快又能时间旅行、批流怎么一套搞定</em>。</p>
+
+<h2>高层架构（湖仓分层）</h2>
+<pre class="mermaid">
+graph TD
+    SRC["数据源<br/><i>OLTP CDC · 日志 · 事件流</i>"]
+    ING["摄入层<br/><i>Spark / Flink / Kafka Connect</i>"]
+    subgraph LH["Lakehouse 存储（对象存储 S3/GCS）"]
+      META["表格式元数据层<br/><i>Iceberg / Delta / Hudi</i>"]
+      DATA["数据文件<br/><i>Parquet / ORC 列存</i>"]
+    end
+    CAT["Catalog<br/><i>表→当前快照指针</i>"]
+    ENG["查询/计算引擎<br/><i>Spark · Trino · Flink · DuckDB</i>"]
+    BI["BI 报表"]
+    ML["ML 训练/特征"]
+    AD["Ad-hoc SQL"]
+
+    SRC --> ING --> META
+    META -.指向.-> DATA
+    CAT -.原子切换当前快照.-> META
+    ENG -->|读元数据→剪枝→只读相关文件| META
+    ENG --> BI & ML & AD
+
+    classDef src fill:#1a2530,stroke:#64c8ff,color:#e8eef5
+    classDef store fill:#1a1a30,stroke:#ffb450,color:#e8eef5
+    classDef eng fill:#0e2030,stroke:#5eead4,color:#e8eef5
+    class SRC,ING src
+    class META,DATA,CAT store
+    class ENG,BI,ML,AD eng
+</pre>
+<p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">核心洞察：<strong>存储仍是对象存储里的开放列存文件</strong>，但上面盖一层<strong>事务性元数据</strong>，让多引擎像操作数据库一样操作它</p>
+
+<h2>关键技术点</h2>
+
+<h3>1. 湖 vs 仓 vs 湖仓：为什么要把数据库拆成『文件 + 元数据』</h3>
+<p><strong>原理</strong>：传统<em>数仓</em>是 schema-on-write、存算耦合的封闭系统——先建模、私有格式，查得快但贵且锁定。<em>数据湖</em>是 schema-on-read——原始文件直接堆 S3，便宜、开放、ML 友好，但<strong>没事务、没索引、没 schema 演进保证</strong>，改一行要重写整个分区目录，并发写互相覆盖。<em>湖仓</em>的本质是：保留湖的开放列存文件（Parquet），在其上加一层<strong>事务性元数据</strong>，于是同一份数据既有湖的成本/开放性，又有仓的 ACID/性能。Databricks 在 CIDR 2021 的 Lakehouse 论文系统论证了这个架构。</p>
+<table>
+<thead><tr><th></th><th>数据仓库</th><th>数据湖</th><th>湖仓 Lakehouse</th></tr></thead>
+<tbody>
+<tr><td><strong>存储</strong></td><td>私有格式、存算耦合</td><td>对象存储 + 开放文件</td><td>对象存储 + 开放文件</td></tr>
+<tr><td><strong>事务</strong></td><td>✅ ACID</td><td>❌ 无</td><td>✅ ACID（靠元数据层）</td></tr>
+<tr><td><strong>Schema</strong></td><td>write 时强制</td><td>read 时解释</td><td>演进 + 强制可选</td></tr>
+<tr><td><strong>成本</strong></td><td>高（常驻存算）</td><td>低</td><td>低（按需算力）</td></tr>
+<tr><td><strong>ML/开放</strong></td><td>弱（要导出）</td><td>强</td><td>强（多引擎直读）</td></tr>
+</tbody></table>
+<div class="tradeoff">
+<strong>Trade-off：</strong>
+<ul>
+<li><strong>纯数仓</strong>：✅ 极致查询性能、成熟治理；❌ 贵、锁定、数据要 ETL 搬入有延迟、ML 不友好。Snowflake/BigQuery 仍是合规报表的首选。</li>
+<li><strong>纯数据湖</strong>：✅ 最便宜最开放；❌ 没 ACID 就是『数据沼泽』——脏读、孤儿文件、schema 漂移没人管。</li>
+<li><strong>湖仓</strong>：✅ 一份数据多引擎、低成本 + ACID；❌ 元数据层是新的复杂度与单点（catalog 一致性、小文件治理、compaction 运维）；极致 BI 延迟仍可能不如专用 MPP 数仓。</li>
+</ul></div>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Netflix</strong>：在 Hive 表格式扛不住 PB 级分析后，自研 <strong>Apache Iceberg</strong>，2020 年成为 Apache 顶级项目，解决文件级原子提交与分区演进。</li>
+<li><strong>Databricks</strong>：提出 <em>Lakehouse</em> 概念并开源 <strong>Delta Lake</strong>，CIDR 2021 论文是该架构的奠基文献。</li>
+<li><strong>Uber</strong>：为了 CDC 增量入湖自研 <strong>Apache Hudi</strong>，支撑万亿级记录的事务型数据湖。</li>
+</ul></div>
+
+<h3>2. 开放表格式：在 S3 上做 ACID 的三种流派</h3>
+<p><strong>原理</strong>：对象存储只保证<em>单个对象 PUT 的原子性</em>，没有跨文件事务、没有 rename 原子性（S3 的 rename = copy+delete）。表格式的做法是：所有数据文件<strong>只追加不修改（immutable）</strong>，每次写产生新文件，再<strong>原子地切换一个『当前快照』指针</strong>——读者要么看到旧快照全集、要么看到新快照全集，绝不看到半截。这就是<em>快照隔离（snapshot isolation）</em>。三大格式（Iceberg / Delta / Hudi）思路同源，区别在元数据组织和写优化方向。</p>
+<pre><code># 乐观并发控制（OCC）提交，三格式通用思路
+def commit(table, new_files):
+    while True:
+        base = catalog.current_snapshot(table)      # 读当前快照
+        snap = base.add(new_files)                   # 生成新快照（指向旧+新文件）
+        # 原子 CAS：仅当 current 仍等于 base 才切指针
+        if catalog.compare_and_swap(table,
+                                    expected=base,
+                                    new=snap):
+            return                                   # 提交成功
+        # 否则有人抢先提交 → 校验是否冲突 → 重试/失败
+        if conflicts(base, snap): raise ConflictError
+</code></pre>
+<div class="tradeoff">
+<strong>Trade-off（三格式取向）：</strong>
+<ul>
+<li><strong>Iceberg</strong>：✅ 引擎中立、设计最干净（隐藏分区、分区演进、文件级元数据），多引擎生态最广；❌ 高频小批量 upsert 不是强项（偏分析批写）。</li>
+<li><strong>Delta Lake</strong>：✅ 与 Spark/Databricks 深度集成、事务日志（<code>_delta_log</code> 的有序 JSON）简单直观；❌ 历史上最佳体验绑 Databricks，开放性追赶中。</li>
+<li><strong>Hudi</strong>：✅ 为 <em>CDC upsert / 流式增量</em> 而生，自带主键索引与 MoR；❌ 概念多（COW/MoR、timeline、compaction），运维心智负担最重。</li>
+</ul></div>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Apple、LinkedIn、Netflix</strong>：大规模采用 Iceberg 做分析底座，看重引擎中立与分区演进。</li>
+<li><strong>Uber</strong>：用 Hudi 做 CDC 增量 ETL，只对 delta 变更跑计算再 upsert，省大量算力（见 Uber Lakehouse 博客）。</li>
+</ul></div>
+
+<h3>3. 元数据管理：分层清单让查询剪枝 + 时间旅行</h3>
+<p><strong>原理</strong>：表格式把元数据组织成<strong>多级清单树</strong>。以 Iceberg 为例：<code>metadata file</code>（表 schema、分区规范、所有快照列表）→ <code>manifest list</code>（一个快照包含哪些 manifest，带分区值范围）→ <code>manifest file</code>（每个数据文件的路径 + <strong>列级统计</strong>：min/max、null 数、行数）。查询时引擎自顶向下读元数据：用分区值范围和列 min/max 做<em>剪枝（pruning）</em>，跳过绝大多数文件，只真正打开相关 Parquet。<strong>不需要扫目录、不需要 LIST S3</strong>（Hive 表的老瓶颈）。每次提交生成新快照、旧快照保留，<em>time travel</em> 就是读历史快照指针。</p>
+<pre><code>-- Iceberg 时间旅行：审计 / 模型复现 / 误删恢复
+SELECT * FROM events
+  FOR SYSTEM_TIME AS OF '2026-06-29 00:00:00';   -- 按时间
+SELECT * FROM events FOR SYSTEM_VERSION AS OF 4912;  -- 按快照ID
+
+-- 文件剪枝示意：WHERE 命中分区/统计 → 只读 3 个文件而非 80000 个
+-- manifest 记录 file_a: dt∈[06-28,06-28], user_id min=10 max=99
+-- 查 dt='06-30' AND user_id=5  → min/max 不相交 → 整文件跳过</code></pre>
+<div class="callout">
+<strong>小文件问题（湖仓头号运维痛点）：</strong>流式/CDC 高频写产生海量小文件，每文件一条 manifest 记录，<strong>元数据爆炸 + 查询要开成千上万次小 IO</strong>，性能断崖。必须定期 <em>compaction</em>（合并小文件成大文件）+ <em>expire snapshots</em>（清理过期快照与孤儿文件回收存储）。这是常驻后台作业，不是可选项。
+</div>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Netflix Iceberg</strong>：隐藏分区——用户查 <code>WHERE ts &gt; ...</code>，引擎自动用 <code>day(ts)</code> 分区剪枝，<em>用户不必知道物理分区列</em>，分区方案还能演进而不重写历史。</li>
+<li><strong>Apache Hudi</strong>：内置 clustering 与 compaction 服务，把增量小文件持续合并，维持读性能。</li>
+</ul></div>
+
+<h3>4. 批流一体：一张表同时接住流写与批读（COW vs MoR）</h3>
+<p><strong>原理</strong>：传统 Lambda 架构要维护<em>批层 + 速度层两套代码两套结果再合并</em>，复杂且对不齐。湖仓让流和批<strong>写同一张表</strong>：Flink/Spark Streaming 持续 append 提交快照，批作业读同一张表的快照——<em>Kappa 化</em>。关键工程权衡是更新怎么落盘：<strong>Copy-on-Write（COW）</strong>写时就把改动合进新数据文件（读快、写放大大）；<strong>Merge-on-Read（MoR）</strong>写时只追加 delta 日志、读时再合并（写快、读时多一次 merge）。CDC 高频 upsert 选 MoR，分析为主选 COW。</p>
+<table>
+<thead><tr><th></th><th>Copy-on-Write</th><th>Merge-on-Read</th></tr></thead>
+<tbody>
+<tr><td><strong>写一行更新</strong></td><td>重写整个数据文件</td><td>追加一条 delta 记录</td></tr>
+<tr><td><strong>写放大</strong></td><td>高</td><td>低</td></tr>
+<tr><td><strong>读延迟</strong></td><td>低（直读）</td><td>高（base + delta 合并）</td></tr>
+<tr><td><strong>新鲜度</strong></td><td>受 compaction 节奏限</td><td>近实时</td></tr>
+<tr><td><strong>适合</strong></td><td>读多写少、分析</td><td>CDC、高频 upsert</td></tr>
+</tbody></table>
+<pre><code># Hudi 增量读：只拉某 commit 之后的变更（增量 ETL 核心）
+df = (spark.read.format("hudi")
+      .option("hoodie.datasource.query.type", "incremental")
+      .option("hoodie.read.begin.instanttime", last_commit)  # 上次水位
+      .load(table_path))
+# 只对 delta 跑业务逻辑，再 upsert 到下游表 → 算力随『变更量』而非『全量』
+</code></pre>
+<div class="tradeoff">
+<strong>Trade-off：</strong>批流一体省掉一套代码，但 <em>exactly-once</em> 入湖仍要靠『幂等提交 + 检查点对齐快照』（Flink checkpoint 与表 commit 两阶段绑定）；MoR 把成本从写转移到读，若 compaction 跟不上，读端 delta 越堆越厚、查询越来越慢。
+</div>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Uber</strong>：用 Hudi 做增量 ETL，上游 CDC 进来只对 delta 变更计算再 upsert，把 Lambda 双链路收敛成一套，显著省算力（Uber Lakehouse 工程博客）。</li>
+<li><strong>Netflix / Flink + Iceberg</strong>：流式 sink 持续提交 Iceberg 快照，下游批与 ad-hoc 读同一张表，统一批流口径。</li>
+</ul></div>
+
+<h2>扩展与优化（增长后怎么办）</h2>
+<ul>
+<li><strong>Catalog 成瓶颈</strong>：所有提交都要 CAS 同一张表指针，热表写并发高会频繁冲突重试。上 REST Catalog（如 Iceberg REST、Polaris、Unity）做服务化提交，或按子分区拆表降低写冲突域。</li>
+<li><strong>查询加速</strong>：加 <em>排序/聚簇（Z-order / clustering）</em>让相关数据物理相邻，提升 min/max 剪枝效果；列存本身已做谓词下推与字典编码。</li>
+<li><strong>compaction 治理</strong>：自动化『小文件合并 + 过期快照清理 + 孤儿文件回收』成常驻作业，监控『平均文件大小』『每查询打开文件数』。</li>
+<li><strong>多引擎一致</strong>：同一张表被 Spark 写、Trino 读、Flink 流写，靠 catalog 统一快照语义，避免各引擎私有缓存读到旧元数据。</li>
+<li><strong>分区演进</strong>：业务增长后分区粒度要变（按天→按小时），Iceberg 支持<em>不重写历史</em>地演进分区，老数据按旧规则、新数据按新规则。</li>
+</ul>
+
+<h2>常见陷阱 + 面试问题</h2>
+<div class="callout">
+<strong>1. 把湖仓当 OLTP 用。</strong> 表格式是<em>分析型</em>的：快照级 ACID、面向批量/列扫描，<strong>不是行级低延迟点查/高频事务</strong>。每秒几万笔单行更新该用 Postgres，别用 Iceberg。</div>
+<div class="callout">
+<strong>2. 忽视小文件与 compaction。</strong> 流式入湖三个月不治理，一张表几百万小文件，查询从 3s 退化到 3 分钟。compaction + expire snapshots 必须从第一天就排期。</div>
+<div class="callout">
+<strong>3. 以为『开放格式』就能随便混引擎。</strong> catalog 一致性是隐形地雷：A 引擎刚提交新快照，B 引擎缓存了旧 metadata 指针，读到旧数据。要统一 catalog 并理解各引擎的元数据刷新语义。</div>
+<div class="callout">
+<strong>4. time travel 当免费午餐。</strong> 每个保留快照都钉住其引用的数据文件不被回收，<em>保留越久存储成本越高</em>；expire 又会让该时间点的回放失效。保留窗口是<em>审计需求 vs 存储成本</em>的权衡，要显式定。</div>
+<div class="callout">
+<strong>5. 面试常问：</strong>① 在只保证单对象原子的 S3 上，怎么实现多文件事务？（答：immutable 文件 + 原子切快照指针 + OCC）② COW 与 MoR 各自的写/读放大，CDC 场景选哪个？③ Hive 表慢在哪、Iceberg 怎么解（LIST 目录 vs 元数据剪枝）？④ time travel 的存储代价与回收策略？⑤ 多引擎并发写如何避免互相覆盖？</div>
+
+<h2>深入资源</h2>
+<ul>
+<li><strong>《Lakehouse: A New Generation of Open Platforms》</strong>（Armbrust, Ghodsi, Xin, Zaharia，CIDR 2021）：湖仓架构的奠基论文，论证存算分离 + 开放格式 + 元数据层。</li>
+<li><strong>Apache Iceberg 官方文档 / 表规范（spec）</strong>：metadata→manifest list→manifest 三级结构、隐藏分区、分区演进的权威定义。</li>
+<li><strong>Uber Engineering：《Uber's Lakehouse Architecture》/ Hudi 博客</strong>：CDC 增量 ETL、COW/MoR、trillion-record 规模的实战。</li>
+<li><strong>《Designing Data-Intensive Applications》</strong>（Kleppmann）：列存、批处理与流处理、Lambda/Kappa 的底层原理（相关章节）。</li>
+</ul>
+
+<h2>深入思考（点击展开答案）</h2>
+
+<details>
+<summary>1. 对象存储只保证单对象 PUT 原子，没有跨文件事务、没有原子 rename。表格式凭什么能给出 ACID？瓶颈在哪？</summary>
+<div class="answer">
+<p><strong>核心两招</strong>：① 数据文件<em>不可变</em>——更新/删除都写新文件、旧文件保留；② 一次写的可见性全压在<em>一个</em>原子操作上：切换『当前快照』指针。读者看到的是指针指向的那整套文件清单，要么旧全集、要么新全集，没有中间态——这就是快照隔离。</p>
+<p><strong>原子切指针</strong>靠 catalog 的 compare-and-swap（『仅当当前还是 v4 才换 v5』）：服务型 catalog（REST / Hive Metastore / DynamoDB）用一行记录的条件更新实现 CAS。</p>
+<p><strong>瓶颈</strong>：所有提交序列化在<em>同一张表指针</em>的 CAS 上。热表高并发写 → 频繁 OCC 冲突 → 重试风暴，吞吐受限于单点 catalog 的提交速率。缓解：拆表/拆分区降冲突域、批量提交、用服务化 catalog。这也是为什么湖仓适合『批量/中频写』而非『每秒几万笔单行事务』。</p>
+</div>
+</details>
+
+<details>
+<summary>2. Hive 表也是 S3 上的 Parquet，为什么 PB 级会慢到不可用？Iceberg 把哪个根因消掉了？</summary>
+<div class="answer">
+<p><strong>Hive 的根因</strong>：表 = 目录，分区 = 子目录，<em>哪些文件属于这张表是靠 LIST 文件系统推断的</em>。在 S3 上 LIST 是<strong>慢、最终一致、按请求收费</strong>的操作；一张表几十万分区、上千万文件时，光列目录就要几分钟，且可能列到一半（一致性问题）。没有文件级统计，剪枝只能到分区目录粒度。并发写靠目录约定，没有真正的原子提交，易产生脏读和孤儿文件。</p>
+<p><strong>Iceberg 的解法</strong>：把『这张表有哪些文件』从<em>文件系统 LIST</em> 变成<em>读元数据清单</em>——manifest 里显式列出每个文件路径 + 列级 min/max 统计。于是：① 不再 LIST S3，规划查询只读几个元数据对象；② 剪枝下沉到文件级（甚至行组级），跳过绝大多数文件；③ 提交是原子切快照，天然 ACID 与一致的文件集。代价是要维护这套元数据树，并定期 compaction/expire。</p>
+</div>
+</details>
+
+<details>
+<summary>3. 一张 MoR 表，流式 CDC 每秒上万 upsert。compaction 暂停一周会发生什么？怎么设计才不崩？</summary>
+<div class="answer">
+<p><strong>会发生</strong>：MoR 写时只追加 delta 日志（log/delete 文件），不动 base。compaction 停了，每个 file group 的 delta 越堆越高。读端每次都要把 base + 一周的 delta 在内存里 merge，<em>读延迟随 delta 厚度线性恶化</em>，最终查询超时、内存打爆。同时小文件/小 delta 数量爆炸，元数据膨胀，连规划查询都变慢。</p>
+<p><strong>设计要点</strong>：① compaction 当作<em>常驻服务</em>按 file group 增量合并，不是『偶尔跑的批作业』；② 阈值触发（delta 大小/数量超限就压）+ 限速避免抢占摄入；③ 监控『每 file group delta 字节数』『读放大』并告警；④ 读多场景考虑 COW，或定期把 MoR 物化成 COW 快照供 BI 读。本质：MoR 把成本从写挪到读，compaction 是把它<em>挪回去</em>的常态机制，不能停。</p>
+</div>
+</details>
+
+<details>
+<summary>4. 湖仓宣称『一份数据多引擎直读』省掉 ETL。但若 BI 团队要 Snowflake 级亚秒延迟，你会怎么权衡？</summary>
+<div class="answer">
+<p><strong>先承认边界</strong>：湖仓在对象存储 + 开放列存上做查询，受限于 S3 的高延迟随机读与文件粒度元数据，<em>极致点查/高并发亚秒 BI 仍可能不如专用 MPP 数仓</em>（本地 SSD、私有索引、物化视图、结果缓存）。开放性与极致延迟有取舍。</p>
+<p><strong>权衡选项</strong>：① 靠 clustering/Z-order + 小文件治理 + 引擎本地缓存把热查询压到秒级，多数 BI 够用；② <em>分层</em>：湖仓做 single source of truth 与明细，把高频 BI 聚合物化/同步到 OLAP（ClickHouse/Druid）服务亚秒看板——但这又部分回到两套系统，要权衡同步延迟；③ 用直读湖仓格式的 MPP（Trino/StarRocks 读 Iceberg）兼顾开放与性能。<strong>没有银弹</strong>：要么牺牲一点延迟换开放/省钱，要么为亚秒 BI 接受一层额外 serving 副本——把这个取舍显式摆给业务，是架构师该做的事。</p>
+</div>
+</details>
+
+<details>
+<summary>5. 批流一体里，Flink 流式写 Iceberg 要 exactly-once 入湖。checkpoint 和表 commit 怎么对齐才不重不漏？</summary>
+<div class="answer">
+<p><strong>问题</strong>：Flink 持续把数据写成 Iceberg 数据文件并提交快照。若进程在『写了文件但没提交快照』或『提交了但 checkpoint 没记上』之间崩溃，恢复后要么漏数据、要么重复提交同一批文件。</p>
+<p><strong>对齐机制（两阶段提交）</strong>：把 Iceberg commit 绑到 Flink checkpoint 屏障上。① <em>pre-commit</em>：每个 checkpoint 周期内 sink 把数据写成数据文件（这些文件此刻还没进快照、不可见），并把『待提交文件清单』作为算子状态存入 checkpoint；② checkpoint 成功后触发 <em>commit</em>：用幂等的快照提交把这批文件原子加入表。崩溃恢复时从最近成功 checkpoint 重放：未提交的文件清单还在状态里，重新提交一次即可；已提交的因 Iceberg 提交带幂等标识（如 commit 的 application/operation id）不会被重复加入。</p>
+<p><strong>关键点</strong>：可见性边界 = checkpoint 边界，下游新鲜度是<em>checkpoint 间隔</em>级（如 1 分钟）而非逐条实时——这是 exactly-once 与延迟的取舍。缩短 checkpoint 能降延迟，但提交太频又制造小文件，回到 compaction 问题。</p>
+</div>
+</details>
+
+<div class="nav"><a href="index.html">← 回到 index</a></div>
+</div>
+</body></html>
