@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 39 · Workflow Engine — System Design Bi-daily</title>
+<style>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"SF Pro Display","Noto Sans SC",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
+.container{max-width:820px;margin:0 auto;padding:24px 20px 60px}
+header{padding:40px 0 28px;border-bottom:1px solid rgba(100,200,255,0.15);margin-bottom:32px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem}
+.tag{padding:3px 10px;border-radius:4px;background:rgba(100,200,255,0.12);color:#64c8ff;border:1px solid rgba(100,200,255,0.25)}
+.tag.diff{background:rgba(94,234,212,0.1);color:#5eead4;border-color:rgba(94,234,212,0.3)}
+.tag.day{background:rgba(255,180,80,0.1);color:#ffb450;border-color:rgba(255,180,80,0.25)}
+h1{font-size:1.75rem;font-weight:800;background:linear-gradient(135deg,#64c8ff 0%,#5eead4 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:0.5px;line-height:1.3}
+h1 .en{display:block;font-size:1rem;color:#7a8590;-webkit-text-fill-color:#7a8590;margin-top:6px;font-weight:500}
+h2{font-size:1.2rem;color:#5eead4;margin:36px 0 14px;padding-left:12px;border-left:3px solid #5eead4}
+h3{font-size:1rem;color:#64c8ff;margin:20px 0 10px;font-weight:600}
+p{margin:10px 0;color:#c8cfd6}
+ul,ol{margin:10px 0 10px 22px;color:#c8cfd6}
+li{margin:6px 0}
+strong{color:#e8eef5;font-weight:600}
+em{color:#5eead4;font-style:normal;font-weight:500}
+code{font-family:"SF Mono",Menlo,Consolas,monospace;background:rgba(100,200,255,0.1);color:#5eead4;padding:1px 6px;border-radius:3px;font-size:0.88em}
+pre{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:14px 16px;overflow-x:auto;margin:12px 0;font-family:"SF Mono",Menlo,Consolas,monospace;font-size:0.84rem;line-height:1.55;color:#c8cfd6}
+pre code{background:none;color:inherit;padding:0;font-size:1em}
+.mermaid{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:18px;margin:14px 0;text-align:center;overflow-x:auto;cursor:zoom-in;transition:border-color 0.15s}
+.mermaid:hover{border-color:rgba(100,200,255,0.4)}
+.mermaid svg{width:100%;max-width:100%;height:auto;min-height:280px}
+.lightbox{position:fixed;inset:0;background:rgba(8,12,18,0.96);z-index:9999;display:none;align-items:center;justify-content:center;padding:24px;cursor:grab;backdrop-filter:blur(4px);overflow:hidden}
+.lightbox.open{display:flex}
+.lightbox.dragging{cursor:grabbing}
+.lightbox svg{width:auto;height:auto;max-width:96vw;max-height:92vh;transform-origin:center center;will-change:transform}
+.lightbox .hint{position:fixed;top:16px;right:20px;font-size:0.78rem;color:#7a8590;font-family:"SF Mono",Menlo,monospace;pointer-events:none}
+.callout{background:rgba(255,180,80,0.06);border-left:3px solid #ffb450;padding:12px 14px;margin:14px 0;border-radius:4px;font-size:0.94rem}
+.callout strong{color:#ffb450}
+.tradeoff{background:rgba(100,200,255,0.05);border:1px solid rgba(100,200,255,0.2);border-radius:6px;padding:12px 14px;margin:12px 0;font-size:0.94rem}
+.case{background:rgba(94,234,212,0.05);border-left:3px solid #5eead4;padding:12px 14px;margin:12px 0;border-radius:4px;font-size:0.94rem}
+.case strong{color:#5eead4}
+.nav{margin-top:50px;padding-top:24px;border-top:1px solid rgba(100,200,255,0.15);text-align:center}
+.nav a{color:#64c8ff;text-decoration:none;font-size:0.92rem;padding:8px 16px;border:1px solid rgba(100,200,255,0.3);border-radius:4px;transition:all 0.15s}
+.nav a:hover{background:rgba(100,200,255,0.1)}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:0.9rem}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid rgba(100,200,255,0.15)}
+th{color:#64c8ff;font-weight:600;background:rgba(100,200,255,0.05)}
+details{background:rgba(100,200,255,0.04);border:1px solid rgba(100,200,255,0.18);border-radius:6px;padding:12px 16px;margin:10px 0;transition:all 0.15s}
+details:hover{border-color:rgba(100,200,255,0.35)}
+details[open]{background:rgba(94,234,212,0.05);border-color:rgba(94,234,212,0.3)}
+details summary{font-weight:600;color:#e8eef5;list-style:none;outline:none;cursor:pointer;display:flex;align-items:flex-start;gap:10px;font-size:0.96rem}
+details summary::-webkit-details-marker{display:none}
+details summary::before{content:'▶';color:#64c8ff;font-size:0.75em;transition:transform 0.2s;flex-shrink:0;margin-top:5px}
+details[open] summary::before{transform:rotate(90deg);color:#5eead4}
+details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
+details .answer ul,details .answer ol{margin:6px 0 6px 22px}
+@media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+</style>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({startOnLoad:true,theme:'base',flowchart:{useMaxWidth:true,htmlLabels:true,nodeSpacing:50,rankSpacing:60},themeVariables:{primaryColor:'#1a2530',primaryTextColor:'#e8eef5',primaryBorderColor:'#64c8ff',lineColor:'#5eead4',secondaryColor:'#0e1419',tertiaryColor:'#0a0f14',background:'#0a0f14',mainBkg:'#1a2530',secondBkg:'#0e1419',textColor:'#d4dae0',fontFamily:'-apple-system,"SF Pro Display",sans-serif',fontSize:'16px'}});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const lb=document.createElement('div');lb.className='lightbox';
+  lb.innerHTML='<span class="hint">scroll = zoom · drag = pan · Esc / click bg = close</span>';
+  document.body.appendChild(lb);
+  let scale=1,panX=0,panY=0,dragging=false,moved=false,lx=0,ly=0;
+  const apply=()=>{const s=lb.querySelector('svg');if(s)s.style.transform=`translate(${panX}px,${panY}px) scale(${scale})`};
+  const reset=()=>{scale=1;panX=0;panY=0};
+  const close=()=>{lb.classList.remove('open');const s=lb.querySelector('svg');if(s)s.remove();reset()};
+  document.addEventListener('click',e=>{
+    if(e.target.closest('.lightbox')){if(moved){moved=false;return}close();return}
+    const w=e.target.closest('.mermaid');if(!w)return;
+    const svg=w.querySelector('svg');if(!svg)return;
+    const c=svg.cloneNode(true);c.removeAttribute('style');
+    c.style.maxWidth='96vw';c.style.maxHeight='92vh';
+    lb.appendChild(c);lb.classList.add('open');reset();apply();
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+  lb.addEventListener('wheel',e=>{
+    if(!lb.classList.contains('open'))return;
+    e.preventDefault();
+    const svg=lb.querySelector('svg');if(!svg)return;
+    const ns=Math.max(0.3,Math.min(10,scale*(1-e.deltaY*0.002)));
+    const r=svg.getBoundingClientRect();
+    const cx=e.clientX-(r.left+r.width/2),cy=e.clientY-(r.top+r.height/2);
+    const k=ns/scale-1;panX-=cx*k;panY-=cy*k;scale=ns;apply();
+  },{passive:false});
+  lb.addEventListener('mousedown',e=>{
+    if(!lb.classList.contains('open'))return;
+    dragging=true;moved=false;lx=e.clientX;ly=e.clientY;lb.classList.add('dragging');e.preventDefault();
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    const dx=e.clientX-lx,dy=e.clientY-ly;
+    if(Math.abs(dx)+Math.abs(dy)>3)moved=true;
+    panX+=dx;panY+=dy;lx=e.clientX;ly=e.clientY;apply();
+  });
+  document.addEventListener('mouseup',()=>{dragging=false;lb.classList.remove('dragging')});
+});
+</script>
+</head><body><div class="container">
+
+<header>
+<div class="meta">
+<span class="tag day">Day 39</span>
+<span class="tag diff">Hard</span>
+<span class="tag">Workflow Engine</span>
+<span class="tag">Durable Execution</span>
+<span class="tag">Saga</span>
+<span class="tag">Compensation</span>
+</div>
+<h1>Workflow Engine — Long-Running Flows That Survive Crashes<span class="en">Durable Execution, Saga Orchestration, Compensating Transactions</span></h1>
+</header>
+
+<h2>Problem & Constraints</h2>
+<p>Design an <strong>order-fulfillment orchestration engine</strong>: <strong>1M</strong> orders/day, each stepping through "charge → reserve inventory → create shipment → wait for carrier pickup (hours to days) → notify". This is a <em>long-running, multi-service, all-or-compensate</em> flow. The hard part isn't any single step — it's <strong>resuming precisely after a crash mid-flow</strong>: the worker gets OOM-killed, the payment callback is 2 days late, inventory times out. You must neither double-charge nor leave the order stuck forever.</p>
+<p>Hand-rolling this ends badly: a DB status column driven by a cron poller quickly degenerates into hundreds of <code>if state==...</code> branches with retry and compensation logic scattered everywhere that nobody dares touch. A workflow engine pushes <strong>state persistence, retries, timeouts, and compensation</strong> down into infrastructure.</p>
+<ul>
+<li><strong>Scale</strong>: ~50 workflow starts/s at peak; ~5M workflows in flight at once (including those sleeping/waiting); a single flow can live for days.</li>
+<li><strong>Reliability SLO</strong>: on process crash / deploy / host loss, workflow state is <em>never lost</em>; it resumes from the exact point, with <em>no duplicated side effects</em> (no double charge, no double shipment).</li>
+<li><strong>Correctness</strong>: either the whole order fulfills, or completed steps are <em>semantically compensated</em> (refund, release inventory) — no distributed 2PC available.</li>
+<li><strong>Observability</strong>: for any order, see "which step it's stuck at, why, how many retries".</li>
+</ul>
+
+<h2>High-Level Architecture</h2>
+<pre class="mermaid">
+graph TD
+    C["Client / API<br/><i>StartWorkflow(order)</i>"]
+    FE["Frontend service<br/><i>gRPC ingress · auth</i>"]
+    HIST[("History store<br/><i>Event Sourcing<br/>Cassandra / MySQL</i>")]
+    MQ["Task Queue<br/><i>Matching service</i>"]
+    W["Worker fleet<br/><i>YOUR Workflow + Activity code</i>"]
+    EXT["External systems<br/><i>payment / inventory / shipping</i>"]
+
+    C --> FE
+    FE -->|① append event| HIST
+    FE -->|② dispatch task| MQ
+    MQ -->|③ long-poll| W
+    W -->|④ replay history to recover| HIST
+    W -->|⑤ invoke side effects| EXT
+    W -->|⑥ result → new event| FE
+
+    classDef client fill:#1a2530,stroke:#64c8ff,color:#e8eef5
+    classDef core fill:#1a1a30,stroke:#ffb450,color:#e8eef5
+    classDef store fill:#2a1530,stroke:#ff7ab6,color:#e8eef5
+    class C,W client
+    class FE,MQ core
+    class HIST,EXT store
+</pre>
+<p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">The engine (Frontend + History + Matching) only persists and schedules — it <strong>runs no business code</strong>; your logic runs in your own Workers, which recover by replaying History after a crash</p>
+
+<h2>Key Technical Points</h2>
+
+<h3>1. Durable Execution — Hiding the "State Machine" Inside Plain Code</h3>
+<p><strong>Principle</strong>: the core idea is <em>event sourcing + deterministic replay</em>. Every advance of a workflow (an Activity scheduled/completed, a Timer fired, a signal received) is <strong>appended in order</strong> to the History. When a worker crashes and restarts, the engine <em>replays</em> that History into your workflow code: at any step whose result is already recorded, it returns the cached value (<strong>without re-running the side effect</strong>); only the step not yet in History actually executes. So a flow that "runs for days across crashes" reads, in code, like a plain synchronous function.</p>
+<div class="tradeoff">
+<strong>Trade-off:</strong>
+<ul>
+<li><strong>Hand-rolled state machine + DB column + cron</strong>: ✅ no new dependency; ❌ reinvent retry/timeout/recovery per flow, state explosion, concurrency bugs nearly guaranteed.</li>
+<li><strong>Durable-execution engine (Temporal/Cadence)</strong>: ✅ code-is-the-flow, auto-recovery, built-in retry/timeout; ❌ workflow code <em>must be deterministic</em> (no direct <code>now()</code>/<code>rand()</code>/global reads), plus a learning curve and engine ops cost.</li>
+<li><strong>Managed Step Functions (AWS)</strong>: ✅ fully managed, no ops; ❌ state machine expressed as JSON/DSL, weak for complex logic, vendor lock-in.</li>
+</ul></div>
+<pre><code># Order-fulfillment workflow — looks synchronous, actually runs
+# for days across process crashes
+@workflow
+def fulfill_order(order):
+    pay = call(charge_payment, order)        # ① Activity = the real side effect
+    if not pay.ok: return "payment_failed"
+    call(reserve_inventory, order)           # ② each result appended to History
+    ship = call(create_shipment, order)
+    workflow.sleep(days=2)                    # ③ durable timer, holds no thread
+    call(send_notification, order, ship)
+    return "done"
+# After a crash the worker replays History: completed Activities return
+# their cached result (no double charge); only the unrecorded step runs.
+</code></pre>
+<div class="case">
+<strong>Real-world:</strong>
+<ul>
+<li><strong>Uber Cadence</strong>: built at Uber to orchestrate long cross-service flows (driver-incentive settlement, refunds), later open-sourced; makes "fault-tolerant stateful code" the programming model.</li>
+<li><strong>Temporal</strong>: founded by the Cadence originals; the flagship of durable execution — its blog "Beyond State Machines" argues why it replaces hand-rolled state machines.</li>
+<li><strong>Netflix Conductor</strong>: Netflix's open-source orchestrator; flows defined as JSON DSL + a web UI, used to orchestrate media-processing pipelines.</li>
+<li><strong>AWS Step Functions</strong>: managed state machines, used heavily inside Amazon for order/supply-chain long flows.</li>
+</ul></div>
+
+<h3>2. Orchestration vs Choreography</h3>
+<p><strong>Principle</strong>: a multi-step cross-service transaction can be coordinated two ways. <em>Orchestration</em>: a central coordinator (the workflow) actively calls each participant in turn — "you charge, you reserve, you ship" — logic is centralized, visible, easy to compensate. <em>Choreography</em>: no central brain; each service emits an event when done, and the next service subscribes and picks up the baton (order-paid → inventory service listens → emits inventory-reserved → shipping listens).</p>
+<div class="tradeoff">
+<strong>Trade-off:</strong>
+<ul>
+<li><strong>Orchestration</strong>: ✅ the flow is obvious at a glance, compensation order is clear, easy to add timeout/retry; ❌ the coordinator becomes a coupling hub, risks turning into a "god service".</li>
+<li><strong>Choreography</strong>: ✅ decoupled services, naturally async, no single point; ❌ the global flow is "owned by no one" — scattered across event subscriptions, painful to debug or change, prone to <em>cyclic dependencies</em> and <em>invisible loops</em>.</li>
+</ul>
+<p>Rule of thumb: <strong>≤ 3 steps and loosely coupled → choreography; many steps needing compensation and visibility → orchestration</strong>. A workflow engine is essentially orchestration turned into infrastructure.</p>
+</div>
+<div class="case">
+<strong>Real-world:</strong>
+<ul>
+<li><strong>Chris Richardson / microservices.io</strong>: the authoritative side-by-side of the two Saga implementations (orchestration / choreography), with the Eventuate Tram reference.</li>
+<li><strong>Netflix Conductor</strong>: explicitly chose orchestration — a central engine holds the flow definition, avoiding choreography's "flow logic scattered everywhere".</li>
+</ul></div>
+
+<h3>3. Compensating Transactions — No Rollback, Only "Semantic Undo"</h3>
+<p><strong>Principle</strong>: distributed systems have no cross-service ACID rollback. A Saga splits a long transaction into local transactions T1…Tn, each Ti paired with a <strong>compensating transaction</strong> Ci: if a step fails, run the compensations of completed steps in <em>reverse</em> order (Cn-1…C1). Compensation isn't a physical rollback to the prior byte state — it's a <em>business-semantic cancellation</em>: charged → refund, reserved → release, emailed → send a correction. This is exactly the model laid down by Garcia-Molina &amp; Salem's 1987 Sagas paper.</p>
+<div class="tradeoff">
+<strong>Trade-off (backward vs forward recovery):</strong>
+<ul>
+<li><strong>Backward recovery (compensating rollback)</strong>: on failure, undo what's done, back to "nothing happened". Fits cancelable flows like ordering.</li>
+<li><strong>Forward recovery (retry to success)</strong>: some steps are irreversible (money already sent to a third party, email already sent) — you can only keep retrying until success. So the design rule is to <em>push irreversible steps as late as possible</em>; once you cross one, only forward recovery remains.</li>
+</ul></div>
+<pre><code>def saga(order):
+    done = []                              # compensation stack of completed steps
+    try:
+        charge_payment(order);   done.append(refund_payment)
+        reserve_inventory(order);done.append(release_inventory)
+        create_shipment(order);  done.append(cancel_shipment)
+    except StepFailed:
+        for compensate in reversed(done):  # reverse-order compensation (LIFO)
+            compensate(order)              # ⚠️ must be idempotent + infinitely retriable
+        raise
+</code></pre>
+<div class="callout"><strong>Pitfall:</strong> compensation itself can fail. It must be <em>idempotent and infinitely retriable</em>, and must not trigger new side effects that themselves need compensating, or the compensation chain diverges forever. Truly-impossible compensations go to a "manual intervention" queue.</div>
+<div class="case">
+<strong>Real-world:</strong>
+<ul>
+<li><strong>Sagas paper (SIGMOD 1987)</strong>: the original definition of Ci semantically canceling Ti — the theoretical source of the modern microservices Saga.</li>
+<li><strong>Payment/e-commerce systems</strong>: refund on failed order, release stock on oversell — classic backward compensation; for money already sent to a third party, switch to forward retry + reconciliation as a backstop.</li>
+</ul></div>
+
+<h3>4. Activity Execution Guarantees — at-least-once + idempotency + timeout/heartbeat</h3>
+<p><strong>Principle</strong>: the workflow itself is "logically exactly-once" via replay, but the <em>Activities</em> that actually touch external systems can only guarantee <strong>at-least-once</strong>: the engine dispatches a task to a worker; if the worker finishes but crashes before reporting the result, the engine never gets the ACK and, after a timeout, <em>redispatches</em> — so the same charge may run twice. The only fix is to <strong>make Activities idempotent</strong>: use a business-unique key (order id) as the idempotency key, and have downstream dedupe on it. Long tasks must also <em>heartbeat</em> periodically so the engine can tell "slow" from "dead" and not falsely time out.</p>
+<div class="tradeoff">
+<strong>Trade-off:</strong> delivery semantics — at-most-once (no retry, may drop, unacceptable) vs at-least-once (retries, paired with idempotency, the industry default). So-called exactly-once doesn't mean "executed only once" — it means <em>executed repeatedly but taking effect once</em> (idempotency-key dedup).</div>
+<pre><code>// Activity runs at least once → the business side MUST be idempotent
+func ChargePayment(ctx, order) error {
+    key := "charge:" + order.ID          // idempotency key = business uniqueness
+    if seen(key) { return nil }          // a retry arrives → short-circuit
+    heartbeat(ctx)                       // periodic heartbeat on long tasks
+    charge(order.Amount, idemKey=key)    // pass the idem key to the payment gateway
+    return nil
+}
+</code></pre>
+<div class="case">
+<strong>Real-world:</strong>
+<ul>
+<li><strong>Temporal / Cadence Task Queue</strong>: workers long-poll for tasks; an Activity that times out or stops heartbeating is retried — the docs require Activities to be idempotent.</li>
+<li><strong>Stripe</strong>: the payments API uses an <code>Idempotency-Key</code> header; retrying the same key charges once — the canonical backstop for upstream workflow retries.</li>
+</ul></div>
+
+<h2>Scaling & Optimization</h2>
+<ul>
+<li><strong>History-store sharding</strong>: as workflow counts explode, consistent-hash by workflow_id across Cassandra shards; don't let a single workflow's History grow too long (tens of thousands of events slow replay) — truncate with <em>Continue-As-New</em>, starting a fresh execution.</li>
+<li><strong>Versioning problem</strong>: change the workflow code and in-flight old workflows replay through mismatched new/old code paths → non-determinism errors. Use <code>getVersion()</code> / patch branches to stay compatible with old histories — the hardest operational aspect of long-flow engines.</li>
+<li><strong>Worker scaling</strong>: put workflow tasks and activity tasks on separate queues, scaled independently; isolate CPU-heavy activities so they don't starve lightweight workflow tasks of threads.</li>
+<li><strong>Multi-region</strong>: replicate History cross-region for DR (Cadence/Temporal global namespace / XDC); after failover, workflows continue from the replicated history.</li>
+</ul>
+
+<h2>Common Pitfalls + Interview Questions</h2>
+<div class="callout"><strong>1. Calling <code>time.now()</code> / <code>rand()</code> / HTTP directly inside a workflow.</strong> Breaks deterministic replay: on replay the value differs, history mismatches, and it errors out. All non-deterministic operations must live inside Activities or use the engine's deterministic APIs.</div>
+<div class="callout"><strong>2. Assuming the engine gives exactly-once so you can skip idempotency.</strong> Activities are at-least-once; side effects must dedupe themselves or a retry becomes a double charge.</div>
+<div class="callout"><strong>3. Placing irreversible steps too early.</strong> Once an irreversible action runs (money to a third party), a later failure can't roll back the whole order — only forward retry remains; order it as late as possible.</div>
+<div class="callout"><strong>4. Common ask:</strong> why do microservices avoid distributed 2PC? (blocking, coordinator single point, long-held locks, participant-failure amplification.) What does Saga trade? (gives up isolation I for availability — intermediate state is externally visible, business must tolerate it.)</div>
+<div class="callout"><strong>5. Common ask:</strong> how does a workflow engine guarantee no state loss and no duplicated side effects after a crash? (event-sourced persistence + deterministic replay + Activity idempotency keys.)</div>
+
+<h2>Further Resources</h2>
+<ul>
+<li><strong>Designing Data-Intensive Applications, Ch. 9 + Ch. 12</strong> (Kleppmann): the essence of distributed transactions, consensus, and "derived data / end-to-end idempotency".</li>
+<li><strong>Sagas (Garcia-Molina &amp; Salem, ACM SIGMOD 1987)</strong>: the theoretical origin of long transactions and compensating transactions — the ancestor of the microservices Saga.</li>
+<li><strong>Temporal blog — "Beyond State Machines"</strong>: first-hand argument for why durable execution replaces hand-rolled state machines.</li>
+<li><strong>Netflix TechBlog — "Netflix Conductor: A microservices orchestrator"</strong>: industrial-grade design and trade-offs of an orchestration engine.</li>
+<li><strong>microservices.io — Saga pattern (Chris Richardson)</strong>: authoritative orchestration-vs-choreography comparison and implementation guide.</li>
+</ul>
+
+<h2>Going Deeper (click to expand)</h2>
+
+<details>
+<summary>1. A workflow engine claims precise recovery after a crash — on what basis? What if an Activity "finished but the worker crashed before reporting the result"?</summary>
+<div class="answer">
+<p><strong>On event sourcing + replay</strong>: the workflow's progress is appended as an immutable event stream persisted in History. After a crash, another machine replays History from the start, returning cached results for steps already recorded and only truly executing steps absent from history — so the workflow logic is "exactly-once".</p>
+<p><strong>But that awkward window is real</strong>: the Activity already charged the card, the result isn't yet in History, and the worker crashes. The engine gets no completion event and, after timeout, <em>redispatches</em> the Activity → a second charge. The engine can't eliminate this; only <strong>Activity idempotency</strong> can: key on the order id, have the payment gateway honor that key and return the first result on the second call. That's why "the engine gives you durability, but idempotency is on you".</p>
+</div>
+</details>
+
+<details>
+<summary>2. Why must workflow code be "deterministic"? What concrete failure does a single <code>if random() &gt; 0.5</code> cause?</summary>
+<div class="answer">
+<p>Recovery is by replay: feeding the same History into the workflow code must produce the <em>exact same command sequence</em> (which Activity to schedule, which Timer to set) to align line-by-line with history.</p>
+<p><code>if random()&gt;0.5</code> took branch A the first time (scheduled Activity A, written to history); on replay <code>random()</code> rolls again, this time taking branch B and wanting to schedule Activity B. The engine sees "code wants to schedule B, but history record N is A" — command doesn't match history, so it throws a non-determinism error and the workflow wedges. Hence randomness, current time, external reads, concurrent-map iteration order… are all mines and must move into Activities (whose results are persisted and not recomputed on replay).</p>
+</div>
+</details>
+
+<details>
+<summary>3. If I'm already using a workflow engine, why do I still need Saga / compensation? Are they alternatives or complements?</summary>
+<div class="answer">
+<p><strong>Complements, not alternatives.</strong> The engine solves "how to reliably persist and recover flow state" (durable execution); Saga solves "how to semantically roll back a multi-step business failure" (compensation). The engine gives you a reliable place to <em>orchestrate</em> a Saga — call steps in order inside the workflow, catch failures with try/except, then call compensating Activities in reverse.</p>
+<p>You can write a Saga without an engine (choreography, via events), but then compensation's state, retries, and timeouts must be persisted by hand — back into the hand-rolled state-machine swamp. So "a Saga workflow running inside Temporal" is today's most common combo: the engine provides durable + retry, the Saga provides business-rollback semantics.</p>
+</div>
+</details>
+
+<details>
+<summary>4. There are 5M in-flight, not-yet-finished workflows, and you need to change the workflow logic. What breaks? How do you ship safely?</summary>
+<div class="answer">
+<p><strong>Disaster scenario</strong>: old workflows wrote History along the old code path; after deploying new code, those in-flight workflows replay along the <em>new</em> path, generating commands that don't match the old history → mass non-determinism errors and collective wedging. This is the nastiest ops trap of long-flow engines (flows live for days while code ships daily).</p>
+<p><strong>Safe approach</strong>: don't change branches directly — version for compatibility. Use the engine's <code>getVersion()</code>/patch API: <code>v=getVersion("addStep",1,2); if v==1: old logic else: new logic</code>. Old workflows on replay get the recorded old version and take the old path; newly started ones take the new path — both coexist in one codebase. Once all old workflows drain, remove the old branch. Or simply spin up a <em>new task queue / new workflow type</em> and let old flows finish naturally on old workers.</p>
+</div>
+</details>
+
+<details>
+<summary>5. What if a compensating transaction fails? "Charge succeeded, inventory reserved, shipment failed, need refund but the refund API is also down" — design this backstop.</summary>
+<div class="answer">
+<p>Compensation isn't a one-shot best-effort; it's itself a <em>reliable</em> Activity: configure <strong>infinite retry + exponential backoff</strong>, since the refund API is most likely just temporarily unavailable. The engine durably keeps this compensating Activity retrying and doesn't lose it across crashes — precisely the biggest win of running a Saga on an engine versus hand-rolling.</p>
+<p>But guard two things: ① compensation must be <strong>idempotent</strong> (refund API takes an idempotency key), or retries could refund several times; ② set a <strong>retry ceiling / deadline</strong>, after which it stops auto-retrying and drops the order into a "manual intervention" queue with an alert for human reconciliation. Never let a compensation retry infinitely and quietly burn resources, and never fake success and move on — <em>better to stall for a human than silently lose money</em>. In production you'd also run an independent reconciliation job: daily scan for "charged but ultimately unfulfilled and unrefunded" orders and force the refund.</p>
+</div>
+</details>
+
+<div class="nav"><a href="index.en.html">← Back to index</a></div>
+</div>
+</body></html>

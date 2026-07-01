@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 39 · 工作流引擎 (Workflow Engine) — System Design Bi-daily</title>
+<style>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"SF Pro Display","Noto Sans SC",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
+.container{max-width:820px;margin:0 auto;padding:24px 20px 60px}
+header{padding:40px 0 28px;border-bottom:1px solid rgba(100,200,255,0.15);margin-bottom:32px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem}
+.tag{padding:3px 10px;border-radius:4px;background:rgba(100,200,255,0.12);color:#64c8ff;border:1px solid rgba(100,200,255,0.25)}
+.tag.diff{background:rgba(94,234,212,0.1);color:#5eead4;border-color:rgba(94,234,212,0.3)}
+.tag.day{background:rgba(255,180,80,0.1);color:#ffb450;border-color:rgba(255,180,80,0.25)}
+h1{font-size:1.75rem;font-weight:800;background:linear-gradient(135deg,#64c8ff 0%,#5eead4 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:0.5px;line-height:1.3}
+h1 .en{display:block;font-size:1rem;color:#7a8590;-webkit-text-fill-color:#7a8590;margin-top:6px;font-weight:500}
+h2{font-size:1.2rem;color:#5eead4;margin:36px 0 14px;padding-left:12px;border-left:3px solid #5eead4}
+h3{font-size:1rem;color:#64c8ff;margin:20px 0 10px;font-weight:600}
+p{margin:10px 0;color:#c8cfd6}
+ul,ol{margin:10px 0 10px 22px;color:#c8cfd6}
+li{margin:6px 0}
+strong{color:#e8eef5;font-weight:600}
+em{color:#5eead4;font-style:normal;font-weight:500}
+code{font-family:"SF Mono",Menlo,Consolas,monospace;background:rgba(100,200,255,0.1);color:#5eead4;padding:1px 6px;border-radius:3px;font-size:0.88em}
+pre{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:14px 16px;overflow-x:auto;margin:12px 0;font-family:"SF Mono",Menlo,Consolas,monospace;font-size:0.84rem;line-height:1.55;color:#c8cfd6}
+pre code{background:none;color:inherit;padding:0;font-size:1em}
+.mermaid{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:18px;margin:14px 0;text-align:center;overflow-x:auto;cursor:zoom-in;transition:border-color 0.15s}
+.mermaid:hover{border-color:rgba(100,200,255,0.4)}
+.mermaid svg{width:100%;max-width:100%;height:auto;min-height:280px}
+.lightbox{position:fixed;inset:0;background:rgba(8,12,18,0.96);z-index:9999;display:none;align-items:center;justify-content:center;padding:24px;cursor:grab;backdrop-filter:blur(4px);overflow:hidden}
+.lightbox.open{display:flex}
+.lightbox.dragging{cursor:grabbing}
+.lightbox svg{width:auto;height:auto;max-width:96vw;max-height:92vh;transform-origin:center center;will-change:transform}
+.lightbox .hint{position:fixed;top:16px;right:20px;font-size:0.78rem;color:#7a8590;font-family:"SF Mono",Menlo,monospace;pointer-events:none}
+.callout{background:rgba(255,180,80,0.06);border-left:3px solid #ffb450;padding:12px 14px;margin:14px 0;border-radius:4px;font-size:0.94rem}
+.callout strong{color:#ffb450}
+.tradeoff{background:rgba(100,200,255,0.05);border:1px solid rgba(100,200,255,0.2);border-radius:6px;padding:12px 14px;margin:12px 0;font-size:0.94rem}
+.case{background:rgba(94,234,212,0.05);border-left:3px solid #5eead4;padding:12px 14px;margin:12px 0;border-radius:4px;font-size:0.94rem}
+.case strong{color:#5eead4}
+.nav{margin-top:50px;padding-top:24px;border-top:1px solid rgba(100,200,255,0.15);text-align:center}
+.nav a{color:#64c8ff;text-decoration:none;font-size:0.92rem;padding:8px 16px;border:1px solid rgba(100,200,255,0.3);border-radius:4px;transition:all 0.15s}
+.nav a:hover{background:rgba(100,200,255,0.1)}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:0.9rem}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid rgba(100,200,255,0.15)}
+th{color:#64c8ff;font-weight:600;background:rgba(100,200,255,0.05)}
+details{background:rgba(100,200,255,0.04);border:1px solid rgba(100,200,255,0.18);border-radius:6px;padding:12px 16px;margin:10px 0;transition:all 0.15s}
+details:hover{border-color:rgba(100,200,255,0.35)}
+details[open]{background:rgba(94,234,212,0.05);border-color:rgba(94,234,212,0.3)}
+details summary{font-weight:600;color:#e8eef5;list-style:none;outline:none;cursor:pointer;display:flex;align-items:flex-start;gap:10px;font-size:0.96rem}
+details summary::-webkit-details-marker{display:none}
+details summary::before{content:'▶';color:#64c8ff;font-size:0.75em;transition:transform 0.2s;flex-shrink:0;margin-top:5px}
+details[open] summary::before{transform:rotate(90deg);color:#5eead4}
+details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
+details .answer ul,details .answer ol{margin:6px 0 6px 22px}
+@media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+</style>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({startOnLoad:true,theme:'base',flowchart:{useMaxWidth:true,htmlLabels:true,nodeSpacing:50,rankSpacing:60},themeVariables:{primaryColor:'#1a2530',primaryTextColor:'#e8eef5',primaryBorderColor:'#64c8ff',lineColor:'#5eead4',secondaryColor:'#0e1419',tertiaryColor:'#0a0f14',background:'#0a0f14',mainBkg:'#1a2530',secondBkg:'#0e1419',textColor:'#d4dae0',fontFamily:'-apple-system,"SF Pro Display",sans-serif',fontSize:'16px'}});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const lb=document.createElement('div');lb.className='lightbox';
+  lb.innerHTML='<span class="hint">scroll = zoom · drag = pan · Esc / click bg = close</span>';
+  document.body.appendChild(lb);
+  let scale=1,panX=0,panY=0,dragging=false,moved=false,lx=0,ly=0;
+  const apply=()=>{const s=lb.querySelector('svg');if(s)s.style.transform=`translate(${panX}px,${panY}px) scale(${scale})`};
+  const reset=()=>{scale=1;panX=0;panY=0};
+  const close=()=>{lb.classList.remove('open');const s=lb.querySelector('svg');if(s)s.remove();reset()};
+  document.addEventListener('click',e=>{
+    if(e.target.closest('.lightbox')){if(moved){moved=false;return}close();return}
+    const w=e.target.closest('.mermaid');if(!w)return;
+    const svg=w.querySelector('svg');if(!svg)return;
+    const c=svg.cloneNode(true);c.removeAttribute('style');
+    c.style.maxWidth='96vw';c.style.maxHeight='92vh';
+    lb.appendChild(c);lb.classList.add('open');reset();apply();
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+  lb.addEventListener('wheel',e=>{
+    if(!lb.classList.contains('open'))return;
+    e.preventDefault();
+    const svg=lb.querySelector('svg');if(!svg)return;
+    const ns=Math.max(0.3,Math.min(10,scale*(1-e.deltaY*0.002)));
+    const r=svg.getBoundingClientRect();
+    const cx=e.clientX-(r.left+r.width/2),cy=e.clientY-(r.top+r.height/2);
+    const k=ns/scale-1;panX-=cx*k;panY-=cy*k;scale=ns;apply();
+  },{passive:false});
+  lb.addEventListener('mousedown',e=>{
+    if(!lb.classList.contains('open'))return;
+    dragging=true;moved=false;lx=e.clientX;ly=e.clientY;lb.classList.add('dragging');e.preventDefault();
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    const dx=e.clientX-lx,dy=e.clientY-ly;
+    if(Math.abs(dx)+Math.abs(dy)>3)moved=true;
+    panX+=dx;panY+=dy;lx=e.clientX;ly=e.clientY;apply();
+  });
+  document.addEventListener('mouseup',()=>{dragging=false;lb.classList.remove('dragging')});
+});
+</script>
+</head><body><div class="container">
+
+<header>
+<div class="meta">
+<span class="tag day">Day 39</span>
+<span class="tag diff">Hard</span>
+<span class="tag">Workflow Engine</span>
+<span class="tag">Durable Execution</span>
+<span class="tag">Saga</span>
+<span class="tag">补偿事务</span>
+</div>
+<h1>工作流引擎 — 让崩溃后还能接着跑的长流程<span class="en">Workflow Engine: Durable Execution, Saga Orchestration, Compensation</span></h1>
+</header>
+
+<h2>问题场景 + 需求约束</h2>
+<p>设计一个<strong>订单履约编排引擎</strong>：每天 <strong>100 万</strong>笔订单，每笔要走「扣款 → 锁库存 → 生成运单 → 等物流揽收（可能几小时到几天）→ 发通知」。这是一条<em>长时间运行、跨多个服务、必须全成或全补偿</em>的流程。难点不在单步，而在<strong>中间任何一步崩溃后如何精确接着跑</strong>：worker 进程被 OOM kill、支付回调延迟 2 天、库存服务超时——你既不能重复扣款，也不能把订单卡死。</p>
+<p>裸写这套逻辑的下场：用 DB 状态字段 + cron 轮询驱动状态机，很快演变成几百个 <code>if state==...</code> 分支、重试和补偿代码散落各处，没人敢改。工作流引擎把「<strong>状态持久化、重试、超时、补偿</strong>」下沉成基础设施。</p>
+<ul>
+<li><strong>规模</strong>：峰值 ~50 workflow/s 启动，同时在途（含 sleep 等待）workflow ~500 万个；单流程可存活数天。</li>
+<li><strong>可靠性 SLO</strong>：进程崩溃 / 部署 / 机器挂，workflow 状态<em>零丢失</em>，恢复后从断点继续，绝不重复副作用（不重复扣款、不重复发货）。</li>
+<li><strong>正确性</strong>：要么整单履约成功，要么已执行的步骤被<em>语义补偿</em>回滚（退款、释放库存）——没有分布式 2PC 可用。</li>
+<li><strong>可观测</strong>：任一订单能查到「现在卡在哪一步、为什么、重试几次」。</li>
+</ul>
+
+<h2>高层架构</h2>
+<pre class="mermaid">
+graph TD
+    C["客户端 / API<br/><i>StartWorkflow(order)</i>"]
+    FE["Frontend 服务<br/><i>gRPC 接入 · 鉴权</i>"]
+    HIST[("History 存储<br/><i>Event Sourcing<br/>Cassandra / MySQL</i>")]
+    MQ["Task Queue<br/><i>Matching 服务</i>"]
+    W["Worker 集群<br/><i>你的 Workflow + Activity 代码</i>"]
+    EXT["外部系统<br/><i>支付 / 库存 / 物流</i>"]
+
+    C --> FE
+    FE -->|① append 事件| HIST
+    FE -->|② 派发 task| MQ
+    MQ -->|③ long-poll 拉取| W
+    W -->|④ replay 历史恢复状态| HIST
+    W -->|⑤ 调用副作用| EXT
+    W -->|⑥ 结果 → 新事件| FE
+
+    classDef client fill:#1a2530,stroke:#64c8ff,color:#e8eef5
+    classDef core fill:#1a1a30,stroke:#ffb450,color:#e8eef5
+    classDef store fill:#2a1530,stroke:#ff7ab6,color:#e8eef5
+    class C,W client
+    class FE,MQ core
+    class HIST,EXT store
+</pre>
+<p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">引擎（Frontend + History + Matching）只管持久化与调度，<strong>不跑业务代码</strong>；业务跑在你自己的 Worker 里，崩了就重放 History 恢复</p>
+
+<h2>关键技术点</h2>
+
+<h3>1. 持久化执行（Durable Execution）—— 把「状态机」藏进普通代码</h3>
+<p><strong>原理</strong>：核心思想是 <em>event sourcing + 确定性重放</em>。workflow 的每一次进展（Activity 被调度、完成、Timer 触发、收到信号）都作为<strong>事件顺序追加</strong>到 History。当 worker 崩溃重启，引擎把这段 History 从头<em>重放</em>给你的 workflow 代码：走到已经记录过结果的那一步，直接返回缓存值（<strong>不重新执行副作用</strong>）；只有 History 里还没有的那一步才真正落地。于是「运行数天、跨崩溃」的流程，在代码里看起来就是一段平铺直叙的同步函数。</p>
+<div class="tradeoff">
+<strong>Trade-off：</strong>
+<ul>
+<li><strong>手写状态机 + DB 字段 + cron</strong>：✅ 无新依赖；❌ 每个流程重造重试/超时/恢复轮子，状态爆炸，几乎必然出并发 bug。</li>
+<li><strong>Durable Execution 引擎（Temporal/Cadence）</strong>：✅ 代码即流程、崩溃自动恢复、内建重试超时；❌ workflow 代码<em>必须确定性</em>（不能直接 <code>now()</code>/<code>rand()</code>/读全局），有学习曲线和引擎运维成本。</li>
+<li><strong>托管 Step Functions（AWS）</strong>：✅ 全托管免运维；❌ 用 JSON/DSL 描述状态机，复杂逻辑表达力差，vendor lock-in。</li>
+</ul></div>
+<pre><code># 订单履约 workflow —— 看着同步，实际可跑数天、跨进程崩溃
+@workflow
+def fulfill_order(order):
+    pay = call(charge_payment, order)        # ① Activity = 真正的副作用
+    if not pay.ok: return "payment_failed"
+    call(reserve_inventory, order)           # ② 每步结果追加进 History
+    ship = call(create_shipment, order)
+    workflow.sleep(days=2)                    # ③ 持久定时器，不占线程
+    call(send_notification, order, ship)
+    return "done"
+# 崩溃后 worker 重放 History：已完成的 Activity 直接返回缓存结果，
+# 不重复扣款；只有尚未记录的那一步才真正执行。
+</code></pre>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Uber Cadence</strong>：Uber 内部为编排跨微服务长流程（司机激励结算、退款）自研，后开源；把「fault-tolerant stateful code」作为编程模型。</li>
+<li><strong>Temporal</strong>：Cadence 原班人马创立，durable execution 的代表；官方博客用「Beyond State Machines」阐述为何要取代手写状态机。</li>
+<li><strong>Netflix Conductor</strong>：Netflix 开源的编排引擎，用 JSON DSL 定义流程 + Web UI 可视化，编排媒体处理 pipeline。</li>
+<li><strong>AWS Step Functions</strong>：托管状态机，Amazon 内部大量用于订单/供应链的长流程编排。</li>
+</ul></div>
+
+<h3>2. 编排 vs 编舞（Orchestration vs Choreography）</h3>
+<p><strong>原理</strong>：跨服务的多步事务有两种协调风格。<em>编排（Orchestration）</em>：一个中央协调器（workflow）主动依次调用各参与者——「你扣款、你锁库存、你发货」，逻辑集中、可视、易补偿。<em>编舞（Choreography）</em>：没有中央大脑，每个服务处理完发一个事件，下一个服务订阅事件自行接力（订单已支付 → 库存服务监听 → 发库存已锁事件 → 物流监听）。</p>
+<div class="tradeoff">
+<strong>Trade-off：</strong>
+<ul>
+<li><strong>编排</strong>：✅ 流程一目了然、补偿顺序清晰、易加超时/重试；❌ 协调器成耦合中心，可能变「上帝服务」。</li>
+<li><strong>编舞</strong>：✅ 服务解耦、天然异步、无单点；❌ 全局流程「没人拥有」——散在各服务的事件订阅里，调试和改流程极痛，容易出<em>循环依赖</em>和<em>看不见的环</em>。</li>
+</ul>
+<p>经验法则：<strong>步骤 ≤ 3、语义松耦合走编舞；步骤多、要补偿要可视化，走编排</strong>。工作流引擎本质是把编排做成基础设施。</p>
+</div>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Chris Richardson / microservices.io</strong>：Saga 的两种实现（orchestration / choreography）权威对照，配 Eventuate Tram 参考实现。</li>
+<li><strong>Netflix Conductor</strong>：明确选编排——中央引擎持有流程定义，避免编舞的「流程逻辑散落」。</li>
+</ul></div>
+
+<h3>3. 补偿事务（Compensation）—— 没有回滚，只有「语义反做」</h3>
+<p><strong>原理</strong>：分布式下没有跨服务 ACID 回滚。Saga 把长事务拆成一串本地事务 T1…Tn，每个 Ti 配一个<strong>补偿事务</strong> Ci：一旦某步失败，就<em>逆序</em>执行已完成步骤的补偿（Cn-1…C1）。补偿不是回到原样的物理 rollback，而是<em>业务语义上的抵消</em>——扣了款就退款、锁了库存就释放、发了邮件就再发一封更正。这正是 1987 年 Garcia-Molina &amp; Salem 的 Sagas 论文奠定的模型。</p>
+<div class="tradeoff">
+<strong>Trade-off（前向 vs 后向恢复）：</strong>
+<ul>
+<li><strong>后向恢复（补偿回滚）</strong>：失败就把已做的撤销掉，回到「什么都没发生」。适合下单这种可整单取消的场景。</li>
+<li><strong>前向恢复（retry 到成功）</strong>：某些步骤不可撤销（钱已打给第三方、邮件已发），只能不断重试直到成功。所以设计上<em>把不可补偿的步骤尽量往后放</em>，一旦越过它就只能前向。</li>
+</ul></div>
+<pre><code>def saga(order):
+    done = []                              # 已成功步骤的补偿栈
+    try:
+        charge_payment(order);   done.append(refund_payment)
+        reserve_inventory(order);done.append(release_inventory)
+        create_shipment(order);  done.append(cancel_shipment)
+    except StepFailed:
+        for compensate in reversed(done):  # 逆序补偿（LIFO）
+            compensate(order)              # ⚠️ 必须幂等 + 可无限重试
+        raise
+</code></pre>
+<div class="callout"><strong>陷阱：</strong>补偿本身也会失败。补偿必须<em>幂等且能无限重试</em>，且不能再触发需要补偿的新副作用，否则补偿链会无限发散。真正做不了的补偿要落「人工介入」队列。</div>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Sagas 论文（SIGMOD 1987）</strong>：补偿事务 Ci 语义抵消 Ti 的原始定义，现代微服务 Saga 的理论源头。</li>
+<li><strong>支付/电商系统</strong>：下单失败退款、超卖时释放库存，都是典型后向补偿；对第三方已划款则转前向重试 + 对账兜底。</li>
+</ul></div>
+
+<h3>4. Activity 执行保证 —— at-least-once + 幂等 + 超时/心跳</h3>
+<p><strong>原理</strong>：workflow 本身靠重放做到「逻辑上 exactly-once」，但真正碰外部系统的 <em>Activity</em> 只能保证 <strong>at-least-once</strong>：引擎派发任务给 worker，若 worker 执行完但上报结果前崩了，引擎没收到 ACK,超时后会<em>重派</em>——于是同一次扣款可能被执行两次。唯一正解是<strong>让 Activity 幂等</strong>：用业务唯一键（订单号）做幂等键，下游据此去重。长任务还要定期 <em>heartbeat</em>，让引擎区分「慢」和「死」，避免误判超时。</p>
+<div class="tradeoff">
+<strong>Trade-off：</strong>投递语义与限流—— at-most-once（不重试，可能丢，不可接受）vs at-least-once（会重试，配幂等，业界默认）。所谓 exactly-once 不是不重复执行，而是<em>重复执行但只生效一次</em>（幂等键去重）。</div>
+<pre><code>// Activity 至少执行一次 → 业务侧必须幂等
+func ChargePayment(ctx, order) error {
+    key := "charge:" + order.ID          // 幂等键 = 业务唯一性
+    if seen(key) { return nil }          // 重试到达 → 短路返回
+    heartbeat(ctx)                       // 长任务定期心跳，防误判超时
+    charge(order.Amount, idemKey=key)    // 把幂等键透传给下游支付网关
+    return nil
+}
+</code></pre>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Temporal / Cadence Task Queue</strong>：worker long-poll 拉任务；Activity 超时未完成或未心跳则重试，官方要求 Activity 幂等。</li>
+<li><strong>Stripe</strong>：支付 API 用 <code>Idempotency-Key</code> 头，客户端重试同一 key 只扣一次——正是给上游 workflow 重试兜底的经典实现。</li>
+</ul></div>
+
+<h2>扩展与优化</h2>
+<ul>
+<li><strong>History 存储分片</strong>：workflow 数暴涨后，按 workflow_id 一致性哈希分片到多个 Cassandra/分库；单 workflow 的 History 别写太长（几万事件会拖慢重放），用 <em>Continue-As-New</em> 截断历史另起新 execution。</li>
+<li><strong>版本化难题</strong>：workflow 代码改了，在途的老 workflow 重放时新旧代码路径不一致会「非确定性」报错。用 <code>getVersion()</code> / patch 分支兼容老历史——这是长流程引擎最难的运维点。</li>
+<li><strong>Worker 扩缩</strong>：workflow task 与 activity task 分不同 queue、独立扩容；CPU 密集的 activity 单独隔离，别和轻量 workflow task 抢线程。</li>
+<li><strong>多区域</strong>：History 跨区复制做灾备（Cadence/Temporal 的 global namespace / XDC），故障切区后 workflow 从复制的历史继续。</li>
+</ul>
+
+<h2>常见陷阱 + 面试问题</h2>
+<div class="callout"><strong>1. 在 workflow 里直接 <code>time.now()</code> / <code>rand()</code> / 调 HTTP。</strong> 破坏确定性重放：重放时值变了，历史对不上直接报错。所有不确定操作都必须放进 Activity，或用引擎提供的确定性 API。</div>
+<div class="callout"><strong>2. 以为引擎给 exactly-once 就不用管幂等。</strong> Activity 是 at-least-once，副作用必须自己幂等去重，否则重试就是重复扣款。</div>
+<div class="callout"><strong>3. 把不可补偿的步骤放太靠前。</strong> 一旦执行了不可撤销的操作（钱打给第三方），后面失败就无法整单回滚，只能前向重试——排序上尽量把它放到最后。</div>
+<div class="callout"><strong>4. 面试常问：</strong>为什么微服务要避免分布式 2PC？（阻塞、协调者单点、锁资源久、参与者故障放大）Saga 用什么换什么？（放弃隔离性 I，换可用性——中间态对外可见，需业务容忍）。</div>
+<div class="callout"><strong>5. 面试常问：</strong>workflow 引擎怎么保证进程崩溃后不丢状态、不重复副作用？（答：event sourcing 持久化 + 确定性重放 + Activity 幂等键）。</div>
+
+<h2>深入资源</h2>
+<ul>
+<li><strong>《Designing Data-Intensive Applications》第 9 章 + 第 12 章</strong>（Kleppmann）：分布式事务、共识与「派生数据/端到端幂等」的本质讨论。</li>
+<li><strong>Sagas（Garcia-Molina &amp; Salem, ACM SIGMOD 1987）</strong>：长事务与补偿事务的理论原点，微服务 Saga 的鼻祖。</li>
+<li><strong>Temporal 博客 —《Beyond State Machines》</strong>：durable execution 为何取代手写状态机的第一手论述。</li>
+<li><strong>Netflix TechBlog —《Netflix Conductor: A microservices orchestrator》</strong>：编排引擎的工业级设计与取舍。</li>
+<li><strong>microservices.io — Saga 模式（Chris Richardson）</strong>：orchestration vs choreography 权威对照与实现指南。</li>
+</ul>
+
+<h2>深入思考（点击展开答案）</h2>
+
+<details>
+<summary>1. workflow 引擎号称崩溃后精确恢复，凭什么？如果 Activity「执行完了但上报结果前 worker 崩了」，会怎样？</summary>
+<div class="answer">
+<p><strong>凭 event sourcing + 重放</strong>：workflow 的推进过程被追加成不可变事件流持久化在 History。worker 崩溃后换台机器把 History 从头重放，走到已有结果的步骤直接返回缓存值，只有历史里没有的步骤才真正执行——所以 workflow 逻辑「exactly-once」。</p>
+<p><strong>但那个尴尬窗口是真实存在的</strong>：Activity 已经把款扣了，结果还没写进 History，worker 就崩了。引擎收不到完成事件，超时后<em>重派</em>这个 Activity → 第二次扣款。引擎层面无法消除，只能靠 <strong>Activity 幂等</strong>：用订单号做幂等键，下游支付网关认这个 key，第二次直接返回首次结果。这就是为什么「引擎给你 durable，但幂等得你自己保证」。</p>
+</div>
+</details>
+
+<details>
+<summary>2. 为什么 workflow 代码必须「确定性」？一个 <code>if random() &gt; 0.5</code> 会引发什么具体故障？</summary>
+<div class="answer">
+<p>恢复靠重放：把同一段 History 喂给 workflow 代码，必须每次都生成<em>完全相同的命令序列</em>（调度哪个 Activity、设哪个 Timer），才能和历史逐条对齐。</p>
+<p><code>if random()&gt;0.5</code> 第一次跑走了 A 分支（调度 Activity A，写进历史）；崩溃重放时 <code>random()</code> 又摇了一次，这次走 B 分支要调度 Activity B。引擎发现「代码想调度 B，但历史第 N 条是 A」——命令与历史<em>不匹配</em>，直接抛非确定性错误，workflow 卡死。所以随机、当前时间、读外部状态、并发 map 遍历顺序……全是雷区,必须挪进 Activity（其结果被持久化，重放时不再重算）。</p>
+</div>
+</details>
+
+<details>
+<summary>3. 都用工作流引擎了，为什么还需要 Saga / 补偿？两者是替代还是互补？</summary>
+<div class="answer">
+<p><strong>互补，不是替代。</strong> 引擎解决的是「流程状态怎么可靠地持久化和恢复」（durable execution）；Saga 解决的是「多步业务失败了语义上怎么回滚」（补偿）。引擎给了你一个可靠的地方去<em>编排</em> Saga——在 workflow 里顺序调用各步，用 try/except 捕获失败后逆序调用补偿 Activity。</p>
+<p>没有引擎你也能写 Saga（编舞式，靠事件），但补偿的状态、重试、超时又得自己持久化，绕回手写状态机的泥潭。所以「Temporal 里跑一个 Saga workflow」是当下最常见的组合：引擎负责 durable + retry，Saga 负责 business rollback 语义。</p>
+</div>
+</details>
+
+<details>
+<summary>4. 在途 workflow 有 500 万个还没结束，此时你要改 workflow 代码逻辑。会出什么事？怎么安全发布？</summary>
+<div class="answer">
+<p><strong>灾难场景</strong>：老 workflow 是按旧代码路径写入 History 的；新代码部署后，这些在途 workflow 被重放时走的是<em>新</em>路径，生成的命令和旧历史对不上 → 大面积非确定性报错、集体卡死。这是长流程引擎最凶的运维坑（流程活几天，代码却在天天发）。</p>
+<p><strong>安全做法</strong>：不能直接改分支，要<em>版本化兼容</em>。用引擎的 <code>getVersion()</code>/patch API：<code>v=getVersion("addStep", 1, 2); if v==1: 老逻辑 else: 新逻辑</code>。老 workflow 重放时拿到记录过的旧版本号走老路径，新启动的走新路径，两者在同一份代码里共存。等所有老 workflow 跑完，再摘掉旧分支。或者干脆<em>另起新 task queue / 新 workflow 类型</em>，让老流程在旧 worker 上自然消化完。</p>
+</div>
+</details>
+
+<details>
+<summary>5. 补偿事务失败了怎么办？「扣款成功、库存锁定、发货失败、要退款但退款接口也挂了」——设计这条兜底路径。</summary>
+<div class="answer">
+<p>补偿不是一次性 best-effort，它本身也是<em>可靠</em>的 Activity：配置<strong>无限重试 + 指数退避</strong>，因为退款接口大概率只是暂时不可用。引擎会持久地把这个补偿 Activity 挂在那儿一直重试，进程崩了也不丢——这正是用引擎跑 Saga 相比裸写的最大好处。</p>
+<p>但要防两件事：① 补偿必须<strong>幂等</strong>（退款接口带幂等键），否则重试可能退好几次；② 设<strong>重试上限 / deadline</strong>，超过后不再自动重试，而是把这单打进「人工介入」队列并告警，转人工对账退款。绝不能让一条补偿无限重试悄悄耗资源、也不能假装成功放过去——<em>宁可卡住等人，不可静默丢钱</em>。生产上还会配一条独立对账 job 兜底：每天扫「已扣款但最终未履约且未退款」的订单强制补退。</p>
+</div>
+</details>
+
+<div class="nav"><a href="index.html">← 回到 index</a></div>
+</div>
+</body></html>
