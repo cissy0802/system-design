@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 40 · 特征平台与 ML 基础设施 — System Design</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"SF Pro Display","Noto Sans SC",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
+.container{max-width:820px;margin:0 auto;padding:24px 20px 60px}
+header{padding:40px 0 28px;border-bottom:1px solid rgba(100,200,255,0.15);margin-bottom:32px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem}
+.tag{padding:3px 10px;border-radius:4px;background:rgba(100,200,255,0.12);color:#64c8ff;border:1px solid rgba(100,200,255,0.25)}
+.tag.diff{background:rgba(94,234,212,0.1);color:#5eead4;border-color:rgba(94,234,212,0.3)}
+.tag.day{background:rgba(255,180,80,0.1);color:#ffb450;border-color:rgba(255,180,80,0.25)}
+h1{font-size:1.75rem;font-weight:800;background:linear-gradient(135deg,#64c8ff 0%,#5eead4 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:0.5px;line-height:1.3}
+h1 .en{display:block;font-size:1rem;color:#7a8590;-webkit-text-fill-color:#7a8590;margin-top:6px;font-weight:500}
+h2{font-size:1.2rem;color:#5eead4;margin:36px 0 14px;padding-left:12px;border-left:3px solid #5eead4}
+h3{font-size:1rem;color:#64c8ff;margin:20px 0 10px;font-weight:600}
+p{margin:10px 0;color:#c8cfd6}
+ul,ol{margin:10px 0 10px 22px;color:#c8cfd6}
+li{margin:6px 0}
+strong{color:#e8eef5;font-weight:600}
+em{color:#5eead4;font-style:normal;font-weight:500}
+code{font-family:"SF Mono",Menlo,Consolas,monospace;background:rgba(100,200,255,0.1);color:#5eead4;padding:1px 6px;border-radius:3px;font-size:0.88em}
+pre{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:14px 16px;overflow-x:auto;margin:12px 0;font-family:"SF Mono",Menlo,Consolas,monospace;font-size:0.84rem;line-height:1.55;color:#c8cfd6}
+pre code{background:none;color:inherit;padding:0;font-size:1em}
+.mermaid{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:18px;margin:14px 0;text-align:center;overflow-x:auto;cursor:zoom-in;transition:border-color 0.15s}
+.mermaid:hover{border-color:rgba(100,200,255,0.4)}
+.mermaid svg{width:100%;max-width:100%;height:auto;min-height:280px}
+.lightbox{position:fixed;inset:0;background:rgba(8,12,18,0.96);z-index:9999;display:none;align-items:center;justify-content:center;padding:24px;cursor:grab;backdrop-filter:blur(4px);overflow:hidden}
+.lightbox.open{display:flex}
+.lightbox.dragging{cursor:grabbing}
+.lightbox svg{width:auto;height:auto;max-width:96vw;max-height:92vh;transform-origin:center center;will-change:transform}
+.lightbox .hint{position:fixed;top:16px;right:20px;font-size:0.78rem;color:#7a8590;font-family:"SF Mono",Menlo,monospace;pointer-events:none}
+.callout{background:rgba(255,180,80,0.06);border-left:3px solid #ffb450;padding:12px 14px;margin:14px 0;border-radius:4px;font-size:0.94rem}
+.callout strong{color:#ffb450}
+.tradeoff{background:rgba(100,200,255,0.05);border:1px solid rgba(100,200,255,0.2);border-radius:6px;padding:12px 14px;margin:12px 0;font-size:0.94rem}
+.case{background:rgba(94,234,212,0.05);border-left:3px solid #5eead4;padding:12px 14px;margin:12px 0;border-radius:4px;font-size:0.94rem}
+.case strong{color:#5eead4}
+.nav{margin-top:50px;padding-top:24px;border-top:1px solid rgba(100,200,255,0.15);text-align:center}
+.nav a{color:#64c8ff;text-decoration:none;font-size:0.92rem;padding:8px 16px;border:1px solid rgba(100,200,255,0.3);border-radius:4px;transition:all 0.15s}
+.nav a:hover{background:rgba(100,200,255,0.1)}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:0.9rem}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid rgba(100,200,255,0.15)}
+th{color:#64c8ff;font-weight:600;background:rgba(100,200,255,0.05)}
+details{background:rgba(100,200,255,0.04);border:1px solid rgba(100,200,255,0.18);border-radius:6px;padding:12px 16px;margin:10px 0;transition:all 0.15s}
+details:hover{border-color:rgba(100,200,255,0.35)}
+details[open]{background:rgba(94,234,212,0.05);border-color:rgba(94,234,212,0.3)}
+details summary{font-weight:600;color:#e8eef5;list-style:none;outline:none;cursor:pointer;display:flex;align-items:flex-start;gap:10px;font-size:0.96rem}
+details summary::-webkit-details-marker{display:none}
+details summary::before{content:'▶';color:#64c8ff;font-size:0.75em;transition:transform 0.2s;flex-shrink:0;margin-top:5px}
+details[open] summary::before{transform:rotate(90deg);color:#5eead4}
+details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
+details .answer ul,details .answer ol{margin:6px 0 6px 22px}
+@media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+</style>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({startOnLoad:true,theme:'base',flowchart:{useMaxWidth:true,htmlLabels:true,nodeSpacing:50,rankSpacing:60},themeVariables:{primaryColor:'#1a2530',primaryTextColor:'#e8eef5',primaryBorderColor:'#64c8ff',lineColor:'#5eead4',secondaryColor:'#0e1419',tertiaryColor:'#0a0f14',background:'#0a0f14',mainBkg:'#1a2530',secondBkg:'#0e1419',textColor:'#d4dae0',fontFamily:'-apple-system,"SF Pro Display",sans-serif',fontSize:'16px'}});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const lb=document.createElement('div');lb.className='lightbox';
+  lb.innerHTML='<span class="hint">scroll = zoom · drag = pan · Esc / click bg = close</span>';
+  document.body.appendChild(lb);
+  let scale=1,panX=0,panY=0,dragging=false,moved=false,lx=0,ly=0;
+  const apply=()=>{const s=lb.querySelector('svg');if(s)s.style.transform=`translate(${panX}px,${panY}px) scale(${scale})`};
+  const reset=()=>{scale=1;panX=0;panY=0};
+  const close=()=>{lb.classList.remove('open');const s=lb.querySelector('svg');if(s)s.remove();reset()};
+  document.addEventListener('click',e=>{
+    if(e.target.closest('.lightbox')){if(moved){moved=false;return}close();return}
+    const w=e.target.closest('.mermaid');if(!w)return;
+    const svg=w.querySelector('svg');if(!svg)return;
+    const c=svg.cloneNode(true);c.removeAttribute('style');
+    c.style.maxWidth='96vw';c.style.maxHeight='92vh';
+    lb.appendChild(c);lb.classList.add('open');reset();apply();
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+  lb.addEventListener('wheel',e=>{
+    if(!lb.classList.contains('open'))return;
+    e.preventDefault();
+    const svg=lb.querySelector('svg');if(!svg)return;
+    const ns=Math.max(0.3,Math.min(10,scale*(1-e.deltaY*0.002)));
+    const r=svg.getBoundingClientRect();
+    const cx=e.clientX-(r.left+r.width/2),cy=e.clientY-(r.top+r.height/2);
+    const k=ns/scale-1;panX-=cx*k;panY-=cy*k;scale=ns;apply();
+  },{passive:false});
+  lb.addEventListener('mousedown',e=>{
+    if(!lb.classList.contains('open'))return;
+    dragging=true;moved=false;lx=e.clientX;ly=e.clientY;lb.classList.add('dragging');e.preventDefault();
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    const dx=e.clientX-lx,dy=e.clientY-ly;
+    if(Math.abs(dx)+Math.abs(dy)>3)moved=true;
+    panX+=dx;panY+=dy;lx=e.clientX;ly=e.clientY;apply();
+  });
+  document.addEventListener('mouseup',()=>{dragging=false;lb.classList.remove('dragging')});
+});
+</script>
+</head><body><div class="container">
+
+<header>
+<div class="meta">
+<span class="tag day">Day 40</span>
+<span class="tag diff">Hard</span>
+<span class="tag">ML Infra</span>
+<span class="tag">Feature Store</span>
+<span class="tag">Serving Skew</span>
+<span class="tag">A/B</span>
+</div>
+<h1>特征平台与 ML 基础设施 — 训练与推理共用一份特征的工程学<span class="en">Feature Platform & ML Infra: Dual Store, Point-in-Time Correctness, Model Serving, Experimentation</span></h1>
+</header>
+
+<h2>问题场景 + 需求约束</h2>
+<p>设计一个支撑<strong>外卖/风控级别</strong>的特征平台：100+ 模型（配送 ETA、门店排序、欺诈识别）共用一套特征，在线推理峰值 <strong>1000 万次特征读/秒</strong>、单次预测要取 200 个特征、<strong>p99 &lt; 10ms</strong>；同时离线要能为几十亿样本回溯出「当时那一刻」的特征做训练。这就是 DoorDash、Uber 真实的量级。</p>
+<p>核心矛盾：<em>训练用离线批处理（吞吐优先），推理用在线低延迟（延迟优先），但两边必须是同一个特征值</em>——否则模型线下 AUC 0.85、线上掉到 0.79，这就是臭名昭著的 <strong>training-serving skew</strong>。平台要解决三件事：<em>存哪、怎么保证一致、怎么服务与验证</em>。</p>
+<ul>
+<li><strong>特征新鲜度</strong>：账户余额类特征要秒级，用户 30 天累计消费可以小时级——不同新鲜度不同代价。</li>
+<li><strong>读写比</strong>：DoorDash 公开过其在线特征「写只占读的 0.1%」，是极端读多写少，决定了选 Redis/KV 而非通用 DB。</li>
+<li><strong>point-in-time 正确</strong>：训练标签在 T 时刻产生，特征只能用 T 之前的值，否则<em>标签泄漏</em>。</li>
+<li><strong>可复用/可发现</strong>：Uber Palette 托管 2 万+ 特征供全公司复用，避免每个团队重复造轮子。</li>
+</ul>
+
+<h2>高层架构</h2>
+<pre class="mermaid">
+graph LR
+    SRC["数据源<br/><i>事件流 / 数仓 / DB CDC</i>"]
+    subgraph 计算层
+      BATCH["批计算<br/><i>Spark / SQL</i>"]
+      STREAM["流计算<br/><i>Flink</i>"]
+    end
+    REG["特征注册表<br/><i>定义 + 版本 + 血缘</i>"]
+    OFF[("离线 Store<br/>Parquet / 数仓")]
+    ON[("在线 Store<br/>Redis / DynamoDB")]
+    TRAIN["训练<br/><i>PIT join 取样本</i>"]
+    SERVE["模型服务<br/><i>取特征 + 推理</i>"]
+
+    SRC --> BATCH & STREAM
+    REG -.约束定义.-> BATCH & STREAM
+    BATCH --> OFF
+    BATCH -->|物化 materialize| ON
+    STREAM --> ON
+    OFF --> TRAIN
+    ON --> SERVE
+
+    classDef src fill:#1a2530,stroke:#64c8ff,color:#e8eef5
+    classDef comp fill:#0e2030,stroke:#5eead4,color:#e8eef5
+    classDef store fill:#2a1530,stroke:#ff7ab6,color:#e8eef5
+    classDef sink fill:#1a1a30,stroke:#ffb450,color:#e8eef5
+    class SRC src
+    class BATCH,STREAM,REG comp
+    class OFF,ON store
+    class TRAIN,SERVE sink
+</pre>
+<p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">同一份特征定义（注册表）驱动批与流两条管道，分别落离线/在线两个 Store，喂给训练与推理</p>
+<p><strong>组件职责</strong>：<em>注册表</em>是唯一真相源，声明特征的实体键、类型、转换逻辑与新鲜度 SLA；<em>批计算</em>做重回溯与 T+1 特征、<em>流计算</em>做秒级新鲜特征；<em>离线 Store</em>按时间分区保留全历史（供 point-in-time 取数），<em>在线 Store</em>只存每个实体的<em>最新</em>值（供毫秒读）。这就是业界共识的<strong>双 Store（dual-store）</strong>架构。</p>
+
+<h2>关键技术点</h2>
+
+<h3>1. 双 Store：离线仓库 vs 在线 KV，一个定义两处物化</h3>
+<p><strong>原理</strong>：训练要「几十亿样本 × 每样本回溯历史特征」，是<em>吞吐型全表扫描</em>，天然属列存数仓（Parquet/Iceberg，按 <code>event_ts</code> 分区）。推理要「给定一个用户，10ms 内取 200 个特征」，是<em>点查型随机读</em>，天然属内存 KV。同一个特征在两个引擎各物化一份，靠注册表保证语义一致。</p>
+<div class="tradeoff">
+<strong>Trade-off（在线 Store 选型）：</strong>
+<ul>
+<li><strong>Redis</strong>：✅ 亚毫秒、pipeline 批量取、数据结构丰富；❌ 内存贵、持久化弱（是 cache 不是真相源）。DoorDash 基准测试后选它。</li>
+<li><strong>DynamoDB / Cassandra</strong>：✅ 海量持久化、按 key 水平扩展；❌ p99 比 Redis 高（个位数 ms 起）、成本随读放大。</li>
+<li><strong>单 Store（只用一个引擎兼顾两边）</strong>：✅ 无一致性问题；❌ 不存在这样的引擎——要么训练扫描慢如龟，要么在线点查扛不住 QPS。所以双 Store 是<em>被迫的正确</em>。</li>
+</ul></div>
+<pre><code># 在线取数：一次 pipeline 批量拉 200 个特征键，避免 200 次 RTT
+def fetch_online(entity_ids, feature_names):
+    keys = [f"{fn}:{eid}" for eid in entity_ids for fn in feature_names]
+    vals = redis.mget(keys)          # 单次往返，200 键 ~1ms
+    return assemble(entity_ids, feature_names, vals)
+
+# 物化 materialization：批管道把最新值刷进在线 Store
+# 只写「每实体最新」，不保留历史 → 在线 Store 体积可控
+</code></pre>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>DoorDash</strong>：<a href="https://doordash.engineering/2020/11/19/building-a-gigascale-ml-feature-store-with-redis/">Gigascale Feature Store with Redis</a>——用 YCSB 基准选定 Redis，扛数十亿特征值、千万级 QPS，写仅占读 0.1%，还做了 protobuf 压缩省内存。</li>
+<li><strong>Uber Michelangelo Palette</strong>：<a href="https://www.uber.com/blog/palette-meta-store-journey/">Palette Meta Store</a>——离线用 Hive、在线用 Cassandra，托管 2 万+ 特征全公司复用。</li>
+<li><strong>Feast（开源）</strong>：把「离线 Store + 在线 Store + 注册表」抽象成标准接口，离线可接 BigQuery/Snowflake，在线可接 Redis/DynamoDB。</li>
+</ul></div>
+
+<h3>2. Point-in-Time 正确性：杜绝标签泄漏的核心机制</h3>
+<p><strong>原理</strong>：训练样本是「(实体, 标签时刻 T, 标签)」，为它拼特征时，<em>只能用 event_ts ≤ T 的最新特征值</em>。若图省事直接 join 特征表的当前值，就把「未来」信息喂给了模型——线下指标虚高、线上崩盘。正确做法是 <strong>point-in-time join（as-of join）</strong>：对每个样本按实体键找「T 之前最近一条」特征。</p>
+<div class="tradeoff">
+<strong>Trade-off（保证一致的两条路线）：</strong>
+<ul>
+<li><strong>Log-and-wait（记录并等待）</strong>：在线推理时把实际用到的特征值<em>原样打日志</em>，训练直接用这份日志。✅ 训练=推理，零 skew；❌ 新特征要等积累足够日志才能训练（冷启动慢）。</li>
+<li><strong>Backfill（离线回溯）</strong>：用批管道重算历史特征做 PIT join。✅ 新特征立刻可训练；❌ 回溯逻辑必须和在线逐位一致，稍有偏差就引入 skew。</li>
+<li><strong>共享转换代码</strong>：无论哪条路，特征转换必须<em>同一份代码/DSL</em> 跑在批与流两侧，而非「Python 训练版 + Java 线上版」两套实现——这是 skew 的头号来源。</li>
+</ul></div>
+<pre><code># Point-in-time join 伪代码（as-of join，防标签泄漏）
+# labels: (entity_id, label_ts, y)   features: (entity_id, event_ts, value)
+for row in labels:
+    cand = features[entity_id == row.entity_id
+                    and event_ts &lt;= row.label_ts]   # 严格 ≤ 标签时刻
+    row.feature = cand.sort_by(event_ts).last()      # 取当时最新的一条
+# 引擎实现：Spark 按 entity_id 分区 + event_ts 排序做 merge as-of join
+</code></pre>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Google（Rules of ML）</strong>：<a href="https://developers.google.com/machine-learning/guides/rules-of-ml">Rules of Machine Learning</a>（Martin Zinkevich）专门有一节讲 training-serving skew，给出的头号解法就是「把服务时的特征打日志、训练复用这份日志」+「训练与服务复用同一段代码」。</li>
+<li><strong>Airbnb Chronon</strong>：<a href="https://medium.com/airbnb-engineering/chronon-airbnbs-ml-feature-platform-is-now-open-source-d9c4dba859e8">Chronon（前身 Zipline）</a>——用一份特征定义同时生成批与流管道，内建 point-in-time correct 的回溯，正是为消除 skew 而生。</li>
+</ul></div>
+
+<h3>3. 模型服务：特征拉取 + 推理的延迟预算切分</h3>
+<p><strong>原理</strong>：一次线上预测的 p99 预算（如 30ms）要在「取特征 + 前处理 + 模型前向 + 后处理」间分配。经验上<em>取特征常占一半以上延迟</em>——200 个特征散在多个实体、多个 Store。优化点：批量 pipeline 取数、把同请求的特征并发拉取、对高频实体做本地 L1 缓存。</p>
+<div class="tradeoff">
+<strong>Trade-off（服务形态）：</strong>
+<ul>
+<li><strong>在线实时推理</strong>：请求到来时现取特征 + 现算模型。✅ 新鲜、灵活；❌ 延迟敏感，重模型（大树/深网）扛不住高 QPS。</li>
+<li><strong>预计算 + 查表</strong>：离线把 (用户×候选) 的分数算好写 KV，线上只查表。✅ 极低延迟；❌ 组合爆炸、无法用请求上下文特征（如「此刻位置」）。</li>
+<li><strong>专用推理服务</strong>（TF Serving / Triton / KServe）：把模型独立成服务、支持动态 batching 与 GPU。✅ 吞吐高、解耦；❌ 多一跳网络，与特征取数要协同编排。</li>
+</ul></div>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>DoorDash</strong>：在<a href="https://careersatdoordash.com/blog/how-we-applied-client-side-caching/">客户端缓存</a>一文里，给特征读加了进程内缓存，性能提升约 70%——热实体（热门门店）本地命中，Redis 压力骤降。</li>
+<li><strong>Uber Michelangelo</strong>：把在线特征（Cassandra 实时 + 预计算 batch）与模型服务统一编排，配送 ETA 等模型全走这套。</li>
+</ul></div>
+
+<h3>4. A/B 实验平台：让「模型上线」变成可度量的因果实验</h3>
+<p><strong>原理</strong>：新模型不能因线下 AUC 涨就上线——线下指标和业务指标（下单率、GMV）常背离。要用<em>随机分流的在线实验</em>建立因果：一致性哈希把用户稳定分到 control/treatment，跑够样本量后比较业务指标的统计显著性，同时盯 <strong>guardrail 指标</strong>（延迟、错误率、退款率）防止「主指标涨、副作用炸」。</p>
+<div class="tradeoff">
+<strong>Trade-off（关键设计点）：</strong>
+<ul>
+<li><strong>分流粒度</strong>：按用户 hash（稳定、防同一用户忽 A 忽 B）vs 按请求（样本多但有干扰）。推荐系统几乎都按用户/会话。</li>
+<li><strong>样本量 vs 速度</strong>：效应量越小需要样本越多（平方反比），要么等更久、要么用 CUPED 之类方差削减技术加速。</li>
+<li><strong>网络效应</strong>：双边市场（外卖骑手/商家）里 treatment 会挤占 control 的资源，破坏独立性——要用<em>区域/时间切换实验</em>而非用户随机。</li>
+</ul></div>
+<pre><code># 稳定分桶：同一 user 永远落同一组（可复现、无闪烁）
+def bucket(user_id, exp_key, treat_ratio=0.5):
+    h = hash_u64(f"{exp_key}:{user_id}")   # 加实验名做盐，各实验独立正交
+    return "treatment" if (h % 10000) / 10000 &lt; treat_ratio else "control"
+</code></pre>
+<div class="case">
+<strong>现实案例：</strong> Netflix、Uber、Airbnb 均自建实验平台，核心都是「稳定分桶 + guardrail 指标 + 方差削减」。Airbnb 的 Chronon 特征定义可直接被实验消费，做到「新特征→上模型→A/B」闭环。</div>
+
+<h2>扩展与优化</h2>
+<ul>
+<li><strong>特征新鲜度分级</strong>：秒级走 Flink 流、分钟级走微批、天级走 Spark T+1，按业务价值分配算力，别一刀切实时（成本爆炸）。</li>
+<li><strong>特征监控与漂移检测</strong>：对每个特征持续统计分布，线上分布 vs 训练分布漂移了就告警——skew 常是「无声」发生的。</li>
+<li><strong>成本治理</strong>：在线 Store 内存最贵，用 protobuf/量化压缩、TTL 淘汰冷实体、只物化真被模型引用的特征（靠血缘剪枝）。</li>
+<li><strong>embedding 特征</strong>：向量类特征（用户/物品 embedding）单独走向量存储，与标量特征分层管理。</li>
+</ul>
+
+<h2>常见陷阱 + 面试问题</h2>
+<div class="callout"><strong>1. 训练用当前值 join 特征表</strong>：最经典的标签泄漏。必须 point-in-time join，用 <code>event_ts ≤ label_ts</code> 严格约束。</div>
+<div class="callout"><strong>2. 训练与服务两套转换代码</strong>：Python 版和 Java 版对同一特征算出不同值 = skew。共享一份定义/DSL 是根治之道。</div>
+<div class="callout"><strong>3. 把在线 Store 当真相源</strong>：Redis 宕机 RPO 有损，它是最新值的缓存，历史与真相在离线 Store 与数仓。</div>
+<div class="callout"><strong>4. A/B 无 guardrail</strong>：只看主指标涨就全量，结果延迟翻倍、退款率飙升。必须同时监控副作用指标。</div>
+<ul>
+<li>为什么需要双 Store？能不能用一个引擎同时服务训练与推理？各自瓶颈在哪？</li>
+<li>解释 training-serving skew 的三种成因，各给一个修法。</li>
+<li>一次预测要取 200 个特征、p99 &lt; 10ms，你怎么切分延迟预算、怎么优化取数？</li>
+<li>双边市场（外卖）里普通用户随机 A/B 为什么会失效？换什么实验设计？</li>
+<li>热实体（顶流门店）特征 QPS 单点过高，怎么扛？（联想 Day 2 缓存热 key）</li>
+</ul>
+
+<h2>深入资源</h2>
+<ul>
+<li><strong>DoorDash</strong>：<a href="https://doordash.engineering/2020/11/19/building-a-gigascale-ml-feature-store-with-redis/">Building a Gigascale ML Feature Store with Redis</a>——在线 Store 选型与压缩实战。</li>
+<li><strong>Uber</strong>：<a href="https://www.uber.com/blog/palette-meta-store-journey/">Michelangelo Palette Meta Store Journey</a>——特征注册、复用与元数据。</li>
+<li><strong>Airbnb</strong>：<a href="https://medium.com/airbnb-engineering/chronon-airbnbs-ml-feature-platform-is-now-open-source-d9c4dba859e8">Chronon: Airbnb's ML Feature Platform (Open Source)</a>——一份定义生成批/流管道 + PIT 回溯。</li>
+<li><strong>Google</strong>：<a href="https://developers.google.com/machine-learning/guides/rules-of-ml">Rules of Machine Learning</a>（Zinkevich）——training-serving skew 的权威论述。</li>
+<li><strong>《Designing Data-Intensive Applications》</strong>（Kleppmann）：批处理/流处理与派生数据章节，是理解双 Store 物化的基础。</li>
+</ul>
+
+<h2>深入思考（点击展开答案）</h2>
+
+<details>
+<summary>1. 一个特征在离线算出来是 3.7，在线算出来是 3.5，模型没报错但线上效果掉了 5%。你怎么系统性地定位并根治这类「无声 skew」？</summary>
+<div class="answer">
+<p><strong>定位分三层</strong>：</p>
+<ul>
+<li><strong>数据层</strong>：对同一批 (实体, 时刻) 分别从离线 PIT 取数和在线打日志取数，逐特征对比分布与逐条差值，找出偏差最大的特征。</li>
+<li><strong>逻辑层</strong>：偏差大的特征，检查批与流是否用了两套实现（如时间窗口口径不同：离线 <code>[T-7d, T)</code> 左闭右开，在线不小心含了当前事件）、类型/精度（float32 vs float64）、缺失值填充策略不一致。</li>
+<li><strong>时间层</strong>：在线特征可能有<em>物化延迟</em>——训练用了 T 时刻的值，但线上此刻 Store 里还是 T-5min 的旧值，等价于隐性 skew。</li>
+</ul>
+<p><strong>根治</strong>：① 特征转换用<em>同一份代码/DSL</em>（Chronon 思路），杜绝双实现；② 生产落地<em>持续 skew 监控</em>——每天抽样对比在线日志 vs 离线回溯，超阈值告警；③ 新特征优先用 log-and-wait，让训练数据天生等于服务数据。Google Rules of ML 的核心建议正是「log serving features，train on them」。</p>
+</div>
+</details>
+
+<details>
+<summary>2. 为什么不能用一个统一的存储引擎同时满足训练的全表扫描和推理的毫秒点查？从存储物理层解释这个「被迫双 Store」。</summary>
+<div class="answer">
+<p>本质是<strong>访问模式对存储布局的要求相互冲突</strong>：</p>
+<ul>
+<li><strong>训练</strong>：几十亿行 × 少数列的顺序扫描 + as-of join。最优布局是<em>列存 + 按时间分区</em>（Parquet/Iceberg），压缩比高、只读需要的列、按分区裁剪。但它<em>点查一行极慢</em>（要扫 row group）。</li>
+<li><strong>推理</strong>：给一个 key 取一行的多个字段，要 O(1) 随机读。最优是<em>内存哈希表/LSM 点查</em>（Redis/KV），但它<em>全表扫描</em>要遍历全部 key，且只存最新值、无历史。</li>
+</ul>
+<p>列存扫描友好但点查慢，KV 点查友好但扫描/历史差——没有单一引擎能同时把两条曲线都压到最优。所以工程上把同一份特征<em>物化两份</em>：历史全量进列存供训练，最新快照进 KV 供推理，代价是要维护两者的一致性（正是双 Store 架构存在的理由）。这和 Day 20 讲的「同一份数据派生多种存储视图」是同一个思想。</p>
+</div>
+</details>
+
+<details>
+<summary>3. 双边市场（外卖：用户/骑手/商家）里，把「新的骑手调度模型」按用户随机分 A/B 会得到偏乐观还是偏悲观的结论？为什么？该换什么实验设计？</summary>
+<div class="answer">
+<p><strong>通常偏乐观（高估收益）</strong>。因为 treatment 与 control 用户<em>共享同一个骑手池</em>：新模型如果把骑手更高效地调给 treatment 用户，等于从 control 用户那里「抢」了运力，人为拉大了两组差距——你测到的不是「新模型的绝对收益」，而是「treatment 挤占 control 后的相对差」。全量上线后大家都在同一池子里，收益会缩水甚至消失（SUTVA 假设被违反）。</p>
+<p><strong>换设计</strong>：用<em>切换实验（switchback / 区域-时间随机）</em>——按「城市 × 时间片」为单位整体切 control/treatment，让同一时空里所有人用同一策略，供需关系闭合在实验单元内，消除跨组干扰。代价是实验单元变少、方差变大、需要更长周期，且要处理时间自相关。Uber/DoorDash 的调度类实验普遍用 switchback。</p>
+</div>
+</details>
+
+<details>
+<summary>4. 在线 Store 里某顶流门店的特征被 QPS 100 万单点打爆（联想 Day 2 的热 key）。特征平台场景下，哪些缓解手段可用、哪些不可用，为什么？</summary>
+<div class="answer">
+<p>先套用 Day 2 的热 key 工具箱，再按特征场景筛：</p>
+<ul>
+<li><strong>✅ app 进程内 L1 缓存</strong>：最有效。特征在一个推理周期内基本不变，本地缓存 TTL 几秒即可把 Redis 压力降几个数量级——DoorDash 客户端缓存正是此法，提升约 70%。</li>
+<li><strong>✅ 多副本读</strong>：热特征复制到多个 Redis 节点分摊读。特征读多写少，副本 lag 影响小，很适用。</li>
+<li><strong>⚠️ Key 分片（拆成 N 个子 key 求和）</strong>：只对<em>可累加</em>的计数型特征成立（如「门店今日订单数」）；对 embedding、比率类特征无法拆合，不可用。</li>
+<li><strong>✅ 请求内去重/合并</strong>：同一请求批里多个候选都引用同一门店特征时，只取一次。</li>
+<li><strong>❌ 直接调大 TTL 换新鲜度</strong>：风控/调度特征对新鲜度敏感，牺牲新鲜度换命中率可能直接损害模型效果，要按特征的新鲜度 SLA 分别定策略。</li>
+</ul>
+<p>实战组合：本地 L1（吸收绝大部分读）+ 热特征多副本（兜底），且缓存 TTL 严格对齐该特征的新鲜度要求。</p>
+</div>
+</details>
+
+<details>
+<summary>5. 团队想「立刻」用一个全新特征训练模型，但它在线上还没积累任何日志。log-and-wait 与 backfill 两条路你怎么选？各自的隐藏风险是什么？</summary>
+<div class="answer">
+<p><strong>想立刻训练 → 只能 backfill</strong>（log-and-wait 要等日志积累，快则数天慢则数周）。但 backfill 的隐藏风险是<em>「历史无法完美重建」</em>：</p>
+<ul>
+<li><strong>数据不可回溯</strong>：若该特征依赖某个只存最新值、不留历史的上游（如某维度表被原地覆盖），你根本无法算出「三个月前那一刻」的值，回溯出来的是被污染的近似。</li>
+<li><strong>回溯逻辑 ≠ 在线逻辑</strong>：backfill 用批代码重算，一旦和未来的在线流代码有口径差异，训练出的模型上线即 skew。</li>
+<li><strong>幸存者/时点偏差</strong>：回溯常用「现在还存在的实体」，把已流失用户漏掉，样本分布偏移。</li>
+</ul>
+<p><strong>务实策略</strong>：先 backfill 快速验证特征是否有信号（离线跑通、看重要性），<em>同时立刻开启在线打日志</em>；一旦日志够了，切换到 log-and-wait 训练做「正式版」，用它对齐线上真实分布。即<em>backfill 探路、log-and-wait 定稿</em>。切忌用 backfill 版直接长期迭代——skew 会悄悄累积。</p>
+</div>
+</details>
+
+<div class="nav"><a href="index.html">← 回到 index</a></div>
+</div>
+</body></html>
