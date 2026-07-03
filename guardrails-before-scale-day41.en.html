@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 41 · Failure Faster Than Humans — System Design</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"SF Pro Display","Noto Sans SC",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
+.container{max-width:820px;margin:0 auto;padding:24px 20px 60px}
+header{padding:40px 0 28px;border-bottom:1px solid rgba(100,200,255,0.15);margin-bottom:32px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem}
+.tag{padding:3px 10px;border-radius:4px;background:rgba(100,200,255,0.12);color:#64c8ff;border:1px solid rgba(100,200,255,0.25)}
+.tag.diff{background:rgba(94,234,212,0.1);color:#5eead4;border-color:rgba(94,234,212,0.3)}
+.tag.day{background:rgba(255,180,80,0.1);color:#ffb450;border-color:rgba(255,180,80,0.25)}
+h1{font-size:1.75rem;font-weight:800;background:linear-gradient(135deg,#64c8ff 0%,#5eead4 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:0.5px;line-height:1.3}
+h1 .en{display:block;font-size:1rem;color:#7a8590;-webkit-text-fill-color:#7a8590;margin-top:6px;font-weight:500}
+h2{font-size:1.2rem;color:#5eead4;margin:36px 0 14px;padding-left:12px;border-left:3px solid #5eead4}
+h3{font-size:1rem;color:#64c8ff;margin:20px 0 10px;font-weight:600}
+p{margin:10px 0;color:#c8cfd6}
+ul,ol{margin:10px 0 10px 22px;color:#c8cfd6}
+li{margin:6px 0}
+strong{color:#e8eef5;font-weight:600}
+em{color:#5eead4;font-style:normal;font-weight:500}
+code{font-family:"SF Mono",Menlo,Consolas,monospace;background:rgba(100,200,255,0.1);color:#5eead4;padding:1px 6px;border-radius:3px;font-size:0.88em}
+pre{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:14px 16px;overflow-x:auto;margin:12px 0;font-family:"SF Mono",Menlo,Consolas,monospace;font-size:0.84rem;line-height:1.55;color:#c8cfd6}
+pre code{background:none;color:inherit;padding:0;font-size:1em}
+.mermaid{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:18px;margin:14px 0;text-align:center;overflow-x:auto;cursor:zoom-in;transition:border-color 0.15s}
+.mermaid:hover{border-color:rgba(100,200,255,0.4)}
+.mermaid svg{width:100%;max-width:100%;height:auto;min-height:280px}
+.lightbox{position:fixed;inset:0;background:rgba(8,12,18,0.96);z-index:9999;display:none;align-items:center;justify-content:center;padding:24px;cursor:grab;backdrop-filter:blur(4px);overflow:hidden}
+.lightbox.open{display:flex}
+.lightbox.dragging{cursor:grabbing}
+.lightbox svg{width:auto;height:auto;max-width:96vw;max-height:92vh;transform-origin:center center;will-change:transform}
+.lightbox .hint{position:fixed;top:16px;right:20px;font-size:0.78rem;color:#7a8590;font-family:"SF Mono",Menlo,monospace;pointer-events:none}
+.callout{background:rgba(255,180,80,0.06);border-left:3px solid #ffb450;padding:12px 14px;margin:14px 0;border-radius:4px;font-size:0.94rem}
+.callout strong{color:#ffb450}
+.tradeoff{background:rgba(100,200,255,0.05);border:1px solid rgba(100,200,255,0.2);border-radius:6px;padding:12px 14px;margin:12px 0;font-size:0.94rem}
+.case{background:rgba(94,234,212,0.05);border-left:3px solid #5eead4;padding:12px 14px;margin:12px 0;border-radius:4px;font-size:0.94rem}
+.case strong{color:#5eead4}
+.nav{margin-top:50px;padding-top:24px;border-top:1px solid rgba(100,200,255,0.15);text-align:center}
+.nav a{color:#64c8ff;text-decoration:none;font-size:0.92rem;padding:8px 16px;border:1px solid rgba(100,200,255,0.3);border-radius:4px;transition:all 0.15s}
+.nav a:hover{background:rgba(100,200,255,0.1)}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:0.9rem}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid rgba(100,200,255,0.15)}
+th{color:#64c8ff;font-weight:600;background:rgba(100,200,255,0.05)}
+details{background:rgba(100,200,255,0.04);border:1px solid rgba(100,200,255,0.18);border-radius:6px;padding:12px 16px;margin:10px 0;transition:all 0.15s}
+details:hover{border-color:rgba(100,200,255,0.35)}
+details[open]{background:rgba(94,234,212,0.05);border-color:rgba(94,234,212,0.3)}
+details summary{font-weight:600;color:#e8eef5;list-style:none;outline:none;cursor:pointer;display:flex;align-items:flex-start;gap:10px;font-size:0.96rem}
+details summary::-webkit-details-marker{display:none}
+details summary::before{content:'▶';color:#64c8ff;font-size:0.75em;transition:transform 0.2s;flex-shrink:0;margin-top:5px}
+details[open] summary::before{transform:rotate(90deg);color:#5eead4}
+details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
+details .answer ul,details .answer ol{margin:6px 0 6px 22px}
+@media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+</style>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({startOnLoad:true,theme:'base',flowchart:{useMaxWidth:true,htmlLabels:true,nodeSpacing:50,rankSpacing:60},themeVariables:{primaryColor:'#1a2530',primaryTextColor:'#e8eef5',primaryBorderColor:'#64c8ff',lineColor:'#5eead4',secondaryColor:'#0e1419',tertiaryColor:'#0a0f14',background:'#0a0f14',mainBkg:'#1a2530',secondBkg:'#0e1419',textColor:'#d4dae0',fontFamily:'-apple-system,"SF Pro Display",sans-serif',fontSize:'16px'}});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const lb=document.createElement('div');lb.className='lightbox';
+  lb.innerHTML='<span class="hint">scroll = zoom · drag = pan · Esc / click bg = close</span>';
+  document.body.appendChild(lb);
+  let scale=1,panX=0,panY=0,dragging=false,moved=false,lx=0,ly=0;
+  const apply=()=>{const s=lb.querySelector('svg');if(s)s.style.transform=`translate(${panX}px,${panY}px) scale(${scale})`};
+  const reset=()=>{scale=1;panX=0;panY=0};
+  const close=()=>{lb.classList.remove('open');const s=lb.querySelector('svg');if(s)s.remove();reset()};
+  document.addEventListener('click',e=>{
+    if(e.target.closest('.lightbox')){if(moved){moved=false;return}close();return}
+    const w=e.target.closest('.mermaid');if(!w)return;
+    const svg=w.querySelector('svg');if(!svg)return;
+    const c=svg.cloneNode(true);c.removeAttribute('style');
+    c.style.maxWidth='96vw';c.style.maxHeight='92vh';
+    lb.appendChild(c);lb.classList.add('open');reset();apply();
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+  lb.addEventListener('wheel',e=>{
+    if(!lb.classList.contains('open'))return;
+    e.preventDefault();
+    const svg=lb.querySelector('svg');if(!svg)return;
+    const ns=Math.max(0.3,Math.min(10,scale*(1-e.deltaY*0.002)));
+    const r=svg.getBoundingClientRect();
+    const cx=e.clientX-(r.left+r.width/2),cy=e.clientY-(r.top+r.height/2);
+    const k=ns/scale-1;panX-=cx*k;panY-=cy*k;scale=ns;apply();
+  },{passive:false});
+  lb.addEventListener('mousedown',e=>{
+    if(!lb.classList.contains('open'))return;
+    dragging=true;moved=false;lx=e.clientX;ly=e.clientY;lb.classList.add('dragging');e.preventDefault();
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    const dx=e.clientX-lx,dy=e.clientY-ly;
+    if(Math.abs(dx)+Math.abs(dy)>3)moved=true;
+    panX+=dx;panY+=dy;lx=e.clientX;ly=e.clientY;apply();
+  });
+  document.addEventListener('mouseup',()=>{dragging=false;lb.classList.remove('dragging')});
+});
+</script>
+</head><body><div class="container">
+
+<header>
+<div class="meta">
+<span class="tag day">Day 41</span>
+<span class="tag diff">Hard</span>
+<span class="tag">Kill Switch</span>
+<span class="tag">Blast Radius</span>
+<span class="tag">Change Safety</span>
+<span class="tag">Error Budget</span>
+</div>
+<h1>Failure Faster Than Humans — Kill Switches, Blast Radius & Change Safety<span class="en">当故障快于人类反应 · 自动护栏、爆炸半径与变更安全</span></h1>
+</header>
+
+<h2>Problem &amp; Constraints</h2>
+<p>On August 1, 2012, market-maker <strong>Knight Capital</strong> shipped a deploy to only 7 of 8 servers. The unpatched server activated dead code retired eight years earlier but never deleted. The system began firing erroneous orders — <strong>over $460M lost in 45 minutes</strong>, and the firm was acquired within a year. In hindsight, the system had sent 97 error emails before the open, but those emails "were not designed to be system alerts" and nobody read them. By the time engineers understood what was happening, the disaster was already done.</p>
+<p>These systems share a signature: <em>tight coupling + short latency</em>. Failure slides from "looks normal" to "catastrophe" faster than the human loop of "read dashboard → judge → decide → act." A human's reaction budget is <strong>seconds to minutes</strong> (alert delivery, context switch, confirming it isn't a false alarm, executing); in a high-QPS trading / payments / automated-change pipeline, a bad change can destroy everything in <strong>milliseconds to seconds</strong>. When MTTD+MTTR (detect + recover) exceeds the failure-to-catastrophe window, <em>putting a human in the fast loop is a design defect</em>.</p>
+<ul>
+<li><strong>Core constraint</strong>: the first responder must be <em>code</em>, not the on-call human — automated detection, automated containment; humans do post-hoc systemic tuning and review.</li>
+<li><strong>Bounded blast radius</strong>: accept that failures can't be eliminated, so structurally cap how much one failure can destroy.</li>
+<li><strong>Change safety</strong>: the vast majority of production disasters are triggered by a change (deploy / config / flag). Changes must be small-batch, auto-rollback-able, and rate-limited by budget.</li>
+<li><strong>Observability is control</strong>: you can only auto-contain what you can auto-detect — SLI-driven machine decisions, not human-read dashboards.</li>
+</ul>
+
+<h2>High-level Architecture: Two Control Loops</h2>
+<pre class="mermaid">
+graph TD
+    C["Client / high-QPS traffic"]
+    SYS["Production system<br/><i>tightly coupled · short latency</i>"]
+    DET["Detector<br/><i>SLI / anomaly / rate</i>"]
+    POL["Auto-policy<br/><i>circuit breaker · error budget</i>"]
+    ACT["Actuator<br/><i>kill switch · auto-rollback · shed load</i>"]
+    ALERT["Alert"]
+    HUMAN["On-call engineer<br/><i>systemic tuning · review</i>"]
+
+    C --> SYS
+    SYS -->|① metric stream| DET
+    DET -->|② trigger| POL
+    POL -->|③ ms-s: stop the bleed| ACT
+    ACT -->|④ acts back on system| SYS
+    DET -.->|side notify| ALERT
+    ALERT -.-> HUMAN
+    HUMAN -.->|⑤ min-hr: change thresholds/policy| POL
+
+    classDef fast fill:#1a1a30,stroke:#ffb450,color:#e8eef5
+    classDef slow fill:#1a2530,stroke:#64c8ff,color:#e8eef5
+    classDef store fill:#2a1530,stroke:#ff7ab6,color:#e8eef5
+    class DET,POL,ACT fast
+    class C,SYS,ALERT slow
+    class HUMAN store
+</pre>
+<p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">The inner loop (detect → policy → actuate) is a <strong>reflex arc</strong> closed by code, stopping the bleed in ms-seconds; the human on the outer loop only <strong>steers at the system level</strong> (adjust thresholds, review, refactor) — never firefighting inside the fast loop</p>
+
+<h2>Key Technical Points</h2>
+
+<h3>1. Get the human out of the fast loop — Circuit Breaker &amp; Kill Switch</h3>
+<p><strong>Principle</strong>: every link in the human reaction chain costs seconds, often minutes in aggregate — while the disaster completes in seconds. The only fix is to <em>close the reflex arc with code</em>. Two mechanisms: a <em>Circuit Breaker</em> monitors downstream failure rate and "trips" past a threshold, failing fast instead of piling up retries that drag down the whole system, with a half-open state that probes and auto-recovers; a <em>Kill Switch</em> is the blunter master cutoff — a switch that hard-blocks on the output side (stop sending orders, freeze writes, take a feature offline), triggered automatically or by one-click human action. Knight Capital's fatal gap was exactly <strong>no output-side kill switch</strong>: erroneous orders went straight to the exchange with nothing cutting them off when order volume exploded abnormally.</p>
+<div class="tradeoff">
+<strong>Trade-off:</strong>
+<ul>
+<li><strong>Pure human response</strong>: ✅ accurate judgment, no false kills; ❌ reaction chain = seconds to minutes, guaranteed too slow against fast failures.</li>
+<li><strong>Automated breaker/kill switch</strong>: ✅ ms-second containment; ❌ will false-trigger (mistaking a blip for a disaster). Tuning is the trade between <em>missing a disaster</em> and <em>killing a healthy service</em> — high-reliability systems <strong>err toward killing</strong>, because the cost of one miss is asymmetrically large.</li>
+</ul>
+<p>Key design: the kill switch must be <em>fail-safe</em> — it can't depend on the very system that's crashing, or the switch won't work when you need it.</p>
+</div>
+<pre><code># Output-side auto kill switch: abnormal rate triggers a hard block
+def emit_order(order):
+    if killed:                      # master cutoff already thrown → reject
+        raise Halted
+    if rate("orders", 1_s) &gt; MAX:  # per-second order volume crosses physical ceiling
+        trip_kill_switch()          # auto-throw + alert, don't wait for a human
+        raise Halted
+    send_to_exchange(order)
+# Key: the threshold comes from a "business physical ceiling" (at most N/day),
+# NOT "historical mean ×N" — the latter gets dragged along by the anomaly itself.
+</code></pre>
+<div class="case">
+<strong>Real-world cases:</strong>
+<ul>
+<li><strong>Netflix Hystrix</strong>: the industrial benchmark for the circuit-breaker pattern — trip past a failure-rate threshold, fail fast, half-open probe — preventing cascading avalanche (now Resilience4j).</li>
+<li><strong>Exchange limiters</strong>: exchange-side price bands / trading halts and broker-side pre-trade risk checks are the "output-side hard cutoffs" strengthened after the Knight event; the same idea applies to pre-blocks on bulk deletes and over-limit transfers.</li>
+</ul></div>
+
+<h3>2. Bound the blast radius — Cells, Bulkheads &amp; Shuffle Sharding</h3>
+<p><strong>Principle</strong>: guardrails leak, so the second line of defense is to <em>structurally limit how far one failure can reach</em>. <em>Bulkhead</em>: like a ship's watertight compartments, isolate resources (thread pools, connection pools) by dependency so one dead downstream can't exhaust global resources and drag down the rest. <em>Cell-based architecture</em>: cut the system into self-contained "cells," each serving a slice of users and failing independently, so a failure is <em>locked inside one cell</em> — blast radius drops from "everything" to "1/N." <em>Shuffle Sharding</em>: assign each user a random subset combination of resources, so a "toxic" user is very unlikely to land on exactly the same shard as you, diluting the victim surface to a tiny probability.</p>
+<div class="tradeoff">
+<strong>Trade-off:</strong> blast radius vs complexity/cost. More and smaller cells mean smaller impact per failure, but higher cross-cell routing, data-partitioning, ops complexity, and redundancy cost. Rule of thumb: <strong>isolate failure domains by cell, and roll out changes "one cell at a time"</strong> — so even a bad change that slips past canary only blows up one cell.</div>
+<div class="case">
+<strong>Real-world cases:</strong>
+<ul>
+<li><strong>AWS Cell-based Architecture</strong>: an official architecture paradigm cutting a service into cells + a thin routing layer, explicitly designed to "limit the blast radius."</li>
+<li><strong>AWS Shuffle Sharding (Route 53 / ELB)</strong>: the classic post showing how random shard combinations drive the probability of "one bad tenant takes down everyone" to near zero. Alibaba's "unitization" for active-active across regions is the same idea scaled to the region level.</li>
+</ul></div>
+
+<h3>3. Change safety — Canary, Auto-rollback &amp; Error Budget (guardrails before scale)</h3>
+<p><strong>Principle</strong>: the vast majority of production disasters are triggered by "one change," so the change pipeline itself must be a guardrail. <em>Canary release</em> first sends the new version to 1% of traffic, automatically comparing canary vs baseline on key metrics (error rate, latency, business volume), and <em>auto-rolls-back on degradation</em> — taking the rollback decision out of human hands (human judgment is, again, minutes). <em>Error Budget</em> turns "stability vs speed" from a culture war into arithmetic: the headroom beyond your SLO is a spendable "change budget," and when it's exhausted, releases auto-freeze. This line answers the title directly — <strong>guardrails (tests / canary / auto-rollback / budget) must be built before scale, then you open up change volume</strong>. The AI era makes this acute: agents drive the marginal cost of generating code/config toward zero and change volume explodes; if downstream control systems can't keep up, you get what DORA observed for two years running — <em>the higher the AI adoption, the worse the delivery stability</em>. Generation got cheap; the bottleneck and the risk both moved to verification and change control.</p>
+<div class="tradeoff">
+<strong>Trade-off:</strong>
+<ul>
+<li><strong>Big-bang full release</strong>: ✅ simple and fast; ❌ a bad change hits everyone instantly, blast radius = 100% (TSB Bank's 2018 single-event migration of 5M customers → online banking collapse, over £300M in losses).</li>
+<li><strong>Canary + auto-rollback</strong>: ✅ a bad change touches only 1% and is auto-reverted; ❌ requires mature metric baselines, traffic splitting, and one-click rollback — guardrails you must invest in building first.</li>
+</ul></div>
+<pre><code># Canary: machine compares metrics, machine decides rollback — human not in the fast loop
+deploy(canary, traffic=1%)
+for _ in range(WINDOW):
+    if canary.error_rate &gt; base.error_rate * 1.5 \
+       or canary.p99 &gt; base.p99 * 1.3:
+        rollback(canary)            # auto-revert, don't wait for human confirmation
+        freeze_deploys()            # trust burned → freeze, hand to human review
+        return
+    if budget.remaining() &lt;= 0:     # error budget exhausted
+        freeze_deploys(); return
+promote(canary)                     # ramp up only when every metric passes
+</code></pre>
+<div class="case">
+<strong>Real-world cases:</strong>
+<ul>
+<li><strong>Google SRE — Error Budget</strong>: using SLO headroom as a quantitative gate on release cadence — burn through it and releases freeze — aligning reliability and iteration speed into a single number.</li>
+<li><strong>Progressive delivery (Argo Rollouts / Flagger)</strong>: declarative canary + automated metric analysis + auto-rollback, turning "human reads dashboard, decides rollback" into one step of the pipeline.</li>
+</ul></div>
+
+<h3>4. Observability-driven automated decisions — stable cognition, variable action</h3>
+<p><strong>Principle</strong>: the shared prerequisite for the first three points is that <em>you can auto-detect</em> — kill switch, rollback, and breaker all need a machine-decidable signal. So observability isn't a "dashboard for humans," it's the <em>input fed to automated policy</em>: SLIs (not a pile of raw metrics), anomaly detection, change correlation. High-reliability organization theory (Weick) has a sharp line: reliability comes from <em>"stable processes of cognition" acting on "variable action"</em> — detection/evaluation/decision must be stable and invested in as first-class infrastructure, while the concrete actions can be cheap and variable. This gives the AI-era landing point: <strong>enter automation through "verifiable tasks"</strong> — where a machine oracle (compile, tests, canary metrics) can decide right/wrong, automate freely; where only a human can judge good/bad, keep the human in the loop; don't pour high-volume automated output into a stage whose verification capacity can't keep up.</p>
+<div class="callout"><strong>Counterintuitive but key:</strong> when action (generation, change, execution) becomes very cheap, the thing to harden and capitalize is precisely the "cognition" end — detection, verification, rollback infrastructure. Doing the reverse (madly accelerating generation while verification stays manual) is exactly the source of DORA's "stability penalty."</div>
+<div class="case">
+<strong>Real-world cases:</strong>
+<ul>
+<li><strong>SLI/SLO systems</strong>: compressing "system health" into a few machine-decidable metrics is the signal source for auto-containment / auto-rollback (see Day 21, Observability).</li>
+<li><strong>Formal guardrails (AWS)</strong>: for high-risk changes, use TLA+-style model checking to answer "is this change safe," upgrading verification from manual review to machine-decidable — a ready mechanism for high-reliability systems to absorb change.</li>
+</ul></div>
+
+<h2>Scaling &amp; Optimization</h2>
+<ul>
+<li><strong>Thresholds from physical ceilings, not historical means</strong>: an auto-cutoff's threshold should anchor to a "business physical boundary" (at most N/day), or the anomaly itself drags a "mean ×N" dynamic threshold along and defeats protection.</li>
+<li><strong>Fail-safe vs fail-open</strong>: when the kill switch itself dies, should it default to "stop" (fail-safe, finance/medical) or "let through" (fail-open, ads/recommendations, availability-first)? Choose by the asymmetry of business consequences, don't take the default.</li>
+<li><strong>Exercise the guardrails</strong>: guardrails' worst enemy is "installed but never tested." Chaos engineering periodically triggers the breaker/rollback/kill switch for real, confirming they actually fire and actually save you. Also push irreversible operations (paying a third party, sending an un-recallable message) as late in the flow as possible, so the auto-rollback-able range is maximal when something upstream fails.</li>
+</ul>
+
+<h2>Pitfalls &amp; Interview Questions</h2>
+<div class="callout"><strong>1. Assuming an alert means a guardrail.</strong> Knight had 97 error emails and nobody responded — alerts go into the human's <em>slow loop</em>. When failure is faster than humans, you need an <em>automated action</em>, not just an automated notification.</div>
+<div class="callout"><strong>2. A kill switch that depends on the crashing system.</strong> If the switch's decision/execution path shares dependencies with the main system, it fails when the main system does. Guardrails must be independent and fail-safe.</div>
+<div class="callout"><strong>3. Dynamic thresholds dragged along by the anomaly.</strong> "Mean ×3" rises along with a slow degradation or a persistent anomaly and never trips. Critical cutoffs need an absolute threshold anchored to a physical ceiling as a backstop.</div>
+<div class="callout"><strong>4. Common interview question:</strong> the relationship between MTTD/MTTR and the failure-to-catastrophe window? (Answer: their sum must be less than the window, or any "human response" is a paper plan; shrink the former with auto-detect + auto-containment, widen the latter by reducing coupling + bounding blast radius.)</div>
+<div class="callout"><strong>5. Common interview question:</strong> why "guardrails before scale"? What happens if you scale first and add guardrails later? (Answer: change volume/traffic go up first, so the blast radius and frequency of bad changes scale up together, and you discover the guardrails are missing exactly when you most need them; DORA data: with control systems absent, more change volume directly causes instability.)</div>
+
+<h2>Further Reading</h2>
+<ul>
+<li><strong>Google SRE Book — Ch.3 Embracing Risk / Error Budgets</strong>: the first-hand account of error budgets as a release gate.</li>
+<li><strong>AWS Builders' Library — "Cell-based Architecture" / "Shuffle Sharding"</strong>: industrial-grade design and quantification for bounding blast radius.</li>
+<li><strong>Release It! (Nygard)</strong>: the original source of Circuit Breaker / Bulkhead / stability patterns.</li>
+<li><strong>SEC order on Knight Capital (2013)</strong>: the technical and organizational root-cause chain of the $460M event — no output-side cutoff + dead code + unanswered alerts.</li>
+<li><strong>Normal Accidents (Perrow, 1984)</strong>: why tight coupling × interactive complexity makes accidents inevitable in normal operation — the source of this issue's risk lens.</li>
+</ul>
+
+<h2>Deep-dive (click to expand)</h2>
+
+<details>
+<summary>1. Why don't more people, more alerts, or more on-call solve "failure faster than humans"? What has to change at the root?</summary>
+<div class="answer">
+<p>Because all of those live in the <em>slow loop</em>. Alert delivery + context switch + login + confirming it's not a false alarm + execution is a seconds-to-minutes chain, while a fast failure completes in seconds. No amount of people or alert density can push below the physical latency of that chain — its floor is fixed.</p>
+<p>Two things at the root: ① <strong>make the first responder code</strong> — auto-detect + auto-contain (breaker/rollback/kill switch), with humans retreating to the outer loop for systemic tuning; ② <strong>widen the window</strong> — reduce coupling and bound blast radius so failure-to-catastrophe goes from seconds to minutes. One shrinks MTTR, the other lengthens the tolerance window; you need both.</p>
+</div>
+</details>
+
+<details>
+<summary>2. An auto kill switch's worst fear is false-triggering — killing a healthy service on a normal blip. How do you design between "miss" and "false kill"?</summary>
+<div class="answer">
+<p>First recognize the asymmetry: in high-reliability contexts, the loss from one miss (letting a real disaster through) far exceeds one false kill (stopping a service that could have continued). So the default should <em>lean toward stopping</em>.</p>
+<p>Concretely: ① critical cutoffs use an <strong>absolute threshold anchored to a physical ceiling</strong> (at most N/day), not a dynamic mean that gets dragged along by the anomaly; ② tiering — soft cutoffs (throttle/degrade) before hard cutoffs (full stop), giving the system room to self-heal; ③ <strong>trip fast, recover slow</strong>: throw decisively, recover via half-open probing and gradual ramp to avoid flapping. Core: machines do "fast containment," humans do "post-hoc threshold calibration."</p>
+</div>
+</details>
+
+<details>
+<summary>3. What does "guardrails before scale" concretely mean in the era of AI/agents generating code en masse?</summary>
+<div class="answer">
+<p>When agents drive the marginal cost of writing code/config toward zero, change volume explodes. If your guardrails (automated tests, canary, auto-rollback, error budget, blast-radius isolation) aren't built <em>first</em>, what scales up isn't just output but the frequency × blast radius of bad changes. DORA's two years of data are exactly this mechanism: higher AI adoption, more change volume, and when the control systems can't keep up, <strong>delivery stability gets worse</strong>.</p>
+<p>Two landings: ① shift investment from "generation capacity" to "verification and change-control infrastructure" — generation is already a commodity, verification is the bottleneck; ② <strong>enter through verifiable tasks</strong>: first open up automation where a machine oracle (compile/tests/canary metrics) can decide right/wrong (large-scale migrations, framework upgrades), and keep humans in the loop where only humans can judge good/bad.</p>
+</div>
+</details>
+
+<details>
+<summary>4. Cell architecture drops blast radius to 1/N — at what cost? When is it not worth it?</summary>
+<div class="answer">
+<p>Costs: ① a <strong>routing layer</strong> — you need a thin, extremely reliable router that stably maps users to cells, which itself becomes a shared component to protect heavily; ② <strong>data partitioning</strong> — strongly-consistent operations across cells get hard, global queries/transactions get fragmented; ③ <strong>ops complexity and redundancy cost</strong> — deployment, monitoring, and capacity for N cells all ×N, and small cells sacrifice economies of scale.</p>
+<p>The criterion comes back to blast radius: <em>if you can tolerate the consequence of one failure hitting everything, don't cell-ify yet</em> (with small traffic and high strong-global-consistency needs, cell-ification just complicates a simple system); when "everything down" is unacceptable (payments, core trading, a multi-tenant SaaS isolation promise), use cells + shuffle sharding to structurally cap it. Often the fastest win is to start with just "roll out changes cell by cell."</p>
+</div>
+</details>
+
+<details>
+<summary>5. Tie Day 23 (breaker/retry/bulkhead), Day 21 (observability), Day 22 (release) together: how do they jointly form a defense when failure is faster than humans?</summary>
+<div class="answer">
+<p>The four are different layers of the same defense-in-depth, laid out along the failure-to-catastrophe timeline:</p>
+<ul>
+<li><strong>Observability (Day 21)</strong> is the <em>eyes and signal source</em>: compress system health into SLIs fed to automated policy — without it, everything downstream is blind.</li>
+<li><strong>Breaker/bulkhead (Day 23)</strong> is the <em>runtime reflex arc</em>: on downstream blips/failures, fail fast in ms and isolate resources to prevent cascading avalanche.</li>
+<li><strong>Release/canary (Day 22)</strong> is the <em>change gate</em>: block "the biggest source of disaster = one bad change," so a bad change touches only 1% and auto-rolls-back.</li>
+<li><strong>This issue's kill switch + blast radius + error budget</strong> is the <em>master cutoff and structural cap</em>: when all the above leak, there's still an output-side hard block as backstop, and a single failure only blows up 1/N.</li>
+</ul>
+<p>The thread through all of it: <strong>humans steer on the outer loop, code firefights on the inner loop</strong> — observability provides signal, automated policy decides, actuators act, and humans retreat to the minute-to-hour scale to adjust thresholds and review. That is the only architecturally sound posture when disaster is faster than humans.</p>
+</div>
+</details>
+
+<div class="nav"><a href="index.en.html">← back to index</a></div>
+</div>
+</body></html>
