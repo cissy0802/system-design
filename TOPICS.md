@@ -45,13 +45,14 @@
 - Day 38: 数据湖与湖仓 — 数据湖 vs 数仓 vs 湖仓, Iceberg/Delta, 元数据管理, 批流一体
 - Day 39: 工作流引擎 — Temporal/Airflow, Saga 编排, 持久化执行, 补偿事务
 - Day 40: 特征平台与 ML 基础设施 — 特征存储, 在线/离线一致, 模型服务, A/B 实验平台
-- Day 41: 全球化与多区域 — 数据驻留, 多活架构, 跨区域一致性, 延迟优化
-- Day 42: 隐私与合规架构 — GDPR 删除权, 数据脱敏, 审计追踪, 同意管理
-- Day 43: 混沌工程与韧性测试 — 故障注入, 游戏日, 韧性验证, 金丝雀深化
-- Day 44: 协作编辑系统 — OT vs CRDT, 冲突解决, 离线同步, Figma/Notion 架构
+- Day 41: 快于人类反应的系统 — 把人移出快回路(自动检测+止血/熔断/Kill Switch), 限爆炸半径(Cell/隔板/Shuffle Sharding), 变更安全(金丝雀+自动回滚+Error Budget, 先护栏后规模), 可观测驱动自动决策(Knight Capital/Perrow)
+- Day 42: 全球化与多区域 — 数据驻留, 多活架构, 跨区域一致性, 延迟优化
+- Day 43: 隐私与合规架构 — GDPR 删除权, 数据脱敏, 审计追踪, 同意管理
+- Day 44: 混沌工程与韧性测试 — 故障注入, 游戏日, 韧性验证, 金丝雀深化
+- Day 45: 协作编辑系统 — OT vs CRDT, 冲突解决, 离线同步, Figma/Notion 架构
 
-<!-- ↓ 查漏补缺追加（Day 45–48）：分布式系统硬核 -->
-- Day 45: 分布式共识与协调 — Raft/Paxos, Leader election 选主, 分布式锁, Zookeeper/etcd, Quorum 与脑裂
-- Day 46: 数据库内部与存储引擎 — B-tree vs LSM-tree, WAL 与崩溃恢复, MVCC, 索引内部与查询优化器
-- Day 47: 网络基础 — TCP/UDP, HTTP/1.1·2·3·QUIC, DNS, TLS 握手, L4 vs L7 负载均衡
-- Day 48: 容器与编排 — 容器原理(namespace/cgroup), Kubernetes 核心对象, Service Mesh(Envoy/Istio), 调度与自愈
+<!-- ↓ 查漏补缺追加（Day 46–49）：分布式系统硬核 -->
+- Day 46: 分布式共识与协调 — Raft/Paxos, Leader election 选主, 分布式锁, Zookeeper/etcd, Quorum 与脑裂
+- Day 47: 数据库内部与存储引擎 — B-tree vs LSM-tree, WAL 与崩溃恢复, MVCC, 索引内部与查询优化器
+- Day 48: 网络基础 — TCP/UDP, HTTP/1.1·2·3·QUIC, DNS, TLS 握手, L4 vs L7 负载均衡
+- Day 49: 容器与编排 — 容器原理(namespace/cgroup), Kubernetes 核心对象, Service Mesh(Envoy/Istio), 调度与自愈
