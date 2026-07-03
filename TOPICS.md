@@ -56,3 +56,4 @@
 - Day 47: 数据库内部与存储引擎 — B-tree vs LSM-tree, WAL 与崩溃恢复, MVCC, 索引内部与查询优化器
 - Day 48: 网络基础 — TCP/UDP, HTTP/1.1·2·3·QUIC, DNS, TLS 握手, L4 vs L7 负载均衡
 - Day 49: 容器与编排 — 容器原理(namespace/cgroup), Kubernetes 核心对象, Service Mesh(Envoy/Istio), 调度与自愈
+- Day 50: 把 Code Review 当信号检测系统 — 误报预算与分诊层, 降噪架构(ReviewFilter/nitpick 过滤), AI 评论的信噪治理, 活动指标 vs 结果指标的度量陷阱(钩子·源自 deep-research #2)
