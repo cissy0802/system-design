@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 45 · Collaborative Editing — System Design</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"SF Pro Display","Noto Sans SC",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
+.container{max-width:820px;margin:0 auto;padding:24px 20px 60px}
+header{padding:40px 0 28px;border-bottom:1px solid rgba(100,200,255,0.15);margin-bottom:32px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem}
+.tag{padding:3px 10px;border-radius:4px;background:rgba(100,200,255,0.12);color:#64c8ff;border:1px solid rgba(100,200,255,0.25)}
+.tag.diff{background:rgba(94,234,212,0.1);color:#5eead4;border-color:rgba(94,234,212,0.3)}
+.tag.day{background:rgba(255,180,80,0.1);color:#ffb450;border-color:rgba(255,180,80,0.25)}
+h1{font-size:1.75rem;font-weight:800;background:linear-gradient(135deg,#64c8ff 0%,#5eead4 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:0.5px;line-height:1.3}
+h1 .en{display:block;font-size:1rem;color:#7a8590;-webkit-text-fill-color:#7a8590;margin-top:6px;font-weight:500}
+h2{font-size:1.2rem;color:#5eead4;margin:36px 0 14px;padding-left:12px;border-left:3px solid #5eead4}
+h3{font-size:1rem;color:#64c8ff;margin:20px 0 10px;font-weight:600}
+p{margin:10px 0;color:#c8cfd6}
+ul,ol{margin:10px 0 10px 22px;color:#c8cfd6}
+li{margin:6px 0}
+strong{color:#e8eef5;font-weight:600}
+em{color:#5eead4;font-style:normal;font-weight:500}
+code{font-family:"SF Mono",Menlo,Consolas,monospace;background:rgba(100,200,255,0.1);color:#5eead4;padding:1px 6px;border-radius:3px;font-size:0.88em}
+pre{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:14px 16px;overflow-x:auto;margin:12px 0;font-family:"SF Mono",Menlo,Consolas,monospace;font-size:0.84rem;line-height:1.55;color:#c8cfd6}
+pre code{background:none;color:inherit;padding:0;font-size:1em}
+.mermaid{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:18px;margin:14px 0;text-align:center;overflow-x:auto;cursor:zoom-in;transition:border-color 0.15s}
+.mermaid:hover{border-color:rgba(100,200,255,0.4)}
+.mermaid svg{width:100%;max-width:100%;height:auto;min-height:280px}
+.lightbox{position:fixed;inset:0;background:rgba(8,12,18,0.96);z-index:9999;display:none;align-items:center;justify-content:center;padding:24px;cursor:grab;backdrop-filter:blur(4px);overflow:hidden}
+.lightbox.open{display:flex}
+.lightbox.dragging{cursor:grabbing}
+.lightbox svg{width:auto;height:auto;max-width:96vw;max-height:92vh;transform-origin:center center;will-change:transform}
+.lightbox .hint{position:fixed;top:16px;right:20px;font-size:0.78rem;color:#7a8590;font-family:"SF Mono",Menlo,monospace;pointer-events:none}
+.callout{background:rgba(255,180,80,0.06);border-left:3px solid #ffb450;padding:12px 14px;margin:14px 0;border-radius:4px;font-size:0.94rem}
+.callout strong{color:#ffb450}
+.tradeoff{background:rgba(100,200,255,0.05);border:1px solid rgba(100,200,255,0.2);border-radius:6px;padding:12px 14px;margin:12px 0;font-size:0.94rem}
+.case{background:rgba(94,234,212,0.05);border-left:3px solid #5eead4;padding:12px 14px;margin:12px 0;border-radius:4px;font-size:0.94rem}
+.case strong{color:#5eead4}
+.nav{margin-top:50px;padding-top:24px;border-top:1px solid rgba(100,200,255,0.15);text-align:center}
+.nav a{color:#64c8ff;text-decoration:none;font-size:0.92rem;padding:8px 16px;border:1px solid rgba(100,200,255,0.3);border-radius:4px;transition:all 0.15s}
+.nav a:hover{background:rgba(100,200,255,0.1)}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:0.9rem}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid rgba(100,200,255,0.15)}
+th{color:#64c8ff;font-weight:600;background:rgba(100,200,255,0.05)}
+details{background:rgba(100,200,255,0.04);border:1px solid rgba(100,200,255,0.18);border-radius:6px;padding:12px 16px;margin:10px 0;transition:all 0.15s}
+details:hover{border-color:rgba(100,200,255,0.35)}
+details[open]{background:rgba(94,234,212,0.05);border-color:rgba(94,234,212,0.3)}
+details summary{font-weight:600;color:#e8eef5;list-style:none;outline:none;cursor:pointer;display:flex;align-items:flex-start;gap:10px;font-size:0.96rem}
+details summary::-webkit-details-marker{display:none}
+details summary::before{content:'▶';color:#64c8ff;font-size:0.75em;transition:transform 0.2s;flex-shrink:0;margin-top:5px}
+details[open] summary::before{transform:rotate(90deg);color:#5eead4}
+details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
+details .answer ul,details .answer ol{margin:6px 0 6px 22px}
+@media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+</style>
+</head><body><div class="container">
+
+<header>
+<div class="meta">
+<span class="tag day">Day 45</span>
+<span class="tag diff">Hard</span>
+<span class="tag">Collaborative Editing</span>
+<span class="tag">OT vs CRDT</span>
+<span class="tag">Offline Sync</span>
+</div>
+<h1>Collaborative Editing — Hundreds Typing One Doc, Still Converging<span class="en">OT vs CRDT, Conflict Resolution, Offline Sync</span></h1>
+</header>
+
+<h2>Problem &amp; Requirements</h2>
+<p>Design a <strong>Google Docs / Figma-class</strong> real-time collaborative editor: up to hundreds of active editors typing into one document, each keystroke an operation, everyone <strong>seeing others' cursors and text within &lt;100ms</strong>, editing offline for arbitrary durations and auto-merging on reconnect. The single hard problem: <em>when two people insert at the same position simultaneously, every replica must converge to a <strong>byte-identical</strong> state</em> — otherwise the document forks.</p>
+<ul>
+<li><strong>Concurrency</strong>: active editors per doc are usually &lt;100, but keystroke rate is high (5-10 ops/s/person); presence (cursors/selections) updates even more often.</li>
+<li><strong>Latency SLO</strong>: local keystrokes must echo with <em>zero delay</em> (optimistic local-first); remote propagation &lt;100ms.</li>
+<li><strong>Consistency</strong>: <strong>Strong Eventual Consistency</strong> — replicas that have received the same set of ops must reach identical state, regardless of arrival order.</li>
+<li><strong>Offline</strong>: edit for arbitrary durations while disconnected; merge on reconnect without lost edits or manual conflict resolution.</li>
+</ul>
+<div class="callout"><strong>Why not last-write-wins over the whole document?</strong> The granularity is too coarse — on save you'd blindly overwrite everyone else's last few minutes. Collaborative editing is fundamentally about splitting edits into <strong>character-level mergeable operations</strong>, not overwriting whole-document snapshots.</div>
+
+<h2>High-Level Architecture</h2>
+<div class="mermaid">
+graph TD
+  subgraph Clients["Clients (local-first + offline buffer)"]
+    A["Client A<br/>local replica + pending op queue"]
+    B["Client B<br/>local replica + pending op queue"]
+  end
+  A -- "op (WebSocket)" --> S
+  B -- "op (WebSocket)" --> S
+  S["Per-document process<br/>Doc Authority (single-threaded serializer)"]
+  S -- "broadcast op / ack" --> A
+  S -- "broadcast op / ack" --> B
+  S --> L["Op Log<br/>(ordered append)"]
+  S --> SN["Snapshot Store<br/>(periodic snapshot + log truncation)"]
+  R["Routing layer<br/>consistent hash: doc_id → process"] -.-> S
+  P["Presence channel<br/>cursors/selections · not persisted"] -.-> A
+  P -.-> B
+</div>
+<p>The core is <strong>one dedicated server process per document</strong> acting as the authority: it serializes all ops into a total-order log, then broadcasts. Clients always render locally first, applying ops optimistically before sending them; once the server acks, the local op is confirmed. Presence (cursors/selections) travels on a separate ephemeral channel and is <strong>never persisted</strong>. When a doc goes cold, it snapshots to storage and the process is reclaimed.</p>
+
+<h2>Key Techniques</h2>
+
+<h3>1. OT (Operational Transformation) — trade central serialization for plain text, zero metadata</h3>
+<p class="tradeoff"><strong>Core trade-off:</strong> the data structure is just plain text (no bloat), at the cost of transform functions that are brutally hard to get right and a hard dependency on a central serializer.</p>
+<p><strong>Principle.</strong> Each operation carries a <strong>positional index</strong> (e.g. "insert X at position 5"). When two concurrent ops derive from the same state, applying them naively by index diverges. OT defines a transform <code>T(op_a, op_b)</code>: recompute op_a's position <em>relative to a world where op_b has already been applied</em>. If A inserts at position 2 and B at position 5, when B reaches A its position must shift +1 (A already lengthened the prefix). Replicas transform along different paths yet converge to the same state.</p>
+<pre><code># insert vs insert position transform (simplified)
+def transform(op_a, op_b):
+    # return op_a's position assuming op_b already applied
+    if op_a.pos &lt; op_b.pos:
+        return op_a                      # unaffected
+    elif op_a.pos &gt; op_b.pos:
+        return op_a.shift(+len(op_b))    # pushed back by b
+    else:  # concurrent insert at same position -- need tie-break
+        if op_a.site_id &lt; op_b.site_id:  # order by site id for symmetry
+            return op_a
+        return op_a.shift(+len(op_b))
+</code></pre>
+<p>The hard part is the <strong>TP1/TP2 correctness properties</strong>: TP1 requires two ops applied in either order to converge; TP2 requires that three-plus concurrent ops converge regardless of transform order. TP2 is extremely hard to satisfy without a total order — several <em>published</em> OT algorithms were later proven to have <strong>counterexamples</strong>. Industry's escape hatch: <em>use a central server to enforce a total order</em>, so you only need TP1 (the key insight of the Jupiter algorithm).</p>
+<div class="case"><strong>Google Docs / Wave</strong> use exactly the <strong>Jupiter algorithm</strong> (AT&amp;T Bell Labs, 1995) — in a client-server structure each client only transforms pairwise against the server, which maintains the total order, sidestepping the TP2 hell. That's the fundamental reason OT still runs stably at massive scale.</div>
+
+<h3>2. Sequence CRDT — trade dense position IDs for "no central coordination needed"</h3>
+<p class="tradeoff"><strong>Core trade-off:</strong> operations are inherently commutative and mergeable offline/P2P, at the cost of per-character metadata plus tombstones that never disappear.</p>
+<p><strong>Principle.</strong> A CRDT does no transform; instead it gives <strong>each character a globally unique, densely comparable position identifier</strong> (a fractional index / tree path). Between any two characters you can always mint another id (density). Insert = generate an id wedged between the left and right neighbors; delete = plant a <strong>tombstone</strong> rather than physically remove (else concurrent references dangle). Because each op depends only on immutable ids, not the current index, <strong>applying the same batch of ops in any order yields the same result</strong> — that is Strong Eventual Consistency with no central ordering.</p>
+<pre><code># RGA-style insert: id = (logical clock, site_id), positioned after a predecessor
+def insert_after(pred_id, char, site_id, clock):
+    new_id = (clock, site_id)           # globally unique
+    node = Node(id=new_id, char=char, after=pred_id, deleted=False)
+    # concurrent inserts under the same pred sort by id descending (deterministic tie-break)
+    insert_sorted(node, key=lambda n: n.id, desc=True)
+    return new_id
+
+def delete(target_id):
+    nodes[target_id].deleted = True     # tombstone, not physical delete
+</code></pre>
+<p><strong>Two famous pitfalls</strong>: (1) <strong>metadata bloat</strong> — one id per character; a naive implementation can hit <strong>100:1</strong> overhead; (2) <strong>interleaving anomaly</strong> — when two people each insert a whole run of text concurrently, some CRDT algorithms <strong>interleave the characters</strong> into garbage (Kleppmann et al. have a dedicated 2019 paper on this).</p>
+<div class="case"><strong>Automerge</strong> (Martin Kleppmann) uses database-style <strong>columnar encoding</strong> to squeeze metadata from 100:1 down to near 1:1 (about 30% larger than the raw data). <strong>Yjs</strong> (Kevin Jahns, the YATA algorithm) is the fastest web CRDT implementation, adopted by many whiteboard/document/notebook products, with nearly a million weekly downloads.</div>
+
+<h3>3. Offline-first &amp; causal merge — where CRDTs really pull ahead</h3>
+<p class="tradeoff"><strong>Core trade-off:</strong> OT on reconnect must transform your stale baseline against the server's missing ops one by one (the server must retain an op log); a CRDT just exchanges the ops each side is missing and merges directly — the longer the offline window, the bigger the advantage.</p>
+<p><strong>Principle.</strong> A client uses a <strong>version vector</strong> (max logical clock per site) to describe "which ops I've seen." On reconnect both sides exchange version vectors and backfill only the delta the other lacks. Causal order is guaranteed by dependencies each op carries (predecessor id / logical clock) — an insert op may only apply once its predecessor is visible. A CRDT's commutativity lets even out-of-order backfilled ops merge correctly — the killer feature for offline.</p>
+<div class="case"><strong>Figma</strong> takes a pragmatic route: it is <strong>inspired by CRDTs but not a full CRDT</strong>. It lets users go offline for an arbitrary amount of time; <strong>on reconnect the client downloads a fresh copy of the document and reapplies its offline ops on top of the latest state</strong>. Object properties (color, position, etc.) use <strong>last-writer-wins</strong> — because a design file, unlike text, doesn't need to preserve every character's history, so LWW is sufficient and simple: concurrent edits to the same property keep one value. The initial version was TypeScript, later ported to Rust for performance and stability.</div>
+
+<h3>4. Server architecture — per-document single-writer authority + snapshot truncation</h3>
+<p class="tradeoff"><strong>Core trade-off:</strong> one process per document serializes cleanly, isolates well, is simple to reason about, and yields a natural total order; the cost is a per-doc single-point throughput ceiling and the need to handle process routing and migration.</p>
+<p><strong>Principle.</strong> The routing layer uses <code>consistent hash(doc_id)</code> to pin all connections for a document to <strong>the same process</strong>. That process processes ops single-threaded → guaranteeing total order (which lets OT need only TP1) → broadcasts to subscribers → appends to the op log. The op log grows unbounded, so periodically it <strong>snapshots</strong> (materializes the current document + version vector) and <strong>truncates</strong> old log, GC'ing tombstones with no remaining concurrent references at the same time. A new client joining just pulls the latest snapshot + a small delta instead of replaying all history.</p>
+<div class="case"><strong>Figma</strong> <strong>spins up a separate process</strong> per multiplayer document as that document's authoritative replica; <strong>Google Docs</strong> likewise has a document-level serialization point on the server. This "one document, one actor" model degrades concurrency reasoning into a single-threaded problem — the most counterintuitive yet effective simplification in collaborative systems.</div>
+
+<h2>Scaling &amp; Optimization</h2>
+<ul>
+<li><strong>Large-doc chunking</strong>: split a huge document into multiple sub-CRDTs / segments, load on demand, so opening a doc doesn't pour millions of nodes into memory.</li>
+<li><strong>Rich text</strong>: a plain sequence CRDT handles "bold spanning a concurrent insert" poorly; you need <strong>Peritext</strong>-style interval-marker CRDTs.</li>
+<li><strong>Tombstone GC</strong>: physically reclaim a tombstone only once every replica has acknowledged the deletion (version vectors have passed it), else you break concurrent references.</li>
+<li><strong>Undo/Redo</strong>: collaborative undo means <strong>undo your own operation</strong>, not "rewind time" — it needs per-user selective-undo semantics.</li>
+<li><strong>Multi-region</strong>: give each document a <strong>home region</strong> (where its authority lives); cross-region edits route to the home region, avoiding the round-trips of global strong consistency.</li>
+</ul>
+
+<h2>Pitfalls &amp; Interview Follow-ups</h2>
+<ul>
+<li><strong>Buggy OT transform</strong>: insert/delete/delete combinations + tie-breaks are bug-prone, and a bug means <strong>silent divergence</strong> — two documents disagree with no error. In interviews, articulate TP1/TP2 and "dodge TP2 via a central server."</li>
+<li><strong>CRDT interleaving</strong>: expect "two people each paste a paragraph — why might they interleave?" Answer: concurrent inserts landing between the same anchor; tie-break guarantees convergence, not semantic coherence.</li>
+<li><strong>Unbounded tombstones</strong>: a long-lived doc deleted and re-deleted drowns in tombstones without GC; the GC condition is a deep-dive point.</li>
+<li><strong>LWW lost updates</strong>: Figma uses LWW for properties — two people changing color simultaneously lose one; be able to say "when a loss is acceptable vs not" (text: never; design property: fine).</li>
+<li><strong>Persisting presence</strong>: storing cursor position as durable data is classic over-engineering — it's ephemeral and droppable.</li>
+<li><strong>OT or CRDT?</strong> "Stable central server, want plain text without bloat, team can hold the transform" → OT (Google Docs); "want offline-first / P2P / local-first, can accept metadata overhead" → CRDT (Yjs/Automerge).</li>
+</ul>
+
+<h2>Deep Resources</h2>
+<ul>
+<li><a href="https://www.figma.com/blog/how-figmas-multiplayer-technology-works/">How Figma's multiplayer technology works</a> — Evan Wallace on server-per-document, offline reconnect, LWW properties; the most readable industry writeup.</li>
+<li><a href="https://martin.kleppmann.com/2020/07/06/crdt-hard-parts-hydra.html">CRDTs: The Hard Parts</a> — Martin Kleppmann on metadata bloat, columnar encoding, interleaving, and other real pain points.</li>
+<li><a href="https://martin.kleppmann.com/papers/interleaving-papoc19.pdf">Interleaving anomalies in collaborative text editors</a> (PaPoC 2019) — a formal dissection of the interleaving problem.</li>
+<li><a href="https://yjs.dev/">Yjs</a> (Kevin Jahns, YATA) and <a href="https://automerge.org/">Automerge</a> — the two mainstream production-grade CRDT implementations; the source is the textbook.</li>
+<li>The Jupiter algorithm (Nichols et al., AT&amp;T, 1995) and the Google Wave OT whitepaper — the origin of central-order OT.</li>
+</ul>
+
+<h2>Going Deeper</h2>
+<details><summary>Why can Figma afford lost updates via LWW while Google Docs cannot? Same "collaborative editing" — what's the criterion?</summary><div class="answer">The criterion is <strong>the granularity of the semantic unit and the user's tolerance for "loss."</strong> Figma's atom is an object property (a rectangle's color, coordinates) — two people changing the color, keeping either is "a reasonable result," and the lost change is instantly visible and redoable, so the loss is bounded. Text is different: its value lies in <strong>the continuity of the character sequence</strong>; having your sentence overwritten wholesale is unacceptable information loss and can't be recovered at a glance. So text must be character-level mergeable (OT/CRDT) while design properties can use LWW — <strong>choose a consistency strategy by "what is lost on conflict and whether the user can bear it," not by blindly chasing lossless merge.</strong></div></details>
+<details><summary>OT dodges TP2 via a central server — so with a stable server, does CRDT's "no central needed" advantage vanish?</summary><div class="answer">Most of it, but not all. With a stable center, OT needs only TP1 and its structure is still plain text with no bloat, often cheaper in engineering. CRDT's remaining independent value is in <strong>offline duration and topology</strong>: (1) offline a week then reconnect — a CRDT just exchanges missing ops and merges, while OT must retain a long-enough op log and transform each one, an ops cost that grows linearly with the offline window; (2) true P2P / local-first (no center; under end-to-end encryption the server can't see plaintext and thus can't transform) is only possible with CRDT. So the criterion is <strong>"can you always rely on a center that sees plaintext and keeps a total-order log?"</strong> — if yes, OT is more economical; if no, you need CRDT.</div></details>
+<details><summary>One process per document — so what about "one doc watched by a million people" (a viral public doc)? Can a single process cope?</summary><div class="answer">Not the writes, but distinguish read from write. Actual <strong>concurrent editors</strong> rarely exceed a few dozen, so single-process serialization on the write path isn't the bottleneck. The bottleneck is <strong>broadcast fan-out</strong> — a million read-only subscribers. The fix is layering: the authority process serializes ops only for the few editors, then pushes the op stream to a set of <strong>read-only fan-out edge nodes</strong> (like a CDN / pub-sub fan-out tree); viewers connect to edge nodes rather than the authority. Writers and readers are physically separated, keeping the authority's connection count controllable. This is essentially Day 14 Feed's fan-out and Day 15 Chat's fan-out ideas applied here.</div></details>
+<details><summary>CRDT tombstones "never delete" — so a document that has existed ten years and been edited repeatedly, isn't it eventually buried by tombstones?</summary><div class="answer">A naive implementation, yes. Engineering relies on <strong>version-vector-gated tombstone GC</strong>: once every known replica's version vector has passed a deletion (so no concurrent op can still reference the deleted node), that tombstone can be safely reclaimed. With a central server this is easy to decide — the server knows every active replica's progress. The hard case is <strong>replicas that may be offline forever</strong>: the server can't wait indefinitely. In practice you set an <strong>offline cap</strong> (beyond which the replica, on reconnect, is treated as a "brand-new client" pulling the latest snapshot, discarding its stale ops), bounding the GC wait. This is also why Figma explicitly handles "arbitrary offline duration" by <strong>re-downloading the latest document and replaying</strong>, rather than blindly merging.</div></details>
+<details><summary>Local keystrokes echo with zero delay (optimistic), but if the server ultimately rejects your op (permission revoked, doc locked), what happens to the characters already on your screen?</summary><div class="answer">This is the inherent risk of optimistic UI: <strong>local-first means you may have to roll back.</strong> Mechanically, a local op sits in a "pending" state and is confirmed only after the server acks. If rejected, the client must revert that op <strong>and all subsequent local ops built on it</strong> (rebase onto the server's authoritative state), then reapply the still-valid operations — like a git rebase. The UX shows what you just typed "flash and vanish," so hard rejections should be rare (permission checks belong at doc-entry time, not per op). This reveals the fundamental difference between collaborative editing and ordinary CRUD: <strong>optimistic local state is a "guess"; authority lives in the server's total-order log, and on conflict/rejection the latter wins via compensation.</strong></div></details>
+
+</div></body></html>
