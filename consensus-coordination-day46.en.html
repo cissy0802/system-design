@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 46 · Distributed Consensus & Coordination — System Design</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"SF Pro Display","Noto Sans SC",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
+.container{max-width:820px;margin:0 auto;padding:24px 20px 60px}
+header{padding:40px 0 28px;border-bottom:1px solid rgba(100,200,255,0.15);margin-bottom:32px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem}
+.tag{padding:3px 10px;border-radius:4px;background:rgba(100,200,255,0.12);color:#64c8ff;border:1px solid rgba(100,200,255,0.25)}
+.tag.diff{background:rgba(255,120,120,0.1);color:#ff8a8a;border-color:rgba(255,120,120,0.3)}
+.tag.day{background:rgba(255,180,80,0.1);color:#ffb450;border-color:rgba(255,180,80,0.25)}
+h1{font-size:1.75rem;font-weight:800;background:linear-gradient(135deg,#64c8ff 0%,#5eead4 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:0.5px;line-height:1.3}
+h1 .en{display:block;font-size:1rem;color:#7a8590;-webkit-text-fill-color:#7a8590;margin-top:6px;font-weight:500}
+h2{font-size:1.2rem;color:#5eead4;margin:36px 0 14px;padding-left:12px;border-left:3px solid #5eead4}
+h3{font-size:1rem;color:#64c8ff;margin:20px 0 10px;font-weight:600}
+p{margin:10px 0;color:#c8cfd6}
+ul,ol{margin:10px 0 10px 22px;color:#c8cfd6}
+li{margin:6px 0}
+strong{color:#e8eef5;font-weight:600}
+em{color:#5eead4;font-style:normal;font-weight:500}
+code{font-family:"SF Mono",Menlo,Consolas,monospace;background:rgba(100,200,255,0.1);color:#5eead4;padding:1px 6px;border-radius:3px;font-size:0.88em}
+pre{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:14px 16px;overflow-x:auto;margin:12px 0;font-family:"SF Mono",Menlo,Consolas,monospace;font-size:0.84rem;line-height:1.55;color:#c8cfd6}
+pre code{background:none;color:inherit;padding:0;font-size:1em}
+.mermaid{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:18px;margin:14px 0;text-align:center;overflow-x:auto;cursor:zoom-in;transition:border-color 0.15s}
+.mermaid:hover{border-color:rgba(100,200,255,0.4)}
+.mermaid svg{width:100%;max-width:100%;height:auto;min-height:280px}
+.lightbox{position:fixed;inset:0;background:rgba(8,12,18,0.96);z-index:9999;display:none;align-items:center;justify-content:center;padding:24px;cursor:grab;backdrop-filter:blur(4px);overflow:hidden}
+.lightbox.open{display:flex}
+.lightbox.dragging{cursor:grabbing}
+.lightbox svg{width:auto;height:auto;max-width:96vw;max-height:92vh;transform-origin:center center;will-change:transform}
+.lightbox .hint{position:fixed;top:16px;right:20px;font-size:0.78rem;color:#7a8590;font-family:"SF Mono",Menlo,monospace;pointer-events:none}
+.callout{background:rgba(255,180,80,0.06);border-left:3px solid #ffb450;padding:12px 14px;margin:14px 0;border-radius:4px;font-size:0.94rem}
+.callout strong{color:#ffb450}
+.tradeoff{background:rgba(100,200,255,0.05);border:1px solid rgba(100,200,255,0.2);border-radius:6px;padding:12px 14px;margin:12px 0;font-size:0.94rem}
+.case{background:rgba(94,234,212,0.05);border-left:3px solid #5eead4;padding:12px 14px;margin:12px 0;border-radius:4px;font-size:0.94rem}
+.case strong{color:#5eead4}
+.nav{margin-top:50px;padding-top:24px;border-top:1px solid rgba(100,200,255,0.15);text-align:center}
+.nav a{color:#64c8ff;text-decoration:none;font-size:0.92rem;padding:8px 16px;border:1px solid rgba(100,200,255,0.3);border-radius:4px;transition:all 0.15s}
+.nav a:hover{background:rgba(100,200,255,0.1)}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:0.9rem}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid rgba(100,200,255,0.15)}
+th{color:#64c8ff;font-weight:600;background:rgba(100,200,255,0.05)}
+details{background:rgba(100,200,255,0.04);border:1px solid rgba(100,200,255,0.18);border-radius:6px;padding:12px 16px;margin:10px 0;transition:all 0.15s}
+details:hover{border-color:rgba(100,200,255,0.35)}
+details[open]{background:rgba(94,234,212,0.05);border-color:rgba(94,234,212,0.3)}
+details summary{font-weight:600;color:#e8eef5;list-style:none;outline:none;cursor:pointer;display:flex;align-items:flex-start;gap:10px;font-size:0.96rem}
+details summary::-webkit-details-marker{display:none}
+details summary::before{content:'▶';color:#64c8ff;font-size:0.75em;transition:transform 0.2s;flex-shrink:0;margin-top:5px}
+details[open] summary::before{transform:rotate(90deg);color:#5eead4}
+details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
+details .answer ul,details .answer ol{margin:6px 0 6px 22px}
+@media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+</style>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({startOnLoad:true,theme:'base',flowchart:{useMaxWidth:true,htmlLabels:true,nodeSpacing:50,rankSpacing:60},themeVariables:{primaryColor:'#1a2530',primaryTextColor:'#e8eef5',primaryBorderColor:'#64c8ff',lineColor:'#5eead4',secondaryColor:'#0e1419',tertiaryColor:'#0a0f14',background:'#0a0f14',mainBkg:'#1a2530',secondBkg:'#0e1419',textColor:'#d4dae0',fontFamily:'-apple-system,"SF Pro Display",sans-serif',fontSize:'16px'}});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const lb=document.createElement('div');lb.className='lightbox';
+  lb.innerHTML='<span class="hint">scroll = zoom · drag = pan · Esc / click bg = close</span>';
+  document.body.appendChild(lb);
+  let scale=1,panX=0,panY=0,dragging=false,moved=false,lx=0,ly=0;
+  const apply=()=>{const s=lb.querySelector('svg');if(s)s.style.transform=`translate(${panX}px,${panY}px) scale(${scale})`};
+  const reset=()=>{scale=1;panX=0;panY=0};
+  const close=()=>{lb.classList.remove('open');const s=lb.querySelector('svg');if(s)s.remove();reset()};
+  document.addEventListener('click',e=>{
+    if(e.target.closest('.lightbox')){if(moved){moved=false;return}close();return}
+    const w=e.target.closest('.mermaid');if(!w)return;
+    const svg=w.querySelector('svg');if(!svg)return;
+    const c=svg.cloneNode(true);c.removeAttribute('style');
+    c.style.maxWidth='96vw';c.style.maxHeight='92vh';
+    lb.appendChild(c);lb.classList.add('open');reset();apply();
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+  lb.addEventListener('wheel',e=>{
+    if(!lb.classList.contains('open'))return;
+    e.preventDefault();
+    const svg=lb.querySelector('svg');if(!svg)return;
+    const ns=Math.max(0.3,Math.min(10,scale*(1-e.deltaY*0.002)));
+    const r=svg.getBoundingClientRect();
+    const cx=e.clientX-(r.left+r.width/2),cy=e.clientY-(r.top+r.height/2);
+    const k=ns/scale-1;panX-=cx*k;panY-=cy*k;scale=ns;apply();
+  },{passive:false});
+  lb.addEventListener('mousedown',e=>{
+    if(!lb.classList.contains('open'))return;
+    dragging=true;moved=false;lx=e.clientX;ly=e.clientY;lb.classList.add('dragging');e.preventDefault();
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    const dx=e.clientX-lx,dy=e.clientY-ly;
+    if(Math.abs(dx)+Math.abs(dy)>3)moved=true;
+    panX+=dx;panY+=dy;lx=e.clientX;ly=e.clientY;apply();
+  });
+  document.addEventListener('mouseup',()=>{dragging=false;lb.classList.remove('dragging')});
+});
+</script>
+</head><body><div class="container">
+
+<header>
+<div class="meta">
+<span class="tag day">Day 46</span>
+<span class="tag diff">Hard</span>
+<span class="tag">Consensus</span>
+<span class="tag">Raft / Paxos</span>
+<span class="tag">Coordination</span>
+</div>
+<h1>Distributed Consensus & Coordination — Getting 5 Machines to Agree on One Thing<span class="en">Raft/Paxos, Leader Election, Locks, Quorum & Split-Brain</span></h1>
+</header>
+
+<h2>Problem & Constraints</h2>
+<p>You're building the <strong>control plane</strong> for a database spanning 3 availability zones: who is the current sole primary (accepting writes)? Can this shard-migration task start right now? What's the address of <code>db-shard-7</code> in service discovery? Every one of these demands that <strong>all nodes see the same answer, and that the answer never splits into two under a network partition</strong>. This is distributed coordination, and the industry's standard answer is a consensus service like etcd / ZooKeeper / Chubby.</p>
+<p>Concrete design goal: a <strong>5-node strongly-consistent coordination service</strong> (etcd-like) —</p>
+<ul>
+<li><strong>Features</strong>: linearizable KV store, leader election, distributed locks, watch notifications.</li>
+<li><strong>Fault tolerance</strong>: <code>2f+1=5</code>, tolerate <em>f=2</em> node failures and still accept writes; under a partition, <strong>never split-brain</strong> (never produce two committing leaders).</li>
+<li><strong>Load profile</strong>: <em>read-heavy, write-light</em> — config/service-discovery reads at hundreds of thousands QPS, but write QPS is usually only hundreds to a few thousand (metadata changes are rare events). Write P99 &lt; 50ms, watch delivery &lt; 100ms.</li>
+<li><strong>Key constraint</strong>: tiny dataset (GB-scale metadata fits in memory), but <strong>zero tolerance for correctness bugs</strong> — one coordination error and hundreds of upstream services split-brain together.</li>
+</ul>
+
+<h2>High-Level Architecture</h2>
+<pre class="mermaid">
+graph TD
+    C["Client<br/><i>kubelet / db node</i>"]
+    subgraph RSM["Consensus Group (Replicated State Machine)"]
+      L["Leader<br/><i>term=7</i>"]
+      F1["Follower A"]
+      F2["Follower B"]
+      F3["Follower C"]
+      F4["Follower D"]
+    end
+    SM["State Machine KV<br/><i>apply committed log</i>"]
+
+    C -->|"1. write"| L
+    L -->|"2. AppendEntries<br/>replicate log"| F1
+    L -->|"2."| F2
+    L -->|"2."| F3
+    L -->|"2."| F4
+    F1 -.->|"3. ack"| L
+    F2 -.->|"3. ack"| L
+    L -->|"4. majority ack -> commit"| SM
+    SM -.->|"5. apply then reply"| C
+
+    classDef leader fill:#2a1530,stroke:#ff7ab6,color:#e8eef5
+    classDef follower fill:#1a2530,stroke:#64c8ff,color:#e8eef5
+    classDef sm fill:#1a1a30,stroke:#ffb450,color:#e8eef5
+    classDef client fill:#0e2030,stroke:#5eead4,color:#e8eef5
+    class L leader
+    class F1,F2,F3,F4 follower
+    class SM sm
+    class C client
+</pre>
+<p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">A write enters the leader's log, replicates to a <strong>majority (3/5)</strong>, and only then commits and applies to the state machine — "majority acknowledgment" is the bedrock of the whole system's safety</p>
+<p>Every write is serialized into a <strong>replicated log</strong>; each node applies it to its state machine in identical order and thus reaches identical state — the <em>Replicated State Machine</em> model. The leader orders; followers merely replicate. Consensus (Raft / Paxos / ZAB) solves exactly one problem: <strong>given that nodes crash and networks drop and partition, make all live nodes reach an irrevocable agreement on "what entry N of the log is."</strong></p>
+
+<h2>Key Technical Points</h2>
+
+<h3>1. The Essence of Consensus — Why It Must Be a Majority Quorum</h3>
+<p class="tradeoff"><strong>Core trade-off:</strong> a majority quorum trades "unavailable once more than half the nodes are down" for "any two decisions necessarily intersect, so they can't contradict." This is the mathematical bedrock of a CP system; the price is that <strong>availability is capped by the quorum</strong>.</p>
+<p><strong>Principle.</strong> Consensus must satisfy <em>Agreement</em> (all nodes agree on one value), <em>Validity</em> (the agreed value was actually proposed), and <em>Termination</em> (eventually decides). The mechanism is <strong>majority intersection</strong>: among 5 nodes, any two majorities (each ≥3) must share at least 1 node, and that node "remembers" the prior decision, preventing two conflicting committed values. That is exactly why <code>2f+1</code> nodes tolerate only <code>f</code> failures — you need a live majority to form a new decision while guaranteeing it intersects the historical one.</p>
+<div class="tradeoff">
+<strong>Trade-off (the three algorithm families):</strong>
+<table>
+<thead><tr><th>Algorithm</th><th>Strengths</th><th>Sacrifice</th></tr></thead>
+<tbody>
+<tr><td><strong>Multi-Paxos</strong></td><td>Earliest, most general, out-of-order commit</td><td>Brutal to understand/implement correctly; the paper omits engineering details</td></tr>
+<tr><td><strong>Raft</strong></td><td>Strong leader, contiguous log, understandability-first</td><td>In-order commit only; leader is the write bottleneck</td></tr>
+<tr><td><strong>ZAB</strong></td><td>ZooKeeper's atomic broadcast + recovery</td><td>Coupled to ZK semantics, not general-purpose</td></tr>
+</tbody></table>
+</div>
+<pre><code># Raft log replication core (leader side, pseudocode)
+def on_client_write(cmd):
+    entry = LogEntry(term=current_term, cmd=cmd)
+    log.append(entry)                       # append to own log first
+    replicate_to_followers(entry)           # parallel AppendEntries
+    # wait for a majority (including self)
+    if acked_count(entry) >= majority:       # 3/5
+        commit_index = entry.index          # advance commit point
+        apply_to_state_machine(entry)       # only now does it take effect
+        return OK
+    # no majority -> block/timeout, NEVER commit
+
+# Follower receiving AppendEntries: reject stale term, never go backwards
+def on_append_entries(req):
+    if req.term < current_term: return REJECT   # stale leader
+    if not log_matches(req.prev_index, req.prev_term): return REJECT  # log gap
+    log.append(req.entries); return ACK
+</code></pre>
+<div class="case"><strong>Real cases:</strong> <strong>etcd</strong> (Kubernetes' brain) uses Raft for all cluster metadata; <strong>Google Chubby</strong> (<a href="https://research.google/pubs/the-chubby-lock-service-for-loosely-coupled-distributed-systems/">Burrows, OSDI 2006</a>) uses Paxos to do leader election for GFS/BigTable; <strong>ZooKeeper</strong> uses ZAB; <strong>Kafka KRaft</strong> (KIP-500) replaced ZooKeeper with a Raft-variant quorum controller, and Kafka 4.0 removed the ZK dependency entirely.</div>
+
+<h3>2. Leader Election & Split-Brain Defense — Monotonic term + Majority = the old king can't return</h3>
+<p class="tradeoff"><strong>Core trade-off:</strong> a monotonic term plus majority election guarantees at most one <em>committable</em> leader at any instant; the price is that the cluster is write-unavailable during elections (a few hundred ms).</p>
+<p><strong>Principle.</strong> Each election produces a <strong>monotonically increasing term (ballot in Paxos, epoch in ZAB)</strong>. A candidate wins only with a majority of votes, and majority intersection guarantees <strong>no two leaders can be elected in one term</strong>. Under a partition, a minority side (≤2 nodes) can't reach a majority, so it can neither elect a new leader nor commit any write; the majority side elects a leader with a higher term. Even if the old leader is still alive and still thinks it's leader, its <code>AppendEntries</code> carrying the old term is <strong>REJECTED</strong> by everyone — this is how <strong>split-brain is killed mathematically</strong>: you can have two "self-proclaimed leaders," but only one can assemble a majority to commit.</p>
+<div class="tradeoff">
+<strong>Trade-off (how to neutralize a stale leader):</strong>
+<ul>
+<li><strong>Pure term fencing</strong>: no clock dependency, safest; but every write (and possibly read) must go through consensus.</li>
+<li><strong>Leader lease</strong>: within the lease, the leader serves locally at low latency; but <strong>depends on clocks not drifting</strong> — a GC pause or clock jump makes a stale leader think its lease is still valid.</li>
+<li><strong>Generation/fencing token</strong>: carry the term all the way down to storage for validation, fully plugging the stale-actor hole; requires downstream to reject old tokens.</li>
+</ul>
+</div>
+<pre><code># Storage rejects a stale leader via a fencing token (monotonic check is key)
+current_token = 0
+def write(payload, token):
+    global current_token
+    if token < current_token:          # smaller = stale leader / stale lease
+        raise StaleLeaderError          # reject! even if it still thinks it's leader
+    current_token = token
+    persist(payload)
+</code></pre>
+<div class="case"><strong>Real cases:</strong> ZooKeeper uses <strong>zxid</strong> (epoch+counter) for total order and fencing; Chubby hands out a <strong>sequencer</strong> (essentially a fencing token) for downstream validation; etcd's <strong>lease + revision</strong> lets leader-election results be verified downstream. Kleppmann in <em>DDIA</em> chapters 8/9 repeats it: <em>a distributed lock without a fencing token is simply wrong</em>.</div>
+
+<h3>3. Doing Distributed Locks Right — TTL Isn't Enough, the Fencing Token Is the Lifeline</h3>
+<p class="tradeoff"><strong>Core trade-off:</strong> a consensus-based lock (ZK/etcd) is slower than Redis Redlock but buys <strong>provable uniqueness</strong>; a pure-TTL lock inevitably produces two owners under GC/network delay.</p>
+<p><strong>Principle.</strong> The classic illusion: client A acquires a lock (TTL=10s); while working it hits a sudden <strong>15s stop-the-world GC pause</strong>; the lock expires, B acquires it and starts writing; A wakes up, <em>unaware it lost the lock</em>, and keeps writing → <strong>two clients hold the lock and write the same resource at once</strong>. TTL can never plug this hole, because there's always a gap between "check the lock" and "use the lock." The only correct fix: the lock service issues a <strong>monotonically increasing fencing token</strong>; the client attaches the token to every downstream operation, and storage <strong>rejects any token smaller than the largest it has seen</strong> — A wakes up with a stale token and its write is bounced.</p>
+<div class="tradeoff">
+<strong>Trade-off (three lock implementations):</strong>
+<table>
+<thead><tr><th></th><th>ZooKeeper ephemeral-sequential</th><th>etcd lease</th><th>Redis Redlock</th></tr></thead>
+<tbody>
+<tr><td><strong>Uniqueness guarantee</strong></td><td>Strong (consensus + session)</td><td>Strong (Raft + lease)</td><td>Disputed (Kleppmann's critique)</td></tr>
+<tr><td><strong>Fencing token</strong></td><td>zxid built-in</td><td>revision built-in</td><td>None built-in; must roll your own</td></tr>
+<tr><td><strong>Failure detection</strong></td><td>Session heartbeat, auto-release on disconnect</td><td>Lease keepalive</td><td>TTL expiry</td></tr>
+<tr><td><strong>Latency</strong></td><td>Higher (goes through consensus)</td><td>Higher (goes through consensus)</td><td>Low (in-memory)</td></tr>
+</tbody></table>
+</div>
+<pre><code># ZooKeeper style: ephemeral-sequential node = natural fair lock + fencing
+def acquire_lock(zk):
+    my = zk.create("/lock/req-", ephemeral=True, sequential=True)  # yields req-000007
+    while True:
+        kids = sorted(zk.children("/lock"))
+        if my == kids[0]:                    # my number is smallest -> hold lock
+            return seq_num(my)               # the number IS the fencing token (monotonic)
+        prev = predecessor(kids, my)         # watch only the node before me -> no herd
+        zk.watch(prev)                       # predecessor released/session lost -> wake me
+        wait()
+</code></pre>
+<div class="case"><strong>Real cases:</strong> many systems use <strong>ZooKeeper ephemeral-sequential nodes</strong> for fair locks and leader election (HBase HMaster, early Kafka controller). Kleppmann's classic <a href="https://martin.kleppmann.com/2016/02/08/how-to-do-distributed-locking.html">"How to do distributed locking"</a> systematically argues that "Redlock lacks a fencing token → it cannot protect operations with side effects" — required reading for this debate.</div>
+
+<h3>4. The Cost of Linearizable Reads — "Read from the Leader Locally" Is a Classic Bug</h3>
+<p class="tradeoff"><strong>Core trade-off:</strong> quorum read is safe but slow; lease read is fast but bets on the clock; follower read scales but may read stale. Pick one, depending on whether you truly need linearizability.</p>
+<p><strong>Principle.</strong> Intuitively "the leader has the latest data, just read its local memory" — <strong>wrong</strong>. A leader may have just been deposed by a majority and a new leader elected, while it <em>doesn't know yet</em> (a partition isolated it). Reading its local state returns a <strong>stale value</strong>, breaking linearizability. The correct approach: before reading, the leader must <strong>confirm it is still leader</strong> — Raft's <em>ReadIndex</em>: record the current commit index, do one round of heartbeats to confirm leadership still holds with a majority, then return the value at that index.</p>
+<div class="tradeoff">
+<strong>Trade-off (three linearizable-read schemes):</strong>
+<ul>
+<li><strong>Quorum / ReadIndex read</strong>: strictly linearizable; but every read costs an extra network round (heartbeat).</li>
+<li><strong>Leader lease read</strong>: local read within the lease, zero round-trips, fastest; but once the clock assumption breaks (drift/pause) it reads stale.</li>
+<li><strong>Follower read</strong>: read throughput scales horizontally; but only guarantees "not older than some instant," non-linearizable by default (TiKV compensates with read index + waiting for apply).</li>
+</ul>
+</div>
+<pre><code># Raft ReadIndex: confirm leadership before reading, avoiding stale-leader reads
+def linearizable_read(key):
+    idx = commit_index                     # record current commit point
+    if not confirm_leadership_via_quorum(): # one heartbeat round; a majority must reply
+        raise NotLeaderError               # deposed -> reject, forward to real leader
+    wait_until(applied_index >= idx)       # wait for state machine to catch up
+    return state_machine.get(key)          # what we read now cannot be stale
+</code></pre>
+<div class="case"><strong>Real cases:</strong> <a href="https://aphyr.com/posts/316-jepsen-etcd-and-consul">Jepsen's analysis of etcd/Consul</a> landed on exactly this trap — early etcd's "consistent read" read the leader's local state directly, and Aphyr found <strong>about 80% of histories were non-linearizable</strong> (could read index 5→4→6, going backwards); etcd then moved to ReadIndex/quorum reads. TiKV and CockroachDB use leader-lease reads to skip the majority round-trip while preserving correctness.</div>
+
+<h2>Scaling & Optimization</h2>
+<ul>
+<li><strong>Learner / non-voting members</strong>: a new node joins as a learner first (replicates the log, doesn't vote), then is promoted once caught up — avoiding a drop in quorum availability at the moment of joining (etcd learner, Raft joint consensus).</li>
+<li><strong>Witness / tiebreaker node</strong>: when spanning only 2 AZs, place a vote-only, no-full-data arbiter to cheaply get an odd number of votes and break 2-2 ties.</li>
+<li><strong>Multi-Raft / sharded consensus</strong>: a single Raft group's write throughput is bottlenecked by its leader. Split the key space into thousands of Raft groups, each electing and replicating independently → write throughput scales horizontally. CockroachDB, TiKV, YugabyteDB all take this route.</li>
+<li><strong>Flexible Paxos</strong>: the election quorum and the replication quorum only need to <em>intersect</em>, not both be majorities — you can shrink the replication quorum for lower latency, compensated by a larger election quorum.</li>
+<li><strong>Batching + pipelining</strong>: batch many log entries into one <code>AppendEntries</code> and allow several in flight, lifting throughput from hundreds to tens of thousands of writes/sec.</li>
+<li><strong>Leader placement</strong>: in a geo-deployment, put the leader in the AZ with the densest write traffic to cut client→leader cross-ocean round-trips.</li>
+</ul>
+
+<h2>Common Pitfalls + Interview Questions</h2>
+<div class="callout"><strong>1. Even node counts are pure waste.</strong> A 4-node majority is 3, same as 3 nodes — tolerates only 1 failure, yet costs an extra machine and raises the odds of a 2-2 deadlock under a partition. Consensus groups are always <strong>odd</strong> (3/5/7).</div>
+<div class="callout"><strong>2. The "read from leader locally" stale bug.</strong> A frequent interview trap: a candidate says "just read the leader," then you ask "what if the leader was deposed by a partition but doesn't know?" — must ReadIndex/lease to confirm leadership.</div>
+<div class="callout"><strong>3. A distributed lock without a fencing token.</strong> Relying on TTL/session alone before writing data means a GC pause gives you two owners. Being able to say "monotonic fencing token + storage-side validation" is a senior signal.</div>
+<div class="callout"><strong>4. Using a lease while assuming perfect clocks.</strong> Leader-lease-read correctness depends on "clock drift being bounded"; a frozen VM or an NTP jump can break it. Either leave ample safety margin or fall back to quorum reads.</div>
+<div class="callout"><strong>5. Treating consensus as high-throughput storage.</strong> Every write goes through majority replication — inherently low-throughput, strongly-consistent control-plane tooling. Don't dump high-frequency business writes into etcd/ZK; they're coordinators, not your primary database.</div>
+<p><strong>Other frequent follow-ups:</strong> (1) Why not use 2PC for coordination? (Coordinator single point; participants block; not fault-tolerant.) (2) How do you place 5 nodes across 3 AZs to survive one AZ dying? (3) What's the real difference between Raft and Paxos? (4) How do watches guarantee no missed events (etcd revision + resumable streaming)?</p>
+
+<h2>Deeper Resources</h2>
+<ul>
+<li><strong>Raft paper</strong> "In Search of an Understandable Consensus Algorithm" (Ongaro & Ousterhout, USENIX ATC 2014) — <a href="https://raft.github.io/">raft.github.io</a> has the paper, a visualization, and implementations in many languages. The best starting point for consensus.</li>
+<li><strong>Chubby paper</strong> "The Chubby Lock Service for Loosely-Coupled Distributed Systems" (<a href="https://research.google/pubs/the-chubby-lock-service-for-loosely-coupled-distributed-systems/">Burrows, OSDI 2006</a>) — firsthand experience turning Paxos into a production lock service.</li>
+<li><strong>"Designing Data-Intensive Applications" ch. 8 & 9</strong> (Kleppmann) — the authoritative treatment of unreliable systems, consistency, and consensus; the fencing-token argument lives here.</li>
+<li><strong>Kleppmann, "How to do distributed locking"</strong> — the <a href="https://martin.kleppmann.com/2016/02/08/how-to-do-distributed-locking.html">Redlock debate</a>, explaining why distributed locks must fence.</li>
+<li><strong>Jepsen: etcd and Consul</strong> — <a href="https://aphyr.com/posts/316-jepsen-etcd-and-consul">Aphyr</a> uses adversarial testing to expose "consistent reads that are actually non-linearizable," a model for validating consensus systems in practice.</li>
+</ul>
+
+<h2>Deep-Dive Questions (click to expand)</h2>
+
+<details>
+<summary>1. A majority is one way to make "any two quorums intersect." Flexible Paxos says the election quorum and replication quorum only need to intersect — what does this reveal about consensus, and how can you exploit it?</summary>
+<div class="answer">
+<p>What consensus safety truly needs is <strong>not "a majority" but "a new decision's quorum is guaranteed to meet an old decision's quorum"</strong> — a majority is merely the simplest sufficient condition for intersection (any two sets each &gt;N/2 must intersect).</p>
+<p><strong>Flexible Paxos's insight</strong>: as long as the <em>election quorum Q1</em> and <em>replication quorum Q2</em> satisfy <code>|Q1| + |Q2| &gt; N</code> (guaranteeing intersection), it's safe. So you can configure them <strong>asymmetrically</strong>: shrink the replication quorum (e.g. only 2 acks to commit among 5 nodes) to cut write latency, at the cost of a larger election quorum (needing 4). For "write-frequent, election-rare" loads this is a net win — moving cost off the hot path (every write) onto the cold path (occasional election).</p>
+<p><strong>Corollary</strong>: you can also do "grid quorums" and other topologies so cross-region replication needs only a local majority plus a few remote nodes, optimizing geographic latency. Essentially it exposes the "intersection" constraint as an explicit tuning knob.</p>
+</div>
+</details>
+
+<details>
+<summary>2. To have 5 nodes survive an entire AZ dying, how do you place them across 3 AZs? Why can't you just do 3-1-1 or 2-2-1 arbitrarily?</summary>
+<div class="answer">
+<p>Key: after any single AZ dies, <strong>the remaining nodes must still form a majority (3/5)</strong>.</p>
+<ul>
+<li><strong>2-2-1 layout</strong>: AZs hold 2/2/1. Lose a 2-node AZ → 3 remain, exactly a majority, available ✅. Lose the 1-node AZ → 4 remain, no problem. <strong>This is the correct layout.</strong></li>
+<li><strong>3-1-1 layout</strong>: lose the 3-node AZ → only 2 remain, &lt;3 is not a majority, <strong>the cluster is entirely write-unavailable</strong> ❌. Putting too many votes in one AZ enlarges the single failure domain.</li>
+<li><strong>2 AZs (3-2)</strong>: losing the 3-node AZ directly loses the majority; and under a partition between the two AZs, the 2-node side can never elect a leader. <strong>To survive AZ-level failure you need at least 3 AZs.</strong></li>
+</ul>
+<p><strong>Cost optimization</strong>: if the third AZ should hold only 1 node, use a "witness / no-data arbiter" — it only votes and stores no full data, cheaply buying the odd vote and tie-breaking power.</p>
+</div>
+</details>
+
+<details>
+<summary>3. A client holding a lock hits a 30s GC pause. Why can't a longer lease or renewal save you? Why does only a fencing token cure it?</summary>
+<div class="answer">
+<p><strong>A longer lease doesn't help</strong>: you don't know how long the pause lasts; whatever you set can be beaten by a longer pause; and the longer the lease, the longer everyone else waits when a real crash happens, wrecking availability.</p>
+<p><strong>Renewal doesn't help</strong>: during a GC pause the <em>entire process is frozen</em>, so it can't execute renewal heartbeats. By the time it wakes, the lock has long changed hands elsewhere.</p>
+<p><strong>Root cause</strong>: no matter how you tune the timing, there's <strong>always a window between "the client checks am I still the lock holder" and "the client actually writes,"</strong> and the pause can land precisely in that window. It's a timing problem, not a duration problem — lengthening times just makes the window harder to hit, not gone.</p>
+<p><strong>Why a fencing token cures it</strong>: it moves the verdict from "the client's unreliable self-perception" to "the storage's monotonic validation." The awakened old client arrives with token=33, but storage has already raised its watermark because the new holder wrote with token=34, so 33 &lt; 34 is rejected outright. <strong>Correctness no longer depends on any timing assumption</strong> — even if the client pauses for an hour, its old token can never get through. This turns a "timing problem" into a "monotonic-ordering problem."</p>
+</div>
+</details>
+
+<details>
+<summary>4. etcd defaults to quorum reads (ReadIndex), noticeably slower. When is a follower read safe? And how does CockroachDB's leader-lease read skip the round-trip?</summary>
+<div class="answer">
+<p><strong>Why default to quorum read</strong>: only by confirming "I am still leader right now and have seen all committed writes" can you guarantee linearizability. Reading local state directly = betting you weren't quietly deposed, and Jepsen proved that reads backwards values.</p>
+<p><strong>When follower reads are safe</strong>: (1) the business can accept <em>bounded staleness</em> (e.g. "at most 5s stale"), giving up linearizability for throughput; or (2) the follower uses a <strong>read-index mechanism</strong> — ask the leader for the current commit index, wait for local apply to catch up to that index, then return; this yields a "no-earlier-than-request-time" linearizable read at the cost of waiting to catch up (TiKV's approach). Purely "read local follower memory" is always non-linearizable.</p>
+<p><strong>Why leader-lease reads skip round-trips</strong>: the leader holds a <em>time-bounded leadership lease</em>; as long as it's within the lease and the system guarantees "no new leader is elected before the old lease expires" (a new election must wait out the old lease), the leader can be sure it's still the sole leader and <strong>read locally without a per-read heartbeat</strong>. Cost: correctness depends on <strong>bounded clock drift</strong> — a frozen VM or a big NTP jump can break it, so you leave a safety margin (compute the lease more conservatively than the theoretical value).</p>
+</div>
+</details>
+
+<details>
+<summary>5. Why can't a consensus group's write throughput scale by "adding machines," and might it even get slower? How does Multi-Raft get around this wall?</summary>
+<div class="answer">
+<p><strong>Why adding machines doesn't raise throughput, or even lowers it</strong>: within a single Raft/Paxos group all writes serialize through the same leader, which is the absolute bottleneck. Adding followers doesn't share writes — instead each log entry must replicate to more nodes, the leader's outbound network and fsync pressure grow, and the majority threshold rises (7 nodes need 4 acks, so tail latency is dragged by the slowest). That's why consensus groups usually stop at 5-7 nodes: beyond that you only add fault tolerance, not performance.</p>
+<p><strong>Multi-Raft's breakthrough</strong>: since one group can't scale, run <strong>thousands of groups</strong>. Split the key space into many ranges/shards; each shard is an independent Raft group with its own leader, log, and majority. Spread the shard leaders across different physical nodes → <strong>write throughput scales with the shard count</strong>, and one machine is simultaneously leader of some groups and follower of others.</p>
+<p><strong>New costs</strong>: atomic operations across shards need an extra distributed-transaction layer (2PC over Raft groups); shard splitting/merging/rebalancing becomes a new source of complexity; and heartbeats for thousands of Raft groups flood the network, so you need <em>Raft group heartbeat coalescing</em> (batching multi-group heartbeats between the same pair of nodes into one). CockroachDB and TiKV exemplify this route.</p>
+</div>
+</details>
+
+<div class="nav"><a href="index.en.html">← Back to index</a></div>
+</div>
+</body></html>
