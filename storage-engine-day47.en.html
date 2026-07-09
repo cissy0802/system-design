@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 47 · Database Internals & Storage Engines — System Design</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"SF Pro Display","Noto Sans SC",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
+.container{max-width:820px;margin:0 auto;padding:24px 20px 60px}
+header{padding:40px 0 28px;border-bottom:1px solid rgba(100,200,255,0.15);margin-bottom:32px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem}
+.tag{padding:3px 10px;border-radius:4px;background:rgba(100,200,255,0.12);color:#64c8ff;border:1px solid rgba(100,200,255,0.25)}
+.tag.diff{background:rgba(94,234,212,0.1);color:#5eead4;border-color:rgba(94,234,212,0.3)}
+.tag.day{background:rgba(255,180,80,0.1);color:#ffb450;border-color:rgba(255,180,80,0.25)}
+h1{font-size:1.75rem;font-weight:800;background:linear-gradient(135deg,#64c8ff 0%,#5eead4 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:0.5px;line-height:1.3}
+h1 .en{display:block;font-size:1rem;color:#7a8590;-webkit-text-fill-color:#7a8590;margin-top:6px;font-weight:500}
+h2{font-size:1.2rem;color:#5eead4;margin:36px 0 14px;padding-left:12px;border-left:3px solid #5eead4}
+h3{font-size:1rem;color:#64c8ff;margin:20px 0 10px;font-weight:600}
+p{margin:10px 0;color:#c8cfd6}
+ul,ol{margin:10px 0 10px 22px;color:#c8cfd6}
+li{margin:6px 0}
+strong{color:#e8eef5;font-weight:600}
+em{color:#5eead4;font-style:normal;font-weight:500}
+code{font-family:"SF Mono",Menlo,Consolas,monospace;background:rgba(100,200,255,0.1);color:#5eead4;padding:1px 6px;border-radius:3px;font-size:0.88em}
+pre{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:14px 16px;overflow-x:auto;margin:12px 0;font-family:"SF Mono",Menlo,Consolas,monospace;font-size:0.84rem;line-height:1.55;color:#c8cfd6}
+pre code{background:none;color:inherit;padding:0;font-size:1em}
+.mermaid{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:18px;margin:14px 0;text-align:center;overflow-x:auto;cursor:zoom-in;transition:border-color 0.15s}
+.mermaid:hover{border-color:rgba(100,200,255,0.4)}
+.mermaid svg{width:100%;max-width:100%;height:auto;min-height:280px}
+.lightbox{position:fixed;inset:0;background:rgba(8,12,18,0.96);z-index:9999;display:none;align-items:center;justify-content:center;padding:24px;cursor:grab;backdrop-filter:blur(4px);overflow:hidden}
+.lightbox.open{display:flex}
+.lightbox.dragging{cursor:grabbing}
+.lightbox svg{width:auto;height:auto;max-width:96vw;max-height:92vh;transform-origin:center center;will-change:transform}
+.lightbox .hint{position:fixed;top:16px;right:20px;font-size:0.78rem;color:#7a8590;font-family:"SF Mono",Menlo,monospace;pointer-events:none}
+.callout{background:rgba(255,180,80,0.06);border-left:3px solid #ffb450;padding:12px 14px;margin:14px 0;border-radius:4px;font-size:0.94rem}
+.callout strong{color:#ffb450}
+.tradeoff{background:rgba(100,200,255,0.05);border:1px solid rgba(100,200,255,0.2);border-radius:6px;padding:12px 14px;margin:12px 0;font-size:0.94rem}
+.case{background:rgba(94,234,212,0.05);border-left:3px solid #5eead4;padding:12px 14px;margin:12px 0;border-radius:4px;font-size:0.94rem}
+.case strong{color:#5eead4}
+.nav{margin-top:50px;padding-top:24px;border-top:1px solid rgba(100,200,255,0.15);text-align:center}
+.nav a{color:#64c8ff;text-decoration:none;font-size:0.92rem;padding:8px 16px;border:1px solid rgba(100,200,255,0.3);border-radius:4px;transition:all 0.15s}
+.nav a:hover{background:rgba(100,200,255,0.1)}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:0.9rem}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid rgba(100,200,255,0.15)}
+th{color:#64c8ff;font-weight:600;background:rgba(100,200,255,0.05)}
+details{background:rgba(100,200,255,0.04);border:1px solid rgba(100,200,255,0.18);border-radius:6px;padding:12px 16px;margin:10px 0;transition:all 0.15s}
+details:hover{border-color:rgba(100,200,255,0.35)}
+details[open]{background:rgba(94,234,212,0.05);border-color:rgba(94,234,212,0.3)}
+details summary{font-weight:600;color:#e8eef5;list-style:none;outline:none;cursor:pointer;display:flex;align-items:flex-start;gap:10px;font-size:0.96rem}
+details summary::-webkit-details-marker{display:none}
+details summary::before{content:'▶';color:#64c8ff;font-size:0.75em;transition:transform 0.2s;flex-shrink:0;margin-top:5px}
+details[open] summary::before{transform:rotate(90deg);color:#5eead4}
+details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
+details .answer ul,details .answer ol{margin:6px 0 6px 22px}
+@media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+</style>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({startOnLoad:true,theme:'base',flowchart:{useMaxWidth:true,htmlLabels:true,nodeSpacing:50,rankSpacing:60},themeVariables:{primaryColor:'#1a2530',primaryTextColor:'#e8eef5',primaryBorderColor:'#64c8ff',lineColor:'#5eead4',secondaryColor:'#0e1419',tertiaryColor:'#0a0f14',background:'#0a0f14',mainBkg:'#1a2530',secondBkg:'#0e1419',textColor:'#d4dae0',fontFamily:'-apple-system,"SF Pro Display",sans-serif',fontSize:'16px'}});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const lb=document.createElement('div');lb.className='lightbox';
+  lb.innerHTML='<span class="hint">scroll = zoom · drag = pan · Esc / click bg = close</span>';
+  document.body.appendChild(lb);
+  let scale=1,panX=0,panY=0,dragging=false,moved=false,lx=0,ly=0;
+  const apply=()=>{const s=lb.querySelector('svg');if(s)s.style.transform=`translate(${panX}px,${panY}px) scale(${scale})`};
+  const reset=()=>{scale=1;panX=0;panY=0};
+  const close=()=>{lb.classList.remove('open');const s=lb.querySelector('svg');if(s)s.remove();reset()};
+  document.addEventListener('click',e=>{
+    if(e.target.closest('.lightbox')){if(moved){moved=false;return}close();return}
+    const w=e.target.closest('.mermaid');if(!w)return;
+    const svg=w.querySelector('svg');if(!svg)return;
+    const c=svg.cloneNode(true);c.removeAttribute('style');
+    c.style.maxWidth='96vw';c.style.maxHeight='92vh';
+    lb.appendChild(c);lb.classList.add('open');reset();apply();
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+  lb.addEventListener('wheel',e=>{
+    if(!lb.classList.contains('open'))return;
+    e.preventDefault();
+    const svg=lb.querySelector('svg');if(!svg)return;
+    const ns=Math.max(0.3,Math.min(10,scale*(1-e.deltaY*0.002)));
+    const r=svg.getBoundingClientRect();
+    const cx=e.clientX-(r.left+r.width/2),cy=e.clientY-(r.top+r.height/2);
+    const k=ns/scale-1;panX-=cx*k;panY-=cy*k;scale=ns;apply();
+  },{passive:false});
+  lb.addEventListener('mousedown',e=>{
+    if(!lb.classList.contains('open'))return;
+    dragging=true;moved=false;lx=e.clientX;ly=e.clientY;lb.classList.add('dragging');e.preventDefault();
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    const dx=e.clientX-lx,dy=e.clientY-ly;
+    if(Math.abs(dx)+Math.abs(dy)>3)moved=true;
+    panX+=dx;panY+=dy;lx=e.clientX;ly=e.clientY;apply();
+  });
+  document.addEventListener('mouseup',()=>{dragging=false;lb.classList.remove('dragging')});
+});
+</script>
+</head><body><div class="container">
+
+<header>
+<div class="meta">
+<span class="tag day">Day 47</span>
+<span class="tag diff">Hard</span>
+<span class="tag">Storage Engine</span>
+<span class="tag">B-tree / LSM</span>
+<span class="tag">WAL / MVCC</span>
+</div>
+<h1>Database Internals & Storage Engines — What Actually Happens to a Read/Write on Disk<span class="en">B-tree vs LSM, WAL & Crash Recovery, MVCC, Query Optimizer</span></h1>
+</header>
+
+<h2>Problem Scenario + Constraints</h2>
+<p>You're choosing the storage engine under a <strong>transactional/ledger system</strong>: order-table write peak <strong>100K QPS</strong>, point lookups (by order id) <strong>50K QPS</strong>, a single table growing past <strong>10 TB</strong>, and after a crash you must recover with <em>zero data loss</em> (RPO=0), while heavy concurrent reads and writes must not block each other. The real question isn't "MySQL or Postgres" — it's: <strong>how do these engines guarantee that one <code>UPDATE</code> is fast, durable, and simultaneously readable as a consistent snapshot by another transaction</strong>?</p>
+<p>Answering that means opening the database black box and seeing four things clearly: <em>how data is laid out on disk (B-tree vs LSM), how nothing is lost on crash (WAL), how concurrent reads/writes avoid fighting (MVCC), and how one SQL statement becomes an optimal on-disk access path (the optimizer)</em>. This is also the dividing line between building storage-intensive systems and merely using them.</p>
+
+<h2>High-Level Architecture (Storage Engine Cross-Section)</h2>
+<pre class="mermaid">
+graph TD
+    SQL["SQL query"] --> PARSE["Parser + Planner<br/><i>cost-based optimizer</i>"]
+    PARSE --> EXEC["Executor<br/><i>Access Method API</i>"]
+    EXEC --> AM{"Storage engine"}
+    AM -->|read-heavy| BT["B+Tree<br/><i>InnoDB / Postgres</i>"]
+    AM -->|write-heavy| LSM["LSM-Tree<br/><i>RocksDB / Cassandra</i>"]
+
+    BT --> BP["Buffer Pool<br/><i>page cache · dirty pages</i>"]
+    LSM --> MEM["MemTable<br/><i>in-memory sorted table</i>"]
+
+    WRITE["write path"] -.first write.-> WAL[("WAL / redo log<br/><i>sequential append</i>")]
+    BP -->|checkpoint flushes dirty| DISK[("data files<br/>heap / SSTable")]
+    MEM -->|flush + compaction| DISK
+    WAL -.crash recovery redo/undo.-> BP
+
+    classDef q fill:#1a2530,stroke:#64c8ff,color:#e8eef5
+    classDef eng fill:#1a1a30,stroke:#ffb450,color:#e8eef5
+    classDef dur fill:#2a1530,stroke:#ff7ab6,color:#e8eef5
+    class SQL,PARSE,EXEC q
+    class BT,LSM,BP,MEM eng
+    class WAL,DISK dur
+</pre>
+<p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">The core invariant: before any data lands, <strong>write the WAL first</strong> (sequential IO); the data structure itself dictates the read/write/space amplification trade-off</p>
+
+<h2>Key Technical Points</h2>
+
+<h3>1. B-tree vs LSM-tree — you can't have low read AND write amplification</h3>
+<p><strong>Principle</strong>: on disk (HDD and even SSD) sequential writes far outrun random writes. A <em>B+Tree</em> organizes data <strong>in place</strong> into sorted pages: lookups are O(log n) and a point query reads one leaf page — read-friendly; but updating a row means reading its page in, modifying, and writing it back — a <strong>random write</strong>, and changing a few bytes still flushes a whole page (write amplification). An <em>LSM-Tree</em> flips this: writes only append to an in-memory MemTable, which when full is flushed sequentially into immutable SSTables, later merged by background compaction — <strong>turning random writes into sequential ones</strong>, giving huge write throughput; the cost is that a key may be scattered across multiple SSTable levels, so a point query probes several levels (read amplification), mitigated by Bloom Filters.</p>
+<div class="tradeoff">
+<strong>Trade-off (the RUM triangle: Read / Update / Memory amplification — optimize at most two):</strong>
+<ul>
+<li><strong>B+Tree</strong>: ✅ low read amp, fast range scans, in-place updates save space; ❌ high write amp (page-level flush + double-write to WAL), random writes, write jitter. Fits <em>read-heavy, mixed point/range</em> OLTP.</li>
+<li><strong>LSM-Tree</strong>: ✅ low write amp (sequential writes), high compression (immutable files compress well), space-efficient; ❌ high read amp, compaction steals IO causing latency spikes, transient space doubling. Fits <em>write-heavy, time-series/log/KV</em>.</li>
+<li><strong>Key insight</strong> (Mark Callaghan): read / write / space amplification — you <em>sacrifice at least one</em>; there's no free lunch. Choosing an engine = choosing which amplification you can tolerate.</li>
+</ul></div>
+<pre><code># LSM point read: newest to oldest levels, Bloom Filter skips absent levels
+def lsm_get(key):
+    if v := memtable.get(key):           # (1) memory, newest
+        return None if v is TOMBSTONE else v
+    for sst in sstables_newest_to_oldest():   # (2) L0->Ln, level by level
+        if not sst.bloom.might_contain(key):  # ~1% false positive rate
+            continue                          # most levels skipped
+        if v := sst.get(key):                 # hit (delete = tombstone)
+            return None if v is TOMBSTONE else v
+    return None
+# write: append only; delete also "writes a tombstone", real reclaim at compaction
+</code></pre>
+<div class="case">
+<strong>Real cases:</strong>
+<ul>
+<li><strong>MySQL InnoDB</strong>: classic B+Tree; primary key is the clustered index, secondary indexes store the PK value (a back-lookup). The default OLTP engine.</li>
+<li><strong>RocksDB (Facebook)</strong>: LSM engine, the substrate under MyRocks, TiKV, CockroachDB, Kafka Streams. The <a href="https://github.com/facebook/rocksdb/wiki">RocksDB wiki</a> details leveled/universal compaction.</li>
+<li><strong>Cassandra / HBase</strong>: LSM, built for high write throughput; standard for time-series and wide-column workloads.</li>
+<li><strong>Uber</strong>: because of Postgres write amplification/replication cost, they <a href="https://www.uber.com/en-US/blog/postgres-to-mysql-migration/">migrated to MySQL/InnoDB</a> — both B-tree family, but index structure differences drove write cost.</li>
+</ul></div>
+
+<h3>2. WAL & Crash Recovery — log first, only then touch data</h3>
+<p><strong>Principle</strong>: a data page is modified in the in-memory buffer pool into a "dirty page"; if the machine crashes before that dirty page reaches disk, the change is lost. The iron rule of <strong>WAL (Write-Ahead Logging)</strong>: <em>the redo log for any page modification must be sequentially written and fsync'd to disk before the dirty page is allowed to flush</em>. Then, after a crash, replaying the WAL rebuilds the lost in-memory changes. Sequential WAL writes also amortize "many random writes" into "one sequential write + async dirty flush", which actually speeds things up. The industry standard is <em>ARIES</em>: three-phase recovery — <strong>Analysis</strong> (find dirty pages and active transactions at crash time), <strong>Redo</strong> (replay to the exact crash-instant state, including uncommitted transactions), <strong>Undo</strong> (roll back uncommitted transactions) — with LSN, checkpoints, and CLRs making it idempotent and restartable.</p>
+<div class="tradeoff">
+<strong>Trade-off (durability vs latency, driven by fsync timing):</strong>
+<ul>
+<li><strong>fsync per transaction</strong> (e.g. <code>innodb_flush_log_at_trx_commit=1</code>): ✅ RPO=0, true durability; ❌ a disk sync per commit — high latency, limited throughput.</li>
+<li><strong>Group commit</strong>: ✅ batch a group of transactions into one fsync, 10x throughput; ❌ tail transactions wait a few extra milliseconds. Enabled by default in almost all production databases.</li>
+<li><strong>Relaxed (=2 / async)</strong>: ✅ very fast; ❌ crash loses the last ~1s of committed transactions. Never for a ledger; fine for cache-like data.</li>
+</ul></div>
+<pre><code># WAL ordering at commit (simplified)
+def commit(txn):
+    lsn = wal.append(txn.redo_records)   # (1) append redo sequentially (incl. undo info)
+    wal.fsync_up_to(lsn)                 # (2) force to disk -- only after this is it "committed"
+    mark_committed(txn)                  # (3) only now reply OK to the client
+    # dirty pages flushed later by checkpoint; a crash is repaired by redo replay
+</code></pre>
+<div class="case">
+<strong>Real cases:</strong>
+<ul>
+<li><strong>PostgreSQL</strong>: WAL + checkpoint; the <code>pg_wal</code> directory is the log; physical replication and PITR all rely on it.</li>
+<li><strong>InnoDB</strong>: redo log (physical, for recovery) + undo log (logical, for MVCC/rollback), group commit on by default.</li>
+<li><strong>RocksDB</strong>: a WAL also fronts the MemTable; its WAL is deletable only after the flush succeeds.</li>
+<li><strong>ARIES</strong> (IBM, Mohan et al.): the theoretical blueprint for crash recovery in nearly all relational databases.</li>
+</ul></div>
+
+<h3>3. MVCC — reads don't block writes, writes don't block reads</h3>
+<p><strong>Principle</strong>: if reads and writes mutually exclude via locks, one long-running read blocks all writes. <strong>MVCC (Multi-Version Concurrency Control)</strong> makes each update <em>not overwrite the old row</em> but produce a new version, each row tagged with the creating/deleting transaction timestamps (xmin/xmax). A transaction takes a <strong>snapshot</strong> at start and, when reading, only sees versions "visible to me" — so <em>reads never take locks, see a consistent snapshot, and writes never wait on reads</em>. This is the basis of <code>REPEATABLE READ</code> / Snapshot Isolation. The cost is that old versions pile up and must be reclaimed: Postgres uses <em>VACUUM</em> to clean dead tuples, InnoDB uses a <em>purge</em> thread to clean undo.</p>
+<div class="tradeoff">
+<strong>Trade-off (where old versions live -> decides write amp and reclamation pain):</strong>
+<ul>
+<li><strong>Postgres-style (new version written into the heap)</strong>: ✅ fast rollback, old version in place; ❌ <em>every update must update all of the row's indexes</em> (new tuple, new location) -> heavy write amp; many dead tuples -> VACUUM pressure and table bloat. HOT updates help (when index columns aren't changed, old and new stay in the same page and indexes aren't touched).</li>
+<li><strong>InnoDB-style (old version goes to undo log, main table updated in place)</strong>: ✅ only changed columns' indexes updated, low write amp; ❌ long transactions grow the undo chain, making historical version reconstruction (read-view walk-back) slower; if purge falls behind, the undo tablespace bloats.</li>
+<li><strong>Pure locking (no MVCC)</strong>: ✅ simple; ❌ reads and writes exclude each other, OLTP concurrency collapses.</li>
+</ul></div>
+<pre><code># Visibility check (Postgres-style, simplified)
+def visible(tuple, snapshot):
+    # the tx that created this version committed, and before my snapshot
+    if not committed_before(tuple.xmin, snapshot):
+        return False
+    # this version isn't deleted, or the deleting tx is invisible to me
+    if tuple.xmax and committed_before(tuple.xmax, snapshot):
+        return False
+    return True
+# a read just scans the version chain and picks the "visible" one -- no locks
+</code></pre>
+<div class="case">
+<strong>Real cases:</strong>
+<ul>
+<li><strong>PostgreSQL</strong>: heap multi-versioning + VACUUM; "a long transaction blocks VACUUM causing table bloat" is a classic production incident.</li>
+<li><strong>MySQL InnoDB</strong>: undo log reconstructs historical versions; the read view decides visibility.</li>
+<li><strong>Oracle</strong>: undo segments + SCN; "ORA-01555 snapshot too old" means a historical version got overwritten.</li>
+<li><strong>CockroachDB / Spanner</strong>: MVCC + timestamps, tying version timestamps to distributed consistency.</li>
+</ul></div>
+
+<h3>4. Index Internals & Query Optimizer — a SQL's optimal on-disk path</h3>
+<p><strong>Principle</strong>: the same <code>SELECT ... WHERE a=? AND b>?</code> can execute several ways: full scan, use a's index then filter, or use composite index (a,b) to locate directly. A <strong>cost-based optimizer (CBO)</strong> uses <em>statistics</em> (histograms, distinct counts, row counts) to estimate how many pages each plan reads and how big the result is, and picks the cheapest. The index itself is a B+Tree: a <em>clustered index</em> leaf stores the whole row, a <em>secondary index</em> leaf stores the PK (needs a back-lookup), and a <em>covering index</em> puts all queried columns in the index to skip the back-lookup. Selectivity is key — indexing a low-selectivity column (like gender) can be slower than a scan.</p>
+<div class="tradeoff">
+<strong>Trade-off:</strong>
+<ul>
+<li><strong>More indexes</strong>: ✅ faster reads, enable covering queries; ❌ every index is maintained on write -> write amp, space cost. A Postgres update touches <em>all</em> indexes.</li>
+<li><strong>Composite index order (a,b) vs (b,a)</strong>: ✅ leftmost-prefix matching decides usability; ❌ wrong order makes the index useless — put range columns last.</li>
+<li><strong>CBO depends on statistics</strong>: ✅ adaptively optimal plans; ❌ stale stats -> wrong plan (turning an index scan into a full scan); needs periodic ANALYZE.</li>
+</ul></div>
+<pre><code>-- Use EXPLAIN to see what the optimizer actually does
+EXPLAIN ANALYZE
+SELECT order_id, amount FROM orders
+WHERE user_id = 42 AND created_at > '2026-01-01';
+-- Expect: Index Scan using idx_user_created (user_id, created_at)
+-- If you see Seq Scan + Filter -> stale stats or bad selectivity, run ANALYZE orders;
+-- Composite index (user_id, created_at): equality user_id first, range column last
+</code></pre>
+<div class="case">
+<strong>Real cases:</strong>
+<ul>
+<li><strong>PostgreSQL</strong>: CBO + <code>EXPLAIN (ANALYZE, BUFFERS)</code>; histogram stats live in <code>pg_statistic</code>.</li>
+<li><strong>MySQL</strong>: 8.0+ supports histograms and invisible indexes (build first, roll out gradually).</li>
+<li><strong>CockroachDB / TiDB</strong>: distributed CBO that also estimates cross-node data distribution and network cost.</li>
+<li><strong>"Implicit type conversion kills the index"</strong>: passing a number to a string column, or wrapping a column in a function (<code>WHERE date(t)=...</code>), disables the index — the most frequent production slow query.</li>
+</ul></div>
+
+<h2>Scaling & Optimization</h2>
+<ul>
+<li><strong>Writes can't keep up</strong>: read-heavy -> stay on B-tree + add read replicas; write-throughput bottleneck -> switch to an LSM engine (MyRocks / TiKV), trading random for sequential writes.</li>
+<li><strong>Single node past 10 TB</strong>: shard (see Day 4); each shard is still an independent storage engine, cross-shard queries handled by the layer above.</li>
+<li><strong>Compaction jitter</strong>: rate-limit LSM compaction, separate hot/cold tiers, use universal compaction to lower write amp (at the cost of higher space amp).</li>
+<li><strong>VACUUM / purge falling behind</strong>: break up long transactions, make autovacuum more aggressive, monitor bloat ratio and undo-chain length.</li>
+<li><strong>WAL is the bottleneck</strong>: group commit + a faster WAL disk (dedicated NVMe); cross-region DR via streaming WAL replication (physical replication / CDC).</li>
+</ul>
+
+<h2>Common Pitfalls + Interview Follow-ups</h2>
+<div class="callout"><strong>1. "LSM is always faster than B-tree"?</strong> Wrong. LSM only wins when <em>write-heavy</em>; for point-query-heavy, range-scan-heavy, read-latency-sensitive workloads, B-tree's low read amp is better. Check the read/write ratio first.</div>
+<div class="callout"><strong>2. Disabling fsync for throughput?</strong> <code>innodb_flush_log_at_trx_commit=2</code> or <code>synchronous_commit=off</code> loses OK'd committed transactions on crash. Never for a ledger/payments — that is RPO≠0.</div>
+<div class="callout"><strong>3. Postgres updates slow / table keeps growing?</strong> Usually MVCC dead-tuple pileup + every update touching all indexes. A long transaction blocking VACUUM is the #1 culprit.</div>
+<div class="callout"><strong>4. Built an index but it's not used?</strong> Leftmost-prefix mismatch, column wrapped by a function/implicit cast, too-low selectivity, or stale stats — verify with <code>EXPLAIN</code>, don't guess.</div>
+<p style="margin-top:14px"><strong>Frequent interview follow-ups:</strong> (1) "Why are sequential writes faster than random — does it still hold on SSD?" (2) "The WAL holds both redo and undo — what does each do? The ARIES three phases?" (3) "Under MVCC, what happens when two transactions update the same row (write-write conflict / first-committer-wins)?" (4) "Clustered vs secondary index, what's a back-lookup, how does a covering index avoid it?" (5) "What anomalies does Snapshot Isolation prevent, and what does it NOT (write skew)?"</p>
+
+<h2>Deep Resources</h2>
+<ul>
+<li><strong>Designing Data-Intensive Applications, Ch. 3</strong> (Kleppmann): the best intro to B-tree vs LSM, WAL, and storage engine trade-offs.</li>
+<li><strong>Database Internals</strong> (Alex Petrov): a systematic deep dive into B+Tree, LSM, ARIES, and concurrency control.</li>
+<li><a href="http://smalldatum.blogspot.com/2015/11/read-write-space-amplification-pick-2_23.html">Mark Callaghan · Small Datum</a>: the authoritative analysis of "pick 2 of read/write/space amplification".</li>
+<li><a href="https://github.com/facebook/rocksdb/wiki">RocksDB Wiki</a>: engineering detail on the LSM engine, compaction strategies, and Bloom Filters.</li>
+<li><a href="https://www.uber.com/en-US/blog/postgres-to-mysql-migration/">Uber Engineering: Postgres→MySQL</a>: a real case on MVCC write amplification and index-architecture differences.</li>
+</ul>
+
+<h2>Food for Thought (click to expand)</h2>
+
+<details>
+<summary>1. In the SSD era random writes aren't slow anymore — why does LSM's "sequential write" advantage still hold?</summary>
+<div class="answer">
+<p>On the surface SSD random IOPS is high, but the advantage doesn't vanish, because of <strong>write amplification and SSD internals</strong>:</p>
+<ul>
+<li><strong>SSDs have their own FTL and erase blocks</strong>: flash is written per "page" and erased per larger "block"; small random writes trigger internal GC and read-modify-write, amplifying physical writes to flash (device-level write amp) and accelerating wear. Large sequential writes are far friendlier to the FTL.</li>
+<li><strong>B-tree's page-level write amp</strong>: changing a few bytes flushes a whole 16KB page, plus a WAL write — one logical write becomes several physical ones. LSM batches many changes into one big sequential block, amortizing per-write cost.</li>
+<li><strong>But LSM has compaction write amp</strong>: data is repeatedly merged and rewritten (leveled can hit 10x+). So "LSM always saves writes" isn't absolute — it saves <em>foreground random writes</em> at the cost of <em>background sequential rewrites</em>.</li>
+</ul>
+<p>Conclusion: SSD narrowed the gap but didn't erase it; what really matters is <em>end-to-end write amplification</em> and latency spikes, not raw IOPS.</p>
+</div>
+</details>
+
+<details>
+<summary>2. A 3-hour analytics transaction causes the Postgres primary's disk to balloon and writes to slow. What's the chain of causation?</summary>
+<div class="answer">
+<p>This is the classic MVCC + VACUUM cascade:</p>
+<ul>
+<li>The long transaction holds an <strong>old snapshot</strong>, and VACUUM <em>dares not reclaim</em> any dead tuple that "might still be visible to this old snapshot" — even if they're long invisible to every new transaction.</li>
+<li>So dead tuples from UPDATE/DELETE <strong>keep piling up</strong>, table and indexes bloat, disk usage balloons.</li>
+<li>Bigger table -> sequential and index scans read more pages -> buffer-pool hit ratio drops -> IO rises, queries slow.</li>
+<li>Bloat also drags VACUUM itself (more pages to scan), forming a vicious cycle.</li>
+</ul>
+<p><strong>Fixes</strong>: split/bound long transactions (<code>idle_in_transaction_session_timeout</code>), run analytics on a read replica, monitor <code>xact_start</code> in <code>pg_stat_activity</code> and the oldest snapshot age, and <code>VACUUM FULL</code> or pg_repack to reclaim space if needed. This is also a core reason to separate OLTP from OLAP.</p>
+</div>
+</details>
+
+<details>
+<summary>3. Snapshot Isolation looks strong, but it doesn't prevent write skew. Give a real example and how to fix it.</summary>
+<div class="answer">
+<p><strong>Classic example — on-call doctors</strong>: the constraint is "at least 1 doctor on call at any time." Currently Alice and Bob are both on call. Both simultaneously click "take leave":</p>
+<ul>
+<li>Each transaction's snapshot sees "2 doctors on call" -> both conclude "dropping to 1 still satisfies the constraint" -> both commit.</li>
+<li>Result: <strong>0 doctors on call</strong>, constraint violated. The two transactions modified <em>different rows</em> (each their own on-call record), so there's no write-write conflict and SI lets them through.</li>
+</ul>
+<p>This is write skew: two transactions decide based on the same read snapshot, each writes its own row, and together they violate a cross-row invariant.</p>
+<p><strong>Fixes</strong>: (1) <strong>Serializable Snapshot Isolation (SSI)</strong> — Postgres's <code>SERIALIZABLE</code> detects read-write dependency cycles and aborts one transaction. (2) <strong>Materialize the conflict with explicit locks</strong> — <code>SELECT ... FOR UPDATE</code> to lock the relevant rows, or put a lock/counter on the "on-call count" aggregate, turning the implicit conflict into an explicit write-write one.</p>
+</div>
+</details>
+
+<details>
+<summary>4. Why do secondary indexes usually store the "PK value" rather than the row's physical address? Costs of each?</summary>
+<div class="answer">
+<p>Both designs exist in real systems, with opposite trade-offs:</p>
+<ul>
+<li><strong>Store the PK value (InnoDB-style)</strong>: secondary index leaf -> PK -> then look up the clustered index for the full row (the <em>back-lookup</em>). The upside: when the row's position in the clustered index changes (page split, MVCC update), <em>the secondary index needn't change</em> as long as the PK is stable. The cost: an extra B+Tree lookup per secondary-index query.</li>
+<li><strong>Store the physical address (Postgres ctid / heap-only idea)</strong>: the index points straight to the physical heap location — fast, no back-lookup. But once a row moves (MVCC produces a new tuple at a new location on every update), <em>all secondary indexes must update their pointers</em> — precisely the source of Postgres update write amplification. HOT updates exist to keep the new version in the same page (when index columns don't change) and avoid touching indexes.</li>
+</ul>
+<p>The essence is "where to put the indirection": the PK indirection buys index stability on update (write savings), the physical address buys one fewer hop on read (read savings) — once again the read/write amplification opposition.</p>
+</div>
+</details>
+
+<details>
+<summary>5. During crash recovery, why replay the modifications of "uncommitted" transactions in the WAL, only to roll them back? Why not just skip them?</summary>
+<div class="answer">
+<p>You can't — this is exactly the elegance of ARIES's "Redo everything, then Undo the uncommitted", and the core is <strong>idempotence and a known state</strong>:</p>
+<ul>
+<li><strong>Why redo the uncommitted</strong>: at the crash instant, the on-disk pages are in an <em>arbitrary intermediate state</em> — some dirty pages of an uncommitted transaction may have flushed, some may not. ARIES uses "repeating history": first replay the WAL indiscriminately to the exact crash-instant state (including uncommitted changes), so the memory/disk state is <em>known and determinate</em>, giving Undo a stable starting point.</li>
+<li><strong>Why then undo</strong>: after replay, uncommitted modifications are present too, so they must be rolled back one by one via undo info, restoring "as if these transactions never happened".</li>
+<li><strong>Why idempotent</strong>: recovery itself may crash again. Each page carries an LSN recording "applied up to here"; redo only re-applies records where <code>page.LSN &lt; record.LSN</code>; undo writes <strong>CLRs</strong> (compensation log records) tracking rollback progress. So recovery can restart repeatedly without error.</li>
+</ul>
+<p>"Just skip the uncommitted" sounds easier, but you simply <em>cannot know</em> which uncommitted changes already reached disk — without replaying to a known state, there's no safe baseline to roll back from.</p>
+</div>
+</details>
+
+<div class="nav"><a href="index.en.html">← Back to index</a></div>
+</div>
+</body></html>

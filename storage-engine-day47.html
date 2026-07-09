@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 47 · 数据库内部与存储引擎 (Storage Engines) — System Design</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"SF Pro Display","Noto Sans SC",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
+.container{max-width:820px;margin:0 auto;padding:24px 20px 60px}
+header{padding:40px 0 28px;border-bottom:1px solid rgba(100,200,255,0.15);margin-bottom:32px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem}
+.tag{padding:3px 10px;border-radius:4px;background:rgba(100,200,255,0.12);color:#64c8ff;border:1px solid rgba(100,200,255,0.25)}
+.tag.diff{background:rgba(94,234,212,0.1);color:#5eead4;border-color:rgba(94,234,212,0.3)}
+.tag.day{background:rgba(255,180,80,0.1);color:#ffb450;border-color:rgba(255,180,80,0.25)}
+h1{font-size:1.75rem;font-weight:800;background:linear-gradient(135deg,#64c8ff 0%,#5eead4 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:0.5px;line-height:1.3}
+h1 .en{display:block;font-size:1rem;color:#7a8590;-webkit-text-fill-color:#7a8590;margin-top:6px;font-weight:500}
+h2{font-size:1.2rem;color:#5eead4;margin:36px 0 14px;padding-left:12px;border-left:3px solid #5eead4}
+h3{font-size:1rem;color:#64c8ff;margin:20px 0 10px;font-weight:600}
+p{margin:10px 0;color:#c8cfd6}
+ul,ol{margin:10px 0 10px 22px;color:#c8cfd6}
+li{margin:6px 0}
+strong{color:#e8eef5;font-weight:600}
+em{color:#5eead4;font-style:normal;font-weight:500}
+code{font-family:"SF Mono",Menlo,Consolas,monospace;background:rgba(100,200,255,0.1);color:#5eead4;padding:1px 6px;border-radius:3px;font-size:0.88em}
+pre{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:14px 16px;overflow-x:auto;margin:12px 0;font-family:"SF Mono",Menlo,Consolas,monospace;font-size:0.84rem;line-height:1.55;color:#c8cfd6}
+pre code{background:none;color:inherit;padding:0;font-size:1em}
+.mermaid{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:18px;margin:14px 0;text-align:center;overflow-x:auto;cursor:zoom-in;transition:border-color 0.15s}
+.mermaid:hover{border-color:rgba(100,200,255,0.4)}
+.mermaid svg{width:100%;max-width:100%;height:auto;min-height:280px}
+.lightbox{position:fixed;inset:0;background:rgba(8,12,18,0.96);z-index:9999;display:none;align-items:center;justify-content:center;padding:24px;cursor:grab;backdrop-filter:blur(4px);overflow:hidden}
+.lightbox.open{display:flex}
+.lightbox.dragging{cursor:grabbing}
+.lightbox svg{width:auto;height:auto;max-width:96vw;max-height:92vh;transform-origin:center center;will-change:transform}
+.lightbox .hint{position:fixed;top:16px;right:20px;font-size:0.78rem;color:#7a8590;font-family:"SF Mono",Menlo,monospace;pointer-events:none}
+.callout{background:rgba(255,180,80,0.06);border-left:3px solid #ffb450;padding:12px 14px;margin:14px 0;border-radius:4px;font-size:0.94rem}
+.callout strong{color:#ffb450}
+.tradeoff{background:rgba(100,200,255,0.05);border:1px solid rgba(100,200,255,0.2);border-radius:6px;padding:12px 14px;margin:12px 0;font-size:0.94rem}
+.case{background:rgba(94,234,212,0.05);border-left:3px solid #5eead4;padding:12px 14px;margin:12px 0;border-radius:4px;font-size:0.94rem}
+.case strong{color:#5eead4}
+.nav{margin-top:50px;padding-top:24px;border-top:1px solid rgba(100,200,255,0.15);text-align:center}
+.nav a{color:#64c8ff;text-decoration:none;font-size:0.92rem;padding:8px 16px;border:1px solid rgba(100,200,255,0.3);border-radius:4px;transition:all 0.15s}
+.nav a:hover{background:rgba(100,200,255,0.1)}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:0.9rem}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid rgba(100,200,255,0.15)}
+th{color:#64c8ff;font-weight:600;background:rgba(100,200,255,0.05)}
+details{background:rgba(100,200,255,0.04);border:1px solid rgba(100,200,255,0.18);border-radius:6px;padding:12px 16px;margin:10px 0;transition:all 0.15s}
+details:hover{border-color:rgba(100,200,255,0.35)}
+details[open]{background:rgba(94,234,212,0.05);border-color:rgba(94,234,212,0.3)}
+details summary{font-weight:600;color:#e8eef5;list-style:none;outline:none;cursor:pointer;display:flex;align-items:flex-start;gap:10px;font-size:0.96rem}
+details summary::-webkit-details-marker{display:none}
+details summary::before{content:'▶';color:#64c8ff;font-size:0.75em;transition:transform 0.2s;flex-shrink:0;margin-top:5px}
+details[open] summary::before{transform:rotate(90deg);color:#5eead4}
+details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
+details .answer ul,details .answer ol{margin:6px 0 6px 22px}
+@media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+</style>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({startOnLoad:true,theme:'base',flowchart:{useMaxWidth:true,htmlLabels:true,nodeSpacing:50,rankSpacing:60},themeVariables:{primaryColor:'#1a2530',primaryTextColor:'#e8eef5',primaryBorderColor:'#64c8ff',lineColor:'#5eead4',secondaryColor:'#0e1419',tertiaryColor:'#0a0f14',background:'#0a0f14',mainBkg:'#1a2530',secondBkg:'#0e1419',textColor:'#d4dae0',fontFamily:'-apple-system,"SF Pro Display",sans-serif',fontSize:'16px'}});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const lb=document.createElement('div');lb.className='lightbox';
+  lb.innerHTML='<span class="hint">scroll = zoom · drag = pan · Esc / click bg = close</span>';
+  document.body.appendChild(lb);
+  let scale=1,panX=0,panY=0,dragging=false,moved=false,lx=0,ly=0;
+  const apply=()=>{const s=lb.querySelector('svg');if(s)s.style.transform=`translate(${panX}px,${panY}px) scale(${scale})`};
+  const reset=()=>{scale=1;panX=0;panY=0};
+  const close=()=>{lb.classList.remove('open');const s=lb.querySelector('svg');if(s)s.remove();reset()};
+  document.addEventListener('click',e=>{
+    if(e.target.closest('.lightbox')){if(moved){moved=false;return}close();return}
+    const w=e.target.closest('.mermaid');if(!w)return;
+    const svg=w.querySelector('svg');if(!svg)return;
+    const c=svg.cloneNode(true);c.removeAttribute('style');
+    c.style.maxWidth='96vw';c.style.maxHeight='92vh';
+    lb.appendChild(c);lb.classList.add('open');reset();apply();
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+  lb.addEventListener('wheel',e=>{
+    if(!lb.classList.contains('open'))return;
+    e.preventDefault();
+    const svg=lb.querySelector('svg');if(!svg)return;
+    const ns=Math.max(0.3,Math.min(10,scale*(1-e.deltaY*0.002)));
+    const r=svg.getBoundingClientRect();
+    const cx=e.clientX-(r.left+r.width/2),cy=e.clientY-(r.top+r.height/2);
+    const k=ns/scale-1;panX-=cx*k;panY-=cy*k;scale=ns;apply();
+  },{passive:false});
+  lb.addEventListener('mousedown',e=>{
+    if(!lb.classList.contains('open'))return;
+    dragging=true;moved=false;lx=e.clientX;ly=e.clientY;lb.classList.add('dragging');e.preventDefault();
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    const dx=e.clientX-lx,dy=e.clientY-ly;
+    if(Math.abs(dx)+Math.abs(dy)>3)moved=true;
+    panX+=dx;panY+=dy;lx=e.clientX;ly=e.clientY;apply();
+  });
+  document.addEventListener('mouseup',()=>{dragging=false;lb.classList.remove('dragging')});
+});
+</script>
+</head><body><div class="container">
+
+<header>
+<div class="meta">
+<span class="tag day">Day 47</span>
+<span class="tag diff">Hard</span>
+<span class="tag">Storage Engine</span>
+<span class="tag">B-tree / LSM</span>
+<span class="tag">WAL / MVCC</span>
+</div>
+<h1>数据库内部与存储引擎 — 一次读写在盘上到底发生了什么<span class="en">Database Internals & Storage Engines: B-tree vs LSM, WAL & Crash Recovery, MVCC, Query Optimizer</span></h1>
+</header>
+
+<h2>问题场景 + 需求约束</h2>
+<p>你在为一个<strong>交易/账本系统</strong>选底层存储引擎：订单表写入峰值 <strong>10 万 QPS</strong>，点查（按订单号）<strong>5 万 QPS</strong>，单表数据量增长到 <strong>10 TB+</strong>，宕机后必须<em>零数据丢失</em>恢复（RPO=0），且大量并发读写不能互相阻塞。摆在面前的问题不是「用 MySQL 还是 Postgres」这种表层选择，而是：<strong>这些数据库内部的存储引擎，凭什么保证一次 <code>UPDATE</code> 既快又不丢、还能被别的事务同时读到一致快照</strong>？</p>
+<p>要回答这个，必须打开数据库这个黑盒，看清四件事：<em>数据在盘上怎么组织（B-tree vs LSM）、崩溃了怎么不丢（WAL）、并发读写怎么不打架（MVCC）、一条 SQL 怎么被翻译成最优的盘上访问（优化器）</em>。这也是设计存储密集型系统、以及面试架构师岗位的分水岭。</p>
+
+<h2>高层架构（存储引擎剖面）</h2>
+<pre class="mermaid">
+graph TD
+    SQL["SQL 查询"] --> PARSE["Parser + Planner<br/><i>基于代价的优化器</i>"]
+    PARSE --> EXEC["Executor<br/><i>Access Method 接口</i>"]
+    EXEC --> AM{"存储引擎"}
+    AM -->|读多| BT["B+Tree<br/><i>InnoDB / Postgres</i>"]
+    AM -->|写多| LSM["LSM-Tree<br/><i>RocksDB / Cassandra</i>"]
+
+    BT --> BP["Buffer Pool<br/><i>页缓存 · 脏页</i>"]
+    LSM --> MEM["MemTable<br/><i>内存有序表</i>"]
+
+    WRITE["写路径"] -.先写.-> WAL[("WAL / redo log<br/><i>顺序追加</i>")]
+    BP -->|checkpoint 刷脏页| DISK[("数据文件<br/>heap / SSTable")]
+    MEM -->|flush + compaction| DISK
+    WAL -.崩溃恢复 redo/undo.-> BP
+
+    classDef q fill:#1a2530,stroke:#64c8ff,color:#e8eef5
+    classDef eng fill:#1a1a30,stroke:#ffb450,color:#e8eef5
+    classDef dur fill:#2a1530,stroke:#ff7ab6,color:#e8eef5
+    class SQL,PARSE,EXEC q
+    class BT,LSM,BP,MEM eng
+    class WAL,DISK dur
+</pre>
+<p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">核心不变量：任何数据落地前，<strong>先写 WAL</strong>（顺序 IO）；数据结构本身决定读/写/空间放大三者的取舍</p>
+
+<h2>关键技术点</h2>
+
+<h3>1. B-tree vs LSM-tree — 读放大与写放大不可兼得</h3>
+<p><strong>原理</strong>：磁盘（尤其机械盘和 SSD）的顺序写远快于随机写。<em>B+Tree</em> 把数据<strong>原地（in-place）</strong>组织成有序的页，查找 O(log n) 且每次点查只读一个叶子页——读友好；但更新一行要把对应页读进来、改、再写回，是<strong>随机写</strong>，且一页只改几字节也要整页刷盘（写放大）。<em>LSM-Tree</em> 反过来：写只追加到内存 MemTable，满了就顺序 flush 成不可变的 SSTable，后台再 compaction 合并——<strong>把随机写变成顺序写</strong>，写吞吐极高；代价是一个 key 可能散落在多层 SSTable，点查要查多层（读放大），靠 Bloom Filter 缓解。</p>
+<div class="tradeoff">
+<strong>Trade-off（RUM 三角：Read / Update / Memory 放大，最多优化两个）：</strong>
+<ul>
+<li><strong>B+Tree</strong>：✅ 读放大低、范围扫描快、原地更新省空间；❌ 写放大高（页级刷盘 + WAL 双写）、随机写、写入抖动。适合<em>读多写少、点查/范围混合</em>的 OLTP。</li>
+<li><strong>LSM-Tree</strong>：✅ 写放大低（顺序写）、压缩率高（不可变文件好压）、省空间；❌ 读放大高、compaction 抢 IO 造成延迟毛刺、空间瞬时翻倍。适合<em>写多、时序/日志/KV</em>。</li>
+<li><strong>关键洞察</strong>（Mark Callaghan）：read / write / space amplification 三者<em>至少牺牲一个</em>，没有银弹。选引擎=选你能承受哪种放大。</li>
+</ul></div>
+<pre><code># LSM 点查：从新到旧逐层找，Bloom Filter 先挡掉不存在的层
+def lsm_get(key):
+    if v := memtable.get(key):           # ① 内存最新
+        return None if v is TOMBSTONE else v
+    for sst in sstables_newest_to_oldest():   # ② L0→Ln 逐层
+        if not sst.bloom.might_contain(key):  # 假阳性率 ~1%
+            continue                          # 绝大多数层被跳过
+        if v := sst.get(key):                 # 命中则返回（删除是墓碑）
+            return None if v is TOMBSTONE else v
+    return None
+# 写：只 append，删除也是「写一个墓碑」，真正回收在 compaction
+</code></pre>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>MySQL InnoDB</strong>：经典 B+Tree，主键即聚簇索引，二级索引存主键值（回表）。默认 OLTP 引擎。</li>
+<li><strong>RocksDB（Facebook）</strong>：LSM 引擎，被 MyRocks、TiKV、CockroachDB、Kafka Streams 当底座。<a href="https://github.com/facebook/rocksdb/wiki">RocksDB wiki</a> 详述 leveled/universal compaction。</li>
+<li><strong>Cassandra / HBase</strong>：LSM，为高写入吞吐设计，时序与宽表场景标配。</li>
+<li><strong>Uber</strong>：因 Postgres 的写放大/复制成本，<a href="https://www.uber.com/en-US/blog/postgres-to-mysql-migration/">迁到 MySQL/InnoDB</a>——同是 B-tree 家族，索引结构差异决定写成本。</li>
+</ul></div>
+
+<h3>2. WAL 与崩溃恢复 — 先写日志，才敢改数据</h3>
+<p><strong>原理</strong>：数据页在内存 buffer pool 里被改成「脏页」，若此时宕机、脏页还没落盘，数据就丢了。<strong>WAL（Write-Ahead Logging）</strong>的铁律：<em>任何对数据页的修改，其 redo 日志必须先顺序写入磁盘并 fsync，才允许脏页刷盘</em>。这样崩溃后重放 WAL 就能重建内存中丢失的修改。顺序写 WAL 也顺便把「多个随机写」摊销成「一次顺序写 + 异步刷脏页」，反而提速。工业标准是 <em>ARIES</em> 算法：三阶段恢复——<strong>Analysis</strong>（找出崩溃时的脏页和活跃事务）、<strong>Redo</strong>（重放到崩溃瞬间的状态，含未提交事务）、<strong>Undo</strong>（回滚未提交事务），配合 LSN、checkpoint、CLR 保证幂等可重入。</p>
+<div class="tradeoff">
+<strong>Trade-off（持久性 vs 延迟，取决于 fsync 时机）：</strong>
+<ul>
+<li><strong>每事务 fsync</strong>（如 <code>innodb_flush_log_at_trx_commit=1</code>）：✅ RPO=0、真持久；❌ 每次 commit 一次磁盘同步，延迟高、吞吐受限。</li>
+<li><strong>组提交 group commit</strong>：✅ 攒一批事务一次 fsync，吞吐×10；❌ 尾部事务多等几毫秒。几乎所有生产库默认开启。</li>
+<li><strong>放松（=2 / async）</strong>：✅ 极快；❌ 崩溃丢最近 ~1s 已提交事务。账本绝不能用，缓存型可以。</li>
+</ul></div>
+<pre><code># 提交时的 WAL 顺序（简化）
+def commit(txn):
+    lsn = wal.append(txn.redo_records)   # ① 顺序追加 redo（还含 undo 信息）
+    wal.fsync_up_to(lsn)                 # ② 强制落盘 —— 这一步返回后才算「已提交」
+    mark_committed(txn)                  # ③ 现在才回复客户端 OK
+    # 脏页稍后由 checkpoint 异步刷；崩溃则靠 redo 重放补回
+</code></pre>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>PostgreSQL</strong>：WAL + checkpoint，<code>pg_wal</code> 目录即日志；物理复制、PITR 全靠它。</li>
+<li><strong>InnoDB</strong>：redo log（物理，恢复用）+ undo log（逻辑，MVCC/回滚用）双日志，group commit 默认开。</li>
+<li><strong>RocksDB</strong>：MemTable 前也有 WAL，flush 成功后对应 WAL 才可删。</li>
+<li><strong>ARIES</strong>（IBM，Mohan 等）：几乎所有关系库崩溃恢复的理论蓝本。</li>
+</ul></div>
+
+<h3>3. MVCC — 读不阻塞写，写不阻塞读</h3>
+<p><strong>原理</strong>：如果读写都靠锁互斥，一个长事务的读会把写全堵死。<strong>MVCC（多版本并发控制）</strong>让每次更新<em>不覆盖旧行</em>而是产生一个新版本，每行带创建/删除的事务时间戳（xmin/xmax）。事务开始时拿一个<strong>快照</strong>，读取时只看「对我可见」的版本——于是<em>读永远不加锁、看到一致快照，写也不用等读</em>。这就是 <code>REPEATABLE READ</code> / Snapshot Isolation 的实现基础。代价是旧版本会堆积，必须回收：Postgres 靠 <em>VACUUM</em> 清理死元组，InnoDB 靠 <em>purge</em> 线程清理 undo。</p>
+<div class="tradeoff">
+<strong>Trade-off（旧版本放哪 → 决定写放大与回收痛点）：</strong>
+<ul>
+<li><strong>Postgres 式（新版本写在堆表里）</strong>：✅ 回滚快、旧版本原地；❌ <em>每次更新要更新该行的所有索引</em>（新元组新位置）→ 写放大严重；死元组多 → VACUUM 压力、表膨胀。HOT 更新可缓解（不改索引列时旧新版本同页、不动索引）。</li>
+<li><strong>InnoDB 式（旧版本进 undo log，主表原地更新）</strong>：✅ 只更新被改列的索引、写放大低；❌ 长事务导致 undo 链变长，历史版本重建（read view 回溯）变慢，purge 跟不上会撑爆 undo 表空间。</li>
+<li><strong>纯锁（无 MVCC）</strong>：✅ 实现简单；❌ 读写互斥，OLTP 并发直接崩。</li>
+</ul></div>
+<pre><code># 可见性判断（Postgres 风格，简化）
+def visible(tuple, snapshot):
+    # 创建该版本的事务已提交，且在我的快照之前
+    if not committed_before(tuple.xmin, snapshot):
+        return False
+    # 该版本未被删除，或删除它的事务对我不可见
+    if tuple.xmax and committed_before(tuple.xmax, snapshot):
+        return False
+    return True
+# 读只扫版本链挑「可见」的那个，全程不加锁
+</code></pre>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>PostgreSQL</strong>：堆表多版本 + VACUUM；「长事务阻塞 VACUUM 导致表膨胀」是经典生产事故。</li>
+<li><strong>MySQL InnoDB</strong>：undo log 重建历史版本，read view 决定可见性。</li>
+<li><strong>Oracle</strong>：undo segment + SCN，「ORA-01555 snapshot too old」即历史版本被覆盖。</li>
+<li><strong>CockroachDB / Spanner</strong>：MVCC + 时间戳，把版本时间戳和分布式一致性结合。</li>
+</ul></div>
+
+<h3>4. 索引内部与查询优化器 — 一条 SQL 的最优盘上路径</h3>
+<p><strong>原理</strong>：同一条 <code>SELECT ... WHERE a=? AND b>?</code> 可以有多种执行方式：全表扫、走 a 的索引再过滤、走复合索引 (a,b) 直接定位。<strong>基于代价的优化器（CBO）</strong>用<em>统计信息</em>（直方图、distinct 值数、行数）估算每种方案要读多少页、结果集多大，选代价最小的。索引本身是 B+Tree：<em>聚簇索引</em>叶子存整行，<em>二级索引</em>叶子存主键（需回表），<em>覆盖索引</em>让查询列全在索引里、免回表。选择性（selectivity）是关键——低选择性列（如性别）走索引反而更慢。</p>
+<div class="tradeoff">
+<strong>Trade-off：</strong>
+<ul>
+<li><strong>更多索引</strong>：✅ 读快、支持覆盖查询；❌ 每个索引都要随写维护 → 写放大、占空间。Postgres 更新还要动<em>全部</em>索引。</li>
+<li><strong>复合索引顺序 (a,b) vs (b,a)</strong>：✅ 最左前缀匹配决定能否用上；❌ 选错顺序索引形同虚设，范围列要放最后。</li>
+<li><strong>CBO 依赖统计</strong>：✅ 自适应最优计划；❌ 统计过期 → 选错计划（把该走索引的走成全表扫），需定期 ANALYZE。</li>
+</ul></div>
+<pre><code>-- 用 EXPLAIN 看优化器到底怎么走
+EXPLAIN ANALYZE
+SELECT order_id, amount FROM orders
+WHERE user_id = 42 AND created_at > '2026-01-01';
+-- 期望: Index Scan using idx_user_created (user_id, created_at)
+-- 若见 Seq Scan + Filter → 统计过期或选择性误判, 先 ANALYZE orders;
+-- 复合索引 (user_id, created_at): user_id 等值在前, 范围列在后
+</code></pre>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>PostgreSQL</strong>：CBO + <code>EXPLAIN (ANALYZE, BUFFERS)</code>，直方图统计存 <code>pg_statistic</code>。</li>
+<li><strong>MySQL</strong>：8.0 起支持直方图与不可见索引（先建后灰度启用）。</li>
+<li><strong>CockroachDB / TiDB</strong>：分布式 CBO，还要估算跨节点数据分布与网络代价。</li>
+<li><strong>「隐式类型转换致索引失效」</strong>：字符串列传数字、函数包裹列（<code>WHERE date(t)=...</code>）都会让索引用不上，是最高频线上慢查询。</li>
+</ul></div>
+
+<h2>扩展与优化（增长后怎么办）</h2>
+<ul>
+<li><strong>写扛不住</strong>：读多写少继续 B-tree + 加读副本；写吞吐瓶颈考虑换 LSM 引擎（MyRocks / TiKV），用顺序写换随机写。</li>
+<li><strong>单机 10TB 到顶</strong>：分片（见 Day 4），每片仍是独立存储引擎；跨片查询交给上层。</li>
+<li><strong>compaction 抖动</strong>：LSM 限速 compaction、分离热冷层、用 universal compaction 降写放大（换更高空间放大）。</li>
+<li><strong>VACUUM / purge 跟不上</strong>：拆分长事务、调 autovacuum 激进度、监控表膨胀率与 undo 长度。</li>
+<li><strong>WAL 成瓶颈</strong>：组提交 + 更快的 WAL 盘（独立 NVMe）；异地灾备用 WAL 流式复制（物理复制 / CDC）。</li>
+</ul>
+
+<h2>常见陷阱 + 面试追问</h2>
+<div class="callout"><strong>1. 「LSM 一定比 B-tree 快」？</strong> 错。LSM 只在<em>写密集</em>时赢；点查多、范围扫多、读延迟敏感的场景，B-tree 的低读放大更优。选引擎先看读写比。</div>
+<div class="callout"><strong>2. 关了 fsync 换吞吐？</strong> <code>innodb_flush_log_at_trx_commit=2</code> 或 <code>synchronous_commit=off</code> 会在崩溃时丢已回复 OK 的事务。账本/支付绝不能碰，这是 RPO≠0。</div>
+<div class="callout"><strong>3. Postgres 更新很慢 / 表越来越大？</strong> 多半是 MVCC 死元组堆积 + 每次更新动全部索引。长事务阻塞 VACUUM 是头号元凶。</div>
+<div class="callout"><strong>4. 建了索引却没用上？</strong> 最左前缀不匹配、列被函数/隐式转换包裹、选择性太低、统计过期——用 <code>EXPLAIN</code> 验证而不是猜。</div>
+<p style="margin-top:14px"><strong>面试高频追问：</strong>①「为什么顺序写比随机写快，SSD 上还成立吗？」②「WAL 里既有 redo 又有 undo，各自作用？ARIES 三阶段？」③「MVCC 下两个事务同时更新同一行会怎样（写写冲突/first-committer-wins）？」④「聚簇索引 vs 二级索引，回表是什么，覆盖索引怎么避免？」⑤「Snapshot Isolation 能防住哪些异常，防不住什么（write skew）？」</p>
+
+<h2>深入资源</h2>
+<ul>
+<li><strong>《Designing Data-Intensive Applications》第 3 章</strong>（Kleppmann）：B-tree vs LSM、WAL、存储引擎权衡的最佳入门。</li>
+<li><strong>《Database Internals》</strong>（Alex Petrov）：B+Tree、LSM、ARIES、并发控制的系统性深挖。</li>
+<li><a href="http://smalldatum.blogspot.com/2015/11/read-write-space-amplification-pick-2_23.html">Mark Callaghan · Small Datum</a>：read/write/space amplification「三选二」的权威分析。</li>
+<li><a href="https://github.com/facebook/rocksdb/wiki">RocksDB Wiki</a>：LSM 引擎、compaction 策略、Bloom Filter 的工程细节。</li>
+<li><a href="https://www.uber.com/en-US/blog/postgres-to-mysql-migration/">Uber Engineering: Postgres→MySQL</a>：MVCC 写放大与索引架构差异的真实案例。</li>
+</ul>
+
+<h2>深入思考（点击展开答案）</h2>
+
+<details>
+<summary>1. SSD 时代随机写已经不慢了，为什么 LSM「顺序写」的优势仍然成立？</summary>
+<div class="answer">
+<p>表面看 SSD 随机 IOPS 很高，但优势没消失，原因在<strong>写放大与 SSD 内部机制</strong>：</p>
+<ul>
+<li><strong>SSD 有自己的 FTL 和擦除块</strong>：闪存以「页」写、以更大的「块」擦除，随机小写会触发内部 GC 和读-改-写，放大对闪存的物理写入（device-level write amp），加速磨损。顺序大写对 FTL 友好得多。</li>
+<li><strong>B-tree 的页级写放大</strong>：改几字节要刷整个 16KB 页，还要写 WAL——一次逻辑写变成多次物理写。LSM 把多个改动攒成一个大顺序块，摊薄单位写成本。</li>
+<li><strong>但 LSM 有 compaction 写放大</strong>：数据要被反复合并重写多次（leveled 可达 10×+）。所以「LSM 一定省写」不绝对——省的是<em>前台随机写</em>，代价是<em>后台顺序重写</em>。</li>
+</ul>
+<p>结论：SSD 缩小了差距，但没抹平；真正要比的是<em>端到端写放大</em>和延迟毛刺，而非单纯 IOPS。</p>
+</div>
+</details>
+
+<details>
+<summary>2. 一个跑了 3 小时的分析事务，导致 Postgres 主库磁盘暴涨、写变慢。机理链条是什么？</summary>
+<div class="answer">
+<p>这是 MVCC + VACUUM 的经典连锁：</p>
+<ul>
+<li>长事务持有一个<strong>老快照</strong>，VACUUM<em>不敢回收</em>任何「可能对这个老快照仍可见」的死元组——哪怕它们对所有新事务都早已不可见。</li>
+<li>于是 UPDATE/DELETE 产生的死元组<strong>持续堆积</strong>，表和索引不断膨胀（bloat），占盘暴涨。</li>
+<li>表变大 → 顺序扫和索引扫要读更多页 → buffer pool 命中率下降 → IO 升高、查询变慢。</li>
+<li>膨胀还拖累后续 VACUUM 本身（要扫更多页），形成恶性循环。</li>
+</ul>
+<p><strong>修法</strong>：拆分/限时长事务（<code>idle_in_transaction_session_timeout</code>）、把分析查询放只读副本、监控 <code>pg_stat_activity</code> 里的 <code>xact_start</code> 和最老快照年龄、必要时 <code>VACUUM FULL</code> 或 pg_repack 回收空间。这也是「OLTP 和 OLAP 要分库」的底层理由之一。</p>
+</div>
+</details>
+
+<details>
+<summary>3. Snapshot Isolation 看似很强，但它防不住 write skew。举个真实例子，怎么修？</summary>
+<div class="answer">
+<p><strong>经典例子——医院值班</strong>：约束是「任何时刻至少 1 名医生值班」。当前 Alice、Bob 都在值班。两人同时点「我请假」：</p>
+<ul>
+<li>各自事务的快照都看到「有 2 人值班」→ 都判断「减到 1 人仍满足约束」→ 都提交。</li>
+<li>结果<strong>0 人值班</strong>，约束被破坏。两个事务改的是<em>不同的行</em>（各自那条值班记录），所以没有写写冲突，SI 放行。</li>
+</ul>
+<p>这就是 write skew：两事务基于同一份读快照做决策，各改各的，合起来违反了跨行不变量。</p>
+<p><strong>修法</strong>：①<strong>Serializable Snapshot Isolation（SSI）</strong>——Postgres 的 <code>SERIALIZABLE</code> 会检测读写依赖环并中止一个事务。②<strong>显式加锁物化冲突</strong>——<code>SELECT ... FOR UPDATE</code> 锁住相关行，或对「值班人数」这个聚合加一把锁/一行计数器，把隐式冲突变成显式写写冲突。</p>
+</div>
+</details>
+
+<details>
+<summary>4. 为什么二级索引通常存「主键值」而不是「行的物理地址」？各自代价？</summary>
+<div class="answer">
+<p>两种设计真实存在，取舍相反：</p>
+<ul>
+<li><strong>存主键值（InnoDB 式）</strong>：二级索引叶子 → 主键 → 再查聚簇索引拿整行（<em>回表</em>）。好处是行在聚簇索引里位置变动（页分裂、MVCC 更新）时，<em>二级索引不用改</em>，只要主键不变。代价是每次二级索引查询多一次 B+Tree 查找。</li>
+<li><strong>存物理地址（Postgres 的 ctid / heap-only 思路）</strong>：索引直接指到堆里的物理位置，查得快、免回表。但行一旦移动位置（MVCC 每次更新产生新元组、在新位置），<em>所有二级索引都得更新指针</em>——这正是 Postgres 更新写放大的根源。HOT 更新就是为了在「不改索引列」时让新版本留在同页、避免动索引。</li>
+</ul>
+<p>本质是「间接层放哪」的取舍：主键间接层换来更新时索引稳定（写省），物理地址换来读时少一跳（读省）——又一次 read/write 放大的对立。</p>
+</div>
+</details>
+
+<details>
+<summary>5. 崩溃恢复时，WAL 里为什么要重放「未提交」事务的修改，再回滚它们？直接跳过不行吗？</summary>
+<div class="answer">
+<p>不行，这正是 ARIES「先 Redo 全部、再 Undo 未提交」设计的精妙之处，核心是<strong>幂等与状态一致</strong>：</p>
+<ul>
+<li><strong>为什么先 redo 未提交的</strong>：崩溃瞬间，磁盘上的数据页处于<em>任意中间状态</em>——可能已经刷了某个未提交事务的部分脏页，也可能没刷。ARIES 采用「repeating history」：先把 WAL 无差别重放到崩溃那一刻的精确状态（含未提交改动），让内存/磁盘状态<em>确定可知</em>，Undo 才有稳定的起点。</li>
+<li><strong>为什么再 undo</strong>：重放后,未提交事务的修改也在了,必须按 undo 信息逐条回滚,恢复到「仿佛这些事务从没发生」。</li>
+<li><strong>为什么幂等</strong>：恢复过程本身可能再次崩溃。每页有 LSN 记录「已应用到哪」，redo 时只对 <code>page.LSN &lt; record.LSN</code> 的才重放；undo 写 <strong>CLR</strong>（补偿日志记录）记录回滚进度。于是恢复可以反复重启而不出错。</li>
+</ul>
+<p>「跳过未提交的」听起来省事，但你根本<em>无法知道</em>磁盘上哪些未提交改动已经落盘——不重放到已知状态，就没有安全的回滚基线。</p>
+</div>
+</details>
+
+<div class="nav"><a href="index.html">← 回到 index</a></div>
+</div>
+</body></html>
