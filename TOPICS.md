@@ -57,3 +57,4 @@
 - Day 48: 网络基础 — TCP/UDP, HTTP/1.1·2·3·QUIC, DNS, TLS 握手, L4 vs L7 负载均衡
 - Day 49: 容器与编排 — 容器原理(namespace/cgroup), Kubernetes 核心对象, Service Mesh(Envoy/Istio), 调度与自愈
 - Day 50: 把 Code Review 当信号检测系统 — 误报预算与分诊层, 降噪架构(ReviewFilter/nitpick 过滤), AI 评论的信噪治理, 活动指标 vs 结果指标的度量陷阱(钩子·源自 deep-research #2)
+- Day 51: 低底率下的告警系统 — 基率谬误的工程后果(低单次错误率 × 极低真报底率 = 报告级误报淹没真报, Argus 消融证明器 0/20 vs LLM 裁判 20/20), 独立 oracle 兜底 vs LLM 自任裁判, 分诊层的精确率地板, 报告级 vs 判定级误报率的度量陷阱, 与 Day 44 混沌工程/Day 50 信号检测的接口(钩子·源自 deep-research #5)
