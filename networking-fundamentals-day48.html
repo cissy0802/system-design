@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 48 · 网络基础 (Networking Fundamentals) — System Design</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"SF Pro Display","Noto Sans SC",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
+.container{max-width:820px;margin:0 auto;padding:24px 20px 60px}
+header{padding:40px 0 28px;border-bottom:1px solid rgba(100,200,255,0.15);margin-bottom:32px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem}
+.tag{padding:3px 10px;border-radius:4px;background:rgba(100,200,255,0.12);color:#64c8ff;border:1px solid rgba(100,200,255,0.25)}
+.tag.diff{background:rgba(94,234,212,0.1);color:#5eead4;border-color:rgba(94,234,212,0.3)}
+.tag.day{background:rgba(255,180,80,0.1);color:#ffb450;border-color:rgba(255,180,80,0.25)}
+h1{font-size:1.75rem;font-weight:800;background:linear-gradient(135deg,#64c8ff 0%,#5eead4 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:0.5px;line-height:1.3}
+h1 .en{display:block;font-size:1rem;color:#7a8590;-webkit-text-fill-color:#7a8590;margin-top:6px;font-weight:500}
+h2{font-size:1.2rem;color:#5eead4;margin:36px 0 14px;padding-left:12px;border-left:3px solid #5eead4}
+h3{font-size:1rem;color:#64c8ff;margin:20px 0 10px;font-weight:600}
+p{margin:10px 0;color:#c8cfd6}
+ul,ol{margin:10px 0 10px 22px;color:#c8cfd6}
+li{margin:6px 0}
+strong{color:#e8eef5;font-weight:600}
+em{color:#5eead4;font-style:normal;font-weight:500}
+code{font-family:"SF Mono",Menlo,Consolas,monospace;background:rgba(100,200,255,0.1);color:#5eead4;padding:1px 6px;border-radius:3px;font-size:0.88em}
+pre{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:14px 16px;overflow-x:auto;margin:12px 0;font-family:"SF Mono",Menlo,Consolas,monospace;font-size:0.84rem;line-height:1.55;color:#c8cfd6}
+pre code{background:none;color:inherit;padding:0;font-size:1em}
+.mermaid{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:18px;margin:14px 0;text-align:center;overflow-x:auto;cursor:zoom-in;transition:border-color 0.15s}
+.mermaid:hover{border-color:rgba(100,200,255,0.4)}
+.mermaid svg{width:100%;max-width:100%;height:auto;min-height:280px}
+.lightbox{position:fixed;inset:0;background:rgba(8,12,18,0.96);z-index:9999;display:none;align-items:center;justify-content:center;padding:24px;cursor:grab;backdrop-filter:blur(4px);overflow:hidden}
+.lightbox.open{display:flex}
+.lightbox.dragging{cursor:grabbing}
+.lightbox svg{width:auto;height:auto;max-width:96vw;max-height:92vh;transform-origin:center center;will-change:transform}
+.lightbox .hint{position:fixed;top:16px;right:20px;font-size:0.78rem;color:#7a8590;font-family:"SF Mono",Menlo,monospace;pointer-events:none}
+.callout{background:rgba(255,180,80,0.06);border-left:3px solid #ffb450;padding:12px 14px;margin:14px 0;border-radius:4px;font-size:0.94rem}
+.callout strong{color:#ffb450}
+.tradeoff{background:rgba(100,200,255,0.05);border:1px solid rgba(100,200,255,0.2);border-radius:6px;padding:12px 14px;margin:12px 0;font-size:0.94rem}
+.case{background:rgba(94,234,212,0.05);border-left:3px solid #5eead4;padding:12px 14px;margin:12px 0;border-radius:4px;font-size:0.94rem}
+.case strong{color:#5eead4}
+.nav{margin-top:50px;padding-top:24px;border-top:1px solid rgba(100,200,255,0.15);text-align:center}
+.nav a{color:#64c8ff;text-decoration:none;font-size:0.92rem;padding:8px 16px;border:1px solid rgba(100,200,255,0.3);border-radius:4px;transition:all 0.15s}
+.nav a:hover{background:rgba(100,200,255,0.1)}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:0.9rem}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid rgba(100,200,255,0.15)}
+th{color:#64c8ff;font-weight:600;background:rgba(100,200,255,0.05)}
+details{background:rgba(100,200,255,0.04);border:1px solid rgba(100,200,255,0.18);border-radius:6px;padding:12px 16px;margin:10px 0;transition:all 0.15s}
+details:hover{border-color:rgba(100,200,255,0.35)}
+details[open]{background:rgba(94,234,212,0.05);border-color:rgba(94,234,212,0.3)}
+details summary{font-weight:600;color:#e8eef5;list-style:none;outline:none;cursor:pointer;display:flex;align-items:flex-start;gap:10px;font-size:0.96rem}
+details summary::-webkit-details-marker{display:none}
+details summary::before{content:'▶';color:#64c8ff;font-size:0.75em;transition:transform 0.2s;flex-shrink:0;margin-top:5px}
+details[open] summary::before{transform:rotate(90deg);color:#5eead4}
+details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
+details .answer ul,details .answer ol{margin:6px 0 6px 22px}
+@media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+</style>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({startOnLoad:true,theme:'base',flowchart:{useMaxWidth:true,htmlLabels:true,nodeSpacing:50,rankSpacing:60},themeVariables:{primaryColor:'#1a2530',primaryTextColor:'#e8eef5',primaryBorderColor:'#64c8ff',lineColor:'#5eead4',secondaryColor:'#0e1419',tertiaryColor:'#0a0f14',background:'#0a0f14',mainBkg:'#1a2530',secondBkg:'#0e1419',textColor:'#d4dae0',fontFamily:'-apple-system,"SF Pro Display",sans-serif',fontSize:'16px'}});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const lb=document.createElement('div');lb.className='lightbox';
+  lb.innerHTML='<span class="hint">scroll = zoom · drag = pan · Esc / click bg = close</span>';
+  document.body.appendChild(lb);
+  let scale=1,panX=0,panY=0,dragging=false,moved=false,lx=0,ly=0;
+  const apply=()=>{const s=lb.querySelector('svg');if(s)s.style.transform=`translate(${panX}px,${panY}px) scale(${scale})`};
+  const reset=()=>{scale=1;panX=0;panY=0};
+  const close=()=>{lb.classList.remove('open');const s=lb.querySelector('svg');if(s)s.remove();reset()};
+  document.addEventListener('click',e=>{
+    if(e.target.closest('.lightbox')){if(moved){moved=false;return}close();return}
+    const w=e.target.closest('.mermaid');if(!w)return;
+    const svg=w.querySelector('svg');if(!svg)return;
+    const c=svg.cloneNode(true);c.removeAttribute('style');
+    c.style.maxWidth='96vw';c.style.maxHeight='92vh';
+    lb.appendChild(c);lb.classList.add('open');reset();apply();
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+  lb.addEventListener('wheel',e=>{
+    if(!lb.classList.contains('open'))return;
+    e.preventDefault();
+    const svg=lb.querySelector('svg');if(!svg)return;
+    const ns=Math.max(0.3,Math.min(10,scale*(1-e.deltaY*0.002)));
+    const r=svg.getBoundingClientRect();
+    const cx=e.clientX-(r.left+r.width/2),cy=e.clientY-(r.top+r.height/2);
+    const k=ns/scale-1;panX-=cx*k;panY-=cy*k;scale=ns;apply();
+  },{passive:false});
+  lb.addEventListener('mousedown',e=>{
+    if(!lb.classList.contains('open'))return;
+    dragging=true;moved=false;lx=e.clientX;ly=e.clientY;lb.classList.add('dragging');e.preventDefault();
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    const dx=e.clientX-lx,dy=e.clientY-ly;
+    if(Math.abs(dx)+Math.abs(dy)>3)moved=true;
+    panX+=dx;panY+=dy;lx=e.clientX;ly=e.clientY;apply();
+  });
+  document.addEventListener('mouseup',()=>{dragging=false;lb.classList.remove('dragging')});
+});
+</script>
+</head><body><div class="container">
+
+<header>
+<div class="meta">
+<span class="tag day">Day 48</span>
+<span class="tag diff">Hard</span>
+<span class="tag">Networking</span>
+<span class="tag">TCP/UDP · QUIC</span>
+<span class="tag">DNS · TLS · LB</span>
+</div>
+<h1>网络基础 — 一次请求在网线上到底走了几个来回<span class="en">Networking Fundamentals: TCP/UDP, HTTP/1.1·2·3·QUIC, DNS, TLS Handshake, L4 vs L7 LB</span></h1>
+</header>
+
+<h2>问题场景 + 需求约束</h2>
+<p>你在为一个<strong>全球 API 平台</strong>设计接入层：<strong>5000 万用户</strong>散布五大洲，移动端占七成，网络丢包率常态 <strong>1–3%</strong>；API 请求 p99 延迟目标 <strong>&lt; 150ms</strong>，其中<em>连接建立</em>（DNS + TCP + TLS）往往就吃掉移动端首字节时间的一半。一个从东京发往美西机房的请求，光物理往返（RTT）就 ~120ms，握手若要 3 个 RTT 就是 360ms——用户还没看到一个字节。</p>
+<p>问题不在「加机器」，而在<strong>每一个 RTT 都要抠</strong>：<em>DNS 怎么把用户导到最近的健康机房、传输层用 TCP 还是 UDP、握手怎么从 3 个 RTT 压到 0、负载均衡在第 4 层还是第 7 层做</em>。这四件事决定了首包延迟，也是架构师面试里区分「会调 Nginx」和「懂网络」的分水岭。</p>
+
+<h2>高层架构（一次请求的网络路径）</h2>
+<pre class="mermaid">
+graph LR
+    U["客户端<br/><i>移动/浏览器</i>"]
+    DNS["DNS 解析<br/><i>GeoDNS + Anycast</i>"]
+    EDGE["Edge / L4 LB<br/><i>Anycast VIP · DSR</i>"]
+    L7["L7 LB / 网关<br/><i>TLS 终止 · 路由</i>"]
+    APP["App 集群"]
+
+    U -->|"① 域名→IP"| DNS
+    U -->|"② TCP/QUIC 握手"| EDGE
+    EDGE -->|"③ TLS 握手 + HTTP"| L7
+    L7 -->|"④ keep-alive 连接池"| APP
+
+    classDef client fill:#1a2530,stroke:#64c8ff,color:#e8eef5
+    classDef edge fill:#0e2030,stroke:#5eead4,color:#e8eef5
+    classDef app fill:#2a1530,stroke:#ff7ab6,color:#e8eef5
+    class U client
+    class DNS,EDGE,L7 edge
+    class APP app
+</pre>
+<p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">DNS 决定去哪个机房；L4 决定进哪台边缘；L7 终止 TLS 并按路径/租户路由；到源站复用长连接省握手</p>
+<p>四个组件各管一段延迟：<strong>DNS</strong> 把用户就近导流（Anycast 让「最近」由 BGP 路由自动决定）；<strong>L4 LB</strong> 按连接四元组转发、吞吐极高但不看内容；<strong>L7 LB/网关</strong> 终止 TLS、看到 HTTP 报文才能做路径路由、限流、灰度；到源站用<strong>连接池 keep-alive</strong> 摊掉握手。理解这条链，才能定位「慢在哪个 RTT」。</p>
+
+<h2>关键技术点</h2>
+
+<h3>1. TCP vs UDP：可靠有序 vs 无连接低延迟</h3>
+<p><strong>原理</strong>：TCP 提供<em>可靠、有序、面向连接的字节流</em>——三次握手建连、序列号 + ACK 重传丢包、滑动窗口做流控、拥塞控制（Cubic/BBR）避免压垮网络。代价是：建连要 1 个 RTT，且<strong>字节流的「有序」是把双刃剑</strong>——一个包丢了，后面已到达的字节也必须在内核缓冲区里干等重传，这就是<em>队头阻塞（HOL blocking）</em>的根源。UDP 则是<em>无连接的数据报</em>：发出去不管到没到、不排序、无拥塞控制，零握手、零队头阻塞，但可靠性/有序/拥塞全得应用层自己造。</p>
+<div class="tradeoff">
+<strong>Trade-off：</strong>
+<ul>
+<li><strong>TCP</strong>：✅ 内核成熟、可靠有序、拥塞控制现成；❌ 1-RTT 建连（加 TLS 是 2–3 RTT）、队头阻塞、连接状态占内存、移动端切换 IP 就断。</li>
+<li><strong>UDP 裸用</strong>：✅ 零握手、延迟最低、适合可丢的实时流（音视频、游戏状态、DNS）；❌ 丢包/乱序/拥塞全自理，易被中间盒（NAT/防火墙）丢弃。</li>
+<li><strong>QUIC（UDP 之上重建可靠层）</strong>：✅ 拿回可靠有序 + 拥塞控制，同时<em>每条 stream 独立</em>消灭传输层队头阻塞、支持连接迁移（换网不断连）；❌ 用户态实现吃 CPU、部分网络封 UDP。</li>
+</ul></div>
+<pre><code># 选型直觉：先问「丢一个包，业务能不能接受？」
+可丢、要最新   → UDP（实时语音：丢帧不如等旧帧）
+不可丢、要有序 → TCP / QUIC（API、文件、支付）
+要有序但怕队头阻塞 + 移动端频繁切网 → QUIC（HTTP/3）
+</code></pre>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>DNS</strong>：默认走 UDP:53，一问一答、丢了重发即可，省 TCP 握手；响应超 512B 才回退 TCP。</li>
+<li><strong>Google / YouTube</strong>：把 QUIC（后来标准化为 HTTP/3）大规模上线，正是看中 UDP 上重建传输层以消灭队头阻塞、支持连接迁移。</li>
+<li><strong>视频会议 / 游戏</strong>：Zoom、实时游戏走 UDP（含 WebRTC），宁可丢帧也不等重传——迟到的数据没有价值。</li>
+</ul></div>
+
+<h3>2. HTTP 演进：队头阻塞的三层围剿</h3>
+<p><strong>原理</strong>：HTTP 性能史，本质是<em>与队头阻塞的三次战争</em>。<strong>HTTP/1.1</strong> 一条连接一次只能处理一个请求（pipelining 因实现问题几乎废弃），浏览器只好开 6 条 TCP 并发——这是<em>连接级</em>队头阻塞。<strong>HTTP/2</strong> 在<em>一条</em> TCP 上做<em>应用层多路复用</em>：把请求切成带 stream id 的 frame 交错传输，解决了应用层队头阻塞——但所有 stream 仍共享一条 TCP 字节流，<strong>一个 TCP 包丢失会卡住全部并发 stream</strong>（传输层队头阻塞仍在，且比 HTTP/1.1 更痛，因为 6 条连接的损失被压进 1 条）。<strong>HTTP/3</strong> 干脆抛弃 TCP，在 QUIC 上跑：每条 stream 有独立的序列空间，丢包只卡它自己那条流，其余照常交付——队头阻塞被<em>彻底</em>解决。</p>
+<div class="tradeoff">
+<strong>三代对比：</strong>
+<table>
+<thead><tr><th></th><th>HTTP/1.1</th><th>HTTP/2</th><th>HTTP/3</th></tr></thead>
+<tbody>
+<tr><td><strong>传输层</strong></td><td>TCP</td><td>TCP</td><td>QUIC / UDP</td></tr>
+<tr><td><strong>并发</strong></td><td>多条连接</td><td>单连接多路复用</td><td>单连接多路复用</td></tr>
+<tr><td><strong>队头阻塞</strong></td><td>连接级（严重）</td><td>TCP 传输层仍在</td><td>无（每流独立）</td></tr>
+<tr><td><strong>建连 RTT</strong></td><td>TCP+TLS 2–3</td><td>TCP+TLS 2–3</td><td>1（含 TLS）/ 0-RTT</td></tr>
+<tr><td><strong>头部</strong></td><td>明文重复</td><td>HPACK 压缩</td><td>QPACK 压缩</td></tr>
+<tr><td><strong>换网重连</strong></td><td>断</td><td>断</td><td>连接迁移不断</td></tr>
+</tbody></table>
+</div>
+<p>关键洞察：<strong>HTTP/2 在丢包高的移动/跨洋链路上，性能可能不如 HTTP/1.1 的多连接</strong>——因为把所有蛋放进一条 TCP 篮子，篮子一晃全撒。这正是必须下沉到 QUIC 的原因：队头阻塞不在应用层，光升级 HTTP 版本治不了根，得换传输层。</p>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Cloudflare</strong>：<a href="https://blog.cloudflare.com/http3-the-past-present-and-future/">《HTTP/3: past, present and future》</a>详解为何 TCP 队头阻塞在高丢包链路上惩罚 HTTP/2，而 QUIC 每流独立可解；其<a href="https://blog.cloudflare.com/http-3-vs-http-2/">HTTP/3 vs HTTP/2 实测</a>显示弱网下 HTTP/3 首字节更快。</li>
+<li><strong>Google</strong>：搜索、YouTube 长期用 QUIC/HTTP/3，移动弱网延迟收益最大。</li>
+</ul></div>
+
+<h3>3. TLS 握手：从 2-RTT 到 0-RTT，以及重放的坑</h3>
+<p><strong>原理</strong>：TLS 在明文 TCP 上叠加加密。<strong>TLS 1.2</strong> 需要 <em>2 个 RTT</em>（ClientHello→ServerHello+证书→密钥交换→Finished）才能发第一个字节，叠加 TCP 的 1-RTT 就是 3 个 RTT。<strong>TLS 1.3</strong> 砍掉一轮协商，只要 <em>1 个 RTT</em>；对回访用户用会话票据（session ticket）可做 <strong>0-RTT</strong>：客户端在第一个包里就带上应用数据（early data），握手与数据并行。QUIC 更进一步，把传输握手和 TLS 握手合并，新连接 1-RTT、回访 0-RTT。省下的每个 RTT 在跨洋链路上就是几十上百毫秒。</p>
+<pre class="mermaid">
+sequenceDiagram
+    participant C as Client
+    participant S as Server
+    Note over C,S: TLS 1.2 (2-RTT)
+    C->>S: ClientHello
+    S->>C: ServerHello + Cert
+    C->>S: KeyExchange + Finished
+    S->>C: Finished ✓ 才能发数据
+    Note over C,S: TLS 1.3 0-RTT (回访)
+    C->>S: ClientHello + early data (请求已在此)
+    S->>C: 响应 + Finished
+</pre>
+<div class="tradeoff">
+<strong>0-RTT 的代价 = 重放攻击（replay）：</strong>early data 在握手完成前发出，服务端无法确认它是否被攻击者<em>录下重发</em>。所以 <strong>0-RTT 数据只能承载幂等操作</strong>（GET、幂等查询），绝不能是 <code>POST /transfer</code> 这类非幂等写——否则一次转账可能被重放成两次。工程上：浏览器只在 0-RTT 里发 GET；服务端对非幂等请求强制回退到完整 1-RTT 握手。</p>
+</div>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Cloudflare</strong>：<a href="https://blog.cloudflare.com/introducing-0-rtt/">《Introducing 0-RTT》</a>说明 0-RTT 的重放风险，其做法是带 query string 的请求透明关闭 0-RTT；<a href="https://blog.cloudflare.com/tls-1-3-overview-and-q-and-a/">TLS 1.3 概览</a>强调服务端不得用 0-RTT 数据执行非幂等操作。</li>
+<li><strong>TLS 1.3（RFC 8446）</strong>：把握手压到 1-RTT 并把 0-RTT 标准化，同时明确 anti-replay 是应用层责任。</li>
+</ul></div>
+
+<h3>4. DNS + L4 vs L7 负载均衡：流量怎么落到最近的健康机房</h3>
+<p><strong>原理</strong>：请求发出前先要 <em>DNS 解析</em>——递归解析器逐级问 root→TLD→权威服务器，靠 <strong>TTL 缓存</strong>避免每次都走全程。全球化用两招：<strong>GeoDNS</strong> 按解析者地理位置返回不同 IP；<strong>Anycast</strong> 让同一个 IP 在多地宣告，BGP 自动把用户路由到网络最近的节点。流量到了机房，负载均衡分两层：<strong>L4</strong>（传输层）只看 IP:Port 四元组做连接转发，不解密、吞吐极高、常配 DSR（回包绕过 LB 直返）；<strong>L7</strong>（应用层）终止 TLS、解析 HTTP，才能按 URL 路径/Header/Cookie 路由、做金丝雀、限流、WAF——代价是每连接都要解密解析，成本高得多。</p>
+<div class="tradeoff">
+<strong>L4 vs L7：</strong>
+<table>
+<thead><tr><th></th><th>L4 (传输层)</th><th>L7 (应用层)</th></tr></thead>
+<tbody>
+<tr><td><strong>看到什么</strong></td><td>IP:Port 四元组</td><td>完整 HTTP（URL/Header/Cookie）</td></tr>
+<tr><td><strong>能做</strong></td><td>连接级转发、DSR</td><td>路径路由、灰度、限流、TLS 终止</td></tr>
+<tr><td><strong>吞吐/成本</strong></td><td>极高 / 低</td><td>较低 / 高（要解密解析）</td></tr>
+<tr><td><strong>典型</strong></td><td>LVS、AWS NLB、Maglev</td><td>Nginx、Envoy、AWS ALB</td></tr>
+</tbody></table>
+</div>
+<pre><code># 生产常见组合：Anycast → L4（抗量+均衡）→ L7（智能路由）
+Client --DNS/Anycast--&gt; [L4 LB: 一致性哈希选边缘, DSR 回程]
+                         --&gt; [L7 网关: 终止 TLS, /v2/* 灰度 5%]
+                             --&gt; App 连接池 (keep-alive 复用, 免重复握手)
+# L4 用一致性哈希是为了后端增减时不打乱既有连接（见 Day 4 分片）
+</code></pre>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Google Maglev</strong>：软件 L4 LB，用一致性哈希 + ECMP 承接 Anycast 流量，单机数百万 pps。</li>
+<li><strong>Cloudflare / AWS</strong>：Anycast 把同一 IP 宣告到全球边缘，DDoS 流量被就近分摊；AWS 用 NLB（L4）+ ALB（L7）分层。</li>
+<li><strong>Envoy</strong>：作为 L7 网关/Service Mesh 数据面，做 TLS 终止、按 Header 灰度、重试与熔断（见 Day 23 可靠性）。</li>
+</ul></div>
+
+<h2>扩展与优化</h2>
+<ul>
+<li><strong>连接复用打底</strong>：到源站永远用 keep-alive 连接池，把 TCP+TLS 握手摊到成百上千请求上——这是省 RTT 性价比最高的一招。</li>
+<li><strong>0-RTT 递进</strong>：TLS 1.3 → HTTP/3 0-RTT，回访用户首包近乎零握手；但严守幂等约束。</li>
+<li><strong>就近终止 TLS</strong>：在离用户最近的边缘节点终止 TLS（握手 RTT 短），边缘到源站走已建好的长连接（见 Day 28 CDN/Edge）。</li>
+<li><strong>拥塞控制升级</strong>：长肥管道（高带宽高延迟，如跨洋）从 Cubic 换 BBR，按实测带宽/RTT 建模，吞吐更稳。</li>
+<li><strong>下一步</strong>：多区域就近路由与故障转移（Day 42）、边缘缓存卸载回源（Day 28）。</li>
+</ul>
+
+<h2>常见陷阱 + 面试问题</h2>
+<div class="callout"><strong>1. 「升级 HTTP/2 就快了」</strong>：在高丢包移动网，HTTP/2 单连接反而被 TCP 队头阻塞拖累，可能不如 HTTP/1.1 多连接。根治要下沉到 QUIC/HTTP/3——队头阻塞在传输层，不在应用层。</div>
+<div class="callout"><strong>2. 0-RTT 拿来发写请求</strong>：early data 可被重放，非幂等操作（转账、下单）绝不能走 0-RTT，否则一次操作被重放成两次。</div>
+<div class="callout"><strong>3. DNS TTL 设太长</strong>：故障切换时旧 IP 被缓存到 TTL 过期才更新，几分钟不可用。灾备场景 TTL 要短（30–60s），但太短又加解析压力——权衡。</div>
+<div class="callout"><strong>4. 只在一处终止 TLS 却忽略内网</strong>：边缘终止 TLS 后到源站若走明文，内网被渗透即可窃听。零信任下内网也要 mTLS。</div>
+<p><strong>高频追问：</strong></p>
+<ol>
+<li>画出一次 HTTPS 请求从输域名到收到首字节，经过哪些 RTT？各能怎么省？</li>
+<li>HTTP/2 已经多路复用了，为什么还要 HTTP/3？TCP 队头阻塞具体怎么发生？</li>
+<li>L4 和 L7 负载均衡分别在什么层、能看到什么、什么场景必须用 L7？</li>
+<li>Anycast 怎么实现「就近」？它对 TCP 长连接有什么隐患（路由抖动换节点）？</li>
+<li>TLS 1.3 0-RTT 为什么快、为什么危险？你会怎么在网关层安全启用它？</li>
+</ol>
+
+<h2>深入资源</h2>
+<ul>
+<li><strong>《High Performance Browser Networking》</strong>（Ilya Grigorik，<a href="https://hpbn.co/">hpbn.co</a> 免费在线）：TCP/UDP/TLS/HTTP 各层延迟来源与优化的权威教材。</li>
+<li><strong>Cloudflare Blog</strong>：<a href="https://blog.cloudflare.com/http3-the-past-present-and-future/">HTTP/3 past-present-future</a>、<a href="https://blog.cloudflare.com/tls-1-3-overview-and-q-and-a/">TLS 1.3 概览</a>、<a href="https://blog.cloudflare.com/introducing-0-rtt/">0-RTT</a>——队头阻塞与握手优化的一手讲解。</li>
+<li><strong>《Designing Data-Intensive Applications》</strong>（Kleppmann）第 8 章：网络的不可靠性、超时与分区，把「网络」放进分布式系统语境。</li>
+<li><strong>RFC 9000 (QUIC) / RFC 9114 (HTTP/3) / RFC 8446 (TLS 1.3)</strong>：协议一手规范，读握手与 0-RTT anti-replay 部分即可。</li>
+</ul>
+
+<h2>深入思考（点击展开答案）</h2>
+
+<details>
+<summary>1. 东京用户访问美西机房，一次冷启动 HTTPS 请求（HTTP/2）要几个 RTT？换 HTTP/3 + 0-RTT 能压到多少？跨洋 RTT 按 120ms 估。</summary>
+<div class="answer">
+<p><strong>HTTP/2 冷启动</strong>：DNS 解析（本地缓存命中≈0，否则 1 RTT）+ TCP 三次握手 1 RTT + TLS 1.3 握手 1 RTT，才发出第一个请求，再等 1 RTT 拿响应。<em>不含 DNS 约 3 个 RTT ≈ 360ms</em>；DNS 未命中再加 ~1 RTT。</p>
+<p><strong>HTTP/3 首次</strong>：QUIC 把传输握手和 TLS 合并成 1 RTT，加取响应 1 RTT ≈ 2 RTT ≈ 240ms，省掉一整个 RTT。</p>
+<p><strong>HTTP/3 回访 0-RTT</strong>：请求随第一个包发出（early data），响应 1 RTT 回来 ≈ <strong>120ms</strong>——从 360ms 到 120ms，跨洋链路上就是「转圈」和「秒开」的差别。</p>
+<p>这也解释了为什么大厂死磕握手 RTT：物理光速不可谈判，唯一能省的就是来回次数。</p>
+</div>
+</details>
+
+<details>
+<summary>2. 为什么 HTTP/2 的队头阻塞比 HTTP/1.1 的「更隐蔽也更痛」？升级前怎么判断该不该上 HTTP/2？</summary>
+<div class="answer">
+<p>HTTP/1.1 时代浏览器开 6 条 TCP，一条卡了另外 5 条照跑——损失被<em>分散</em>。HTTP/2 把所有请求压进<em>一条</em> TCP，应用层看似并发，但底层字节流一旦丢包，TCP 必须按序交付，<strong>全部 stream 一起等重传</strong>。低丢包链路上多路复用净赚；<strong>高丢包链路上把鸡蛋全放一个篮子反而更脆</strong>。</p>
+<p><strong>判断</strong>：看目标用户网络质量。数据中心内部/低丢包 → HTTP/2 收益明确；大量移动弱网/跨洋 → 要么保留多连接，要么直接上 HTTP/3（QUIC 每流独立，从根上免疫）。别只看「版本号更高」。</p>
+</div>
+</details>
+
+<details>
+<summary>3. Anycast 让「同一个 IP 全球最近节点响应」，但它对 TCP 长连接暗藏什么风险？为什么 UDP/QUIC 反而更适配 Anycast？</summary>
+<div class="answer">
+<p><strong>风险</strong>：Anycast 的「最近」由 BGP 路由决定，路由随网络状况<em>抖动</em>。若一条 TCP 长连接中途 BGP 收敛把后续包导向<em>另一个</em>节点，那个节点没有这条连接的状态（seq、TLS 会话），连接直接 RST 断掉。所以 Anycast 传统上更适合<em>短、无状态</em>的交互（DNS 一问一答）。</p>
+<p><strong>QUIC 为何更配</strong>：QUIC 用<em>连接 ID</em>而非四元组标识连接，且支持<strong>连接迁移</strong>——即便包被路由到新节点、或客户端换了 IP/端口，凭连接 ID 仍能认领这条连接、无需重握手。这让 Anycast + 长连接第一次真正可行，也是移动端换 WiFi/蜂窝不断连的底层原因。</p>
+</div>
+</details>
+
+<details>
+<summary>4. L7 负载均衡要终止 TLS 才能看 HTTP，这给延迟、安全、成本各带来什么？为什么很多大厂用 L4+L7 两层而非纯 L7？</summary>
+<div class="answer">
+<p><strong>终止 TLS 的代价</strong>：每条连接都要在 L7 解密，CPU 成本高、单机吞吐远低于 L4；且明文报文在 LB 内存中出现，成为攻击面（密钥、请求内容集中）。收益是能按 URL/Header 路由、灰度、限流、WAF——这些不解密根本做不了。</p>
+<p><strong>为何两层</strong>：<em>L4 扛量、L7 扛智能</em>。L4（Maglev/LVS/NLB）用一致性哈希把海量连接均匀撒给一组 L7，自己不解密、吞吐极高、还能配 DSR 让回包绕过 LB 直返客户端（省一半带宽）；L7 只需处理分到自己的那份连接做精细路由。纯 L7 顶在最前面既贵又难水平扩展，还把 DDoS 直接引到解密层。分层等于「先粗筛再精调」。</p>
+</div>
+</details>
+
+<details>
+<summary>5. 「省 RTT」在整篇里反复出现。把 DNS、TCP、TLS、HTTP 四层能省 RTT 的手段串成一张清单，指出哪些有一致性/安全代价。</summary>
+<div class="answer">
+<ul>
+<li><strong>DNS</strong>：TTL 缓存省全程递归解析；预解析（dns-prefetch）。<em>代价</em>：TTL 长则故障切换慢。</li>
+<li><strong>TCP</strong>：keep-alive 连接池复用，把握手摊到成千请求；TCP Fast Open 让 SYN 带数据。<em>代价</em>：连接占内存；TFO 的 early data 同样有重放面。</li>
+<li><strong>TLS</strong>：1.2→1.3 省一个 RTT；session resumption/ticket 免全握手；0-RTT 首包带数据。<em>代价</em>：0-RTT 可重放，只能发幂等请求。</li>
+<li><strong>HTTP</strong>：多路复用省额外连接握手；HTTP/3 把传输+TLS 合并成 1-RTT，连接迁移免换网重连。<em>代价</em>：QUIC 用户态 CPU 开销、部分网络封 UDP。</li>
+<li><strong>拓扑层</strong>：就近边缘终止 TLS（短 RTT 握手）+ 到源站长连接（Day 28）。</li>
+</ul>
+<p>贯穿主线：<strong>物理光速定死了单个 RTT，架构能做的只有「减少来回次数」和「把来回摊薄」，而每一次激进省 RTT（0-RTT/TFO）几乎都在拿安全或一致性换延迟。</strong></p>
+</div>
+</details>
+
+<div class="nav"><a href="index.html">← 回到 index</a></div>
+</div>
+</body></html>

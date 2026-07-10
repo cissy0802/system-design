@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 48 · Networking Fundamentals — System Design</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"SF Pro Display","Noto Sans SC",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
+.container{max-width:820px;margin:0 auto;padding:24px 20px 60px}
+header{padding:40px 0 28px;border-bottom:1px solid rgba(100,200,255,0.15);margin-bottom:32px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem}
+.tag{padding:3px 10px;border-radius:4px;background:rgba(100,200,255,0.12);color:#64c8ff;border:1px solid rgba(100,200,255,0.25)}
+.tag.diff{background:rgba(94,234,212,0.1);color:#5eead4;border-color:rgba(94,234,212,0.3)}
+.tag.day{background:rgba(255,180,80,0.1);color:#ffb450;border-color:rgba(255,180,80,0.25)}
+h1{font-size:1.75rem;font-weight:800;background:linear-gradient(135deg,#64c8ff 0%,#5eead4 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:0.5px;line-height:1.3}
+h1 .en{display:block;font-size:1rem;color:#7a8590;-webkit-text-fill-color:#7a8590;margin-top:6px;font-weight:500}
+h2{font-size:1.2rem;color:#5eead4;margin:36px 0 14px;padding-left:12px;border-left:3px solid #5eead4}
+h3{font-size:1rem;color:#64c8ff;margin:20px 0 10px;font-weight:600}
+p{margin:10px 0;color:#c8cfd6}
+ul,ol{margin:10px 0 10px 22px;color:#c8cfd6}
+li{margin:6px 0}
+strong{color:#e8eef5;font-weight:600}
+em{color:#5eead4;font-style:normal;font-weight:500}
+code{font-family:"SF Mono",Menlo,Consolas,monospace;background:rgba(100,200,255,0.1);color:#5eead4;padding:1px 6px;border-radius:3px;font-size:0.88em}
+pre{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:14px 16px;overflow-x:auto;margin:12px 0;font-family:"SF Mono",Menlo,Consolas,monospace;font-size:0.84rem;line-height:1.55;color:#c8cfd6}
+pre code{background:none;color:inherit;padding:0;font-size:1em}
+.mermaid{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:18px;margin:14px 0;text-align:center;overflow-x:auto;cursor:zoom-in;transition:border-color 0.15s}
+.mermaid:hover{border-color:rgba(100,200,255,0.4)}
+.mermaid svg{width:100%;max-width:100%;height:auto;min-height:280px}
+.lightbox{position:fixed;inset:0;background:rgba(8,12,18,0.96);z-index:9999;display:none;align-items:center;justify-content:center;padding:24px;cursor:grab;backdrop-filter:blur(4px);overflow:hidden}
+.lightbox.open{display:flex}
+.lightbox.dragging{cursor:grabbing}
+.lightbox svg{width:auto;height:auto;max-width:96vw;max-height:92vh;transform-origin:center center;will-change:transform}
+.lightbox .hint{position:fixed;top:16px;right:20px;font-size:0.78rem;color:#7a8590;font-family:"SF Mono",Menlo,monospace;pointer-events:none}
+.callout{background:rgba(255,180,80,0.06);border-left:3px solid #ffb450;padding:12px 14px;margin:14px 0;border-radius:4px;font-size:0.94rem}
+.callout strong{color:#ffb450}
+.tradeoff{background:rgba(100,200,255,0.05);border:1px solid rgba(100,200,255,0.2);border-radius:6px;padding:12px 14px;margin:12px 0;font-size:0.94rem}
+.case{background:rgba(94,234,212,0.05);border-left:3px solid #5eead4;padding:12px 14px;margin:12px 0;border-radius:4px;font-size:0.94rem}
+.case strong{color:#5eead4}
+.nav{margin-top:50px;padding-top:24px;border-top:1px solid rgba(100,200,255,0.15);text-align:center}
+.nav a{color:#64c8ff;text-decoration:none;font-size:0.92rem;padding:8px 16px;border:1px solid rgba(100,200,255,0.3);border-radius:4px;transition:all 0.15s}
+.nav a:hover{background:rgba(100,200,255,0.1)}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:0.9rem}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid rgba(100,200,255,0.15)}
+th{color:#64c8ff;font-weight:600;background:rgba(100,200,255,0.05)}
+details{background:rgba(100,200,255,0.04);border:1px solid rgba(100,200,255,0.18);border-radius:6px;padding:12px 16px;margin:10px 0;transition:all 0.15s}
+details:hover{border-color:rgba(100,200,255,0.35)}
+details[open]{background:rgba(94,234,212,0.05);border-color:rgba(94,234,212,0.3)}
+details summary{font-weight:600;color:#e8eef5;list-style:none;outline:none;cursor:pointer;display:flex;align-items:flex-start;gap:10px;font-size:0.96rem}
+details summary::-webkit-details-marker{display:none}
+details summary::before{content:'▶';color:#64c8ff;font-size:0.75em;transition:transform 0.2s;flex-shrink:0;margin-top:5px}
+details[open] summary::before{transform:rotate(90deg);color:#5eead4}
+details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
+details .answer ul,details .answer ol{margin:6px 0 6px 22px}
+@media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+</style>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({startOnLoad:true,theme:'base',flowchart:{useMaxWidth:true,htmlLabels:true,nodeSpacing:50,rankSpacing:60},themeVariables:{primaryColor:'#1a2530',primaryTextColor:'#e8eef5',primaryBorderColor:'#64c8ff',lineColor:'#5eead4',secondaryColor:'#0e1419',tertiaryColor:'#0a0f14',background:'#0a0f14',mainBkg:'#1a2530',secondBkg:'#0e1419',textColor:'#d4dae0',fontFamily:'-apple-system,"SF Pro Display",sans-serif',fontSize:'16px'}});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const lb=document.createElement('div');lb.className='lightbox';
+  lb.innerHTML='<span class="hint">scroll = zoom · drag = pan · Esc / click bg = close</span>';
+  document.body.appendChild(lb);
+  let scale=1,panX=0,panY=0,dragging=false,moved=false,lx=0,ly=0;
+  const apply=()=>{const s=lb.querySelector('svg');if(s)s.style.transform=`translate(${panX}px,${panY}px) scale(${scale})`};
+  const reset=()=>{scale=1;panX=0;panY=0};
+  const close=()=>{lb.classList.remove('open');const s=lb.querySelector('svg');if(s)s.remove();reset()};
+  document.addEventListener('click',e=>{
+    if(e.target.closest('.lightbox')){if(moved){moved=false;return}close();return}
+    const w=e.target.closest('.mermaid');if(!w)return;
+    const svg=w.querySelector('svg');if(!svg)return;
+    const c=svg.cloneNode(true);c.removeAttribute('style');
+    c.style.maxWidth='96vw';c.style.maxHeight='92vh';
+    lb.appendChild(c);lb.classList.add('open');reset();apply();
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+  lb.addEventListener('wheel',e=>{
+    if(!lb.classList.contains('open'))return;
+    e.preventDefault();
+    const svg=lb.querySelector('svg');if(!svg)return;
+    const ns=Math.max(0.3,Math.min(10,scale*(1-e.deltaY*0.002)));
+    const r=svg.getBoundingClientRect();
+    const cx=e.clientX-(r.left+r.width/2),cy=e.clientY-(r.top+r.height/2);
+    const k=ns/scale-1;panX-=cx*k;panY-=cy*k;scale=ns;apply();
+  },{passive:false});
+  lb.addEventListener('mousedown',e=>{
+    if(!lb.classList.contains('open'))return;
+    dragging=true;moved=false;lx=e.clientX;ly=e.clientY;lb.classList.add('dragging');e.preventDefault();
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    const dx=e.clientX-lx,dy=e.clientY-ly;
+    if(Math.abs(dx)+Math.abs(dy)>3)moved=true;
+    panX+=dx;panY+=dy;lx=e.clientX;ly=e.clientY;apply();
+  });
+  document.addEventListener('mouseup',()=>{dragging=false;lb.classList.remove('dragging')});
+});
+</script>
+</head><body><div class="container">
+
+<header>
+<div class="meta">
+<span class="tag day">Day 48</span>
+<span class="tag diff">Hard</span>
+<span class="tag">Networking</span>
+<span class="tag">TCP/UDP · QUIC</span>
+<span class="tag">DNS · TLS · LB</span>
+</div>
+<h1>Networking Fundamentals — How Many Round Trips Does One Request Really Take<span class="en">TCP/UDP, HTTP/1.1·2·3·QUIC, DNS, TLS Handshake, L4 vs L7 Load Balancing</span></h1>
+</header>
+
+<h2>Problem Scenario + Requirements</h2>
+<p>You're designing the ingress layer for a <strong>global API platform</strong>: <strong>50M users</strong> across five continents, ~70% mobile, packet loss routinely <strong>1–3%</strong>; API p99 target <strong>&lt; 150ms</strong>, of which <em>connection setup</em> (DNS + TCP + TLS) often eats half of mobile time-to-first-byte. A request from Tokyo to a US-West data center already costs ~120ms of physical round-trip time (RTT); if the handshake takes 3 RTTs, that's 360ms before a single byte arrives.</p>
+<p>The problem isn't "add servers"—it's that <strong>every RTT must be squeezed</strong>: <em>how DNS steers a user to the nearest healthy DC, whether the transport is TCP or UDP, how to cut the handshake from 3 RTTs to 0, and whether load balancing happens at layer 4 or layer 7</em>. These four decisions dominate first-packet latency, and in architect interviews they separate "can configure Nginx" from "understands the network."</p>
+
+<h2>High-Level Architecture (a request's network path)</h2>
+<pre class="mermaid">
+graph LR
+    U["Client<br/><i>mobile/browser</i>"]
+    DNS["DNS resolve<br/><i>GeoDNS + Anycast</i>"]
+    EDGE["Edge / L4 LB<br/><i>Anycast VIP · DSR</i>"]
+    L7["L7 LB / Gateway<br/><i>TLS terminate · route</i>"]
+    APP["App cluster"]
+
+    U -->|"① name→IP"| DNS
+    U -->|"② TCP/QUIC handshake"| EDGE
+    EDGE -->|"③ TLS + HTTP"| L7
+    L7 -->|"④ keep-alive pool"| APP
+
+    classDef client fill:#1a2530,stroke:#64c8ff,color:#e8eef5
+    classDef edge fill:#0e2030,stroke:#5eead4,color:#e8eef5
+    classDef app fill:#2a1530,stroke:#ff7ab6,color:#e8eef5
+    class U client
+    class DNS,EDGE,L7 edge
+    class APP app
+</pre>
+<p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">DNS picks the DC; L4 picks the edge box; L7 terminates TLS and routes by path/tenant; origin reuses long-lived connections to skip handshakes</p>
+<p>Each component owns a slice of latency: <strong>DNS</strong> steers users nearby (Anycast lets BGP decide "nearest"); <strong>L4 LB</strong> forwards by the connection 4-tuple—very high throughput but blind to content; the <strong>L7 LB/gateway</strong> terminates TLS and, seeing the HTTP message, does path routing, rate limiting, canary; the origin uses a <strong>keep-alive pool</strong> to amortize handshakes. Understanding this chain is how you locate "which RTT is slow."</p>
+
+<h2>Key Technical Points</h2>
+
+<h3>1. TCP vs UDP: reliable & ordered vs connectionless & low-latency</h3>
+<p><strong>Principle</strong>: TCP provides a <em>reliable, ordered, connection-oriented byte stream</em>—three-way handshake to connect, sequence numbers + ACK retransmit for loss, sliding window for flow control, congestion control (Cubic/BBR) to avoid overwhelming the network. The cost: 1 RTT to connect, and <strong>"ordered" delivery is a double-edged sword</strong>—if one packet is lost, already-arrived bytes must wait in the kernel buffer for the retransmit. That is the root of <em>head-of-line (HOL) blocking</em>. UDP is <em>connectionless datagrams</em>: fire-and-forget, no ordering, no congestion control—zero handshake, zero HOL blocking, but reliability/ordering/congestion are all the application's problem.</p>
+<div class="tradeoff">
+<strong>Trade-off:</strong>
+<ul>
+<li><strong>TCP</strong>: ✅ mature kernel stack, reliable/ordered, congestion control built in; ❌ 1-RTT connect (2–3 with TLS), HOL blocking, per-connection memory, breaks when mobile IP changes.</li>
+<li><strong>Raw UDP</strong>: ✅ zero handshake, lowest latency, ideal for loss-tolerant real-time (audio/video, game state, DNS); ❌ loss/reorder/congestion all DIY, often dropped by middleboxes (NAT/firewall).</li>
+<li><strong>QUIC (reliability rebuilt over UDP)</strong>: ✅ regains reliable/ordered + congestion control while making <em>each stream independent</em>, killing transport-layer HOL blocking, plus connection migration (survives network switch); ❌ user-space impl burns CPU, some networks block UDP.</li>
+</ul></div>
+<pre><code># Selection intuition: first ask "if one packet is lost, can the app tolerate it?"
+lossy-OK, want latest   → UDP (voice: a dropped frame beats a stale one)
+lossless, need ordering → TCP / QUIC (API, files, payments)
+ordered but fear HOL blocking + frequent mobile network switch → QUIC (HTTP/3)
+</code></pre>
+<div class="case">
+<strong>Real-world:</strong>
+<ul>
+<li><strong>DNS</strong>: defaults to UDP:53—one question, one answer, just resend on loss, no TCP handshake; falls back to TCP only when the response exceeds 512B.</li>
+<li><strong>Google / YouTube</strong>: deployed QUIC (later standardized as HTTP/3) at scale precisely to rebuild transport over UDP, kill HOL blocking, and support connection migration.</li>
+<li><strong>Video conferencing / games</strong>: Zoom and real-time games use UDP (incl. WebRTC)—drop a frame rather than wait for a retransmit; late data has no value.</li>
+</ul></div>
+
+<h3>2. HTTP evolution: three sieges against head-of-line blocking</h3>
+<p><strong>Principle</strong>: HTTP's performance history is essentially <em>three wars against HOL blocking</em>. <strong>HTTP/1.1</strong> processes one request at a time per connection (pipelining was practically abandoned), so browsers open 6 parallel TCP connections—<em>connection-level</em> HOL blocking. <strong>HTTP/2</strong> does <em>application-layer multiplexing</em> over <em>one</em> TCP connection: requests are sliced into frames tagged with stream IDs and interleaved, solving application-layer HOL blocking—but all streams still share one TCP byte stream, so <strong>a single lost TCP packet stalls every concurrent stream</strong> (transport-layer HOL blocking remains, and hurts more than HTTP/1.1 because the losses of 6 connections are compressed into 1). <strong>HTTP/3</strong> drops TCP entirely and runs over QUIC: each stream has its own sequence space, so loss only stalls its own stream while the rest keep flowing—HOL blocking is <em>fully</em> solved.</p>
+<div class="tradeoff">
+<strong>Three generations:</strong>
+<table>
+<thead><tr><th></th><th>HTTP/1.1</th><th>HTTP/2</th><th>HTTP/3</th></tr></thead>
+<tbody>
+<tr><td><strong>Transport</strong></td><td>TCP</td><td>TCP</td><td>QUIC / UDP</td></tr>
+<tr><td><strong>Concurrency</strong></td><td>multiple conns</td><td>single-conn mux</td><td>single-conn mux</td></tr>
+<tr><td><strong>HOL blocking</strong></td><td>connection-level (severe)</td><td>TCP transport still</td><td>none (per-stream)</td></tr>
+<tr><td><strong>Setup RTT</strong></td><td>TCP+TLS 2–3</td><td>TCP+TLS 2–3</td><td>1 (incl. TLS) / 0-RTT</td></tr>
+<tr><td><strong>Headers</strong></td><td>plaintext, repeated</td><td>HPACK compressed</td><td>QPACK compressed</td></tr>
+<tr><td><strong>Network switch</strong></td><td>breaks</td><td>breaks</td><td>connection migration</td></tr>
+</tbody></table>
+</div>
+<p>Key insight: <strong>on high-loss mobile/transoceanic links, HTTP/2 may underperform HTTP/1.1's multiple connections</strong>—putting all eggs in one TCP basket means one jolt spills them all. That's exactly why you must descend to QUIC: HOL blocking lives in the transport layer, so bumping the HTTP version alone can't cure it—you have to change the transport.</p>
+<div class="case">
+<strong>Real-world:</strong>
+<ul>
+<li><strong>Cloudflare</strong>: <a href="https://blog.cloudflare.com/http3-the-past-present-and-future/">"HTTP/3: past, present and future"</a> explains why TCP HOL blocking punishes HTTP/2 on lossy links while QUIC's per-stream independence solves it; their <a href="https://blog.cloudflare.com/http-3-vs-http-2/">HTTP/3 vs HTTP/2 measurements</a> show faster TTFB on weak networks.</li>
+<li><strong>Google</strong>: Search and YouTube have long run QUIC/HTTP/3, with the biggest latency wins on weak mobile networks.</li>
+</ul></div>
+
+<h3>3. TLS handshake: from 2-RTT to 0-RTT, and the replay trap</h3>
+<p><strong>Principle</strong>: TLS layers encryption over plaintext TCP. <strong>TLS 1.2</strong> needs <em>2 RTTs</em> (ClientHello→ServerHello+cert→key exchange→Finished) before the first byte; stacked on TCP's 1 RTT that's 3 RTTs. <strong>TLS 1.3</strong> cuts a negotiation round to just <em>1 RTT</em>; for returning users a session ticket enables <strong>0-RTT</strong>: the client puts application data (early data) in the very first packet, running handshake and data in parallel. QUIC goes further, merging the transport and TLS handshakes—1-RTT for new connections, 0-RTT for returning ones. Each saved RTT on a transoceanic link is tens to hundreds of milliseconds.</p>
+<pre class="mermaid">
+sequenceDiagram
+    participant C as Client
+    participant S as Server
+    Note over C,S: TLS 1.2 (2-RTT)
+    C->>S: ClientHello
+    S->>C: ServerHello + Cert
+    C->>S: KeyExchange + Finished
+    S->>C: Finished ✓ only now can send data
+    Note over C,S: TLS 1.3 0-RTT (resumption)
+    C->>S: ClientHello + early data (request already here)
+    S->>C: response + Finished
+</pre>
+<div class="tradeoff">
+<strong>The cost of 0-RTT = replay attacks:</strong> early data is sent before the handshake completes, so the server cannot tell whether an attacker <em>recorded and replayed</em> it. Therefore <strong>0-RTT data may only carry idempotent operations</strong> (GET, idempotent queries), never a non-idempotent write like <code>POST /transfer</code>—otherwise one transfer could be replayed into two. In practice: browsers only send GET in 0-RTT; servers force a full 1-RTT handshake for non-idempotent requests.</p>
+</div>
+<div class="case">
+<strong>Real-world:</strong>
+<ul>
+<li><strong>Cloudflare</strong>: <a href="https://blog.cloudflare.com/introducing-0-rtt/">"Introducing 0-RTT"</a> details the replay risk and transparently disables 0-RTT for requests with query strings; their <a href="https://blog.cloudflare.com/tls-1-3-overview-and-q-and-a/">TLS 1.3 overview</a> stresses that servers must not execute non-idempotent operations from 0-RTT data.</li>
+<li><strong>TLS 1.3 (RFC 8446)</strong>: compressed the handshake to 1-RTT and standardized 0-RTT, while making anti-replay an application-layer responsibility.</li>
+</ul></div>
+
+<h3>4. DNS + L4 vs L7 load balancing: getting traffic to the nearest healthy DC</h3>
+<p><strong>Principle</strong>: before a request goes out it needs <em>DNS resolution</em>—a recursive resolver walks root→TLD→authoritative servers, relying on <strong>TTL caching</strong> to avoid the full walk each time. Going global uses two tricks: <strong>GeoDNS</strong> returns different IPs by resolver geography; <strong>Anycast</strong> announces the same IP from many locations, letting BGP route each user to the network-nearest node. Once traffic reaches a DC, load balancing splits into two layers: <strong>L4</strong> (transport) only sees the IP:Port 4-tuple and forwards by connection—no decryption, extreme throughput, often with DSR (return path bypasses the LB); <strong>L7</strong> (application) terminates TLS and parses HTTP, so it can route by URL path/header/cookie, do canary, rate limiting, WAF—at the cost of decrypting and parsing every connection.</p>
+<div class="tradeoff">
+<strong>L4 vs L7:</strong>
+<table>
+<thead><tr><th></th><th>L4 (transport)</th><th>L7 (application)</th></tr></thead>
+<tbody>
+<tr><td><strong>Sees</strong></td><td>IP:Port 4-tuple</td><td>full HTTP (URL/header/cookie)</td></tr>
+<tr><td><strong>Can do</strong></td><td>connection forwarding, DSR</td><td>path routing, canary, rate limit, TLS terminate</td></tr>
+<tr><td><strong>Throughput/cost</strong></td><td>very high / low</td><td>lower / high (decrypt+parse)</td></tr>
+<tr><td><strong>Typical</strong></td><td>LVS, AWS NLB, Maglev</td><td>Nginx, Envoy, AWS ALB</td></tr>
+</tbody></table>
+</div>
+<pre><code># Common production combo: Anycast → L4 (volume+balance) → L7 (smart routing)
+Client --DNS/Anycast--&gt; [L4 LB: consistent hash picks edge, DSR return]
+                         --&gt; [L7 gateway: terminate TLS, /v2/* canary 5%]
+                             --&gt; App pool (keep-alive reuse, no re-handshake)
+# L4 uses consistent hashing so existing connections aren't reshuffled when backends change (see Day 4)
+</code></pre>
+<div class="case">
+<strong>Real-world:</strong>
+<ul>
+<li><strong>Google Maglev</strong>: a software L4 LB using consistent hashing + ECMP to absorb Anycast traffic at millions of pps per box.</li>
+<li><strong>Cloudflare / AWS</strong>: Anycast announces one IP across global edges so DDoS traffic is diffused nearby; AWS layers NLB (L4) + ALB (L7).</li>
+<li><strong>Envoy</strong>: serves as an L7 gateway / service-mesh data plane for TLS termination, header-based canary, retries and circuit breaking (see Day 23).</li>
+</ul></div>
+
+<h2>Scaling & Optimization</h2>
+<ul>
+<li><strong>Connection reuse as the baseline</strong>: always use a keep-alive pool to the origin, amortizing the TCP+TLS handshake over hundreds/thousands of requests—the highest-ROI RTT saving.</li>
+<li><strong>0-RTT progression</strong>: TLS 1.3 → HTTP/3 0-RTT gives returning users near-zero-handshake first packets; hold the idempotency constraint strictly.</li>
+<li><strong>Terminate TLS nearby</strong>: terminate TLS at the edge closest to the user (short handshake RTT), then ride a pre-established long connection from edge to origin (see Day 28).</li>
+<li><strong>Congestion control upgrade</strong>: on long fat pipes (high bandwidth, high latency, e.g. transoceanic) switch Cubic → BBR, which models measured bandwidth/RTT for steadier throughput.</li>
+<li><strong>Next steps</strong>: multi-region nearest-routing and failover (Day 42), edge caching to offload origin (Day 28).</li>
+</ul>
+
+<h2>Common Pitfalls + Interview Questions</h2>
+<div class="callout"><strong>1. "Just upgrade to HTTP/2 and it's faster"</strong>: on high-loss mobile networks, HTTP/2's single connection is dragged by TCP HOL blocking and may lose to HTTP/1.1's multiple connections. The real fix descends to QUIC/HTTP/3—HOL blocking is in the transport, not the application.</div>
+<div class="callout"><strong>2. Sending writes over 0-RTT</strong>: early data can be replayed; non-idempotent operations (transfers, orders) must never use 0-RTT, or one operation is replayed into two.</div>
+<div class="callout"><strong>3. DNS TTL set too long</strong>: during failover the stale IP stays cached until the TTL expires—minutes of downtime. Disaster-recovery scenarios want short TTLs (30–60s), but too short adds resolution load—a trade-off.</div>
+<div class="callout"><strong>4. Terminating TLS in one place but ignoring the internal network</strong>: if the edge terminates TLS and talks plaintext to the origin, a breached internal network can eavesdrop. Under zero trust the internal hop needs mTLS too.</div>
+<p><strong>Frequent follow-ups:</strong></p>
+<ol>
+<li>Draw an HTTPS request from typing the domain to receiving the first byte—which RTTs are involved, and how do you save each?</li>
+<li>HTTP/2 already multiplexes—why HTTP/3? How exactly does TCP HOL blocking occur?</li>
+<li>L4 vs L7 LB: which layer, what can each see, and when must you use L7?</li>
+<li>How does Anycast achieve "nearest"? What's its hazard for long-lived TCP connections (route flap switches nodes)?</li>
+<li>Why is TLS 1.3 0-RTT fast, and why dangerous? How would you enable it safely at the gateway?</li>
+</ol>
+
+<h2>Deeper Resources</h2>
+<ul>
+<li><strong>High Performance Browser Networking</strong> (Ilya Grigorik, free at <a href="https://hpbn.co/">hpbn.co</a>): the authoritative text on latency sources and optimizations across TCP/UDP/TLS/HTTP.</li>
+<li><strong>Cloudflare Blog</strong>: <a href="https://blog.cloudflare.com/http3-the-past-present-and-future/">HTTP/3 past-present-future</a>, <a href="https://blog.cloudflare.com/tls-1-3-overview-and-q-and-a/">TLS 1.3 overview</a>, <a href="https://blog.cloudflare.com/introducing-0-rtt/">0-RTT</a>—first-hand accounts of HOL blocking and handshake optimization.</li>
+<li><strong>Designing Data-Intensive Applications</strong> (Kleppmann), Ch. 8: unreliable networks, timeouts, and partitions—placing "the network" into distributed-systems context.</li>
+<li><strong>RFC 9000 (QUIC) / RFC 9114 (HTTP/3) / RFC 8446 (TLS 1.3)</strong>: first-hand specs; the handshake and 0-RTT anti-replay sections suffice.</li>
+</ul>
+
+<h2>Deep-Dive Questions (click to expand)</h2>
+
+<details>
+<summary>1. Tokyo user to a US-West DC: how many RTTs for a cold HTTPS request (HTTP/2)? What does HTTP/3 + 0-RTT cut it to? Assume 120ms transoceanic RTT.</summary>
+<div class="answer">
+<p><strong>HTTP/2 cold start</strong>: DNS (≈0 on local cache hit, else 1 RTT) + TCP three-way handshake 1 RTT + TLS 1.3 handshake 1 RTT before the first request goes out, then 1 RTT to fetch the response. <em>Excluding DNS ≈ 3 RTTs ≈ 360ms</em>; add ~1 RTT if DNS misses.</p>
+<p><strong>HTTP/3 first time</strong>: QUIC merges transport and TLS handshakes into 1 RTT, plus 1 RTT for the response ≈ 2 RTTs ≈ 240ms—one whole RTT saved.</p>
+<p><strong>HTTP/3 returning 0-RTT</strong>: the request rides the first packet (early data), response returns 1 RTT later ≈ <strong>120ms</strong>—from 360ms to 120ms, the difference between "spinning" and "instant" on a transoceanic link.</p>
+<p>This is why big players fight over handshake RTTs: the speed of light is non-negotiable; the only thing you can cut is the number of round trips.</p>
+</div>
+</details>
+
+<details>
+<summary>2. Why is HTTP/2's HOL blocking "more subtle yet more painful" than HTTP/1.1's? How do you decide whether to adopt HTTP/2?</summary>
+<div class="answer">
+<p>In the HTTP/1.1 era browsers opened 6 TCP connections; one stalling left the other 5 running—loss was <em>diffused</em>. HTTP/2 compresses all requests into <em>one</em> TCP connection; the application appears concurrent, but once the underlying byte stream drops a packet, TCP must deliver in order, so <strong>all streams wait for the retransmit together</strong>. On low-loss links multiplexing wins net; on <strong>high-loss links, one basket for all eggs is more fragile</strong>.</p>
+<p><strong>Deciding</strong>: look at your users' network quality. Intra-DC/low-loss → HTTP/2's gain is clear; heavy mobile-weak/transoceanic → either keep multiple connections or go straight to HTTP/3 (QUIC's per-stream independence is immune at the root). Don't chase "higher version number" alone.</p>
+</div>
+</details>
+
+<details>
+<summary>3. Anycast makes "the same IP answered by the nearest node," but what risk does it hide for long-lived TCP connections? Why does UDP/QUIC fit Anycast better?</summary>
+<div class="answer">
+<p><strong>Risk</strong>: Anycast's "nearest" is decided by BGP routing, which <em>flaps</em> with network conditions. If a long-lived TCP connection has its subsequent packets rerouted mid-flight by BGP convergence to <em>another</em> node, that node holds no state for the connection (seq, TLS session), so the connection is RST-reset. Traditionally Anycast suits <em>short, stateless</em> exchanges (DNS's one-question-one-answer).</p>
+<p><strong>Why QUIC fits</strong>: QUIC identifies a connection by a <em>connection ID</em> rather than the 4-tuple, and supports <strong>connection migration</strong>—even if packets land on a new node, or the client changes IP/port, the connection ID lets it reclaim the connection without re-handshaking. This makes Anycast + long-lived connections truly viable for the first time, and is also why mobile devices survive a WiFi/cellular switch without dropping.</p>
+</div>
+</details>
+
+<details>
+<summary>4. L7 LB must terminate TLS to read HTTP—what does that cost in latency, security, and money? Why do big players run L4+L7 rather than pure L7?</summary>
+<div class="answer">
+<p><strong>Cost of terminating TLS</strong>: every connection is decrypted at L7, high CPU cost, per-box throughput far below L4; and plaintext appears in the LB's memory, becoming an attack surface (keys, request bodies concentrated). The gain is routing by URL/header, canary, rate limiting, WAF—impossible without decryption.</p>
+<p><strong>Why two layers</strong>: <em>L4 carries volume, L7 carries intelligence</em>. L4 (Maglev/LVS/NLB) uses consistent hashing to spread massive connections evenly across a fleet of L7s, itself never decrypting, with extreme throughput, and can run DSR so return packets bypass the LB straight to the client (saving half the bandwidth); each L7 only handles its share for fine-grained routing. Pure L7 at the very front is both expensive and hard to scale horizontally, and pipes DDoS straight into the decryption layer. Layering means "coarse-filter first, fine-tune second."</p>
+</div>
+</details>
+
+<details>
+<summary>5. "Saving RTTs" recurs throughout. String together the RTT-saving techniques across DNS, TCP, TLS, HTTP, and note which carry a consistency/security cost.</summary>
+<div class="answer">
+<ul>
+<li><strong>DNS</strong>: TTL caching skips the full recursive walk; dns-prefetch. <em>Cost</em>: long TTL slows failover.</li>
+<li><strong>TCP</strong>: keep-alive pooling amortizes handshakes over thousands of requests; TCP Fast Open lets SYN carry data. <em>Cost</em>: connection memory; TFO early data has the same replay surface.</li>
+<li><strong>TLS</strong>: 1.2→1.3 saves an RTT; session resumption/ticket skips the full handshake; 0-RTT sends data in the first packet. <em>Cost</em>: 0-RTT is replayable, idempotent requests only.</li>
+<li><strong>HTTP</strong>: multiplexing saves extra connection handshakes; HTTP/3 merges transport+TLS into 1-RTT, connection migration avoids re-handshake on network switch. <em>Cost</em>: QUIC user-space CPU overhead, some networks block UDP.</li>
+<li><strong>Topology</strong>: terminate TLS at the nearest edge (short handshake RTT) + long connection to origin (Day 28).</li>
+</ul>
+<p>The through-line: <strong>the speed of light fixes a single RTT; architecture can only "reduce the number of round trips" and "amortize them," and every aggressive RTT saving (0-RTT/TFO) trades security or consistency for latency.</strong></p>
+</div>
+</details>
+
+<div class="nav"><a href="index.en.html">← Back to index</a></div>
+</div>
+</body></html>
