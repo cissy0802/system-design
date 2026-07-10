@@ -1,9 +1,10 @@
 # Topics Roadmap
 
+> **⚠️ routine 须知**：本表即全部计划。只写下面**已列出**的条目；**全部写完就停**——别自己发明新主题、别往本文件加行。写完只发一条 PushNotification 请 BigCat 补充。（新条目由 BigCat / deep-research 反哺加进本表，届时你自然继续写。）
+
 源是仓库中的文件本身（`ls *-{day,week,book,issue}*.html`）。本文件是主题查找表：N → 主题。
 
 **本路线图已收口：Day 1–48 封顶，不再自动续写。** Day 45–48 为查漏补缺补齐的分布式系统硬核（共识协调 / 数据库内部 / 网络基础 / 容器编排）——此前只有 CAP 与区块链 PoW/PoS，缺真正的 Raft/Paxos 协调层。
-（注：仅改本文件不阻止 routine 在 day48 之后再 append；停止续写需在 routine prompt / cron 侧设上限或暂停。）
 
 - Day 1: Scalability 基础 — Vertical vs Horizontal scaling, Load balancing, Stateless services, 容量规划
 - Day 2: 缓存 (Caching) — Cache layers, LRU/LFU/ARC, Cache-aside vs Write-through vs Write-back, Cache invalidation
