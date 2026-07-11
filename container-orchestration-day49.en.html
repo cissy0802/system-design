@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 49 · Containers & Orchestration — System Design</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"SF Pro Display","Noto Sans SC",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
+.container{max-width:820px;margin:0 auto;padding:24px 20px 60px}
+header{padding:40px 0 28px;border-bottom:1px solid rgba(100,200,255,0.15);margin-bottom:32px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem}
+.tag{padding:3px 10px;border-radius:4px;background:rgba(100,200,255,0.12);color:#64c8ff;border:1px solid rgba(100,200,255,0.25)}
+.tag.diff{background:rgba(255,120,120,0.1);color:#ff8a8a;border-color:rgba(255,120,120,0.3)}
+.tag.day{background:rgba(255,180,80,0.1);color:#ffb450;border-color:rgba(255,180,80,0.25)}
+h1{font-size:1.75rem;font-weight:800;background:linear-gradient(135deg,#64c8ff 0%,#5eead4 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:0.5px;line-height:1.3}
+h1 .en{display:block;font-size:1rem;color:#7a8590;-webkit-text-fill-color:#7a8590;margin-top:6px;font-weight:500}
+h2{font-size:1.2rem;color:#5eead4;margin:36px 0 14px;padding-left:12px;border-left:3px solid #5eead4}
+h3{font-size:1rem;color:#64c8ff;margin:20px 0 10px;font-weight:600}
+p{margin:10px 0;color:#c8cfd6}
+ul,ol{margin:10px 0 10px 22px;color:#c8cfd6}
+li{margin:6px 0}
+strong{color:#e8eef5;font-weight:600}
+em{color:#5eead4;font-style:normal;font-weight:500}
+code{font-family:"SF Mono",Menlo,Consolas,monospace;background:rgba(100,200,255,0.1);color:#5eead4;padding:1px 6px;border-radius:3px;font-size:0.88em}
+pre{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:14px 16px;overflow-x:auto;margin:12px 0;font-family:"SF Mono",Menlo,Consolas,monospace;font-size:0.84rem;line-height:1.55;color:#c8cfd6}
+pre code{background:none;color:inherit;padding:0;font-size:1em}
+.mermaid{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:18px;margin:14px 0;text-align:center;overflow-x:auto;cursor:zoom-in;transition:border-color 0.15s}
+.mermaid:hover{border-color:rgba(100,200,255,0.4)}
+.mermaid svg{width:100%;max-width:100%;height:auto;min-height:280px}
+.lightbox{position:fixed;inset:0;background:rgba(8,12,18,0.96);z-index:9999;display:none;align-items:center;justify-content:center;padding:24px;cursor:grab;backdrop-filter:blur(4px);overflow:hidden}
+.lightbox.open{display:flex}
+.lightbox.dragging{cursor:grabbing}
+.lightbox svg{width:auto;height:auto;max-width:96vw;max-height:92vh;transform-origin:center center;will-change:transform}
+.lightbox .hint{position:fixed;top:16px;right:20px;font-size:0.78rem;color:#7a8590;font-family:"SF Mono",Menlo,monospace;pointer-events:none}
+.callout{background:rgba(255,180,80,0.06);border-left:3px solid #ffb450;padding:12px 14px;margin:14px 0;border-radius:4px;font-size:0.94rem}
+.callout strong{color:#ffb450}
+.tradeoff{background:rgba(100,200,255,0.05);border:1px solid rgba(100,200,255,0.2);border-radius:6px;padding:12px 14px;margin:12px 0;font-size:0.94rem}
+.case{background:rgba(94,234,212,0.05);border-left:3px solid #5eead4;padding:12px 14px;margin:12px 0;border-radius:4px;font-size:0.94rem}
+.case strong{color:#5eead4}
+.nav{margin-top:50px;padding-top:24px;border-top:1px solid rgba(100,200,255,0.15);text-align:center}
+.nav a{color:#64c8ff;text-decoration:none;font-size:0.92rem;padding:8px 16px;border:1px solid rgba(100,200,255,0.3);border-radius:4px;transition:all 0.15s}
+.nav a:hover{background:rgba(100,200,255,0.1)}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:0.9rem}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid rgba(100,200,255,0.15)}
+th{color:#64c8ff;font-weight:600;background:rgba(100,200,255,0.05)}
+details{background:rgba(100,200,255,0.04);border:1px solid rgba(100,200,255,0.18);border-radius:6px;padding:12px 16px;margin:10px 0;transition:all 0.15s}
+details:hover{border-color:rgba(100,200,255,0.35)}
+details[open]{background:rgba(94,234,212,0.05);border-color:rgba(94,234,212,0.3)}
+details summary{font-weight:600;color:#e8eef5;list-style:none;outline:none;cursor:pointer;display:flex;align-items:flex-start;gap:10px;font-size:0.96rem}
+details summary::-webkit-details-marker{display:none}
+details summary::before{content:'▶';color:#64c8ff;font-size:0.75em;transition:transform 0.2s;flex-shrink:0;margin-top:5px}
+details[open] summary::before{transform:rotate(90deg);color:#5eead4}
+details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
+details .answer ul,details .answer ol{margin:6px 0 6px 22px}
+@media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+</style>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({startOnLoad:true,theme:'base',flowchart:{useMaxWidth:true,htmlLabels:true,nodeSpacing:50,rankSpacing:60},themeVariables:{primaryColor:'#1a2530',primaryTextColor:'#e8eef5',primaryBorderColor:'#64c8ff',lineColor:'#5eead4',secondaryColor:'#0e1419',tertiaryColor:'#0a0f14',background:'#0a0f14',mainBkg:'#1a2530',secondBkg:'#0e1419',textColor:'#d4dae0',fontFamily:'-apple-system,"SF Pro Display",sans-serif',fontSize:'16px'}});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const lb=document.createElement('div');lb.className='lightbox';
+  lb.innerHTML='<span class="hint">scroll = zoom · drag = pan · Esc / click bg = close</span>';
+  document.body.appendChild(lb);
+  let scale=1,panX=0,panY=0,dragging=false,moved=false,lx=0,ly=0;
+  const apply=()=>{const s=lb.querySelector('svg');if(s)s.style.transform=`translate(${panX}px,${panY}px) scale(${scale})`};
+  const reset=()=>{scale=1;panX=0;panY=0};
+  const close=()=>{lb.classList.remove('open');const s=lb.querySelector('svg');if(s)s.remove();reset()};
+  document.addEventListener('click',e=>{
+    if(e.target.closest('.lightbox')){if(moved){moved=false;return}close();return}
+    const w=e.target.closest('.mermaid');if(!w)return;
+    const svg=w.querySelector('svg');if(!svg)return;
+    const c=svg.cloneNode(true);c.removeAttribute('style');
+    c.style.maxWidth='96vw';c.style.maxHeight='92vh';
+    lb.appendChild(c);lb.classList.add('open');reset();apply();
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+  lb.addEventListener('wheel',e=>{
+    if(!lb.classList.contains('open'))return;
+    e.preventDefault();
+    const svg=lb.querySelector('svg');if(!svg)return;
+    const ns=Math.max(0.3,Math.min(10,scale*(1-e.deltaY*0.002)));
+    const r=svg.getBoundingClientRect();
+    const cx=e.clientX-(r.left+r.width/2),cy=e.clientY-(r.top+r.height/2);
+    const k=ns/scale-1;panX-=cx*k;panY-=cy*k;scale=ns;apply();
+  },{passive:false});
+  lb.addEventListener('mousedown',e=>{
+    if(!lb.classList.contains('open'))return;
+    dragging=true;moved=false;lx=e.clientX;ly=e.clientY;lb.classList.add('dragging');e.preventDefault();
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    const dx=e.clientX-lx,dy=e.clientY-ly;
+    if(Math.abs(dx)+Math.abs(dy)>3)moved=true;
+    panX+=dx;panY+=dy;lx=e.clientX;ly=e.clientY;apply();
+  });
+  document.addEventListener('mouseup',()=>{dragging=false;lb.classList.remove('dragging')});
+});
+</script>
+</head><body><div class="container">
+
+<header>
+<div class="meta">
+<span class="tag day">Day 49</span>
+<span class="tag diff">Hard</span>
+<span class="tag">Containers</span>
+<span class="tag">Kubernetes</span>
+<span class="tag">Scheduling</span>
+<span class="tag">Service Mesh</span>
+</div>
+<h1>Containers & Orchestration — How a Declarative Control Plane Self-Heals<span class="en">namespaces/cgroups, Kubernetes objects, Scheduling, Service Mesh</span></h1>
+</header>
+
+<h2>Problem & Constraints</h2>
+<p>Your platform team inherits <strong>500 bare-metal machines and 2000+ microservice instances</strong>: CPU utilization sits at &lt;15% year-round (each service hogs a machine to avoid interference), releases go out via Ansible pushing box-by-box, and when a machine dies an on-call engineer gets up at 3am to migrate by hand. Goals: pack 2000 instances onto this fleet, push utilization past 40%, automate releases, and <em>self-heal node failures within 30 seconds</em>. This is exactly what Google's internal Borg — and open-source Kubernetes — were built to solve.</p>
+<ul>
+<li><strong>Isolation</strong>: one service going OOM or pegging the CPU must not drag down its neighbors on the same machine (noisy neighbor).</li>
+<li><strong>Density</strong>: from "1 service / 1 machine" to "1 machine / N containers", utilization 15%→40%, cutting the fleet by more than half.</li>
+<li><strong>Scheduling scale</strong>: 2000 pods × dozens of releases/scaling events per day = the scheduler makes tens of "which node?" decisions per second, all while honoring affinity/anti-affinity constraints.</li>
+<li><strong>Self-heal SLO</strong>: node dies → detect → reschedule pods elsewhere, end-to-end &lt;60s; a single crashed pod restarts &lt;10s.</li>
+<li><strong>Safe rollout</strong>: rolling update keeping at least N-1 replicas alive at all times, with a bad version auto-halting the rollout.</li>
+</ul>
+
+<h2>High-Level Architecture (Kubernetes Control Plane)</h2>
+<pre class="mermaid">
+graph TD
+    U["User / CI<br/><i>kubectl apply YAML</i>"]
+    API["API Server<br/><i>sole write entry · validate/authz</i>"]
+    ETCD[("etcd<br/><i>single source of truth<br/>Raft strong consistency</i>")]
+    SCHED["Scheduler<br/><i>bind pod → node</i>"]
+    CM["Controller Manager<br/><i>reconcile loops</i>"]
+
+    subgraph node["Worker Node ×N"]
+      KUBELET["kubelet<br/><i>node agent</i>"]
+      CRI["container runtime<br/><i>containerd + runc</i>"]
+      PROXY["kube-proxy / CNI<br/><i>Service routing</i>"]
+      POD["Pods<br/><i>namespace+cgroup isolation</i>"]
+    end
+
+    U --> API
+    API <--> ETCD
+    SCHED -.watch/bind.-> API
+    CM -.watch/reconcile.-> API
+    KUBELET -.watch local pods.-> API
+    KUBELET --> CRI --> POD
+    PROXY --> POD
+
+    classDef ctrl fill:#1a2530,stroke:#64c8ff,color:#e8eef5
+    classDef store fill:#2a1530,stroke:#ff7ab6,color:#e8eef5
+    classDef work fill:#0e2030,stroke:#5eead4,color:#e8eef5
+    class API,SCHED,CM ctrl
+    class ETCD store
+    class KUBELET,CRI,PROXY,POD work
+</pre>
+<p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">The core is <strong>watch + reconcile</strong>: components never call each other directly — they watch the desired state on the API Server and each drives reality toward it</p>
+<p><strong>Responsibilities</strong>: the <em>API Server</em> is the sole writer to etcd, handling authz, validation, and optimistic concurrency (resourceVersion). <em>etcd</em> uses Raft to store the whole cluster's desired + actual state — the single source of truth. The <em>Scheduler</em> does one thing: pick a node for each unbound pod and write it back. The <em>Controller Manager</em> runs dozens of controllers (Deployment/ReplicaSet/Node…), each an infinite loop of "observe actual vs desired, act on the diff". The <em>kubelet</em> is the node agent — it watches pods assigned to its node and calls containerd to start them.</p>
+
+<h2>Key Techniques</h2>
+
+<h3>1. Container internals: namespaces slice the view, cgroups slice the resources</h3>
+<p><strong>Core trade-off:</strong> kernel isolation buys startup speed and density, at the cost of a shared kernel = weaker isolation than a VM.</p>
+<p><strong>Principle</strong>: a container is not a "lightweight VM" — it's <em>an ordinary Linux process</em>, merely fenced in by two kernel features. <strong>Namespaces</strong> govern "what you can see" — <code>pid</code> (isolated process tree; PID 1 inside the container), <code>net</code> (own NIC/IP/ports), <code>mnt</code> (own filesystem view), <code>uts</code> (hostname), <code>ipc</code>, <code>user</code> (UID mapping). <strong>cgroups</strong> (control groups) govern "how much you can use" — CPU quota, memory ceiling, IO bandwidth, PID count. The image layers via <em>overlayfs</em>: read-only layers shared, copy-on-write on top. Together: the process thinks it owns a machine while sharing one kernel with dozens of neighbors.</p>
+<div class="tradeoff">
+<strong>Trade-off (container vs VM vs sandbox):</strong>
+<table>
+<thead><tr><th></th><th>Isolation</th><th>Startup</th><th>Density/overhead</th><th>Fits</th></tr></thead>
+<tbody>
+<tr><td><strong>Container (runc)</strong></td><td>Weak (shared kernel; one kernel bug pierces all)</td><td>~ ms</td><td>High (no guest OS)</td><td>Same-trust microservices</td></tr>
+<tr><td><strong>VM (KVM)</strong></td><td>Strong (own kernel + hypervisor)</td><td>~ seconds</td><td>Low (one OS each)</td><td>Multi-tenant hard isolation</td></tr>
+<tr><td><strong>gVisor/Kata</strong></td><td>Medium-strong (userspace kernel / microVM)</td><td>Sub-second</td><td>Medium</td><td>Running untrusted code</td></tr>
+</tbody></table>
+</div>
+<pre><code># cgroup v2 capping a container to 1.5 cores + 512MB (pseudo-shell)
+mkdir /sys/fs/cgroup/mysvc
+echo "150000 100000" > /sys/fs/cgroup/mysvc/cpu.max   # 150ms CPU per 100ms window = 1.5 cores
+echo 536870912       > /sys/fs/cgroup/mysvc/memory.max # exceed → OOM kill
+echo $CONTAINER_PID  > /sys/fs/cgroup/mysvc/cgroup.procs
+# memory over limit → kernel OOM killer → kubelet records OOMKilled → restart per restartPolicy</code></pre>
+<div class="case">
+<strong>Real-world cases:</strong>
+<ul>
+<li><strong>Google Borg</strong>: ran containerized for a decade, using cgroups for performance isolation + over-commit to lift utilization far above the industry-typical &lt;20%. namespaces/cgroups — pushed into the kernel by Google engineers — became the foundation the open-source world used to build Docker.</li>
+<li><strong>AWS Fargate / Lambda</strong>: built on <em>Firecracker</em> microVMs, not plain containers — running untrusted customer code across tenants needs a VM-grade boundary, not container isolation.</li>
+<li><strong>CPU throttling in production</strong>: cgroup CPU quota is enforced via CFS quota, and many teams set limits too low, causing P99 latency spikes (the process gets forcibly paused) — a recurring topic in the Kubernetes community.</li>
+</ul></div>
+
+<h3>2. Declarative object model: desired state + reconcile loop</h3>
+<p><strong>Core trade-off:</strong> declarative ("I want 3 replicas") self-heals better than imperative ("start a container"), at the cost of turning all logic into eventually-consistent async loops that are hard to debug.</p>
+<p><strong>Principle</strong>: in K8s you don't "start a container" — you <em>declare intent</em>: a <code>Deployment</code> says "nginx:1.25, 3 replicas". The Deployment controller then creates a <code>ReplicaSet</code>, whose controller ensures "actual pod count == 3". Every controller follows the same <strong>reconcile loop</strong>: read desired, read actual, compute diff, act, write status back, forever. Delete a pod → actual=2≠desired=3 → the controller immediately adds one. That is the essence of self-healing: there is no special "failure handling" code path — a failure is just an event that deviates actual from desired, and the loop naturally pulls it back. A <code>Service</code> provides a stable VIP + DNS, abstracting a set of ephemeral pod IPs into one unchanging entry point.</p>
+<pre><code># Skeleton of every controller (pseudocode) — all of K8s runs on this loop
+def reconcile(desired, actual):
+    if actual.replicas &lt; desired.replicas:
+        create_pods(desired.replicas - actual.replicas)   # short → add
+    elif actual.replicas &gt; desired.replicas:
+        delete_pods(actual.replicas - desired.replicas)   # over → remove
+    # key: idempotent + level-triggered (look at current state, not the event stream)
+    # missing an event is fine — next loop still sees the true current diff</code></pre>
+<div class="tradeoff">
+<strong>Trade-off (declarative vs imperative):</strong>
+<ul>
+<li><strong>Declarative + level-triggered</strong>: ✅ self-heals naturally, idempotent, dropped events aren't fatal (recompute next loop), desired state is versionable (GitOps); ❌ everything is async/eventually-consistent — "why isn't my pod up yet" means tracing a causal chain across multiple controllers.</li>
+<li><strong>Imperative + edge-triggered</strong> (old scripts / early orchestrators): ✅ intuitive, immediate feedback; ❌ drop one event and state drifts permanently — recovery needs mountains of special-case code.</li>
+</ul></div>
+<div class="case">
+<strong>Real-world cases:</strong>
+<ul>
+<li><strong>Borg → Omega → Kubernetes</strong>: Google's ACM Queue retrospective — Omega put cluster state in a Paxos store with optimistic concurrency; Kubernetes inherited this as etcd + API Server + resourceVersion optimistic locking, the direct ancestor of this declarative architecture.</li>
+<li><strong>Argo CD / Flux (GitOps)</strong>: put "desired state" in Git and let controllers continuously reconcile the cluster toward it — a natural extension of the model, where rollback = git revert.</li>
+<li><strong>CRD + Operator</strong>: model "operating a database" as a reconcile loop too (etcd/Redis Operators) — users declare "I want a 3-node Redis" and the Operator handles failover automatically.</li>
+</ul></div>
+
+<h3>3. Scheduling & self-heal: filter → score → probes</h3>
+<p><strong>Core trade-off:</strong> the tighter you bin-pack for utilization, the less headroom is left for bursts and failover.</p>
+<p><strong>Principle</strong>: the scheduler runs two phases per pending pod. <em>Filter (predicates)</em>: drop nodes that violate hard constraints — insufficient resources, node-selector mismatch, untolerated taint, anti-affinity conflict. <em>Score (priorities)</em>: rank the survivors — most-idle node (LeastAllocated, spread) vs fullest node (MostAllocated, pack to save machines), affinity preferences, image already local. Bind to the top score. <strong>Self-heal via three probes</strong>: <code>liveness</code> (dead → restart), <code>readiness</code> (not ready → pull out of Service endpoints, but don't restart), <code>startup</code> (grace period for slow-starting services). At node level: node heartbeat times out → marked NotReady → its pods evicted → rebuilt elsewhere.</p>
+<div class="tradeoff">
+<strong>Trade-off (packing strategy):</strong>
+<ul>
+<li><strong>Bin-packing / MostAllocated</strong>: ✅ fewest machines, lowest cost, easy to scale down and power off; ❌ one node failure evacuates a huge batch of pods at once, and no headroom to absorb bursts.</li>
+<li><strong>Spread / LeastAllocated</strong>: ✅ failure-resilient, headroom per node; ❌ low utilization, higher cost.</li>
+<li><strong>Pragmatic approach</strong>: separate <em>request/limit</em> — schedule by request (guaranteed), cap by limit (burstable) — and use anti-affinity to spread a service's replicas across nodes/racks/AZs.</li>
+</ul></div>
+<pre><code># liveness vs readiness: the most confused pair — misconfiguring = avalanche
+livenessProbe:   { httpGet: {path: /healthz}, periodSeconds: 10, failureThreshold: 3 }
+                 # 3 consecutive failures → restart the container
+readinessProbe:  { httpGet: {path: /ready},   periodSeconds: 5 }
+                 # failure → remove from Service, take no new traffic, but do NOT restart (wait for deps)
+# ⚠️ pitfall: a liveness probe that checks a downstream dep (e.g. DB) → DB blips → every pod judged dead & restarted → self-inflicted avalanche</code></pre>
+<div class="case">
+<strong>Real-world cases:</strong>
+<ul>
+<li><strong>Google Borg paper (EuroSys 2015)</strong>: details how task-packing + admission control + over-commit + process-level isolation together lift utilization, using scheduling policies to lower the probability of <em>correlated failures</em> (same service not placed in the same failure domain).</li>
+<li><strong>Kubernetes descheduler</strong>: scheduling is one-shot; a long-running cluster drifts out of balance (some nodes full, some empty), so the descheduler periodically evicts to rebalance.</li>
+<li><strong>Cluster Autoscaler / Karpenter</strong>: pods Pending for lack of resources → add machines; nodes idle long-term → scale down. Extends "self-heal" from pod level to node level.</li>
+</ul></div>
+
+<h3>4. Service Mesh: push networking down into a sidecar</h3>
+<p><strong>Core trade-off:</strong> a per-pod Envoy sidecar buys "zero code change" retries/circuit-breaking/mTLS/observability, at the cost of an extra proxy hop and doubled resources.</p>
+<p><strong>Principle</strong>: with many microservices, network concerns — retries, timeouts, circuit breaking, mTLS, traffic splitting, tracing — become painful if baked into each service's business code: you'd maintain a library per language, and upgrades mean editing and redeploying every service. A Service Mesh extracts these into a <em>sidecar proxy</em> (Envoy), co-located in the pod, intercepting all inbound/outbound traffic. The business code just sends plain HTTP; retries/encryption/metrics happen transparently in the sidecar. <strong>Data plane</strong> (a fleet of Envoys) + <strong>control plane</strong> (Istio's istiod) are split: the control plane pushes routing rules and certs to all Envoys, which do the actual forwarding.</p>
+<div class="tradeoff">
+<strong>Trade-off (where networking lives):</strong>
+<ul>
+<li><strong>In-process library</strong> (e.g. Netflix's early Hystrix/Ribbon): ✅ no extra hop, no sidecar overhead; ❌ one impl per language, upgrade = redeploy everything, breaks if languages aren't uniform.</li>
+<li><strong>Sidecar mesh</strong> (Istio+Envoy): ✅ language-agnostic, upgrade without touching business code, most complete feature set; ❌ an extra proxy per pod (memory/CPU doubled), +1 proxy latency per hop, steep operational complexity.</li>
+<li><strong>Ambient / sidecar-less mesh</strong> (Istio ambient, eBPF via Cilium): ✅ drops per-pod sidecar overhead, shared node-level proxy; ❌ newer, and L7 capability vs isolation granularity is the trade-off point.</li>
+</ul></div>
+<div class="case">
+<strong>Real-world cases:</strong>
+<ul>
+<li><strong>Lyft Envoy</strong>: Envoy is the C++ L7 proxy Lyft built starting 2015 and fully deployed by 2016 — first as an edge proxy, then as a service-to-service sidecar — spanning 100+ services and millions of requests/sec, later donated to the CNCF and now the data plane of nearly every mesh.</li>
+<li><strong>Istio</strong>: the istiod control plane pushes xDS config to Envoy, providing mTLS, canary traffic splitting, and fault injection — the standard mesh implementation, launched jointly by Google/IBM/Lyft.</li>
+<li><strong>Sidecar cost debate</strong>: because of per-pod sidecar CPU/memory/latency overhead, the industry is shifting to eBPF (Cilium) and Istio ambient mode, sinking some L4 into the kernel and using shared proxies for L7.</li>
+</ul></div>
+
+<h2>Scaling & Optimization</h2>
+<ul>
+<li><strong>etcd is the bottleneck</strong>: all watches/writes hit etcd; beyond ~5000 nodes its Raft commit latency and watch fan-out become the limit. Mitigations: split events into a separate etcd, cache in the API Server, cap watch counts, or split a huge cluster into multiple + federation.</li>
+<li><strong>Scheduler scaling</strong>: the default scheduler is serial; extreme scale uses scheduling-framework plugins or multiple sharded schedulers (Borg shards by cell).</li>
+<li><strong>Multi-cluster / multi-region</strong>: a single cluster has a blast-radius ceiling (one bad config takes it all down); production splits by region/environment and manages the fleet (Cluster API, Karmada) for unified rollout.</li>
+<li><strong>Cost</strong>: Cluster Autoscaler/Karpenter add/remove nodes on demand + Spot instances for stateless workloads + VPA auto-tuning requests — K8s's three levers for cost (echoing Day 27, Cost Engineering).</li>
+<li><strong>Stateful services</strong>: StatefulSet + PV/PVC + CSI storage, but databases on K8s still need careful evaluation (storage performance, failover complexity).</li>
+</ul>
+
+<h2>Common Pitfalls + Interview Questions</h2>
+<div class="callout"><strong>1. A liveness probe that checks dependencies = self-inflicted avalanche.</strong> liveness should only check the process's own health. Probe a downstream DB and a DB blip gets every pod judged dead and restarted, amplifying a local failure into a global one. Leave dependency health to readiness.</div>
+<div class="callout"><strong>2. No or wrong request/limit.</strong> No request → the scheduler treats it as 0, over-commits to OOM; a memory limit too low → repeated OOMKilled restarts; a CPU limit too low → CFS throttling and P99 spikes.</div>
+<div class="callout"><strong>3. Treating Pods as pets.</strong> Pods are cattle, not pets — they get evicted/rebuilt anytime and their IP changes. Any design relying on a fixed pod IP or pod-local disk is wrong — use Service + PV.</div>
+<div class="callout"><strong>4. Assuming container = security isolation.</strong> Containers share a kernel; one kernel privilege-escalation bug pierces all of them. Running untrusted code requires gVisor/Kata/microVM — don't count on namespaces.</div>
+<div class="callout"><strong>5. Frequent interview asks:</strong> ① From a <code>kubectl apply</code> to a running pod, which components does it pass through? ② After a node dies, how and how fast is a pod rebuilt? ③ Why does declarative self-heal better than imperative? ④ What does a Service Mesh solve, at what cost, and when should you <em>not</em> adopt one? ⑤ liveness vs readiness, and what breaks when each is misconfigured?</div>
+
+<h2>Deeper Resources</h2>
+<ul>
+<li><strong>"Large-scale cluster management at Google with Borg"</strong> (Verma et al., EuroSys 2015): the origin of container-orchestration thinking — task-packing / over-commit / isolation all here.</li>
+<li><strong>"Borg, Omega, and Kubernetes"</strong> (ACM Queue, 2016): a retrospective across three generations that explains why K8s looks the way it does.</li>
+<li><strong>Envoy announcement blog</strong> (Matt Klein, Lyft Engineering, 2016): the origin of the service-mesh data plane.</li>
+<li><strong>Kubernetes official docs — concepts</strong>: the authoritative definitions of controller / reconcile / scheduling / probes.</li>
+<li><strong>"Designing Data-Intensive Applications"</strong> (Kleppmann), ch. 8-9: distributed failure models and consensus — why etcd/Raft is the control plane's foundation.</li>
+</ul>
+
+<h2>Deeper Thinking (click to expand)</h2>
+
+<details>
+<summary>1. Why does K8s insist on level-triggered (look at current state) rather than edge-triggered (react to events)? What happens if a controller misses a watch event?</summary>
+<div class="answer">
+<p><strong>Edge-triggered</strong> means "pod deleted" is an event the controller must receive to act. Problem: network partitions, controller restarts, and dropped watch connections all <em>lose events</em> — miss "pod was deleted" once and the actual replica count is permanently short by 1 with nothing to fix it.</p>
+<p><strong>Level-triggered</strong> re-reads the <em>current true state</em> every loop and computes the diff: a missed event doesn't matter — next loop still lists "actual 2 ≠ desired 3" and adds one. After a controller restart, one full list re-aligns everything, no event replay needed.</p>
+<p>The cost: actions must be <em>idempotent</em> (same diff applied many times yields the same result), plus there's polling/resync overhead. K8s balances both with informer caches + periodic resync: watch increments for efficiency, periodic full lists as a backstop against drops. This is the very root of self-healing — failure isn't a special case, just another deviation of the level.</p>
+</div>
+</details>
+
+<details>
+<summary>2. etcd gives strong consistency via Raft, but the whole cluster's watches and writes pile onto it. At what scale does it bottleneck, and how do you mitigate?</summary>
+<div class="answer">
+<p>etcd is a single Raft group; writes need a majority to fsync, so <strong>write throughput has a hard ceiling</strong> (order of tens of thousands/sec), and all API Server watch fan-out flows from it. Approaching thousands of nodes, symptoms appear: rising apply latency, watch events backing up, full lists crushing memory.</p>
+<p><strong>Mitigations</strong>: ① split the high-churn <code>events</code> objects into a separate etcd so they don't contend for IO; ② watch cache in the API Server so many clients share one watch instead of hitting etcd directly; ③ paginated list + resourceVersion to avoid full pulls; ④ control the count and update frequency of CRDs/objects (abusing high-frequency status writes is a common killer); ⑤ the ultimate move — <strong>split the cluster</strong>. A single cluster always has a scale ceiling; Google Borg long ago sharded by "cell", and K8s production commonly runs multi-cluster + federation, trading blast radius for scalability.</p>
+</div>
+</details>
+
+<details>
+<summary>3. Bin-packing to 90% — what chain reaction happens when one node dies? Why are "high utilization" and "high availability" inherently opposed here?</summary>
+<div class="answer">
+<p>Packed to 90%, the cluster has almost no headroom. One node dies → its dozen-odd pods all go Pending needing reschedule → but the other nodes are also ~90% full, so <strong>they don't fit</strong> → pods stuck Pending, or the autoscaler adds machines (with minute-scale cold start). Meanwhile the surviving nodes must absorb the dead node's traffic while already near saturation → cascading overload → more nodes crushed. This is a <em>correlated failure</em>.</p>
+<p><strong>The core opposition</strong>: failover needs "empty slots elsewhere" to catch refugee pods, and empty slots are wasted utilization. High utilization = no slots = failover fails. The engineering answer isn't either/or but <em>explicit reservation</em>: keep N+1 or per-AZ headroom (e.g. enough per AZ to survive an entire AZ loss), use PodDisruptionBudget to cap simultaneous unavailability, and anti-affinity to spread replicas. Fundamentally this is the same as capacity planning's P99/queueing-theory headroom (Day 27).</p>
+</div>
+</details>
+
+<details>
+<summary>4. A Service Mesh adds an Envoy sidecar per pod. In a 1000-pod cluster, where exactly does that cost bite? Why is the industry moving to ambient/eBPF "sidecar-less"?</summary>
+<div class="answer">
+<p><strong>Three bills</strong>: ① <em>resources</em> — each sidecar holds tens-to-hundreds of MB of memory + a slice of CPU, ×1000 pods = 1000 copies, possibly 10-20% of the cluster's resources spent purely on proxying; ② <em>latency</em> — every call now traverses "local Envoy out → peer Envoy in", two proxy hops, sub-ms each but cumulative and amplifying the P99 tail; ③ <em>ops</em> — a sidecar version upgrade means rolling-restarting all business pods, and injection failures / startup ordering (business sends traffic before the sidecar is up) are classic traps.</p>
+<p><strong>Why sidecar-less</strong>: this overhead is poor value for teams that just want "mTLS + basic metrics". Ambient mode sinks L4 (mTLS, TCP routing) into a shared node-level proxy (ztunnel), only routing through a shared waypoint proxy when L7 (HTTP routing, retries) is needed; Cilium uses eBPF to do L4 policy and load balancing directly in kernel space, skipping the proxy process entirely. The cost is re-weighing L7 capability and per-pod isolation granularity — a re-pick on the "full capability vs low overhead" spectrum, not a free lunch.</p>
+</div>
+</details>
+
+<details>
+<summary>5. Containers share the host kernel. Why is this "feature" fatal in multi-tenant public cloud (running arbitrary customer code)? How did AWS work around it?</summary>
+<div class="answer">
+<p>Container isolation rests entirely on the kernel's namespaces/cgroups. That means <strong>the attack surface is the entire Linux kernel</strong> — one kernel privilege-escalation bug (container escape) lets you break out of the container to the host, then peer into <em>other tenants'</em> containers on the same host. Fine for same-trust in-house microservices, but on public cloud a neighbor could be an attacker running malicious code, and one escape = cross-tenant data breach. Unacceptable.</p>
+<p><strong>AWS's answer</strong>: Lambda and Fargate run not on raw containers but on <em>Firecracker</em> microVMs — each function/task runs in a minimal KVM VM with its <em>own guest kernel</em>, isolating tenants via the hypervisor, a far narrower and more auditable boundary than kernel syscalls. It strips traditional VM device emulation, pushing startup to ~hundreds of ms with tiny memory overhead, reclaiming near-container density while keeping VM-grade isolation. Similar ideas: Google gVisor (a userspace re-implementation intercepting kernel syscalls) and Kata Containers (lightweight VMs). The takeaway: <em>isolation strength and density can be partly reconciled, but never for free — running untrusted multi-tenant code means paying the isolation tax</em>.</p>
+</div>
+</details>
+
+<div class="nav"><a href="index.en.html">← Back to index</a></div>
+</div>
+</body></html>
