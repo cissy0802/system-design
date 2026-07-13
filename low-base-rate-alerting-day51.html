@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 51 · 低底率下的告警系统 (Alerting Under a Low Base Rate) — System Design</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"SF Pro Display","Noto Sans SC",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
+.container{max-width:820px;margin:0 auto;padding:24px 20px 60px}
+header{padding:40px 0 28px;border-bottom:1px solid rgba(100,200,255,0.15);margin-bottom:32px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem}
+.tag{padding:3px 10px;border-radius:4px;background:rgba(100,200,255,0.12);color:#64c8ff;border:1px solid rgba(100,200,255,0.25)}
+.tag.diff{background:rgba(94,234,212,0.1);color:#5eead4;border-color:rgba(94,234,212,0.3)}
+.tag.day{background:rgba(255,180,80,0.1);color:#ffb450;border-color:rgba(255,180,80,0.25)}
+h1{font-size:1.75rem;font-weight:800;background:linear-gradient(135deg,#64c8ff 0%,#5eead4 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:0.5px;line-height:1.3}
+h1 .en{display:block;font-size:1rem;color:#7a8590;-webkit-text-fill-color:#7a8590;margin-top:6px;font-weight:500}
+h2{font-size:1.2rem;color:#5eead4;margin:36px 0 14px;padding-left:12px;border-left:3px solid #5eead4}
+h3{font-size:1rem;color:#64c8ff;margin:20px 0 10px;font-weight:600}
+p{margin:10px 0;color:#c8cfd6}
+ul,ol{margin:10px 0 10px 22px;color:#c8cfd6}
+li{margin:6px 0}
+strong{color:#e8eef5;font-weight:600}
+em{color:#5eead4;font-style:normal;font-weight:500}
+code{font-family:"SF Mono",Menlo,Consolas,monospace;background:rgba(100,200,255,0.1);color:#5eead4;padding:1px 6px;border-radius:3px;font-size:0.88em}
+pre{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:14px 16px;overflow-x:auto;margin:12px 0;font-family:"SF Mono",Menlo,Consolas,monospace;font-size:0.84rem;line-height:1.55;color:#c8cfd6}
+pre code{background:none;color:inherit;padding:0;font-size:1em}
+.mermaid{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:18px;margin:14px 0;text-align:center;overflow-x:auto;cursor:zoom-in;transition:border-color 0.15s}
+.mermaid:hover{border-color:rgba(100,200,255,0.4)}
+.mermaid svg{width:100%;max-width:100%;height:auto;min-height:280px}
+.lightbox{position:fixed;inset:0;background:rgba(8,12,18,0.96);z-index:9999;display:none;align-items:center;justify-content:center;padding:24px;cursor:grab;backdrop-filter:blur(4px);overflow:hidden}
+.lightbox.open{display:flex}
+.lightbox.dragging{cursor:grabbing}
+.lightbox svg{width:auto;height:auto;max-width:96vw;max-height:92vh;transform-origin:center center;will-change:transform}
+.lightbox .hint{position:fixed;top:16px;right:20px;font-size:0.78rem;color:#7a8590;font-family:"SF Mono",Menlo,monospace;pointer-events:none}
+.callout{background:rgba(255,180,80,0.06);border-left:3px solid #ffb450;padding:12px 14px;margin:14px 0;border-radius:4px;font-size:0.94rem}
+.callout strong{color:#ffb450}
+.tradeoff{background:rgba(100,200,255,0.05);border:1px solid rgba(100,200,255,0.2);border-radius:6px;padding:12px 14px;margin:12px 0;font-size:0.94rem}
+.case{background:rgba(94,234,212,0.05);border-left:3px solid #5eead4;padding:12px 14px;margin:12px 0;border-radius:4px;font-size:0.94rem}
+.case strong{color:#5eead4}
+.nav{margin-top:50px;padding-top:24px;border-top:1px solid rgba(100,200,255,0.15);text-align:center}
+.nav a{color:#64c8ff;text-decoration:none;font-size:0.92rem;padding:8px 16px;border:1px solid rgba(100,200,255,0.3);border-radius:4px;transition:all 0.15s}
+.nav a:hover{background:rgba(100,200,255,0.1)}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:0.9rem}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid rgba(100,200,255,0.15)}
+th{color:#64c8ff;font-weight:600;background:rgba(100,200,255,0.05)}
+details{background:rgba(100,200,255,0.04);border:1px solid rgba(100,200,255,0.18);border-radius:6px;padding:12px 16px;margin:10px 0;transition:all 0.15s}
+details:hover{border-color:rgba(100,200,255,0.35)}
+details[open]{background:rgba(94,234,212,0.05);border-color:rgba(94,234,212,0.3)}
+details summary{font-weight:600;color:#e8eef5;list-style:none;outline:none;cursor:pointer;display:flex;align-items:flex-start;gap:10px;font-size:0.96rem}
+details summary::-webkit-details-marker{display:none}
+details summary::before{content:'▶';color:#64c8ff;font-size:0.75em;transition:transform 0.2s;flex-shrink:0;margin-top:5px}
+details[open] summary::before{transform:rotate(90deg);color:#5eead4}
+details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
+details .answer ul,details .answer ol{margin:6px 0 6px 22px}
+@media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+</style>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({startOnLoad:true,theme:'base',flowchart:{useMaxWidth:true,htmlLabels:true,nodeSpacing:50,rankSpacing:60},themeVariables:{primaryColor:'#1a2530',primaryTextColor:'#e8eef5',primaryBorderColor:'#64c8ff',lineColor:'#5eead4',secondaryColor:'#0e1419',tertiaryColor:'#0a0f14',background:'#0a0f14',mainBkg:'#1a2530',secondBkg:'#0e1419',textColor:'#d4dae0',fontFamily:'-apple-system,"SF Pro Display",sans-serif',fontSize:'16px'}});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const lb=document.createElement('div');lb.className='lightbox';
+  lb.innerHTML='<span class="hint">scroll = zoom · drag = pan · Esc / click bg = close</span>';
+  document.body.appendChild(lb);
+  let scale=1,panX=0,panY=0,dragging=false,moved=false,lx=0,ly=0;
+  const apply=()=>{const s=lb.querySelector('svg');if(s)s.style.transform=`translate(${panX}px,${panY}px) scale(${scale})`};
+  const reset=()=>{scale=1;panX=0;panY=0};
+  const close=()=>{lb.classList.remove('open');const s=lb.querySelector('svg');if(s)s.remove();reset()};
+  document.addEventListener('click',e=>{
+    if(e.target.closest('.lightbox')){if(moved){moved=false;return}close();return}
+    const w=e.target.closest('.mermaid');if(!w)return;
+    const svg=w.querySelector('svg');if(!svg)return;
+    const c=svg.cloneNode(true);c.removeAttribute('style');
+    c.style.maxWidth='96vw';c.style.maxHeight='92vh';
+    lb.appendChild(c);lb.classList.add('open');reset();apply();
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+  lb.addEventListener('wheel',e=>{
+    if(!lb.classList.contains('open'))return;
+    e.preventDefault();
+    const svg=lb.querySelector('svg');if(!svg)return;
+    const ns=Math.max(0.3,Math.min(10,scale*(1-e.deltaY*0.002)));
+    const r=svg.getBoundingClientRect();
+    const cx=e.clientX-(r.left+r.width/2),cy=e.clientY-(r.top+r.height/2);
+    const k=ns/scale-1;panX-=cx*k;panY-=cy*k;scale=ns;apply();
+  },{passive:false});
+  lb.addEventListener('mousedown',e=>{
+    if(!lb.classList.contains('open'))return;
+    dragging=true;moved=false;lx=e.clientX;ly=e.clientY;lb.classList.add('dragging');e.preventDefault();
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    const dx=e.clientX-lx,dy=e.clientY-ly;
+    if(Math.abs(dx)+Math.abs(dy)>3)moved=true;
+    panX+=dx;panY+=dy;lx=e.clientX;ly=e.clientY;apply();
+  });
+  document.addEventListener('mouseup',()=>{dragging=false;lb.classList.remove('dragging')});
+});
+</script>
+</head><body><div class="container">
+
+<header>
+<div class="meta">
+<span class="tag day">Day 51</span>
+<span class="tag diff">Hard</span>
+<span class="tag">Alerting</span>
+<span class="tag">Base Rate</span>
+<span class="tag">Signal Detection</span>
+<span class="tag">Observability</span>
+</div>
+<h1>低底率下的告警系统 — 报告级误报如何淹没真报<span class="en">Alerting Under a Low Base Rate: Why Report-Level False Positives Drown the Truth</span></h1>
+</header>
+
+<h2>问题场景 + 需求约束</h2>
+<p>你给一个<strong>数万实例的生产平台</strong>设计自动告警系统：一堆探针、断言、异常检测器、再加一个 LLM「判官」在每次判定上盖章「这是不是事故」。规模是关键——每天约 <strong>1000 万次检查</strong>，而<em>真正值得 page 人的事故底率极低</em>：假设一天只有约 <strong>5 起</strong>真事故，那么单次检查为「真」的先验概率约 <strong>5 × 10⁻⁷</strong>。</p>
+<p>直觉会说「我检测器很准，FP 才 0.1%」——但这正是<strong>基率谬误（base-rate fallacy）</strong>：0.1% 乘以一千万次检查，一天就是 <strong>1 万条误报</strong>，把那 5 条真报彻底淹没，P(真│报) ≈ 5/10005 ≈ <strong>0.05%</strong>。工程师收到的 2000 条里才 1 条真，几周后所有人学会同一动作——<em>把告警全部划过去</em>。此时召回再高也没意义：<strong>没人看的真报等于漏报</strong>。这与 Day 50「Code Review 当信号检测」同源，但这里的敌人不是噪声，而是<em>底率</em>。</p>
+<ul>
+<li><strong>核心约束是 precision 地板，不是吞吐</strong>：底率越低，对单次 FP 率的要求越苛刻——这是数学，不是调参能绕过的。</li>
+<li><strong>误报预算</strong>：SRE 经验值——告警的有效误报率若高到让人不信任，整个系统的召回全部作废。</li>
+<li><strong>可行动性 + 时机</strong>：每条 page 必须紧急、可执行、用户可见；三天后的离线扫描无价值。</li>
+<li><strong>兜底裁判要独立</strong>：谁盖「这是真事故」的章？裁判与检测器共享失败模式，则兜底形同虚设。</li>
+</ul>
+
+<h2>高层架构（底率漏斗 → 独立兜底 → 分诊 → page）</h2>
+<pre class="mermaid">
+graph LR
+    SRC["1000 万次检查/天<br/><i>探针 · 断言 · 异常检测</i>"]
+    DET["检测器海<br/><i>单次 FP≈0.1%</i>"]
+    ORA["独立 Oracle 兜底<br/><i>差分/确定性复核</i>"]
+    TRI["分诊 · 降噪层<br/><i>去重 · 聚合 · 精确率地板</i>"]
+    PAGE["Page 人类<br/><i>&lt;10 条/天</i>"]
+    ARCH[("归档 / 静默<br/>可查不打扰")]
+
+    SRC -->|海量| DET -->|1万候选| ORA
+    ORA -->|独立判定| TRI -->|precision≥90%| PAGE
+    TRI -.降级噪声.-> ARCH
+    DET -.低置信.-> ARCH
+
+    classDef src fill:#1a2530,stroke:#64c8ff,color:#e8eef5
+    classDef det fill:#1a1a30,stroke:#ffb450,color:#e8eef5
+    classDef ora fill:#0e2030,stroke:#5eead4,color:#e8eef5
+    classDef page fill:#2a1530,stroke:#ff7ab6,color:#e8eef5
+    class SRC src
+    class DET,TRI det
+    class ORA ora
+    class PAGE page
+    class ARCH src
+</pre>
+<p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">底率漏斗每一级都在提升 precision：检测器保召回，独立 oracle 打破相关性，分诊层守精确率地板，最终只有 &lt;10 条/天进人的视野</p>
+
+<h2>关键技术点</h2>
+
+<h3>1. 基率谬误的贝叶斯数学：precision 被底率压垮</h3>
+<p><strong>原理</strong>：告警系统的可用性由 <em>P(真│告警)</em>（贝叶斯检出率 / precision）决定，而它不只取决于检测器的召回率，更被<strong>底率 base rate</strong> 支配。贝叶斯公式：<code>P(真│报) = TPR·B / (TPR·B + FPR·(1−B))</code>。当底率 <code>B</code> 极小，分母被 <code>FPR·(1−B)</code> 主导——哪怕 TPR=99%，只要 FPR 没低到与 B 同量级，precision 就趋近于 0。这就是 Axelsson 在入侵检测里证明的结论：<strong>限制 IDS 实用性的从来不是检出率，而是误报率</strong>。</p>
+<div class="tradeoff">
+<strong>Trade-off（三种应对方向，各有代价）：</strong>
+<ul>
+<li><strong>压 FPR（提高单检测器精度）</strong>：✅ 直接抬 precision；❌ 底率 10⁻⁷ 时你需要 FPR &lt; 10⁻⁷ 才能过半，单个检测器几乎做不到——收益随底率递减。</li>
+<li><strong>抬 B（缩小判定域，只在高风险面判定）</strong>：✅ 把 1000 万次压到 1 万次高危检查，底率从 10⁻⁷ 抬到 10⁻⁴，precision 数量级改善；❌ 缩小判定域=牺牲召回，漏掉判定域外的真事故。</li>
+<li><strong>串联独立层（乘法降噪）</strong>：✅ 两个<em>独立</em>层的 FPR 相乘，0.1%×1%=10⁻⁵；❌ 独立性是硬约束，见技术点 3——不独立就退化成加法。</li>
+</ul></div>
+<pre><code># 底率如何碾压 precision（先算清楚再设计）
+def precision(tpr, fpr, base_rate):
+    tp = tpr * base_rate
+    fp = fpr * (1 - base_rate)
+    return tp / (tp + fp)
+
+# 检测器很"准"：召回 99%，单次误报 0.1%
+precision(0.99, 0.001, 5e-7)   # ≈ 0.000495 —— 2000 条报里 1 条真
+# 把判定域缩到高危面，底率抬到 1e-4：
+precision(0.99, 0.001, 1e-4)   # ≈ 0.090   —— 仍不够
+# 再串一层独立 oracle，等效 FPR 降到 1e-5：
+precision(0.99, 1e-5, 1e-4)    # ≈ 0.908   —— 过了精确率地板
+</code></pre>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Axelsson（ACM TISSEC 2000）</strong>：用贝叶斯把「基率谬误」引入入侵检测——证明为达到可用的 P(入侵│告警)，需要一个可能低到不现实的误报率。这是本主题的理论奠基。</li>
+<li><strong>Google SRE</strong>：明确用 precision/recall 定义告警质量，坚持 <em>symptom-based / SLO-based 告警</em>——只在用户可见的症状面判定，本质就是「抬底率、缩判定域」。</li>
+<li><strong>安全 SOC / 大型 IDS</strong>：安全告警长期困于「告警疲劳」，团队每天面对海量低 precision 告警，正是底率谬误在生产的体现。</li>
+</ul></div>
+
+<h3>2. 精确率地板：分诊层是可用性的守门人</h3>
+<p><strong>原理</strong>：单检测器压不动底率，就把 precision 交给<strong>分诊 / 降噪层（triage）</strong>——它不产生新信号，只对候选做去重、聚合、置信打分、跨检测器投票，仅放行超过<em>精确率地板</em>（如 precision≥90%）的判定。低于地板的降级到「可查询但不打扰」的归档池。关键心态：<strong>宁可漏报进归档，也不让噪声进 pager</strong>——一条噪声的代价不是它自己，而是它侵蚀了对<em>所有</em>后续告警的信任。</p>
+<div class="tradeoff">
+<strong>Trade-off：</strong>
+<ul>
+<li><strong>阈值高（只放极高置信）</strong>：✅ precision 达标、pager 干净；❌ 召回下降，边缘真事故被归档、延迟发现。</li>
+<li><strong>阈值低（宁可多报）</strong>：✅ 召回高；❌ 回到 1 万条噪声的老路，系统性死亡。</li>
+<li><strong>聚合去重（N 条同因合成 1 条）</strong>：✅ 一次事故不刷屏、天然抬 precision；❌ 聚合窗口调错会把两起独立事故合并，或延迟首报。</li>
+</ul></div>
+<pre><code># 分诊：跨检测器投票 + 聚合 + 精确率地板
+def triage(candidates, floor=0.9, window="5m"):
+    groups = group_by_root_cause(candidates, window)   # 同因聚合，防刷屏
+    for g in groups:
+        # 独立检测器越多同时命中，置信越高（近似乘法降噪）
+        conf = calibrated_confidence(g.detectors, g.signals)
+        if conf >= floor:
+            page(dedup_key=g.root_cause, evidence=g.top_signals)
+        else:
+            archive(g)        # 可查询、进指标，但绝不打扰 on-call
+</code></pre>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Google SRE — Outalator</strong>：把海量告警聚合成「事件（incident）」维度供 on-call 消化，本质是分诊层，避免逐条告警刷屏。</li>
+<li><strong>PagerDuty / Opsgenie</strong>：事件聚合、去重、抑制（suppression）、依赖压制——商业化的分诊降噪层，卖点就是把噪声挡在 pager 之外。</li>
+<li><strong>Netflix</strong>：以 SLO/症状告警为核心，把内部指标异常降级为可观测信号而非直接 page，守住 on-call 的 pager precision。</li>
+</ul></div>
+
+<h3>3. 独立 Oracle 兜底 vs LLM 自任裁判：相关性是隐形杀手</h3>
+<p><strong>原理</strong>：低底率下最诱人的偷懒是——让生成告警的模型<em>自己</em>当裁判。但<strong>兜底降噪只在它与被兜底层<em>失败模式独立</em>时才成立</strong>。串联两层把 FPR 相乘（0.1%×1%）的前提是独立；若裁判和检测器共享盲区（同模型、同 prompt、同训练分布），它们会<em>在同样输入上一起错</em>——误报相关、漏报也相关，等效 FPR 从「相乘」退化成「几乎不降」。真正的兜底要用<strong>独立 oracle</strong>：确定性断言、差分复核（同输入跑参照路径比对，见 Day 52）、或不同架构/信号源的第二判定器。</p>
+<div class="tradeoff">
+<strong>Trade-off：</strong>
+<ul>
+<li><strong>LLM 自任裁判</strong>：✅ 零额外系统、上线快；❌ 与生成器失败模式高度相关——它对自己幻觉出来的「事故」往往一路盖章确认，兜底≈没有。</li>
+<li><strong>独立第二 LLM 裁判</strong>：✅ 打破部分 prompt/上下文相关；❌ 同底座模型仍共享训练分布盲区，独立性打折。</li>
+<li><strong>确定性 / 差分 oracle</strong>：✅ 与模型完全不同的失败模式，真正正交；❌ 覆盖面窄——只能验能写出参照路径/断言的部分，写不出 oracle 的场景仍需人。</li>
+</ul></div>
+<pre><code># 兜底的价值取决于独立性，不是「多加一层」
+def confirm(alert):
+    # ❌ 反模式：同模型自我确认，相关失败
+    # return llm_judge(alert)                # 幻觉 → 自我盖章
+
+    # ✅ 独立 oracle：确定性 + 差分，失败模式正交
+    if deterministic_assert(alert) is FAIL:            # 硬规则先过
+        return True
+    ref = run_reference_path(alert.input)              # 独立参照路径
+    return normalize(alert.observed) != normalize(ref) # 差分比对（Day 52）
+</code></pre>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Jepsen（Kyle Kingbury）</strong>：验证分布式系统一致性时，用<em>独立的形式化 checker</em>（Knossos/Elle）判定历史是否线性化，绝不让被测系统自证——正是「独立 oracle」范式。</li>
+<li><strong>差分测试（differential testing）</strong>：编译器/数据库领域用多实现交叉比对找 bug，独立实现的失败模式正交，是 oracle 独立性的经典工程化。</li>
+<li><strong>Google SRE — 多信号确认</strong>：关键告警要求多个独立信号源（症状 + 依赖 + 用户侧）同时成立才升级，降低单一来源相关误报。</li>
+</ul></div>
+
+<h3>4. 度量陷阱：报告级 vs 判定级误报率</h3>
+<p><strong>原理</strong>：团队最爱说「我们检测器误报率只有 0.1%」——这是<strong>判定级（per-decision）FP 率</strong>，好看但骗人。工程师真正承受的是<strong>报告级（per-report）precision</strong>：打开 pager 的 N 条里有几条是真的。判定级 0.1% 在 10⁻⁷ 底率下对应报告级 precision 0.05%——同一系统，一个指标「优秀」，一个「不可用」。更深一层是<em>活动指标 vs 结果指标</em>（承 Day 50）：告警数、覆盖率、检测器数量都是活动指标，涨了不代表变好；真正的结果指标是<strong>真事故被及时发现的比例</strong>与 <strong>on-call 对 pager 的信任度</strong>。</p>
+<table>
+<thead><tr><th>指标</th><th>类型</th><th>陷阱</th><th>该看什么</th></tr></thead>
+<tbody>
+<tr><td>单次 FP 率 0.1%</td><td>判定级</td><td>乘以海量检查后报告级崩塌</td><td>换算成 precision 再汇报</td></tr>
+<tr><td>告警总数 / 覆盖率</td><td>活动</td><td>涨了像在进步，其实在制造噪声</td><td>真报占比、漏报数</td></tr>
+<tr><td>检测器数量</td><td>活动</td><td>越多越可能拉低整体 precision</td><td>边际 precision 贡献</td></tr>
+<tr><td>on-call 是否还看 pager</td><td>结果</td><td>没人量，却是系统死活的真相</td><td>ack 率 / 忽略率</td></tr>
+</tbody></table>
+<div class="case">
+<strong>现实案例：</strong>
+<ul>
+<li><strong>Google SRE</strong>：用 precision/recall 而非「告警数」评估告警质量，并把「不该被 page 却被 page」列为需要根治的问题，正是拒绝活动指标。</li>
+<li><strong>安全 SOC 行业</strong>：长期用「告警量」衡量 SIEM 价值，导致告警疲劳成灾——教科书级的报告级/活动指标度量陷阱。</li>
+</ul></div>
+
+<h2>扩展与优化（增长后怎么办）</h2>
+<ul>
+<li><strong>底率随规模继续下降</strong>：实例翻 10 倍、检查翻 10 倍，真事故底率反而更小——precision 持续恶化。对策是让判定域随规模<em>收敛</em>（只在 SLO 违约面判定），而非随规模膨胀。</li>
+<li><strong>自适应阈值</strong>：按每类检测器历史 precision 动态调地板，长期低 precision 者自动降权或下线。</li>
+<li><strong>反馈闭环</strong>：on-call 对每条 page 打「真/假」标签回灌校准置信模型——把 precision 地板从静态变成学习型。</li>
+<li><strong>与混沌工程对接（承 Day 44）</strong>：用故障注入制造<em>已知真事故</em>，直接量测告警的召回与首报延迟——否则低底率下根本没有足够真样本评估召回。</li>
+<li><strong>成本视角</strong>：每条误报的成本不是 CPU，是 on-call 的注意力和信任——用「打扰一次人的等效成本」给阈值定价。</li>
+</ul>
+
+<h2>常见陷阱 + 面试追问</h2>
+<div class="callout">
+<strong>1. 「我检测器 99% 准」≠ 系统可用。</strong> 面试必追：底率多少？把 precision 算出来。答不出贝叶斯换算=没理解本质，最经典的失分点。</div>
+<div class="callout">
+<strong>2. 用 LLM 给自己的输出当裁判。</strong> 相关失败——它对自己的幻觉一路盖章。追问：你的兜底 oracle 与生成器<em>独立</em>吗？独立性从何而来？</div>
+<div class="callout">
+<strong>3. 把召回当唯一目标。</strong> 低底率下拉满召回=噪声淹没系统=人不看=实际召回归零。召回和 precision 在这里不是对立，而是「precision 不达标则召回作废」。</div>
+<div class="callout">
+<strong>4. 用告警数/覆盖率证明进步。</strong> 活动指标。追问：ack 率、忽略率、真报占比多少？没人看的系统覆盖率 100% 也是死的。</div>
+<div class="callout">
+<strong>5. 忽略聚合窗口的双刃。</strong> 聚合抬 precision，但窗口过大会把两起独立事故合并、或延迟首报。追问：一次雪崩式级联故障，你的聚合会不会把 root cause 藏起来？</div>
+
+<h2>深入资源</h2>
+<ul>
+<li><strong>Stefan Axelsson, "The Base-Rate Fallacy and the Difficulty of Intrusion Detection"</strong>（ACM TISSEC, 2000）：本主题理论奠基，贝叶斯证明误报率才是瓶颈。</li>
+<li><strong>Google SRE Workbook — "Alerting on SLOs"</strong>：precision/recall 定义告警质量、symptom-based 告警的工程实践（sre.google/workbook/alerting-on-slos）。</li>
+<li><strong>《Designing Data-Intensive Applications》(Kleppmann)</strong>：可靠性与故障检测章节，理解「检测本身也会错」。</li>
+<li><strong>Jepsen (jepsen.io)</strong>：独立 oracle 判定分布式一致性的范式教材，理解「裁判为何必须独立」。</li>
+</ul>
+
+<h2>深入思考（点击展开答案）</h2>
+
+<details>
+<summary>1. 底率 10⁻⁷、想让报告级 precision 达到 90%，单检测器的 FPR 需要压到多少？这现实吗？给出数量级与替代路径。</summary>
+<div class="answer">
+<p>令 TPR≈1。要 precision≥0.9，即 <code>B / (B + FPR·(1−B)) ≥ 0.9</code>，解出 <code>FPR ≤ B/9 ≈ 1.1×10⁻⁸</code>。也就是<strong>每一亿次检查最多错一次</strong>——单个统计/ML 检测器几乎不可能做到，校准误差本身就远大于这个数。</p>
+<p><strong>所以正确路径不是硬压单检测器 FPR，而是：</strong></p>
+<ul>
+<li><strong>抬底率</strong>：把判定域从「所有检查」缩到「SLO 违约/高危面」，B 从 10⁻⁷ 抬 3 个数量级到 10⁻⁴，要求的 FPR 立刻放宽到 ~10⁻⁵。</li>
+<li><strong>串联独立层</strong>：两层独立 FPR 相乘，0.1%×0.1%=10⁻⁶，配合抬底率就能过 90%。</li>
+<li><strong>聚合</strong>：一次事故的 N 个候选合成 1 条报告，等效把 FP 计数从「次」降到「事件」。</li>
+</ul>
+<p>洞察：<em>低底率问题几乎永远靠「抬 B + 独立层」解，而不是靠让某个检测器变神。</em></p>
+</div>
+</details>
+
+<details>
+<summary>2. 为什么「再加一层 LLM 裁判」有时几乎不降误报？用相关性把它讲清楚。</summary>
+<div class="answer">
+<p>串联降噪的数学前提是<strong>条件独立</strong>：<code>FPR_total = FPR₁ × FPR₂</code> 只在两层对同一输入的错误互不相关时成立。若两层是同一底座模型、同一 prompt 上下文，它们的错误<em>高度相关</em>——生成器幻觉出的「事故」往往正是裁判也会认可的那类输入（同样的分布盲区）。极端情况下相关系数趋近 1，<code>FPR_total ≈ FPR₁</code>，第二层白加。</p>
+<p>这也是为什么真正的兜底要<strong>换失败模式</strong>：确定性断言的错误来自规则写漏（与模型幻觉正交）；差分 oracle 的错误来自参照路径 bug（独立实现）；不同架构的第二检测器盲区不同。<em>独立性不是「有没有第二层」，而是「第二层会不会在同样的地方跟着错」。</em></p>
+</div>
+</details>
+
+<details>
+<summary>3. 你把判定域从 1000 万次缩到 1 万次高危检查，precision 大幅改善——但代价藏在哪？如何量化你漏掉了什么？</summary>
+<div class="answer">
+<p>代价是<strong>召回</strong>：判定域外的真事故你根本不判定，直接漏。缩域=用召回换 precision，只是这笔交易在低底率下往往划算（噪声淹没时召回本来就是虚的）。</p>
+<p><strong>怎么量化漏了什么：</strong></p>
+<ul>
+<li><strong>事后复盘反查</strong>：每次真事故复盘时，检查它当初落在判定域内吗？落在域外=你的缩域策略漏了它,记为一次「域外漏报」。</li>
+<li><strong>混沌工程注入（Day 44）</strong>：主动在域内域外都注入已知故障，直接测两侧召回。低底率下这是唯一能拿到足够真样本的办法。</li>
+<li><strong>影子判定</strong>：对被排除的域仍在后台判定但不告警，离线统计「本会报中多少真事故」，评估漏报率。</li>
+</ul>
+<p>决策标准：域外漏报里有没有「高严重度」的？precision 换召回可以，但不能把 Sev1 换出去——那类必须无论底率多低都保留判定。</p>
+</div>
+</details>
+
+<details>
+<summary>4. 一次级联雪崩故障会同时触发成百上千个检测器。你的聚合/去重层是帮手还是帮凶？</summary>
+<div class="answer">
+<p><strong>两面性都有。</strong> 帮手：聚合把一场雪崩的上千条告警合成少数几条「事件」，避免刷屏、避免真正的 root cause 被淹在下游症状里——这正是分诊层的价值。</p>
+<p><strong>帮凶风险：</strong></p>
+<ul>
+<li><strong>过度聚合藏因</strong>：若按「时间窗口 + 相似性」粗暴合并，可能把<em>触发雪崩的 root cause 告警</em>和<em>下游连锁症状</em>合成一条，on-call 只看到症状、找不到源头。</li>
+<li><strong>窗口内混入独立事故</strong>：雪崩期间恰好发生的第二起无关故障被吸进同一聚合，被当噪声压掉。</li>
+<li><strong>首报延迟</strong>：为了聚合等窗口攒够,首次告警反而晚了——雪崩最需要的是快。</li>
+</ul>
+<p><em>对策</em>：聚合要带因果/依赖拓扑（不是纯时间相似），保留并高亮「最上游」告警；对高严重度信号用「先报再聚合」而非「先聚合再报」，用拓扑而非时间窗定义同因。</p>
+</div>
+</details>
+
+<details>
+<summary>5. on-call 已经不看 pager 了——这个「信任崩塌」状态在指标上长什么样？如何早于崩塌前发现？</summary>
+<div class="answer">
+<p><strong>崩塌的指标画像</strong>：ack 时延变长、ack 率下降、「已确认但无操作」比例上升、批量静默/snooze 飙升、同一告警反复触发无人处理。注意：<em>告警量和覆盖率此时可能仍很好看</em>——这正是活动指标骗人处。</p>
+<p><strong>如何早发现（在崩塌前）：</strong></p>
+<ul>
+<li><strong>把「人的行为」当一等指标</strong>：监控 ack 率、忽略率、误报反馈率，而不只是监控系统。人开始忽略是最早的领先信号。</li>
+<li><strong>误报预算 + 熔断</strong>：像 error budget 一样给「误报」设预算，某检测器一周烧超预算就自动降级下线，防止它侵蚀整体信任。</li>
+<li><strong>抽样审计</strong>：定期人工标注一批 page 的真/假，直接测报告级 precision 的漂移。</li>
+</ul>
+<p>核心：<strong>告警系统真正的 SLO 不在机器侧，在人侧——「人是否还相信它」。</strong>信任一旦烧穿，重建成本远高于当初省下的降噪工作。</p>
+</div>
+</details>
+
+</div>
+</body></html>

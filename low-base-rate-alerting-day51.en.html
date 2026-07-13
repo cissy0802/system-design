@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Day 51 · Alerting Under a Low Base Rate — System Design</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"SF Pro Display","Noto Sans SC",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
+.container{max-width:820px;margin:0 auto;padding:24px 20px 60px}
+header{padding:40px 0 28px;border-bottom:1px solid rgba(100,200,255,0.15);margin-bottom:32px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem}
+.tag{padding:3px 10px;border-radius:4px;background:rgba(100,200,255,0.12);color:#64c8ff;border:1px solid rgba(100,200,255,0.25)}
+.tag.diff{background:rgba(94,234,212,0.1);color:#5eead4;border-color:rgba(94,234,212,0.3)}
+.tag.day{background:rgba(255,180,80,0.1);color:#ffb450;border-color:rgba(255,180,80,0.25)}
+h1{font-size:1.75rem;font-weight:800;background:linear-gradient(135deg,#64c8ff 0%,#5eead4 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:0.5px;line-height:1.3}
+h1 .en{display:block;font-size:1rem;color:#7a8590;-webkit-text-fill-color:#7a8590;margin-top:6px;font-weight:500}
+h2{font-size:1.2rem;color:#5eead4;margin:36px 0 14px;padding-left:12px;border-left:3px solid #5eead4}
+h3{font-size:1rem;color:#64c8ff;margin:20px 0 10px;font-weight:600}
+p{margin:10px 0;color:#c8cfd6}
+ul,ol{margin:10px 0 10px 22px;color:#c8cfd6}
+li{margin:6px 0}
+strong{color:#e8eef5;font-weight:600}
+em{color:#5eead4;font-style:normal;font-weight:500}
+code{font-family:"SF Mono",Menlo,Consolas,monospace;background:rgba(100,200,255,0.1);color:#5eead4;padding:1px 6px;border-radius:3px;font-size:0.88em}
+pre{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:14px 16px;overflow-x:auto;margin:12px 0;font-family:"SF Mono",Menlo,Consolas,monospace;font-size:0.84rem;line-height:1.55;color:#c8cfd6}
+pre code{background:none;color:inherit;padding:0;font-size:1em}
+.mermaid{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:18px;margin:14px 0;text-align:center;overflow-x:auto;cursor:zoom-in;transition:border-color 0.15s}
+.mermaid:hover{border-color:rgba(100,200,255,0.4)}
+.mermaid svg{width:100%;max-width:100%;height:auto;min-height:280px}
+.lightbox{position:fixed;inset:0;background:rgba(8,12,18,0.96);z-index:9999;display:none;align-items:center;justify-content:center;padding:24px;cursor:grab;backdrop-filter:blur(4px);overflow:hidden}
+.lightbox.open{display:flex}
+.lightbox.dragging{cursor:grabbing}
+.lightbox svg{width:auto;height:auto;max-width:96vw;max-height:92vh;transform-origin:center center;will-change:transform}
+.lightbox .hint{position:fixed;top:16px;right:20px;font-size:0.78rem;color:#7a8590;font-family:"SF Mono",Menlo,monospace;pointer-events:none}
+.callout{background:rgba(255,180,80,0.06);border-left:3px solid #ffb450;padding:12px 14px;margin:14px 0;border-radius:4px;font-size:0.94rem}
+.callout strong{color:#ffb450}
+.tradeoff{background:rgba(100,200,255,0.05);border:1px solid rgba(100,200,255,0.2);border-radius:6px;padding:12px 14px;margin:12px 0;font-size:0.94rem}
+.case{background:rgba(94,234,212,0.05);border-left:3px solid #5eead4;padding:12px 14px;margin:12px 0;border-radius:4px;font-size:0.94rem}
+.case strong{color:#5eead4}
+.nav{margin-top:50px;padding-top:24px;border-top:1px solid rgba(100,200,255,0.15);text-align:center}
+.nav a{color:#64c8ff;text-decoration:none;font-size:0.92rem;padding:8px 16px;border:1px solid rgba(100,200,255,0.3);border-radius:4px;transition:all 0.15s}
+.nav a:hover{background:rgba(100,200,255,0.1)}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:0.9rem}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid rgba(100,200,255,0.15)}
+th{color:#64c8ff;font-weight:600;background:rgba(100,200,255,0.05)}
+details{background:rgba(100,200,255,0.04);border:1px solid rgba(100,200,255,0.18);border-radius:6px;padding:12px 16px;margin:10px 0;transition:all 0.15s}
+details:hover{border-color:rgba(100,200,255,0.35)}
+details[open]{background:rgba(94,234,212,0.05);border-color:rgba(94,234,212,0.3)}
+details summary{font-weight:600;color:#e8eef5;list-style:none;outline:none;cursor:pointer;display:flex;align-items:flex-start;gap:10px;font-size:0.96rem}
+details summary::-webkit-details-marker{display:none}
+details summary::before{content:'▶';color:#64c8ff;font-size:0.75em;transition:transform 0.2s;flex-shrink:0;margin-top:5px}
+details[open] summary::before{transform:rotate(90deg);color:#5eead4}
+details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
+details .answer ul,details .answer ol{margin:6px 0 6px 22px}
+@media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+</style>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({startOnLoad:true,theme:'base',flowchart:{useMaxWidth:true,htmlLabels:true,nodeSpacing:50,rankSpacing:60},themeVariables:{primaryColor:'#1a2530',primaryTextColor:'#e8eef5',primaryBorderColor:'#64c8ff',lineColor:'#5eead4',secondaryColor:'#0e1419',tertiaryColor:'#0a0f14',background:'#0a0f14',mainBkg:'#1a2530',secondBkg:'#0e1419',textColor:'#d4dae0',fontFamily:'-apple-system,"SF Pro Display",sans-serif',fontSize:'16px'}});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const lb=document.createElement('div');lb.className='lightbox';
+  lb.innerHTML='<span class="hint">scroll = zoom · drag = pan · Esc / click bg = close</span>';
+  document.body.appendChild(lb);
+  let scale=1,panX=0,panY=0,dragging=false,moved=false,lx=0,ly=0;
+  const apply=()=>{const s=lb.querySelector('svg');if(s)s.style.transform=`translate(${panX}px,${panY}px) scale(${scale})`};
+  const reset=()=>{scale=1;panX=0;panY=0};
+  const close=()=>{lb.classList.remove('open');const s=lb.querySelector('svg');if(s)s.remove();reset()};
+  document.addEventListener('click',e=>{
+    if(e.target.closest('.lightbox')){if(moved){moved=false;return}close();return}
+    const w=e.target.closest('.mermaid');if(!w)return;
+    const svg=w.querySelector('svg');if(!svg)return;
+    const c=svg.cloneNode(true);c.removeAttribute('style');
+    c.style.maxWidth='96vw';c.style.maxHeight='92vh';
+    lb.appendChild(c);lb.classList.add('open');reset();apply();
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+  lb.addEventListener('wheel',e=>{
+    if(!lb.classList.contains('open'))return;
+    e.preventDefault();
+    const svg=lb.querySelector('svg');if(!svg)return;
+    const ns=Math.max(0.3,Math.min(10,scale*(1-e.deltaY*0.002)));
+    const r=svg.getBoundingClientRect();
+    const cx=e.clientX-(r.left+r.width/2),cy=e.clientY-(r.top+r.height/2);
+    const k=ns/scale-1;panX-=cx*k;panY-=cy*k;scale=ns;apply();
+  },{passive:false});
+  lb.addEventListener('mousedown',e=>{
+    if(!lb.classList.contains('open'))return;
+    dragging=true;moved=false;lx=e.clientX;ly=e.clientY;lb.classList.add('dragging');e.preventDefault();
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    const dx=e.clientX-lx,dy=e.clientY-ly;
+    if(Math.abs(dx)+Math.abs(dy)>3)moved=true;
+    panX+=dx;panY+=dy;lx=e.clientX;ly=e.clientY;apply();
+  });
+  document.addEventListener('mouseup',()=>{dragging=false;lb.classList.remove('dragging')});
+});
+</script>
+</head><body><div class="container">
+
+<header>
+<div class="meta">
+<span class="tag day">Day 51</span>
+<span class="tag diff">Hard</span>
+<span class="tag">Alerting</span>
+<span class="tag">Base Rate</span>
+<span class="tag">Signal Detection</span>
+<span class="tag">Observability</span>
+</div>
+<h1>Alerting Under a Low Base Rate — How Report-Level False Positives Drown the Truth<span class="en">Bayesian precision, independent oracles, and the metrics trap of per-decision vs per-report FP rates</span></h1>
+</header>
+
+<h2>Problem Scenario + Requirements</h2>
+<p>You are designing an automated alerting system for a <strong>fleet of tens of thousands of instances</strong>: a swarm of probes, assertions, anomaly detectors, plus an LLM "judge" that stamps each verdict as "incident or not." Scale is the crux — about <strong>10 million checks per day</strong>, while the <em>base rate of events that genuinely deserve to page a human is minuscule</em>: say only about <strong>5 real incidents</strong> a day, so the prior probability that any single check is "true" is roughly <strong>5 × 10⁻⁷</strong>.</p>
+<p>Intuition says "my detector is accurate, FP is only 0.1%" — but that is exactly the <strong>base-rate fallacy</strong>: 0.1% times ten million checks is <strong>10,000 false positives</strong> a day, drowning those 5 true reports, so P(true│alert) ≈ 5/10005 ≈ <strong>0.05%</strong>. Of the 2,000 alerts an engineer receives, 1 is real; within weeks everyone learns the same reflex — <em>swipe every alert away</em>. At that point high recall is meaningless: <strong>a true report no one reads equals a miss</strong>. This shares DNA with Day 50 ("Code Review as Signal Detection"), but here the enemy isn't noise itself — it's the <em>base rate</em>.</p>
+<ul>
+<li><strong>The constraint is a precision floor, not throughput</strong>: the lower the base rate, the harsher the demand on per-check FP rate — this is math, not something tuning can dodge.</li>
+<li><strong>FP budget</strong>: SRE lore — if an alert's effective false-positive rate gets high enough to break trust, the whole system's recall is voided.</li>
+<li><strong>Actionability + timing</strong>: every page must be urgent, executable, user-visible; a three-days-later offline scan has no value.</li>
+<li><strong>The backstop judge must be independent</strong>: who stamps "this is a real incident"? If the judge shares failure modes with the detector, the backstop is worthless.</li>
+</ul>
+
+<h2>High-Level Architecture (base-rate funnel → independent backstop → triage → page)</h2>
+<pre class="mermaid">
+graph LR
+    SRC["10M checks/day<br/><i>probes · assertions · anomaly</i>"]
+    DET["Detector swarm<br/><i>per-check FP≈0.1%</i>"]
+    ORA["Independent Oracle<br/><i>differential/deterministic</i>"]
+    TRI["Triage · denoise<br/><i>dedup · aggregate · precision floor</i>"]
+    PAGE["Page a human<br/><i>&lt;10/day</i>"]
+    ARCH[("Archive / silence<br/>queryable, non-paging")]
+
+    SRC -->|massive| DET -->|10k candidates| ORA
+    ORA -->|independent verdict| TRI -->|precision≥90%| PAGE
+    TRI -.demoted noise.-> ARCH
+    DET -.low confidence.-> ARCH
+
+    classDef src fill:#1a2530,stroke:#64c8ff,color:#e8eef5
+    classDef det fill:#1a1a30,stroke:#ffb450,color:#e8eef5
+    classDef ora fill:#0e2030,stroke:#5eead4,color:#e8eef5
+    classDef page fill:#2a1530,stroke:#ff7ab6,color:#e8eef5
+    class SRC src
+    class DET,TRI det
+    class ORA ora
+    class PAGE page
+    class ARCH src
+</pre>
+<p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">Each stage of the funnel raises precision: detectors preserve recall, the independent oracle breaks correlation, triage guards the precision floor, and only &lt;10/day reach human attention</p>
+
+<h2>Key Technical Points</h2>
+
+<h3>1. The Bayesian math of the base-rate fallacy: precision crushed by the base rate</h3>
+<p><strong>Principle</strong>: An alerting system's usability is set by <em>P(true│alert)</em> (the Bayesian detection rate / precision), which depends not only on recall but is dominated by the <strong>base rate</strong>. Bayes: <code>P(true│alert) = TPR·B / (TPR·B + FPR·(1−B))</code>. When base rate <code>B</code> is tiny, the denominator is dominated by <code>FPR·(1−B)</code> — even at TPR=99%, unless FPR is driven down to the order of B, precision approaches 0. This is exactly what Axelsson proved for intrusion detection: <strong>the limiting factor of an IDS was never the detection rate, but the false-alarm rate</strong>.</p>
+<div class="tradeoff">
+<strong>Trade-off (three responses, each with a cost):</strong>
+<ul>
+<li><strong>Cut FPR (raise single-detector precision)</strong>: ✅ directly lifts precision; ❌ at base rate 10⁻⁷ you need FPR &lt; 10⁻⁷ to clear half — a single detector essentially can't; returns diminish with the base rate.</li>
+<li><strong>Raise B (shrink the decision domain, only judge high-risk surface)</strong>: ✅ squeezing 10M checks into 10k high-risk ones lifts B from 10⁻⁷ to 10⁻⁴, orders-of-magnitude better precision; ❌ shrinking the domain sacrifices recall — you miss real incidents outside it.</li>
+<li><strong>Chain independent layers (multiplicative denoise)</strong>: ✅ two <em>independent</em> layers multiply FPR, 0.1%×1%=10⁻⁵; ❌ independence is a hard constraint (see point 3) — without it, multiplication degrades to addition.</li>
+</ul></div>
+<pre><code># How the base rate crushes precision (compute before you design)
+def precision(tpr, fpr, base_rate):
+    tp = tpr * base_rate
+    fp = fpr * (1 - base_rate)
+    return tp / (tp + fp)
+
+# "Accurate" detector: recall 99%, per-check FP 0.1%
+precision(0.99, 0.001, 5e-7)   # ≈ 0.000495 —— 1 real in 2000 reports
+# Shrink domain to high-risk surface, base rate up to 1e-4:
+precision(0.99, 0.001, 1e-4)   # ≈ 0.090   —— still not enough
+# Chain an independent oracle, effective FPR down to 1e-5:
+precision(0.99, 1e-5, 1e-4)    # ≈ 0.908   —— clears the precision floor
+</code></pre>
+<div class="case">
+<strong>Real-world cases:</strong>
+<ul>
+<li><strong>Axelsson (ACM TISSEC 2000)</strong>: used Bayes to bring the "base-rate fallacy" to intrusion detection — proving that to reach a usable P(intrusion│alert) you need a possibly unrealistically low false-alarm rate. The theoretical bedrock of this topic.</li>
+<li><strong>Google SRE</strong>: explicitly defines alert quality by precision/recall and insists on <em>symptom-based / SLO-based alerting</em> — only judging on the user-visible surface, which is essentially "raise the base rate, shrink the domain."</li>
+<li><strong>Security SOC / large IDS</strong>: security alerting is chronically plagued by "alert fatigue," teams facing floods of low-precision alerts daily — the base-rate fallacy manifesting in production.</li>
+</ul></div>
+
+<h3>2. The precision floor: triage is the gatekeeper of usability</h3>
+<p><strong>Principle</strong>: Since single detectors can't move the base rate, hand precision to the <strong>triage / denoise layer</strong> — it produces no new signal, only dedups, aggregates, confidence-scores and cross-detector-votes candidates, admitting only verdicts above a <em>precision floor</em> (e.g. precision≥90%) into human view. Everything below is demoted to a "queryable but non-paging" archive. Key mindset: <strong>better a miss into the archive than noise into the pager</strong> — a single false positive's cost isn't itself, it's that it erodes trust in <em>every</em> subsequent alert.</p>
+<div class="tradeoff">
+<strong>Trade-off:</strong>
+<ul>
+<li><strong>High threshold (only very high confidence)</strong>: ✅ precision met, pager clean; ❌ recall drops, edge incidents archived and discovered late.</li>
+<li><strong>Low threshold (report generously)</strong>: ✅ high recall; ❌ back to 10k of noise — systemic death.</li>
+<li><strong>Aggregate/dedup (N same-cause → 1)</strong>: ✅ one incident doesn't spam, naturally raises precision; ❌ a mis-tuned window merges two independent incidents or delays the first report.</li>
+</ul></div>
+<pre><code># Triage: cross-detector voting + aggregation + precision floor
+def triage(candidates, floor=0.9, window="5m"):
+    groups = group_by_root_cause(candidates, window)   # same-cause grouping, anti-spam
+    for g in groups:
+        # more independent detectors firing together = higher confidence (approx. multiplicative)
+        conf = calibrated_confidence(g.detectors, g.signals)
+        if conf >= floor:
+            page(dedup_key=g.root_cause, evidence=g.top_signals)
+        else:
+            archive(g)        # queryable, in metrics, but never bothers on-call
+</code></pre>
+<div class="case">
+<strong>Real-world cases:</strong>
+<ul>
+<li><strong>Google SRE — Outalator</strong>: aggregates masses of alerts into an "incident" dimension for on-call to digest — essentially a triage layer, avoiding per-alert spam.</li>
+<li><strong>PagerDuty / Opsgenie</strong>: event aggregation, dedup, suppression, dependency suppression — a commercialized triage/denoise layer whose selling point is keeping noise out of the pager.</li>
+<li><strong>Netflix</strong>: centers on SLO/symptom alerting, demoting internal metric anomalies to observable signals rather than direct pages, protecting on-call pager precision.</li>
+</ul></div>
+
+<h3>3. Independent oracle backstop vs LLM self-judging: correlation is the invisible killer</h3>
+<p><strong>Principle</strong>: The most tempting shortcut at low base rate is to let the model that generates the alert <em>judge itself</em>. But <strong>a backstop's denoise only holds when its <em>failure modes are independent</em> of the layer it backs</strong>. Chaining two layers to multiply FPR (0.1%×1%) presumes independence; if judge and detector share blind spots (same model, same prompt, same training distribution), they <em>err together on the same inputs</em> — false positives correlate, misses correlate, and effective FPR degrades from "multiply" to "barely moves." A real backstop needs an <strong>independent oracle</strong>: a deterministic assertion, differential re-check (run a reference path on the same input and compare, see Day 52), or a second judge of a different architecture / signal source.</p>
+<div class="tradeoff">
+<strong>Trade-off:</strong>
+<ul>
+<li><strong>LLM self-judge</strong>: ✅ zero extra system, ships fast; ❌ failure modes highly correlated with the generator — it tends to rubber-stamp its own hallucinated "incidents"; backstop ≈ none.</li>
+<li><strong>Independent second LLM judge</strong>: ✅ breaks some prompt/context correlation; ❌ same base model still shares training-distribution blind spots — independence is discounted.</li>
+<li><strong>Deterministic / differential oracle</strong>: ✅ failure modes completely different from the model, truly orthogonal; ❌ narrow coverage — only validates where you can write a reference path/assertion; the rest still needs humans.</li>
+</ul></div>
+<pre><code># A backstop's value depends on independence, not on "adding a layer"
+def confirm(alert):
+    # ❌ anti-pattern: same model self-confirms, correlated failure
+    # return llm_judge(alert)                # hallucinate -> self-stamp
+
+    # ✅ independent oracle: deterministic + differential, orthogonal failure modes
+    if deterministic_assert(alert) is FAIL:            # hard rules first
+        return True
+    ref = run_reference_path(alert.input)              # independent reference path
+    return normalize(alert.observed) != normalize(ref) # differential compare (Day 52)
+</code></pre>
+<div class="case">
+<strong>Real-world cases:</strong>
+<ul>
+<li><strong>Jepsen (Kyle Kingsbury)</strong>: when verifying distributed-systems consistency, uses an <em>independent formal checker</em> (Knossos/Elle) to decide whether a history is linearizable — never lets the system under test self-certify. The archetypal "independent oracle."</li>
+<li><strong>Differential testing</strong>: compilers/databases cross-compare multiple implementations to find bugs — independent implementations have orthogonal failure modes, the classic engineering of oracle independence.</li>
+<li><strong>Google SRE — multi-signal confirmation</strong>: critical alerts require multiple independent signal sources (symptom + dependency + client-side) to hold before escalating, reducing single-source correlated false positives.</li>
+</ul></div>
+
+<h3>4. The metrics trap: report-level vs decision-level FP rate</h3>
+<p><strong>Principle</strong>: Teams love to report "our detector's FP rate is only 0.1%" — that's the <strong>per-decision FP rate</strong>, pretty but deceptive. What engineers actually bear is <strong>per-report precision</strong>: of the N alerts they open in the pager, how many are real. A per-decision 0.1% at base rate 10⁻⁷ corresponds to a report-level precision of 0.05% — same system, one metric shows "excellent," another "unusable." Deeper still is <em>activity vs outcome metrics</em> (following Day 50): alert count, coverage, detector count are all activity metrics — rising doesn't mean better; the true outcome metrics are <strong>the fraction of real incidents caught in time</strong> and <strong>on-call's trust in the pager</strong>.</p>
+<table>
+<thead><tr><th>Metric</th><th>Type</th><th>Trap</th><th>What to watch</th></tr></thead>
+<tbody>
+<tr><td>Per-check FP 0.1%</td><td>decision-level</td><td>report-level collapses after multiplying by volume</td><td>convert to precision before reporting</td></tr>
+<tr><td>Total alerts / coverage</td><td>activity</td><td>rising looks like progress, actually making noise</td><td>true-report share, miss count</td></tr>
+<tr><td>Detector count</td><td>activity</td><td>more detectors likely lower overall precision</td><td>marginal precision contribution</td></tr>
+<tr><td>Does on-call still read the pager</td><td>outcome</td><td>no one measures it, yet it's the system's life-or-death truth</td><td>ack rate / ignore rate</td></tr>
+</tbody></table>
+<div class="case">
+<strong>Real-world cases:</strong>
+<ul>
+<li><strong>Google SRE</strong>: evaluates alert quality by precision/recall rather than "alert count," and lists "paged when it shouldn't have been" as a problem to root out — precisely rejecting activity metrics.</li>
+<li><strong>Security SOC industry</strong>: long measured SIEM value by "alert volume," breeding rampant alert fatigue — a textbook report-level/activity-metric trap.</li>
+</ul></div>
+
+<h2>Scaling & Optimization</h2>
+<ul>
+<li><strong>Base rate keeps dropping with scale</strong>: 10× the instances, 10× the checks, but the real-incident base rate gets smaller — precision keeps degrading. The fix: let the decision domain <em>converge</em> with scale (judge only the SLO-violation surface), not balloon with it.</li>
+<li><strong>Adaptive thresholds</strong>: dynamically tune the floor by each detector class's historical precision; chronically low-precision detectors auto-downweight or retire.</li>
+<li><strong>Feedback loop</strong>: on-call labels each page "true/false" to feed back and calibrate the confidence model — turning the precision floor from static to learned.</li>
+<li><strong>Interface with chaos engineering (following Day 44)</strong>: use fault injection to manufacture <em>known real incidents</em> and directly measure the alerting system's recall and time-to-first-report — otherwise, at low base rate you lack enough true samples to evaluate recall.</li>
+<li><strong>Cost lens</strong>: each false positive's cost isn't CPU, it's on-call's attention and trust — price the triage threshold by the "equivalent cost of interrupting a human once."</li>
+</ul>
+
+<h2>Common Pitfalls + Interview Follow-ups</h2>
+<div class="callout">
+<strong>1. "My detector is 99% accurate" ≠ usable system.</strong> The interviewer will press: what's the base rate? Compute the precision. Failing to do the Bayesian conversion = not understanding the essence, the classic point-loser.</div>
+<div class="callout">
+<strong>2. Using an LLM to judge its own output.</strong> Correlated failure — it rubber-stamps its own hallucinations. Follow-up: is your backstop oracle <em>independent</em> of the generator? Where does that independence come from?</div>
+<div class="callout">
+<strong>3. Treating recall as the sole goal.</strong> At low base rate, maxing recall = noise drowns the system = humans stop reading = actual recall goes to zero. Here recall and precision aren't opposed; rather, "recall is void if precision misses the floor."</div>
+<div class="callout">
+<strong>4. Using alert count/coverage to prove progress.</strong> Activity metrics. Follow-up: what are the ack rate, ignore rate, true-report share? A system no one reads is dead at 100% coverage.</div>
+<div class="callout">
+<strong>5. Ignoring the double edge of the aggregation window.</strong> Aggregation raises precision, but too wide a window merges two independent incidents or delays the first report. Follow-up: in a cascading avalanche failure, will your aggregation hide the root cause?</div>
+
+<h2>Deep-Dive Resources</h2>
+<ul>
+<li><strong>Stefan Axelsson, "The Base-Rate Fallacy and the Difficulty of Intrusion Detection"</strong> (ACM TISSEC, 2000): the theoretical bedrock — a Bayesian proof that false-alarm rate is the bottleneck.</li>
+<li><strong>Google SRE Workbook — "Alerting on SLOs"</strong>: precision/recall to define alert quality, and the engineering practice of symptom-based alerting (sre.google/workbook/alerting-on-slos).</li>
+<li><strong>"Designing Data-Intensive Applications" (Kleppmann)</strong>: reliability and fault-detection chapters — understanding that "detection itself can err."</li>
+<li><strong>Jepsen (jepsen.io)</strong>: the canonical text on independent oracles judging distributed consistency — understanding "why the judge must be independent."</li>
+</ul>
+
+<h2>Deeper Reflection (click to expand)</h2>
+
+<details>
+<summary>1. At base rate 10⁻⁷, to reach report-level precision 90%, how low must a single detector's FPR go? Is it realistic? Give the order of magnitude and alternatives.</summary>
+<div class="answer">
+<p>Let TPR≈1. For precision≥0.9, i.e. <code>B / (B + FPR·(1−B)) ≥ 0.9</code>, solve <code>FPR ≤ B/9 ≈ 1.1×10⁻⁸</code> — that's <strong>at most one error per hundred million checks</strong>. A single statistical/ML detector essentially cannot do this; calibration error alone far exceeds it.</p>
+<p><strong>So the right path isn't hard-pressing single-detector FPR, but:</strong></p>
+<ul>
+<li><strong>Raise the base rate</strong>: shrink the decision domain from "all checks" to "SLO-violation/high-risk surface," lifting B three orders (10⁻⁷ → 10⁻⁴), relaxing the required FPR to ~10⁻⁵.</li>
+<li><strong>Chain independent layers</strong>: two independent FPRs multiply, 0.1%×0.1%=10⁻⁶, which with a raised base rate clears 90%.</li>
+<li><strong>Aggregate</strong>: fuse a single incident's N candidates into 1 report, effectively dropping the FP count from "per-check" to "per-event."</li>
+</ul>
+<p>Key insight: <em>low-base-rate problems are almost always solved by "raise B + independent layers," not by making some detector godlike.</em></p>
+</div>
+</details>
+
+<details>
+<summary>2. Why does "just add another LLM judge" sometimes barely reduce false positives? Explain it through correlation.</summary>
+<div class="answer">
+<p>The math premise of chained denoise is <strong>conditional independence</strong>: <code>FPR_total = FPR₁ × FPR₂</code> holds only when the two layers' errors on the same input are uncorrelated. If both are the same base model, same prompt context, their errors are <em>highly correlated</em> — the "incidents" the generator hallucinates are exactly the kind the judge also endorses (same distributional blind spot). At the extreme, correlation approaches 1 and <code>FPR_total ≈ FPR₁</code>; the second layer adds nothing.</p>
+<p>This is why a real backstop must <strong>change the failure mode</strong>: a deterministic assertion's errors come from missing rules (orthogonal to model hallucination); a differential oracle's errors come from reference-path bugs (independent implementation); a different-architecture second detector has different blind spots. <em>Independence isn't "is there a second layer," it's "will the second layer err in the same places."</em></p>
+</div>
+</details>
+
+<details>
+<summary>3. You shrank the decision domain from 10M to 10k high-risk checks and precision improved a lot — but where is the cost hidden? How do you quantify what you missed?</summary>
+<div class="answer">
+<p>The cost is <strong>recall</strong>: real incidents outside the domain simply aren't judged, so they're missed outright. Shrinking = trading recall for precision, which at low base rate is often worth it (recall was illusory anyway when noise drowns it).</p>
+<p><strong>How to quantify what you missed:</strong></p>
+<ul>
+<li><strong>Post-mortem back-check</strong>: at each real incident's review, check whether it originally fell inside the domain. Outside = your shrinking missed it; record an "out-of-domain miss."</li>
+<li><strong>Chaos injection (Day 44)</strong>: inject known faults both inside and outside the domain, directly measuring both sides' recall. At low base rate this is the only way to get enough true samples.</li>
+<li><strong>Shadow judging</strong>: keep judging the excluded domain in the background without alerting, offline counting "how many real incidents would have been reported," estimating the shrink's miss rate.</li>
+</ul>
+<p>Decision rule: are there "high-severity" ones among the out-of-domain misses? Trading precision for recall is fine, but you can't trade a Sev1 out — those must remain judged no matter how low the base rate.</p>
+</div>
+</details>
+
+<details>
+<summary>4. A cascading avalanche failure trips hundreds or thousands of detectors at once. Is your aggregation/dedup layer a friend or an accomplice?</summary>
+<div class="answer">
+<p><strong>It's both.</strong> Friend: aggregation fuses an avalanche's thousands of alerts into a few "incidents," avoiding spam and stopping the real root cause from drowning in downstream symptoms — precisely the triage layer's value.</p>
+<p><strong>Accomplice risks:</strong></p>
+<ul>
+<li><strong>Over-aggregation hides the cause</strong>: crude merging by "time window + similarity" may fuse the <em>root-cause alert</em> with <em>downstream chained symptoms</em>, so on-call sees only symptoms and can't find the source.</li>
+<li><strong>An independent incident mixed into the window</strong>: a second unrelated failure happening during the avalanche gets sucked into the same aggregate and suppressed as noise.</li>
+<li><strong>First-report delay</strong>: waiting a window to aggregate delays the first alert — and an avalanche most needs speed.</li>
+</ul>
+<p><em>Countermeasures</em>: aggregate by causal/dependency topology (not pure temporal similarity), preserve and highlight the "most upstream" alert; for high-severity signals use "report then aggregate" rather than "aggregate then report," defining same-cause by topology not time window.</p>
+</div>
+</details>
+
+<details>
+<summary>5. On-call has stopped reading the pager — what does this "trust collapse" state look like in metrics? How do you catch it before the collapse?</summary>
+<div class="answer">
+<p><strong>Collapse's metric portrait</strong>: ack latency lengthens, ack rate drops, "acked but no action" share rises, bulk silence/snooze frequency spikes, the same alert re-fires with no one handling it. Note: <em>alert volume and coverage may still look great here</em> — precisely how activity metrics deceive.</p>
+<p><strong>How to catch it early (before collapse):</strong></p>
+<ul>
+<li><strong>Treat "human behavior" as a first-class metric</strong>: monitor ack rate, ignore rate, false-positive feedback rate, not just the system. Humans starting to ignore is the earliest leading signal.</li>
+<li><strong>FP budget + circuit breaker</strong>: budget "false positives" like an error budget; a detector that burns past budget in a week auto-downgrades/retires, preventing it from eroding overall trust.</li>
+<li><strong>Sampled audit</strong>: periodically hand-label a batch of pages true/false, directly measuring report-level precision drift.</li>
+</ul>
+<p>Core mindset: <strong>an alerting system's true SLO isn't on the machine side, it's on the human side — "do people still trust it."</strong> Once trust burns through, rebuilding costs far more than the denoising work you saved.</p>
+</div>
+</details>
+
+</div>
+</body></html>
