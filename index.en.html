@@ -14,6 +14,11 @@ header .subtitle{font-size:0.85rem;color:#5eead4;margin-top:6px;font-family:"SF 
 .entry .num{flex-shrink:0;font-size:0.85rem;color:#64c8ff;font-weight:700;min-width:50px;font-family:"SF Mono",Menlo,monospace}
 .entry .title{font-size:1.05rem;font-weight:600;color:#e8eef5}
 .entry .topics{font-size:0.85rem;color:#7a8590;margin-left:auto;text-align:right;font-family:"SF Mono",Menlo,monospace}
+.entry.todo{background:rgba(255,255,255,0.02);border-color:rgba(100,200,255,0.05);border-left-color:#3a4450;cursor:default}
+.entry.todo:hover{transform:none;background:rgba(255,255,255,0.02);border-left-color:#3a4450}
+.entry.todo .num{color:#59636e}
+.entry.todo .title{color:#6b7682;font-weight:600}
+.entry.todo .topics{color:#4f5862}
 footer{text-align:center;padding:40px 0 12px;font-size:0.82rem;color:#5a6378}
 @media(max-width:600px){header h1{font-size:1.5rem}.entry{flex-direction:column;gap:4px}.entry .topics{margin-left:0;text-align:left}}
 </style></head><body>
@@ -72,6 +77,7 @@ footer{text-align:center;padding:40px 0 12px;font-size:0.82rem;color:#5a6378}
 <a class="entry" href="code-review-signal-detection-day50.en.html"><span class="num">Day 50</span><span class="title">Code Review as a Signal-Detection System</span><span class="topics">Effective FP &lt;10% decides the tool's fate (Google Tricorder NOT USEFUL) · Triage layer severity×confidence gating + nitpicks to autofix, never ask a human · Diff-time vs batch decides fix rate (Meta Infer near-0→substantial) · FP budget auto-downgrade like an SLO error budget + activity vs outcome metrics Goodhart trap</span></a>
 <a class="entry" href="low-base-rate-alerting-day51.en.html"><span class="num">Day 51</span><span class="title">Alerting Under a Low Base Rate</span><span class="topics">Base-rate fallacy: 0.1% per-check FP × 10M checks drowns 5 real reports, P(true│alert)≈0.05% (Axelsson Bayes) · Three exits: cut FPR / raise base rate by shrinking the domain / chain independent layers to multiply · Independent oracle backstop vs LLM self-judge — shared blind spots degrade multiply to no-drop · Report-level vs decision-level FP metrics trap + on-call trust is the true SLO</span></a>
 <a class="entry" href="chaos-correctness-oracle-day52.en.html"><span class="num">Day 52</span><span class="title">Adding a Correctness Oracle to Chaos Engineering</span><span class="topics">Under a fault "alive" ≠ "correct": skipping a shard silently returns the partial sum, zero alerts (gray failure's differential observability) · Differential oracle: fault-free reference path vs fault path compared after normalization, ground truth self-generated from traffic · Normalization (total order / quantize money to cents / mask now·rand) or FPs spam you off · Three-state verdict PASS / acceptable degradation / correctness bug — honestly-declared partial=🟡, falsely-complete=🔴 · Independent reference vs correlated failure + AI only in the generator seat, never judge (builds on Day 44/51)</span></a>
+<div class="entry todo"><span class="num">Day 53</span><span class="title">Managing Project Risk as Fat-Tailed</span><span class="topics">Mean overrun stays tame (IT +73%) but 1-in-6 is a black-swan +200%, worst 18% average +447% (Flyvbjerg's 16k-project database) · Modeling the mean vs the tail: reserves / stop-loss / staged commitment · "All-or-nothing" success definitions manufacture false failure rates (CHAOS 16.2% ≡ 0.5%) · Same root as capacity planning's P99 tail thinking</span></div>
 <!-- entries --></div>
 <footer>BigCat · System Design · 2026</footer>
 <script src="https://cissy0802.github.io/comments.js" defer></script>
