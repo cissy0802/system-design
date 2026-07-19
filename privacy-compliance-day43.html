@@ -260,8 +260,8 @@ def append_audit(actor, action, subject_id, purpose):
 <details><summary>差分隐私给了数学保证，为什么业界大量「匿名化」数据集仍被重识别？DP 没被普遍采用的真实障碍是什么？</summary><div class="answer">因为大多数「匿名化」根本不是 DP，而是<em>去标识 + k-匿名</em>这类<strong>语法匿名</strong>，对「攻击者拥有外部辅助数据」毫无保证。经典翻车：Netflix Prize 数据集被 IMDb 公开评分交叉重识别。这些数据「删了姓名、做了 k-匿名」，但准标识符 + 外部知识组合仍能定位；DP 的强大正在于它对<em>任意背景知识</em>都成立。那为什么 DP 没普及？三个真实障碍：①<strong>效用损失</strong>——噪声让细粒度 / 小样本查询几乎不可用；②<strong>隐私预算 ε 会耗尽</strong>——同一数据反复查询每次泄一点，多团队共享时预算管理极难；③<strong>ε 取多少</strong>无普适答案，大了没保护、小了没数据。所以 DP 在<em>聚合统计发布</em>（普查、遥测）落地好，在<em>行级细节分析</em>里仍难替代。理解这个断层，比记住「DP 很安全」重要。</div></details>
 
 <div class="nav"><a href="index.html">← 回到 index</a></div>
-<script src="https://cissy0802.github.io/comments.js" defer></script>
-<script src="https://cissy0802.github.io/search.js" defer></script>
-<script src="https://cissy0802.github.io/index-button.js" defer></script>
-<script src="https://cissy0802.github.io/i18n-tts.js" defer></script>
+<script src="https://hub.cissychen.com/comments.js" defer></script>
+<script src="https://hub.cissychen.com/search.js" defer></script>
+<script src="https://hub.cissychen.com/index-button.js" defer></script>
+<script src="https://hub.cissychen.com/i18n-tts.js" defer></script>
 </div></body></html>

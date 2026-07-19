@@ -177,8 +177,8 @@ def delete(target_id):
 <details><summary>CRDT 的墓碑「永不删除」，那一个存在十年、被反复编辑的文档，是不是迟早被墓碑撑爆？</summary><div class="answer">朴素实现会。工程上靠<strong>version-vector 门槛的墓碑 GC</strong>：当所有已知副本的 version vector 都已越过某删除操作（即不可能再有并发 op 引用被删节点），该墓碑就能安全物理回收。有中心服务器时这很好判定——服务端知道所有活跃副本的进度。难点在<strong>可能永远离线的副本</strong>：若一个客户端离线三年，服务端不能无限等它。实践中设<strong>离线上限</strong>（超过则该副本重连时按「全新客户端」拉最新 snapshot，放弃其陈旧 op），把 GC 的等待时间上界化。这也解释了为什么 Figma 明确处理「离线任意时长」时是<strong>重新下载最新文档再 replay</strong>，而非无脑合并。</div></details>
 <details><summary>本地击键 0 延迟回显（optimistic），但如果服务端最终拒绝了你的 op（如权限撤销、文档被锁），已经显示在你屏幕上的字怎么收场？</summary><div class="answer">这是 optimistic UI 的固有风险：<strong>本地先行意味着可能要回滚</strong>。机制上，本地 op 处于「未确认（pending）」状态，服务端 ack 后才转正。若被拒，客户端要把该 op 及<strong>所有基于它的后续本地 op</strong>一并回退（rebase 到服务端权威状态），再把仍合法的操作重新应用——类似 git 的 rebase。用户体验上会看到自己刚敲的内容「闪一下消失」，所以这类硬拒绝要尽量少（权限检查应前置到进入文档时，而非每个 op）。这揭示了协作编辑与普通 CRUD 的根本差异：<strong>乐观本地状态是「推测」，权威在服务端的全序日志里，冲突/拒绝时以后者为准做补偿</strong>。</div></details>
 
-<script src="https://cissy0802.github.io/comments.js" defer></script>
-<script src="https://cissy0802.github.io/search.js" defer></script>
-<script src="https://cissy0802.github.io/index-button.js" defer></script>
-<script src="https://cissy0802.github.io/i18n-tts.js" defer></script>
+<script src="https://hub.cissychen.com/comments.js" defer></script>
+<script src="https://hub.cissychen.com/search.js" defer></script>
+<script src="https://hub.cissychen.com/index-button.js" defer></script>
+<script src="https://hub.cissychen.com/i18n-tts.js" defer></script>
 </div></body></html>
