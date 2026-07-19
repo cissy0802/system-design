@@ -85,7 +85,7 @@ HTML 输出格式
 4. 更新 index.html（编号 + 主题 + 3-4 个技术点），保持原样式
 5. git config user.email "chengchen0802@gmail.com" && git config user.name "BigCat"
 6. main 分支 add/commit/push
-7. PushNotification: "🏗️ System Design：[主题] — [点1]、[点2]、[点3]。https://cissy0802.github.io/system-design-bidaily/[文件名]" 不超过 200 字符。
+7. PushNotification: "🏗️ System Design：[主题] — [点1]、[点2]、[点3]。https://hub.cissychen.com/system-design-bidaily/[文件名]" 不超过 200 字符。
 
 ---
 
