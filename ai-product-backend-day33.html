@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<html lang="zh-CN"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>Day 33 · AI 产品后端 (AI Product Backend) — System Design</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -97,7 +98,6 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 </script>
 </head><body><div class="container">
-
 <header>
 <div class="meta">
 <span class="tag day">Day 33</span>
@@ -107,10 +107,9 @@ document.addEventListener('DOMContentLoaded',()=>{
 <span class="tag">Agent Loop</span>
 <span class="tag">Embedding Serving</span>
 </div>
-<h1>AI 产品后端 — RAG、Agent loop 服务化与人机协同<span class="en">AI Product Backend: RAG, Agentic Loops, Embedding Serving, Human-in-the-loop</span></h1>
+<h1 data-tts="5e8a55f4f13de8f3">AI 产品后端 — RAG、Agent loop 服务化与人机协同<span class="en">AI Product Backend: RAG, Agentic Loops, Embedding Serving, Human-in-the-loop</span></h1>
 </header>
-
-<h2>问题场景 + 需求约束</h2>
+<h2 data-tts="8b96be5add8967f9">问题场景 + 需求约束</h2>
 <p>为 <strong>50 万企业用户</strong>做一个「文档问答 + Agent 助手」后端：用户问问题，系统检索内部知识库回答；复杂任务（「把这三份合同的差异整理成表格并发邮件」）交给 agent 多步执行。这<strong>不是套个 LLM API</strong> 就完事——它同时是个<em>检索系统</em>、一个<em>长任务编排系统</em>、还要<em>把不确定的模型输出关进可控的工程边界里</em>。</p>
 <ul>
 <li><strong>规模</strong>：知识库 1 亿 chunk（约 2000 万文档切块），向量 1024 维；问答峰值 2000 QPS，agent 任务并发 5000 路。</li>
@@ -118,35 +117,32 @@ document.addEventListener('DOMContentLoaded',()=>{
 <li><strong>正确性</strong>：答案必须<em>有出处</em>（可溯源到 chunk），高风险动作（发邮件、改数据）要<em>人确认</em>。</li>
 <li><strong>成本</strong>：LLM token 是大头，检索召回的 context 越长越贵——召回质量直接换算成钱。</li>
 </ul>
-
-<h2>高层架构</h2>
+<h2 data-tts="46d8e87a27b71274">高层架构</h2>
 <div class="mermaid">
 graph TD
-  U[用户请求] --> GW[API Gateway / 鉴权·限流]
-  GW --> ORCH[Orchestrator<br/>问答 or Agent 路由]
-  ORCH -->|问答| RET[检索层]
+  U[用户请求] --&gt; GW[API Gateway / 鉴权·限流]
+  GW --&gt; ORCH[Orchestrator<br/>问答 or Agent 路由]
+  ORCH --&gt;|问答| RET[检索层]
   subgraph RET[检索层 ≤300ms]
-    EMB[Embedding 服务<br/>query 向量化] --> VDB[(向量库 ANN)]
+    EMB[Embedding 服务<br/>query 向量化] --&gt; VDB[(向量库 ANN)]
     BM25[(BM25 倒排)]
-    VDB --> FUSE[RRF 融合]
-    BM25 --> FUSE
-    FUSE --> RR[Cross-encoder 重排]
+    VDB --&gt; FUSE[RRF 融合]
+    BM25 --&gt; FUSE
+    FUSE --&gt; RR[Cross-encoder 重排]
   end
-  RR --> LLM[LLM 推理<br/>streaming 首 token]
-  ORCH -->|复杂任务| AG[Agent Loop<br/>持久化执行引擎]
-  AG --> TOOLS[Tool 调用<br/>检索·DB·外部 API]
-  AG -.高风险动作.-> HITL[人机协同<br/>审批队列]
-  HITL -.批准/拒绝.-> AG
-  AG --> LLM
-  LLM --> U
-  INGEST[离线 Ingest<br/>切块·嵌入·建索引] --> VDB
-  INGEST --> BM25
+  RR --&gt; LLM[LLM 推理<br/>streaming 首 token]
+  ORCH --&gt;|复杂任务| AG[Agent Loop<br/>持久化执行引擎]
+  AG --&gt; TOOLS[Tool 调用<br/>检索·DB·外部 API]
+  AG -.高风险动作.-&gt; HITL[人机协同<br/>审批队列]
+  HITL -.批准/拒绝.-&gt; AG
+  AG --&gt; LLM
+  LLM --&gt; U
+  INGEST[离线 Ingest<br/>切块·嵌入·建索引] --&gt; VDB
+  INGEST --&gt; BM25
 </div>
 <p><strong>三条主线</strong>：① <em>问答热路径</em>走「检索→融合→重排→流式生成」，预算紧；② <em>Agent 路径</em>走持久化执行引擎，能跑很久、能中断恢复；③ <em>离线 Ingest</em> 把文档变成可检索的向量+倒排，与在线解耦。下面拆四个关键技术点。</p>
-
-<h2>关键技术点</h2>
-
-<h3>① RAG 检索质量 — 召回烂，模型再强也救不回来</h3>
+<h2 data-tts="c3df2e03437171d5">关键技术点</h2>
+<h3 data-tts="89a427d39616925e">① RAG 检索质量 — 召回烂，模型再强也救不回来</h3>
 <p>一句话 trade-off：<strong>朴素切块嵌入便宜但召回差</strong>，contextual + hybrid + rerank 召回好但贵且慢。</p>
 <p>【原理】RAG 的瓶颈几乎从来不是生成，而是<em>检索召回</em>——模型只能基于你喂给它的 chunk 回答，<strong>没召回到的内容等于不存在</strong>。朴素做法把文档按 512 token 切块、各自嵌入，问题是切块丢了上下文：一段写「该方案延迟降低 40%」，但「该方案」指谁、在哪份文档，孤立 chunk 里看不出来，语义检索就召不准。Anthropic 的 <em>Contextual Retrieval</em> 在每个 chunk 前拼一段 LLM 生成的「这段在讲什么」上下文摘要再嵌入，并叠加 BM25 关键词检索做 hybrid。</p>
 <div class="tradeoff"><strong>三种召回策略：</strong>
@@ -166,8 +162,7 @@ top = cross_encoder.rerank(query, fused)[:8]  # 精排留 8 个最相关
 context = "\n\n".join(c.text for c in top)
 answer = llm.stream(prompt(query, context))   # 带出处流式生成</code></pre>
 <div class="case"><strong>现实案例：</strong>Anthropic <a href="https://www.anthropic.com/news/contextual-retrieval">Contextual Retrieval</a> 报告该方法把检索失败率降低约 49%，叠加重排后约 67%。原始 <em>RAG</em> 范式由 Lewis 等人 2020 年（NeurIPS）提出，把参数化知识与外部非参数检索库结合。检索质量与重排的更多细节见 Day 31「混合检索与重排序」。</div>
-
-<h3>② Agent Loop 服务化 — 把「跑很久还会崩」的循环变成可恢复的工作流</h3>
+<h3 data-tts="e71830b3559ffd61">② Agent Loop 服务化 — 把「跑很久还会崩」的循环变成可恢复的工作流</h3>
 <p>一句话 trade-off：<strong>内存态 loop 简单但进程一挂全丢</strong>，持久化执行可恢复但要把每步状态落盘。</p>
 <p>【原理】Agent 是个循环：<em>调模型 → 模型要求调工具 → 执行工具 → 把结果喂回 → 再调模型</em>，直到完成。问题在于这循环可能跑几分钟、几十步，期间任何一步都可能：进程被部署重启、工具超时、模型 503。如果状态只在内存里，崩一次整个任务从头再来——而每一步都烧了真金白银的 token。解法是<strong>持久化执行（durable execution）</strong>：把每一步的输入输出当成事件落盘，崩溃后从最后一个成功 step 重放恢复，已完成的工具调用不重跑（靠幂等键）。这正是 Temporal / AWS Step Functions 这类引擎的核心价值。</p>
 <div class="tradeoff"><strong>三种 agent 执行模型：</strong>
@@ -190,8 +185,7 @@ def agent_workflow(task):
             history.append(tool_result(call, result))
     raise StepLimitExceeded   # 触发降级/转人工</code></pre>
 <div class="case"><strong>现实案例：</strong>Anthropic <a href="https://www.anthropic.com/engineering/building-effective-agents">Building Effective Agents</a> 区分了 <em>workflow</em>（预定义编排）与 <em>agent</em>（模型动态决定路径），并强调「能用简单方案就别上 agent」——agent 用延迟和成本换灵活性。生产中 agent 编排常落在 Temporal / Step Functions 这类持久化执行引擎上（与 Day 39「工作流引擎」同源）。</div>
-
-<h3>③ Embedding 服务设计 — 模型版本与索引版本必须绑死</h3>
+<h3 data-tts="0fdd43e76eb7ea19">③ Embedding 服务设计 — 模型版本与索引版本必须绑死</h3>
 <p>一句话 trade-off：<strong>在线实时嵌入延迟低但贵</strong>，批量嵌入吞吐高但有延迟；最大的坑是<em>换模型 = 整库重嵌入</em>。</p>
 <p>【原理】Embedding 服务有两类流量：在线（query 向量化，要快，可缓存）和离线（ingest 批量嵌入 1 亿 chunk，要吞吐）。两者该<em>分开部署</em>：在线服务小批量低延迟，离线服务大 batch 打满 GPU。关键约束是<strong>同一个向量空间</strong>——query 和 doc 必须用<em>同一个 embedding 模型</em>嵌入，否则向量没法比较。所以一旦升级 embedding 模型，<strong>整个索引必须用新模型重建</strong>，且重建期间新旧索引要并存、灰度切换，不能中途混用（混用会让相似度彻底失真）。</p>
 <div class="callout"><strong>致命陷阱：</strong>把 query 用新模型嵌、doc 还是旧索引——相似度计算出来是<em>噪声</em>，召回全错但系统不报错（没人崩溃，只是答案变烂）。务必给索引打 <code>model_version</code> 标签，query 端校验一致。</div>
@@ -205,8 +199,7 @@ for batch in chunks.stream(size=256):         # 大 batch 打满 GPU
 def embed_query(q): return embed_online(q, model=current_index_model())</code></pre>
 <div class="tradeoff"><strong>在线 vs 离线嵌入：</strong>在线适合 query（QPS 高、文本短、可缓存命中高）；离线适合 ingest（量大、可容忍分钟级延迟、批处理省钱）。别用在线服务跑全库重嵌入——会把在线 query 的延迟拖垮。</div>
 <div class="case"><strong>现实案例：</strong>向量库（pgvector / Pinecone / Milvus 等）普遍用 HNSW 做 ANN 索引，召回与延迟的取舍见 Day 12「搜索系统」。OpenAI / Cohere 的 embedding API 都明确标注模型版本，换代时官方文档强调需重建索引——这是行业通用约束，不是某家的特例。</div>
-
-<h3>④ 人机协同 — 把高风险动作关进审批门</h3>
+<h3 data-tts="17607ecb994d1ee6">④ 人机协同 — 把高风险动作关进审批门</h3>
 <p>一句话 trade-off：<strong>同步阻塞等人简单但占着连接/线程</strong>，异步挂起可扩展但要持久化整个 agent 状态。</p>
 <p>【原理】模型会犯错，所以<em>不可逆的高风险动作</em>（发邮件、转账、删数据、改生产配置）不能让 agent 自己拍板。模式是 <strong>human-in-the-loop</strong>：agent 走到高风险工具时不直接执行，而是<em>暂停</em>，把「我打算做 X」推到审批队列，等人批准再继续。难点是「等人」可能等几小时甚至几天——你不能让一个线程/连接傻等。所以它必须建立在技术点 ② 的持久化执行之上：agent 状态落盘、释放所有资源、收到审批回调时<em>从暂停点恢复</em>。</p>
 <div class="tradeoff"><strong>三种等待方式：</strong>
@@ -226,8 +219,7 @@ def run_tool(call):
             return refused(call)                     # 拒绝则不执行
     return execute(call)                             # 批准/低风险才真正执行</code></pre>
 <div class="case"><strong>现实案例：</strong>Anthropic <a href="https://www.anthropic.com/engineering/building-effective-agents">Building Effective Agents</a> 把「在关键节点设置人类检查点（checkpoints）」列为 agentic 系统的核心实践——尤其在动作不可逆或高代价时。这与 Day 7「分布式事务」的 Saga 补偿思路互补：能补偿的自动跑，不能补偿的（已发出的邮件）走人审批。</div>
-
-<h2>扩展与优化</h2>
+<h2 data-tts="eeb6b5d141480bf0">扩展与优化</h2>
 <ul>
 <li><strong>语义缓存</strong>：相似 query 复用答案（向量近邻命中即返回），高频 FAQ 直接省掉整条检索+生成链路，省钱省延迟。注意失效——知识库更新要让缓存过期。</li>
 <li><strong>检索分片</strong>：1 亿向量单机扛不住，按租户/topic 分片，query 路由到相关分片，避免全库扫描（见 Day 4「分片」）。</li>
@@ -235,8 +227,7 @@ def run_tool(call):
 <li><strong>增量 reindex</strong>：文档更新走 CDC，只重嵌入变化的 chunk，而非全库重建。</li>
 <li><strong>评测闭环</strong>：建一个固定的「问题→期望出处」黄金集，每次改检索/换模型都跑回归，用召回率/答案正确率守住质量，别凭感觉调参。</li>
 </ul>
-
-<h2>常见陷阱 + 面试追问</h2>
+<h2 data-tts="dc358f7e2dc573d6">常见陷阱 + 面试追问</h2>
 <ul>
 <li><strong>「召回差却怪模型幻觉」</strong>：80% 的 RAG 烂答案是没召回到对的 chunk，不是模型瞎编。先量召回率（retrieval recall），再谈生成。</li>
 <li><strong>「query 和 doc 用了不同 embedding 模型」</strong>：相似度变噪声、召回全错且系统不报警——前面讲过的隐形杀手。</li>
@@ -245,8 +236,7 @@ def run_tool(call):
 <li><strong>「高风险动作不可逆还让 agent 自动执行」</strong>：发错邮件、删错数据无法回滚。不可逆动作一律 human-in-the-loop。</li>
 <li><strong>面试追问</strong>：「检索预算只有 300ms，hybrid+rerank 跑不完怎么办？」→ 并行召回 dense/sparse、rerank 只精排 top-N、cross-encoder 用蒸馏小模型、热门 query 走语义缓存。</li>
 </ul>
-
-<h2>深入资源</h2>
+<h2 data-tts="a8fe5d30a2c12ed6">深入资源</h2>
 <ul>
 <li><a href="https://www.anthropic.com/engineering/building-effective-agents">Anthropic — Building Effective Agents</a>：workflow vs agent 的区分、何时该用 agent、人类 checkpoint 等实践。</li>
 <li><a href="https://www.anthropic.com/news/contextual-retrieval">Anthropic — Contextual Retrieval</a>：contextual embedding + BM25 + rerank 把检索失败率降约 49%/67%。</li>
@@ -254,48 +244,41 @@ def run_tool(call):
 <li>《Designing Data-Intensive Applications》(Kleppmann)：幂等、状态机、可恢复执行的底层原理，对应 agent 持久化执行。</li>
 <li>本系列 Day 31（混合检索与重排序）、Day 32（LLM 服务）、Day 39（工作流引擎）——本期是这三者在 AI 产品上的合流。</li>
 </ul>
-
-<h2>深入思考</h2>
-
+<h2 data-tts="c9b79f5c40bb38ad">深入思考</h2>
 <details><summary>1. 「长上下文模型越来越便宜，把整个知识库塞进 context、RAG 就过时了」——这个判断哪里对、哪里错？</summary>
 <div class="answer">
 <p>错。即便 context 窗口足够大、足够便宜，RAG 仍有三个不可替代的理由：<strong>① 成本与延迟仍线性于 token</strong>——塞 1 亿 chunk 进每次请求，成本和首 token 延迟都爆炸，检索把它压到 top-8；<strong>② 中间遗忘</strong>，超长 context 里模型对中段信息的利用率显著下降，相关内容前置（检索做的就是这件事）反而更准；<strong>③ 可溯源与时效</strong>，RAG 天然给出「答案来自哪个 chunk」，且知识库更新即时生效，不用重训/重灌模型。</p>
 <p>对的部分：检索<em>粒度</em>可以放粗——不必切 512 token 的小块，可以召回整节/整文档塞进大窗口，减少「切块丢上下文」的问题。所以趋势是 RAG 和长上下文<em>融合</em>（粗召回 + 大窗口精读），不是谁取代谁。</p>
 </div>
 </details>
-
 <details><summary>2. 你的 agent 在 step 7 调「发邮件」工具成功了，但 step 8 落盘前进程崩了。恢复时如何不重复发邮件？</summary>
 <div class="answer">
 <p>核心是<strong>幂等</strong>，而非「记得已经发过」。持久化执行的恢复是<em>重放</em>：从最后一个成功落盘的 step 重新执行。如果 step 7 的工具结果<em>已落盘</em>，重放时引擎直接返回缓存结果、不重跑工具——邮件不会重发。危险窗口是「工具执行成功但结果还没落盘就崩」：此时重放会再次调用工具。</p>
 <p>防御要靠<em>工具侧幂等键</em>：每次工具调用带 <code>idem_key=(workflow_id, step, args_hash)</code>，邮件服务用它去重——同一个 key 第二次到达直接返回首次结果，不真正发送。这就是 Day 17「支付系统」幂等 recovery point 的同款思路：<strong>外部副作用必须自带幂等，光靠编排引擎记账不够</strong>，因为副作用与落盘之间永远存在裂缝。</p>
 </div>
 </details>
-
 <details><summary>3. 知识库每天更新 10 万文档，但你换了新 embedding 模型要全库重嵌入（1 亿 chunk，需 8 小时）。重建期间用户查询怎么办？</summary>
 <div class="answer">
 <p>不能停服，也不能新旧混查（向量空间不兼容）。标准做法是<strong>双索引 + 原子切换</strong>：旧索引（v2）继续对外服务全部 query；新索引（v3）在后台用新模型从头重建，期间 query 端仍走 v2、query 也用 v2 模型嵌入（保持空间一致）。v3 建完先跑黄金评测集校验召回不退化，再<em>原子地</em>把流量（包括 query 嵌入模型）整体切到 v3，最后删 v2。</p>
 <p>难点是<em>重建期间的增量更新</em>：这 8 小时里新进来的 10 万文档要<em>同时</em>写两个索引（v2 用旧模型、v3 用新模型），即<strong>双写</strong>，否则切到 v3 时会缺这段数据。双写要处理失败一致性（其中一个写失败要重试/补偿）。成本上，重建是一次性大批量离线作业，用 spot/批量 GPU 压成本，别占在线资源。</p>
 </div>
 </details>
-
 <details><summary>4. 为什么说「agent 的可观测性比传统微服务更难」？该埋哪些点？</summary>
 <div class="answer">
 <p>难在<strong>非确定性 + 多步 + 高成本</strong>。传统服务一个请求一条 trace、行为可复现；agent 一个任务是<em>动态展开</em>的几十步树，同样输入下次可能走不同路径，且每步都烧 token——出问题时你要回答的不只是「哪步慢/错」，还有「为什么模型决定走这条路」「这步花了多少钱」。</p>
 <p>该埋的点：<strong>① 每步的完整 trace</strong>（模型输入/输出、选了哪个工具、工具耗时与结果）；<strong>② token 与成本归因</strong>到任务/用户/工具；<strong>③ 决策可回放</strong>，存下每步的 prompt+response 以便复盘「为什么这么决策」；<strong>④ 质量信号</strong>，检索召回率、答案是否带出处、人审批通过率、失控率（撞 step 上限的比例）。这是 Day 21「可观测性」的 metrics/logs/traces 三件套，但额外多了「成本」和「决策」两个维度。</p>
 </div>
 </details>
-
 <details><summary>5. 把语义缓存（相似 query 复用答案）上线后，命中率 30% 省了不少钱——但两周后开始有用户投诉「答案过时/答非所问」。可能哪里错了？</summary>
 <div class="answer">
 <p>两个经典坑。<strong>① 缓存失效缺失</strong>：知识库更新了，但语义缓存里的旧答案没过期，用户拿到的是基于旧文档的结论。语义缓存的失效比普通 KV 缓存难——你不知道某条缓存答案依赖了哪些 chunk，所以要么给短 TTL、要么按知识库版本号整体 bump、要么记录答案的来源 chunk 并在那些 chunk 更新时定向失效。</p>
 <p><strong>② 相似度阈值太松</strong>：「答非所问」说明把<em>不够像</em>的 query 也判成命中了。「我们的退款政策是什么」和「我们的退货政策是什么」向量很近但答案不同。阈值太松会错配，太紧则命中率掉。要拿真实 query 对调阈值，且对<em>高风险/精确类</em> query（涉及金额、政策、个人数据）<strong>禁用</strong>语义缓存，只对宽泛 FAQ 开。这正是 Day 2「缓存」里「容忍 stale 多久」和「缓存失效是难题」在 AI 场景的重演。</p>
 </div>
 </details>
-
 <div class="nav"><a href="index.html">← 返回目录</a></div>
 </div>
-<script src="https://hub.cissychen.com/comments.js" defer></script>
-<script src="https://hub.cissychen.com/search.js" defer></script>
-<script src="https://hub.cissychen.com/index-button.js" defer></script>
-<script src="https://hub.cissychen.com/i18n-tts.js" defer></script>
+<script defer="" src="https://hub.cissychen.com/comments.js"></script>
+<script defer="" src="https://hub.cissychen.com/search.js"></script>
+<script defer="" src="https://hub.cissychen.com/index-button.js"></script>
+<script defer="" src="https://hub.cissychen.com/i18n-tts.js"></script>
 </body></html>
