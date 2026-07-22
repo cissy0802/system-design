@@ -56,9 +56,22 @@ _SKIP_TEXT_PARENTS = ("pre", "code", "svg", "style", "script", "figure")
 _READABLE_CODE = _re_mod.compile(r"^[\w .,-]{1,24}$")
 
 
+def _in_diagram(s) -> bool:
+    """Diagram source (mermaid graph definitions, chart labels) is markup for
+    the renderer, not prose — narrating it yields "graph TD U 用户请求 GW"."""
+    return s.find_parent(
+        class_=lambda cl: cl and any(
+            k in " ".join(cl if isinstance(cl, list) else [cl])
+            for k in ("mermaid", "diagram", "viz", "chart", "graphviz", "plot")
+        )
+    ) is not None
+
+
 def visible_text(node) -> str:
     parts = []
     for s in node.strings:
+        if _in_diagram(s):
+            continue
         holder = s.find_parent(_SKIP_TEXT_PARENTS)
         if holder is not None:
             if holder.name == "code" and holder.find_parent("pre") is None:
