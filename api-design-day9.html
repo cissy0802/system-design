@@ -148,7 +148,7 @@ graph LR
 </div>
 <p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px"><strong>核心思路</strong>：一个 <em>Gateway</em> 收口认证、限流、版本路由；<em>对外</em>用 REST + GraphQL（web 友好、可演进、易缓存），<em>对内</em>服务间用 gRPC（强类型、高吞吐）。信任边界两侧用不同协议，是几乎所有大平台的默认形态。</p>
 <h2 data-tts="c3df2e03437171d5">关键技术点</h2>
-<h3 data-tts="2ab8e7701a8b411a">1. 协议选型：REST vs GraphQL vs gRPC</h3>
+<h3 data-tts="bf9123deeee9fecb">1. 协议选型：REST vs GraphQL vs gRPC</h3>
 <p style="color:#5eead4">核心 trade-off：<strong>资源模型可缓存的简单</strong> vs <strong>客户端按需取数的灵活</strong> vs <strong>内部强类型高性能</strong>。</p>
 <p><strong>原理</strong>：三种抽象。<strong>REST</strong> 把世界建模成<em>资源 + HTTP 动词</em>，无状态、可按 URL 被 CDN/浏览器缓存，但常<em>over-fetch（多给用不到的字段）</em>或 <em>under-fetch（一个视图要多次往返）</em>。<strong>GraphQL</strong> 让客户端<em>用一个查询声明要哪些字段</em>，一次取齐、消除 over/under-fetch，代价是缓存与限流变难（都走 POST /graphql，URL 不再是缓存键）。<strong>gRPC</strong> 基于 HTTP/2 + Protobuf，二进制、强类型 IDL、支持双向流，延迟吞吐最优，但浏览器不能直连、调试不直观——天生是<em>内部服务间</em>协议。</p>
 <table>
@@ -194,7 +194,7 @@ query {
 <li><strong>gRPC</strong>：源自 Google 内部 Stubby，广泛用于服务间通信；Uber、Square、Netflix 等内部 mesh 大量采用，对外仍以 REST/GraphQL 暴露。</li>
 </ul>
 </div>
-<h3 data-tts="a8ba5120c32ab1d6">2. 分页：Offset vs Cursor (Keyset)</h3>
+<h3 data-tts="f4a8f1ea7d5cd80a">2. 分页：Offset vs Cursor (Keyset)</h3>
 <p style="color:#5eead4">核心 trade-off：<strong>offset 可随机跳页的简单</strong> vs <strong>cursor 在大数据集 + 高频写下的稳定与高效</strong>。</p>
 <p><strong>原理</strong>：<strong>Offset 分页</strong>（<code>LIMIT 20 OFFSET 100000</code>）实现简单、能跳到任意页，但有两个硬伤：(1) <em>深翻页慢</em>——DB 要扫描并丢弃前 100000 行，O(offset)；(2) <em>数据漂移</em>——翻页过程中有人插入/删除，窗口错位，导致<em>漏读或重复</em>。<strong>Cursor / Keyset 分页</strong>用「上一页最后一行的有序锚点」做游标（<code>WHERE id &gt; last_seen ORDER BY id</code>），走索引 O(log n) 定位，且新插入的行不影响已翻过的页——稳定。代价是<em>不能跳页、不能显示总页数</em>。</p>
 <table>
@@ -221,7 +221,7 @@ ORDER BY id LIMIT 20;
 <li><strong>Google API 规范</strong>：<a href="https://google.aip.dev/158">AIP-158</a> 强制用 <em>opaque（不可解析）的 page_token</em>——把分页实现细节藏在 token 里，将来能换底层实现而不破坏调用方。</li>
 </ul>
 </div>
-<h3 data-tts="473ef099e69fd884">3. 版本管理：让契约「永不破坏」</h3>
+<h3 data-tts="0037101f593d457a">3. 版本管理：让契约「永不破坏」</h3>
 <p style="color:#5eead4">核心 trade-off：<strong>显式版本（/v2）的破坏自由</strong> vs <strong>日期版本 + 兼容层的零破坏，但永久维护成本</strong>。</p>
 <p><strong>原理</strong>：先分清<em>什么是破坏性变更</em>——<em>加</em>字段/端点是<strong>向后兼容</strong>的（老客户端忽略新字段）；<em>删</em>字段、<em>改</em>类型/语义、<em>改</em>默认值才是 <strong>breaking</strong>。三种版本策略：(1) <em>URL 路径</em>（<code>/v1</code> /<code>/v2</code>）——直观，但每个大版本要并行维护整套代码；(2) <em>Header 协商</em>——URL 干净，但不可见、易被代理/缓存忽略；(3) <em>日期版本 + 兼容层</em>（Stripe 法）——账号<em>pin</em>在注册时的版本，核心逻辑<em>只写最新</em>，响应经一条<em>向后 transform 链</em>降级回客户端 pinned 的格式。新老客户端永远不破，代价是兼容层逐年累积。</p>
 <div class="mermaid">
@@ -254,7 +254,7 @@ def respond(account, payload_latest):
 <li><strong>Google AIP / GitHub</strong>：倾向<em>加性演进</em>（只加不删），把删除推迟到极少的大版本里，最大化向后兼容窗口。</li>
 </ul>
 </div>
-<h3 data-tts="bf713bda17002b85">4. 限流契约：429 不只是拒绝，是一份协议</h3>
+<h3 data-tts="059c9a9ecf0fee06">4. 限流契约：429 不只是拒绝，是一份协议</h3>
 <p style="color:#5eead4">核心 trade-off：<strong>静默丢弃/裸 429</strong> vs <strong>带 Retry-After + 配额头 + 幂等键的可协作限流</strong>。（算法内部——token bucket / sliding window / 分布式限流——留 Day 10。）</p>
 <p><strong>原理</strong>：限流在 API 设计层是<em>契约</em>而非纯防御，要让客户端知道<em>还剩多少额度、何时能重试、怎样重试安全</em>：(1) 超限返回 <code>429</code> + <code>Retry-After</code>（明确等多久）；(2) 每个响应带 <code>X-RateLimit-Remaining / Reset</code>，客户端可主动减速而非撞墙；(3) 按 key 分<em>配额层级</em>（免费/付费）；(4) 写请求配 <em>Idempotency-Key</em>，让限流后的重试<em>不重复扣款</em>（见 Day 7）。最忌裸 429——客户端只能盲目立即重试，制造重试风暴二次打垮后端。</p>
 <pre><code># 限流是契约: 客户端读 Retry-After, 幂等键让重试安全

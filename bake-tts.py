@@ -39,7 +39,8 @@ ENDPOINT_TEMPLATE = "https://{region}.tts.speech.microsoft.com/cognitiveservices
 DEFAULT_VOICE_ZH = "zh-CN-XiaoxiaoNeural"
 DEFAULT_VOICE_EN = "en-US-JennyNeural"
 # Elements whose data-zh/data-en text becomes part of a model's narration.
-NARRATION_TAGS = ("h1", "h2", "h3", "h4", "p", "div", "li", "summary", "span")
+NARRATION_TAGS = ("h1", "h2", "h3", "h4", "p", "div", "li", "summary", "span",
+                  "strong", "b")
 REPO_DIR = Path(__file__).parent.resolve()
 AUDIO_DIR = REPO_DIR / "audio"
 # Azure tolerates much larger bodies than Volcano. 3000 chars gives plenty of
@@ -373,7 +374,11 @@ def collect_groups(soup) -> list[tuple]:
             # sitting directly inside a div that has block children — that div
             # gets skipped as a wrapper, and no block child contains the span.
             # e.g. <div class="sec"><span class="label">机制解读</span><p>…</p></div>
-            if node.name == "span":
+            # A lead-in label sitting directly inside a wrapper div is the one
+            # inline element nothing else covers, e.g.
+            #   <div class="tradeoff"><strong>三种 agent 执行模型：</strong><ul>…
+            # The <ul> items get read, the heading above them would be lost.
+            if node.name in ("span", "strong", "b"):
                 par = node.parent
                 if par is None or par.name != "div":
                     continue

@@ -142,7 +142,7 @@ graph TD
 </div>
 <p><strong>三条主线</strong>：① <em>问答热路径</em>走「检索→融合→重排→流式生成」，预算紧；② <em>Agent 路径</em>走持久化执行引擎，能跑很久、能中断恢复；③ <em>离线 Ingest</em> 把文档变成可检索的向量+倒排，与在线解耦。下面拆四个关键技术点。</p>
 <h2 data-tts="c3df2e03437171d5">关键技术点</h2>
-<h3 data-tts="89a427d39616925e">① RAG 检索质量 — 召回烂，模型再强也救不回来</h3>
+<h3 data-tts="a9fd979db16e57f2">① RAG 检索质量 — 召回烂，模型再强也救不回来</h3>
 <p>一句话 trade-off：<strong>朴素切块嵌入便宜但召回差</strong>，contextual + hybrid + rerank 召回好但贵且慢。</p>
 <p>【原理】RAG 的瓶颈几乎从来不是生成，而是<em>检索召回</em>——模型只能基于你喂给它的 chunk 回答，<strong>没召回到的内容等于不存在</strong>。朴素做法把文档按 512 token 切块、各自嵌入，问题是切块丢了上下文：一段写「该方案延迟降低 40%」，但「该方案」指谁、在哪份文档，孤立 chunk 里看不出来，语义检索就召不准。Anthropic 的 <em>Contextual Retrieval</em> 在每个 chunk 前拼一段 LLM 生成的「这段在讲什么」上下文摘要再嵌入，并叠加 BM25 关键词检索做 hybrid。</p>
 <div class="tradeoff"><strong>三种召回策略：</strong>
@@ -162,7 +162,7 @@ top = cross_encoder.rerank(query, fused)[:8]  # 精排留 8 个最相关
 context = "\n\n".join(c.text for c in top)
 answer = llm.stream(prompt(query, context))   # 带出处流式生成</code></pre>
 <div class="case"><strong>现实案例：</strong>Anthropic <a href="https://www.anthropic.com/news/contextual-retrieval">Contextual Retrieval</a> 报告该方法把检索失败率降低约 49%，叠加重排后约 67%。原始 <em>RAG</em> 范式由 Lewis 等人 2020 年（NeurIPS）提出，把参数化知识与外部非参数检索库结合。检索质量与重排的更多细节见 Day 31「混合检索与重排序」。</div>
-<h3 data-tts="e71830b3559ffd61">② Agent Loop 服务化 — 把「跑很久还会崩」的循环变成可恢复的工作流</h3>
+<h3 data-tts="fd1c2383efcdabb1">② Agent Loop 服务化 — 把「跑很久还会崩」的循环变成可恢复的工作流</h3>
 <p>一句话 trade-off：<strong>内存态 loop 简单但进程一挂全丢</strong>，持久化执行可恢复但要把每步状态落盘。</p>
 <p>【原理】Agent 是个循环：<em>调模型 → 模型要求调工具 → 执行工具 → 把结果喂回 → 再调模型</em>，直到完成。问题在于这循环可能跑几分钟、几十步，期间任何一步都可能：进程被部署重启、工具超时、模型 503。如果状态只在内存里，崩一次整个任务从头再来——而每一步都烧了真金白银的 token。解法是<strong>持久化执行（durable execution）</strong>：把每一步的输入输出当成事件落盘，崩溃后从最后一个成功 step 重放恢复，已完成的工具调用不重跑（靠幂等键）。这正是 Temporal / AWS Step Functions 这类引擎的核心价值。</p>
 <div class="tradeoff"><strong>三种 agent 执行模型：</strong>
@@ -199,7 +199,7 @@ for batch in chunks.stream(size=256):         # 大 batch 打满 GPU
 def embed_query(q): return embed_online(q, model=current_index_model())</code></pre>
 <div class="tradeoff"><strong>在线 vs 离线嵌入：</strong>在线适合 query（QPS 高、文本短、可缓存命中高）；离线适合 ingest（量大、可容忍分钟级延迟、批处理省钱）。别用在线服务跑全库重嵌入——会把在线 query 的延迟拖垮。</div>
 <div class="case"><strong>现实案例：</strong>向量库（pgvector / Pinecone / Milvus 等）普遍用 HNSW 做 ANN 索引，召回与延迟的取舍见 Day 12「搜索系统」。OpenAI / Cohere 的 embedding API 都明确标注模型版本，换代时官方文档强调需重建索引——这是行业通用约束，不是某家的特例。</div>
-<h3 data-tts="17607ecb994d1ee6">④ 人机协同 — 把高风险动作关进审批门</h3>
+<h3 data-tts="91a07bc79e6bbbc4">④ 人机协同 — 把高风险动作关进审批门</h3>
 <p>一句话 trade-off：<strong>同步阻塞等人简单但占着连接/线程</strong>，异步挂起可扩展但要持久化整个 agent 状态。</p>
 <p>【原理】模型会犯错，所以<em>不可逆的高风险动作</em>（发邮件、转账、删数据、改生产配置）不能让 agent 自己拍板。模式是 <strong>human-in-the-loop</strong>：agent 走到高风险工具时不直接执行，而是<em>暂停</em>，把「我打算做 X」推到审批队列，等人批准再继续。难点是「等人」可能等几小时甚至几天——你不能让一个线程/连接傻等。所以它必须建立在技术点 ② 的持久化执行之上：agent 状态落盘、释放所有资源、收到审批回调时<em>从暂停点恢复</em>。</p>
 <div class="tradeoff"><strong>三种等待方式：</strong>
