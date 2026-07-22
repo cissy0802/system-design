@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<html lang="zh-CN"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>Day 26 · 容量估算与假设 (Capacity Estimation) — System Design</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -97,7 +98,6 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 </script>
 </head><body><div class="container">
-
 <header>
 <div class="meta">
 <span class="tag day">Day 26</span>
@@ -106,10 +106,9 @@ document.addEventListener('DOMContentLoaded',()=>{
 <span class="tag">Back-of-Envelope</span>
 <span class="tag">QPS / Storage / Bandwidth</span>
 </div>
-<h1>容量估算 — 用一张草稿纸把『这个设计扛不扛得住』算出来<span class="en">Capacity Estimation: QPS, Storage, Bandwidth & the Discipline of Assumptions</span></h1>
+<h1 data-tts="f60d9a9f80b0f789">容量估算 — 用一张草稿纸把『这个设计扛不扛得住』算出来<span class="en">Capacity Estimation: QPS, Storage, Bandwidth &amp; the Discipline of Assumptions</span></h1>
 </header>
-
-<h2>问题场景 + 需求约束</h2>
+<h2 data-tts="def6761a5b4beb4f">问题场景 + 需求约束</h2>
 <p>面试官说：「设计一个 <strong>1 亿 DAU</strong> 的图文 Feed（类 Instagram）。」在画任何方框之前，你得先回答一个问题：<em>这套系统是一台机器的活，还是一千台机器的活？</em> 答案决定架构形态——单库还是分片、同步 fanout 还是异步、缓存放多大。<strong>容量估算（capacity estimation / back-of-the-envelope）就是用几个假设和数量级常数，在 2 分钟内把 QPS、存储、带宽、内存推算到正确的 10 倍以内</strong>，从而把无数种架构砍到一两种。</p>
 <p>它的目的<em>不是精确</em>——精确是压测和真实指标的事。它的目的是<strong>排除明显不可行的设计</strong>：如果算出来写入要 200 GB/s 带宽，那「单机 + 本地磁盘」的方案当场出局。先固定本期的输入假设：</p>
 <ul>
@@ -118,8 +117,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 <li><strong>对象</strong>：一条帖子的<em>元数据</em>（文本+作者+时间戳+计数）≈ 1 KB；图片走对象存储/CDN，单独估。</li>
 <li><strong>延迟 SLO</strong>：feed 首屏 p99 &lt; 200 ms。</li>
 </ul>
-
-<h2>高层架构（估算的推导链）</h2>
+<h2 data-tts="86222d7378db7cf4">高层架构（估算的推导链）</h2>
 <p>容量估算不是一团数字，而是一条<strong>有向的推导链</strong>：所有量都从 DAU 和「人均行为」两个根假设流出。下图是这条链——每个箭头是一次乘除，记住链路就不会漏算。</p>
 <pre class="mermaid">
 graph TD
@@ -132,12 +130,12 @@ graph TD
     BW["带宽<br/>QPS × payload"]
     MEM["缓存内存<br/>热数据 × 80/20"]
 
-    DAU --> W --> AQ
-    DAU --> R --> AQ
-    AQ --> PQ
-    W --> ST
-    R --> BW
-    R --> MEM
+    DAU --&gt; W --&gt; AQ
+    DAU --&gt; R --&gt; AQ
+    AQ --&gt; PQ
+    W --&gt; ST
+    R --&gt; BW
+    R --&gt; MEM
 
     classDef root fill:#2a1530,stroke:#ff7ab6,color:#e8eef5
     classDef mid fill:#1a2530,stroke:#64c8ff,color:#e8eef5
@@ -147,10 +145,8 @@ graph TD
     class PQ,ST,BW,MEM out
 </pre>
 <p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">两个根假设（规模 + 人均行为）决定一切；QPS 决定算力，存储/带宽/内存决定形态</p>
-
-<h2>关键技术点</h2>
-
-<h3>1. 数量级直觉：2 的幂、时间常数与延迟数字</h3>
+<h2 data-tts="c3df2e03437171d5">关键技术点</h2>
+<h3 data-tts="ff7e971ef89bd2f9">1. 数量级直觉：2 的幂、时间常数与延迟数字</h3>
 <p><strong>核心 trade-off：记住一小撮常数 → 心算速度，换取 ±2 倍以内的误差。</strong> 估算的地基是三组「免背公式」的数字。第一组是 <em>2 的幂与数据单位</em>：<code>2^10≈10^3=KB</code>、<code>2^20=MB</code>、<code>2^30=GB</code>、<code>2^40=TB</code>、<code>2^50=PB</code>。第二组是 <em>时间常数</em>：一天 ≈ <code>86400 ≈ 10^5 秒</code>（这个近似让「每天 N 次」直接除以 10 万得 QPS，是估算里用得最多的一步）。第三组是 <em>Jeff Dean 的延迟数字</em>：它告诉你哪一步是瓶颈。</p>
 <table>
 <thead><tr><th>操作</th><th>量级</th><th>含义</th></tr></thead>
@@ -164,8 +160,7 @@ graph TD
 </tbody></table>
 <div class="callout"><strong>为什么有用：</strong>p99 &lt; 200 ms 的 feed 里，跨洲一次 RTT 就吃掉 150 ms——所以必须就近部署、不能让请求绕地球。延迟数字让你<em>一眼看出哪个设计在物理上就不可能</em>。</div>
 <div class="case"><strong>现实案例：</strong>Jeff Dean 在 Google 的工程文化里把这套数字立为基准（<em>Latency Numbers Every Programmer Should Know</em>），Colin Scott 还做了「随年份变化」的可视化版。ByteByteGo（Alex Xu《System Design Interview》第 2 章）把「2 的幂 + 可用性 nines + QPS 推导」整理成面试速查表。</div>
-
-<h3>2. 从 DAU 推 QPS：平均、峰值与读写分离</h3>
+<h3 data-tts="75e618984f379169">2. 从 DAU 推 QPS：平均、峰值与读写分离</h3>
 <p><strong>核心 trade-off：用平均 QPS 估算简单，但按平均部署的系统会在高峰当场挂掉。</strong> 推导分三步：① <em>每天请求数</em> = DAU × 人均次数；② <em>平均 QPS</em> = 每天请求数 ÷ 10^5；③ <em>峰值 QPS</em> = 平均 × 峰值因子。峰值因子来自流量的日内不均匀——晚高峰、午休、突发热点，社交类常取 <code>2~3×</code>，秒杀/直播开播可达 10× 以上。</p>
 <pre><code># 本期数字（1 亿 DAU）
 写: 1e8 × 2  = 2e8  /day → 平均 2000 QPS  → 峰值 ~5k  写 QPS
@@ -179,9 +174,8 @@ graph TD
 <li><strong>峰值写 QPS（5 千）</strong>→ 单台 Postgres 写入可达数千 TPS，所以写主库<em>暂时不必分片</em>——这是估算帮你<em>避免过度设计</em>的典型场景。</li>
 <li><strong>读写比 25:1</strong>→ 证明值得上缓存、值得 fanout-on-write（写时多干活换读时便宜）。若是 1:1，缓存收益就存疑。</li>
 </ul></div>
-<div class="case"><strong>现实案例：</strong>Twitter 公开过其 timeline 是「读 ~30 万 QPS、写 ~数千 QPS」的极端读多写少，正是这个比例催生了 fanout-on-write 的预计算 timeline（见 Day 14）。面试里给出峰值因子并<em>出声说明</em>「我假设晚高峰是均值的 2 倍」，比直接报一个数更得分。</p></div>
-
-<h3>3. 存储、带宽、内存：三件套一次算清</h3>
+<div class="case"><strong>现实案例：</strong>Twitter 公开过其 timeline 是「读 ~30 万 QPS、写 ~数千 QPS」的极端读多写少，正是这个比例催生了 fanout-on-write 的预计算 timeline（见 Day 14）。面试里给出峰值因子并<em>出声说明</em>「我假设晚高峰是均值的 2 倍」，比直接报一个数更得分。</div>
+<h3 data-tts="4ace7734d3ceb9c2">3. 存储、带宽、内存：三件套一次算清</h3>
 <p><strong>核心 trade-off：把『元数据』和『大对象/媒体』分开估，否则一个数量级的错算会让整张表失真。</strong> 三个量各有公式，关键是<em>选对乘子</em>。</p>
 <pre><code># 存储 = 写入量/天 × 对象大小 × 留存时长
 元数据: 2e8/day × 1KB × 365 × 5年 ≈ 365 TB   → 分片 + 冷热分层
@@ -198,8 +192,7 @@ graph TD
 </code></pre>
 <div class="callout"><strong>反复出错的乘子：</strong>① <em>留存时长</em>——5 年 vs 永久差几十倍；② <em>副本数</em>——存储要 ×3（三副本），别报裸容量；③ <em>媒体没分开</em>——把 200 KB 的图按 1 KB 算，存储和带宽全错一个数量级。</div>
 <div class="case"><strong>现实案例：</strong>对象存储/CDN 分流是行业共识——Instagram、YouTube、Netflix 的「大字节」全部走 blob + CDN，源站只存与传<em>元数据和索引</em>。估算时把这两类拆开，是和「只会背组件」的候选人拉开差距的地方。</div>
-
-<h3>4. 假设的纪律：显式声明、标注来源、做敏感性检查</h3>
+<h3 data-tts="94085d8cac8904a4">4. 假设的纪律：显式声明、标注来源、做敏感性检查</h3>
 <p><strong>核心 trade-off：估算的可信度不在于小数点，而在于假设是否被讲清、是否经得起『换个数会怎样』。</strong> 一个好的估算把每个输入数字<em>显式写出来并标注来源</em>：哪些是题目给的（DAU）、哪些是行业常识（读写比）、哪些是你拍的（峰值因子）。然后做<strong>敏感性检查</strong>——哪个假设错一倍会让结论翻盘？那个就是要和面试官确认、或在生产里重点监控的。</p>
 <pre><code># 假设清单（estimation 的真正交付物）
 DAU         = 1e8     [题目给定]
@@ -219,32 +212,27 @@ DAU         = 1e8     [题目给定]
 <li><strong>生产</strong>：靠真实指标 + 压测 + 可观测性回归（见 Day 21 / Day 27）。BOTE 只是<em>容量规划的起点</em>，用来定压测目标和初始机器数，之后由 dashboard、负载测试、自动扩缩容把误差收敛到真实值。</li>
 </ul></div>
 <div class="case"><strong>现实案例：</strong>SRE 实践里，BOTE 估算用于「给压测设一个预期量级」和「容量规划初稿」，真正的扩容决策由 SLO 监控和压测数据驱动——估算负责<em>提出假设</em>，生产负责<em>证伪假设</em>。两者不是替代关系，是接力关系。</div>
-
-<h2>扩展与优化（估算之后做什么）</h2>
+<h2 data-tts="2d8230676a54f0d1">扩展与优化（估算之后做什么）</h2>
 <ul>
 <li><strong>把数字翻译成机器数</strong>：峰值读 10 万 QPS ÷ 单机承载（如 1 万 QPS）≈ 10 台 + 冗余。这一步把估算变成<em>采购/扩容清单</em>。</li>
 <li><strong>找瓶颈量</strong>：四个输出里哪个最先撞墙？本例是读 QPS 和缓存内存——所以下一步设计重心是缓存分片和读副本，而非写库分片。</li>
 <li><strong>留增长 headroom</strong>：按当前 DAU 估算后，乘一个增长系数（如 18 个月翻倍）再定容量，避免上线即扩容。</li>
 <li><strong>用估算选架构</strong>：若算出写 QPS 也到几十万（如日志/IoT 摄入），结论就从「单写主库」翻成「Kafka + LSM 存储 + 分片」——估算的最终价值是<em>把架构选项砍到一两个</em>。</li>
 </ul>
-
-<h2>常见陷阱 + 面试问题</h2>
+<h2 data-tts="fc98ac628cd504b6">常见陷阱 + 面试问题</h2>
 <div class="callout"><strong>1. 直接报峰值忘了÷峰值，或报平均忘了×峰值。</strong> 永远讲清你报的是平均还是峰值，部署按峰值、成本算按平均。</div>
 <div class="callout"><strong>2. 漏了副本与开销系数。</strong> 裸数据 ×3 副本、×（索引+WAL 开销）、再留 headroom。报「365 TB」时说清是逻辑量还是物理占用。</div>
 <div class="callout"><strong>3. 把媒体和元数据混在一起算。</strong> 200 KB 的图和 1 KB 的文本差 200 倍，必须分开，且媒体走 CDN 不压源站。</div>
 <div class="callout"><strong>4. 追求精确，纠结 86400 还是 10^5。</strong> 估算要的是数量级，10^5 足够；把时间花在「哪个假设最敏感」上。</div>
 <div class="callout"><strong>5. 不声明假设，直接报数。</strong> 面试官无法判断你对错，也无法和你讨论——估算的交付物是<em>假设链</em>，不是一个孤零零的数字。</div>
 <p><strong>高频追问：</strong>① 一天大概多少秒，为什么能近似成 10^5？② 这个系统单机扛得住吗，你怎么一眼判断？③ 如果 DAU 涨 10 倍，哪个量先撑爆、架构要怎么变？④ 你这个峰值因子哪来的，错一倍结论会怎样？⑤ 存储要不要算副本和留存，怎么估冷热分层？</p>
-
-<h2>深入资源</h2>
+<h2 data-tts="356110629ec6f5e2">深入资源</h2>
 <ul>
 <li><strong>《Designing Data-Intensive Applications》</strong>（Martin Kleppmann）：第 1 章用 Twitter timeline 的读写量做容量推理，是「用数字驱动架构选型」的范本。</li>
 <li><strong>Jeff Dean — Latency Numbers Every Programmer Should Know</strong>：延迟数量级基准；Colin Scott 的交互式版本展示其随年份的变化。</li>
 <li><strong>ByteByteGo / Alex Xu《System Design Interview》第 2 章 Back-of-the-envelope Estimation</strong>：2 的幂、可用性 nines、QPS/存储推导的速查表与例题。</li>
 </ul>
-
-<h2>深入思考（点击展开答案）</h2>
-
+<h2 data-tts="31e31622ad583dc2">深入思考（点击展开答案）</h2>
 <details>
 <summary>1. 为什么「一天 ≈ 10^5 秒」这个近似在估算里几乎从不出问题？什么时候它会咬你？</summary>
 <div class="answer">
@@ -252,7 +240,6 @@ DAU         = 1e8     [题目给定]
 <p><strong>它咬你的场景</strong>：当流量<em>不是</em>按天均摊，而是高度集中——比如一个每天只在 8 点开抢 5 分钟的秒杀。这时「÷10^5」算出的平均 QPS 毫无意义，真实瞬时 QPS = 当天总量 ÷ 300 秒，可能是「平均」的几百倍。教训：均摊到秒只在流量大致均匀时成立，集中型负载必须按<em>实际活跃窗口</em>做分母。</p>
 </div>
 </details>
-
 <details>
 <summary>2. 同样是 1 亿 DAU，为什么写 QPS 才几千、不用分片，读 QPS 却到十万、必须分片？这个不对称从哪来？</summary>
 <div class="answer">
@@ -260,7 +247,6 @@ DAU         = 1e8     [题目给定]
 <p>所以社交/内容系统几乎全是「写库轻松、读路径吃紧」。这正解释了为什么这类系统的核心武器是<em>缓存、读副本、预计算 timeline（fanout-on-write）</em>，而不是写分片。反例是 IoT/日志摄入——写远大于读，架构重心就完全反过来，落到 Kafka + LSM 分片写。一句话：<strong>读写比决定你往哪边堆机器。</strong></p>
 </div>
 </details>
-
 <details>
 <summary>3. 你估出元数据 5 年要 365 TB。面试官问「那要几台机器」，怎么从存储量推到机器数而不踩坑？</summary>
 <div class="answer">
@@ -268,7 +254,6 @@ DAU         = 1e8     [题目给定]
 <p>再除以单机有效容量，并且<em>瓶颈未必是容量</em>：单台数据库节点的限制往往先到 IOPS/连接数/内存，而不是磁盘空间——一台塞 10 TB 数据但扛不住 QPS 是常态。所以正确答案是「按<em>容量和 QPS 两个约束取较紧的那个</em>定节点数，再 ×副本」。只报「365 TB ÷ 16 TB ≈ 23 台」是典型失分点，因为它同时漏了副本、开销和 QPS 约束。</p>
 </div>
 </details>
-
 <details>
 <summary>4. 估算只能到「正确的 10 倍以内」。既然这么糙，它凭什么能指导价值千万的架构决策？</summary>
 <div class="answer">
@@ -276,17 +261,15 @@ DAU         = 1e8     [题目给定]
 <p>反过来，估算<em>不能</em>回答的是数量级内部的精调：要 8 台还是 12 台、缓存设 50 GB 还是 80 GB——这些差异在估算精度内不可分辨，必须交给压测和生产指标。所以正确用法是：<strong>用估算选架构形态（粗决策），用压测和监控定具体容量（细决策）</strong>。把估算当精确预算用，或反过来嫌它不精确而不用，都是误用。</p>
 </div>
 </details>
-
 <details>
 <summary>5. 如果面试官把约束从「1 亿 DAU 社交」换成「1 万企业租户、每租户 500 人的 B2B SaaS」，你的估算方法要怎么改？</summary>
 <div class="answer">
 <p>总用户数 1 万 × 500 = 500 万，比 C 端小两个数量级，但<em>方法的重心要变</em>。其一，B2B 的「人均行为」完全不同——工作时间内高频、夜间几乎为零，峰值因子更极端（工作日 9-18 点集中），但<em>跨时区可削峰</em>，要按租户时区分布修正。其二，关键约束从「总量」变成「<strong>单租户上限</strong>和<strong>租户间隔离</strong>」：最大租户可能比中位数大 100 倍（power-law），按平均估算会让大租户压垮共享资源，所以要估「最大租户」而非「平均租户」。其三，多租户存储要算<em>每租户开销</em>（独立 schema/索引的固定成本 × 1 万），小租户的固定开销总和可能超过数据本身。一句话：<strong>C 端估算看总量与峰值，B2B 估算看租户分布的尾部与隔离成本</strong>（呼应 Day 27 多租户与成本工程）。</p>
 </div>
 </details>
-
 </div>
-<script src="https://hub.cissychen.com/comments.js" defer></script>
-<script src="https://hub.cissychen.com/search.js" defer></script>
-<script src="https://hub.cissychen.com/index-button.js" defer></script>
-<script src="https://hub.cissychen.com/i18n-tts.js" defer></script>
+<script defer="" src="https://hub.cissychen.com/comments.js"></script>
+<script defer="" src="https://hub.cissychen.com/search.js"></script>
+<script defer="" src="https://hub.cissychen.com/index-button.js"></script>
+<script defer="" src="https://hub.cissychen.com/i18n-tts.js"></script>
 </body></html>

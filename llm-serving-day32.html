@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<html lang="zh-CN"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>Day 32 · LLM 服务架构 — System Design</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -97,7 +98,6 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 </script>
 </head><body><div class="container">
-
 <header>
 <div class="meta">
 <span class="tag day">Day 32</span>
@@ -107,14 +107,12 @@ document.addEventListener('DOMContentLoaded',()=>{
 <span class="tag">KV Cache</span>
 <span class="tag">Cost/Latency/Quality</span>
 </div>
-<h1>LLM 服务架构 — 把 GPU 喂饱，把延迟压住<span class="en">LLM Serving: Continuous Batching, PagedAttention, Prompt Caching, Cost/Latency/Quality</span></h1>
+<h1 data-tts="8b98050395a5e535">LLM 服务架构 — 把 GPU 喂饱，把延迟压住<span class="en">LLM Serving: Continuous Batching, PagedAttention, Prompt Caching, Cost/Latency/Quality</span></h1>
 </header>
-
-<h2>问题场景 + 需求约束</h2>
+<h2 data-tts="2729fa9c58080c9d">问题场景 + 需求约束</h2>
 <p>为一个 <strong>1000 万 DAU 的对话产品</strong>自建推理平台：模型是 <strong>70B dense</strong>，部署在 8×H100 节点（张量并行）。用户人均每天 15 轮，平均 <strong>input 3k token、output 400 token</strong>，峰值约 <strong>5k 请求/秒</strong>。这不是「调个 API」——一张 H100 每小时 $2–4，GPU 是绝对的成本大头，<em>把利用率从 30% 提到 80% 就是把账单砍掉一半</em>。</p>
 <p>SLO 要拆成两个，因为 LLM 是<em>逐 token 流式</em>返回的：<strong>TTFT</strong>（time-to-first-token，首 token 延迟）p99 &lt; 700ms 决定「卡不卡」；<strong>TPOT</strong>（time-per-output-token，每 token 间隔）p99 &lt; 40ms（≈25 tok/s，快过人阅读）决定「流得顺不顺」。这两个指标背后是两种完全不同的计算特性，整套架构都是在围绕它们做权衡。</p>
-
-<h2>高层架构</h2>
+<h2 data-tts="e535a9f17959f896">高层架构</h2>
 <pre class="mermaid">
 graph LR
     C["Client<br/><i>SSE 流式接收</i>"]
@@ -127,13 +125,13 @@ graph LR
       KV[("KV Cache<br/><i>PagedAttention</i>")]
     end
 
-    C -->|① prompt| GW --> R
-    R -.前缀命中?.-> PC
-    R -->|② 路由| PF
-    PF -->|KV transfer| DC
-    PF <--> KV
-    DC <--> KV
-    DC -.->|③ token 流| GW -.SSE.-> C
+    C --&gt;|① prompt| GW --&gt; R
+    R -.前缀命中?.-&gt; PC
+    R --&gt;|② 路由| PF
+    PF --&gt;|KV transfer| DC
+    PF &lt;--&gt; KV
+    DC &lt;--&gt; KV
+    DC -.-&gt;|③ token 流| GW -.SSE.-&gt; C
 
     classDef client fill:#1a2530,stroke:#64c8ff,color:#e8eef5
     classDef edge fill:#0e2030,stroke:#5eead4,color:#e8eef5
@@ -146,10 +144,8 @@ graph LR
 </pre>
 <p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">请求先查前缀缓存，再进引擎；引擎内部 prefill 与 decode 分工不同，token 逐个经 SSE 回流</p>
 <p>Gateway 做鉴权、限流（按 token 而非按请求计）、用量计量。<strong>Router 是 LLM 特有的</strong>：它要做「前缀感知」——把 system prompt 相同的请求尽量路由到同一个 GPU，复用已缓存的 KV。引擎内部把推理拆成 <em>prefill</em>（一次性处理整段 prompt）和 <em>decode</em>（逐 token 自回归生成），两者抢同一块 KV Cache 显存。</p>
-
-<h2>关键技术点</h2>
-
-<h3>1. 推理两阶段 + Continuous Batching：吞吐的命门</h3>
+<h2 data-tts="c3df2e03437171d5">关键技术点</h2>
+<h3 data-tts="b53c2650fb19a6f5">1. 推理两阶段 + Continuous Batching：吞吐的命门</h3>
 <p>核心 trade-off：<strong>静态批处理让快请求等慢请求，GPU 大量空转；连续批处理在每个 token 步动态换人，把利用率打满。</strong></p>
 <p><strong>原理</strong>：LLM 推理分两阶段。<em>Prefill</em> 把整段 prompt 并行过一遍、算出所有 token 的 KV，是 <strong>compute-bound</strong>（算力受限，能吃满 GPU）；<em>Decode</em> 每次只生成 1 个 token，但要把整个模型权重从显存搬进计算单元，是 <strong>memory-bandwidth-bound</strong>（带宽受限，算力大量闲置）。decode 阶段单请求的 GPU 利用率可能只有几个百分点——<em>唯一的救赎是把很多请求的 decode 攒成一个大 batch 一起算</em>，权重只搬一次，分摊给整个 batch。</p>
 <p>但传统「静态批处理」有致命缺陷：一个 batch 里有的请求生成 10 token 就结束，有的要生成 2000 token，先结束的位置只能空等到全 batch 完成。<strong>Continuous batching（连续批处理 / iteration-level scheduling）</strong>把调度粒度从「整个请求」降到「单次 token 迭代」：每生成一个 token 就重新组 batch，结束的请求立刻让位、排队的请求立刻补进来。</p>
@@ -173,7 +169,7 @@ while True:
     for req in running:
         tok = sample(logits[req])
         stream_out(req, tok)           # 立刻 SSE 推给客户端
-        if tok == EOS or req.len >= req.max:
+        if tok == EOS or req.len &gt;= req.max:
             release_kv(req); running.remove(req)   # 让位，KV 立刻回收
 </code></pre>
 <div class="case">
@@ -183,8 +179,7 @@ while True:
 <li><strong>vLLM</strong>：把连续批处理与 PagedAttention 结合，成为开源事实标准，被无数推理平台采用。</li>
 <li><strong>NVIDIA TensorRT-LLM</strong>：把同一思路工程化为「in-flight batching」，在 H100 上做生产部署。</li>
 </ul></div>
-
-<h3>2. KV Cache 是第一性瓶颈：PagedAttention 与压缩</h3>
+<h3 data-tts="224a0d5d0b8f35bc">2. KV Cache 是第一性瓶颈：PagedAttention 与压缩</h3>
 <p>核心 trade-off：<strong>KV Cache 占多少显存，直接决定能并发多少请求、batch 能多大——它而非算力，才是大多数 serving 系统的真正天花板。</strong></p>
 <p><strong>原理</strong>：自回归生成每一步都要回看之前所有 token 的 K/V，为避免重算就把它们缓存起来。每 token 的 KV 显存 ≈ <code>2 × 层数 × KV头数 × head_dim × 字节数</code>。以 70B GQA 模型为例约 <strong>0.3 MB/token</strong>，8k 上下文一条请求就吃 <strong>~2.5 GB</strong>。70B 权重 fp16 本身就 140GB（需多卡），剩下的显存被 KV Cache 瓜分——<em>所以「能并发几个请求」本质是道显存除法题</em>。更糟的是朴素实现给每个请求预留「最大长度」的连续显存，碎片化 + 过度预留浪费 60–80%。</p>
 <p><strong>PagedAttention</strong> 借操作系统虚拟内存的思路：把 KV Cache 切成固定大小的 <em>block（页）</em>，逻辑连续、物理可不连续，用页表映射。按需分配、几乎零碎片，还能让相同前缀的请求<em>共享同一批物理页</em>（copy-on-write）。这把可用 batch size 翻了几倍，吞吐随之暴涨。</p>
@@ -202,15 +197,14 @@ while True:
 <li><strong>vLLM PagedAttention</strong>（SOSP 2023 最佳论文）：相比 HuggingFace Transformers 吞吐最高提升 24×，靠的就是把内存浪费从 60–80% 压到个位数。</li>
 <li><strong>主流开源模型</strong>（Llama、Mistral 等）普遍采用 GQA，正是为了 serving 阶段的 KV 经济性。</li>
 </ul></div>
-
-<h3>3. Prompt Caching + 前缀感知路由：把重复的 prefill 省掉</h3>
+<h3 data-tts="d6229c861b0e013c">3. Prompt Caching + 前缀感知路由：把重复的 prefill 省掉</h3>
 <p>核心 trade-off：<strong>多数请求共享长前缀（system prompt、few-shot、RAG 文档）——缓存这段前缀的 KV，能把昂贵的 prefill 算力和 TTFT 一起省掉，代价是路由必须「亲和」。</strong></p>
 <p><strong>原理</strong>：一个 agent 应用的 system prompt 可能 2k token，每个请求都重新 prefill 是纯浪费。<em>Prefix caching</em> 把前缀算出的 KV 留在显存（或下沉到 CPU/SSD），后续请求若前缀逐 token 相同，直接复用、跳过这段 prefill。但缓存在<em>具体某块 GPU 的显存</em>里——这就要求 <strong>前缀感知路由（prefix-aware routing）</strong>：把前缀相同的请求路由到持有该缓存的节点，否则缓存形同虚设。这是 LLM 负载均衡区别于传统无状态 LB 的根本点——<em>它是有状态的、亲和性的</em>。</p>
 <pre><code># 前缀感知路由（pseudo）：让相同前缀落到同一节点
 def route(req):
     prefix_hash = hash(req.system_prompt + req.shared_context)
     node = consistent_hash_ring.get(prefix_hash)   # 前缀亲和
-    if node.kv_load > HIGH_WATERMARK:              # 但要防热点
+    if node.kv_load &gt; HIGH_WATERMARK:              # 但要防热点
         node = least_loaded(replicas_of(prefix_hash))
     return node
 # 工程要点：缓存命中省 prefill，但把 cache 写进 prompt 的「稳定前缀末尾」
@@ -226,8 +220,7 @@ def route(req):
 <li><strong>vLLM Automatic Prefix Caching</strong>：基于 PagedAttention 的页哈希自动复用相同前缀的物理页，开箱即用。</li>
 <li><strong>Streaming（SSE）</strong>：所有大厂的 chat API 都用 Server-Sent Events 逐 token 推送，让 TTFT 成为用户感知延迟——首 token 一出来用户就开始读，把后面几百 token 的生成时间「藏」在阅读里。</li>
 </ul></div>
-
-<h3>4. Cost / Latency / Quality 三角：架构师的总权衡</h3>
+<h3 data-tts="d8454001c3387565">4. Cost / Latency / Quality 三角：架构师的总权衡</h3>
 <p>核心 trade-off：<strong>更强的模型质量更高但更慢更贵；这三者构成不可能三角，工程手段是在不牺牲质量的前提下，沿着「成本-延迟」边界往外推。</strong></p>
 <p><strong>原理</strong>：你不可能同时拿到「最强模型 + 最低延迟 + 最低成本」。但有几招能把帕累托前沿往外推：</p>
 <ul>
@@ -251,8 +244,7 @@ def speculative_step(ctx):
 <li><strong>DistServe</strong>（OSDI 2024）：prefill/decode 解耦，在满足 SLO 前提下相比同置系统多服务 7.4× 请求或满足 12.6× 更严的 SLO。</li>
 <li><strong>各大 API 平台</strong>普遍提供「同模型不同尺寸 + 不同价位」分层（如 Haiku/Sonnet/Opus），让调用方按场景自选三角上的点。</li>
 </ul></div>
-
-<h2>扩展与优化（增长后怎么办）</h2>
+<h2 data-tts="c13b73889c98b814">扩展与优化（增长后怎么办）</h2>
 <ul>
 <li><strong>多模型/多 LoRA 共置</strong>：一个底座 + 多个 LoRA adapter 在同一 GPU 上服务多租户，省卡；调度要做 adapter 切换的批处理。</li>
 <li><strong>KV Cache 多级下沉</strong>：热前缀留 HBM，温的下沉 CPU 内存/本地 NVMe，跨节点共享走 KV 传输——把「缓存命中」从单机扩展到集群。</li>
@@ -260,16 +252,14 @@ def speculative_step(ctx):
 <li><strong>Chunked prefill</strong>：把长 prompt 的 prefill 切片，与 decode 交错执行，削平 TPOT 毛刺。</li>
 <li><strong>多区域</strong>：模型权重各区域常驻，按地理就近路由降 TTFT；前缀缓存难跨区共享，是 trade-off。</li>
 </ul>
-
-<h2>常见陷阱 + 面试问题</h2>
+<h2 data-tts="624b3c91e07f68ca">常见陷阱 + 面试问题</h2>
 <div class="callout"><strong>1. 只看吞吐不看延迟分布。</strong> 把 batch 调大吞吐很漂亮，但 TPOT 被拖慢、p99 TTFT 爆炸。面试要能说清「吞吐 vs 单请求延迟」是同一资源的两面，得按 SLO 定 batch 上限。</div>
 <div class="callout"><strong>2. 以为 LLM 负载均衡 = 无状态轮询。</strong> KV Cache 和 prefix cache 让节点变得<em>有状态、有亲和性</em>。轮询会让前缀缓存命中率归零。这是最常被追问的点。</div>
 <div class="callout"><strong>3. 混淆 compute-bound 与 memory-bound。</strong> prefill 缺算力、decode 缺带宽。优化手段完全不同（decode 靠加大 batch，prefill 靠切片/并行），答错暴露不懂底层。</div>
 <div class="callout"><strong>4. 把 prompt 前缀写得不稳定。</strong> 在 system prompt 里塞当前时间戳、随机 ID，导致前缀哈希永不命中、缓存白建。缓存要放在「逐 token 稳定」的前缀末尾。</div>
 <div class="callout"><strong>5. 用平均值定容量。</strong> input/output 长度是长尾分布，几个超长上下文请求能吃光 KV 显存触发抢占（preemption）甚至 OOM。要按分布和 admission control 设计。</div>
 <p style="margin-top:14px"><strong>高频面试题：</strong>① 为什么 decode 阶段单请求 GPU 利用率极低，连续批处理如何救？② 估算 70B 模型 8k 上下文下单卡能并发多少请求。③ prefix-aware routing 怎么在「缓存命中率」和「负载均衡」间取舍？④ speculative decoding 为什么是无损加速，什么时候反而变慢？⑤ TTFT 与 TPOT 各受什么瓶颈支配，分别怎么优化？</p>
-
-<h2>深入资源</h2>
+<h2 data-tts="a9ecffe8e7888a6e">深入资源</h2>
 <ul>
 <li><strong>vLLM: Efficient Memory Management with PagedAttention</strong>（Kwon 等，SOSP 2023）+ vLLM 官方博客——KV Cache 分页的奠基工作。</li>
 <li><strong>Orca</strong>（Yu 等，OSDI 2022，USENIX）——iteration-level scheduling / 连续批处理原始论文。</li>
@@ -277,9 +267,7 @@ def speculative_step(ctx):
 <li><strong>Fast Inference from Transformers via Speculative Decoding</strong>（Leviathan 等，ICML 2023）。</li>
 <li><strong>Anthropic Prompt Caching 文档</strong> 与 <strong>Character.AI「Optimizing AI Inference」</strong>工程博客——生产侧 prompt 缓存与 KV 压缩实践。</li>
 </ul>
-
-<h2>深入思考（点击展开答案）</h2>
-
+<h2 data-tts="865e5804a75af578">深入思考（点击展开答案）</h2>
 <details>
 <summary>1. 给定 8×H100（640GB 显存）、70B fp16 模型，估算理论并发请求数。瓶颈是算力还是显存？</summary>
 <div class="answer">
@@ -287,7 +275,6 @@ def speculative_step(ctx):
 <p><strong>瓶颈是显存不是算力</strong>：decode 是 memory-bandwidth-bound，算力大量闲置；真正卡住「能并发几个」的是 KV Cache 显存。所以省显存（MQA、KV 量化、PagedAttention）比堆算力更能提并发。这也解释了为何 Character.AI 把 KV 缩 20× 后说「显存不再是瓶颈」——瓶颈被搬走了。注意这是数量级估算，实际受最大长度预留、抢占策略影响。</p>
 </div>
 </details>
-
 <details>
 <summary>2. 连续批处理把 GPU 喂满了，为什么用户仍抱怨「打字打到一半卡一下」？</summary>
 <div class="answer">
@@ -295,7 +282,6 @@ def speculative_step(ctx):
 <p><strong>解法</strong>：① Chunked prefill——把长 prompt 的 prefill 切成小块，与 decode 步交错，每步只插一点 prefill；② prefill/decode 解耦（DistServe）——干脆放不同 GPU 池，互不干扰；③ 调度优先级——给 decode 更高优先级保 TPOT。这题考的是「吞吐优化（连续批处理）和尾延迟（TPOT 毛刺）是两个目标，优化一个会伤另一个」。</p>
 </div>
 </details>
-
 <details>
 <summary>3. prompt caching 命中率从 80% 掉到 40%，成本和 TTFT 会怎样变化？为什么不是线性的？</summary>
 <div class="answer">
@@ -304,7 +290,6 @@ def speculative_step(ctx):
 <p><strong>常见诱因</strong>：有人在 system prompt 里加了动态内容（时间戳/会话 ID），让前缀哈希失配——一行代码就能把命中率从 80% 砸到 10%。所以「前缀稳定性」是要被监控和守护的工程契约。</p>
 </div>
 </details>
-
 <details>
 <summary>4. speculative decoding 号称无损 2–3× 加速，什么情况下反而拖慢、甚至降低整体吞吐？</summary>
 <div class="answer">
@@ -316,7 +301,6 @@ def speculative_step(ctx):
 <p>所以生产里常按负载动态开关投机解码：低峰开（省延迟），高峰关（保吞吐）。</p>
 </div>
 </details>
-
 <details>
 <summary>5. 把第 2 期「缓存」的思维套到 LLM serving：KV Cache、prefix cache、传统 Redis 缓存，三者在「失效」「一致性」上有何本质不同？</summary>
 <div class="answer">
@@ -326,10 +310,9 @@ def speculative_step(ctx):
 <p><strong>本质区别</strong>：LLM 的两种 cache 因「相同输入→确定输出」而<em>免疫一致性问题</em>，难题搬到了「显存容量」和「有状态路由」；传统缓存的难题在「源数据会变」。同样叫 cache，约束维度完全不同。</p>
 </div>
 </details>
-
 <div class="nav"><a href="index.html">← 回到 index</a></div>
-<script src="https://hub.cissychen.com/comments.js" defer></script>
-<script src="https://hub.cissychen.com/search.js" defer></script>
-<script src="https://hub.cissychen.com/index-button.js" defer></script>
-<script src="https://hub.cissychen.com/i18n-tts.js" defer></script>
+<script defer="" src="https://hub.cissychen.com/comments.js"></script>
+<script defer="" src="https://hub.cissychen.com/search.js"></script>
+<script defer="" src="https://hub.cissychen.com/index-button.js"></script>
+<script defer="" src="https://hub.cissychen.com/i18n-tts.js"></script>
 </div></body></html>

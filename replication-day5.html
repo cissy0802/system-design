@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<html lang="zh-CN"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>Day 5 · 复制 (Replication) — System Design</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -94,7 +95,6 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 </script>
 </head><body><div class="container">
-
 <header>
 <div class="meta">
 <span class="tag day">Day 5</span>
@@ -104,10 +104,9 @@ document.addEventListener('DOMContentLoaded',()=>{
 <span class="tag">Consistency</span>
 <span class="tag">Failover</span>
 </div>
-<h1>复制 (Replication) — 你以为复制是为了读扩展，其实是为了那一次故障<span class="en">Leader-Follower vs Multi-leader vs Leaderless, Sync vs Async, Replication Lag, Failover</span></h1>
+<h1 data-tts="be7460a43282a3b7">复制 (Replication) — 你以为复制是为了读扩展，其实是为了那一次故障<span class="en">Leader-Follower vs Multi-leader vs Leaderless, Sync vs Async, Replication Lag, Failover</span></h1>
 </header>
-
-<h2>问题场景与约束</h2>
+<h2 data-tts="297757d43ea6039c">问题场景与约束</h2>
 <p>设计一个跨大洲的协作文档平台（类 Notion / Linear / GitHub），读写比 <strong>100:1</strong>，写 <strong>~5k QPS</strong>、读 <strong>~500k QPS</strong>，欧美亚三大洲都有用户，欧洲用户希望读延迟 P99 &lt; 50 ms。同时要求：</p>
 <ul>
 <li><strong>RPO（数据丢失上限） ≤ 1 秒</strong>：单 region 整片故障，最多丢 1 秒写入。</li>
@@ -116,8 +115,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 <li><strong>单调读（monotonic read）</strong>：连续两次刷新，时间不能倒退（不能第一次看到评论，第二次又消失）。</li>
 </ul>
 <p>这些约束看似温和，组合在一起就把『随便加个 read replica』的方案打回原型。复制是少数几个『不复杂的方案根本无法工作』的领域——单机扛不住、主从有 lag、跨区域有光速延迟、failover 有 split-brain 风险。<em>复制本质是为故障买保险，读扩展只是顺带的副作用</em>。</p>
-
-<h2>高层架构</h2>
+<h2 data-tts="ff7adabefb855a11">高层架构</h2>
 <pre class="mermaid">
 graph TD
     subgraph US["us-east (Primary Region)"]
@@ -137,18 +135,18 @@ graph TD
 
     CONSUL["Orchestrator + Consul<br/><i>健康检查 / failover</i>"]
 
-    APP_US -- write --> L
-    APP_US -- read --> L
-    L == sync ==> F1
-    L -. async .-> F2
-    L -. async (WAN) .-> R_EU
-    L -. async (WAN) .-> R_AP
-    APP_EU -- read --> R_EU
-    APP_AP -- read --> R_AP
-    APP_EU -- write --> L
-    APP_AP -- write --> L
-    CONSUL -. monitor .-> L
-    CONSUL -. monitor .-> F1
+    APP_US -- write --&gt; L
+    APP_US -- read --&gt; L
+    L == sync ==&gt; F1
+    L -. async .-&gt; F2
+    L -. async (WAN) .-&gt; R_EU
+    L -. async (WAN) .-&gt; R_AP
+    APP_EU -- read --&gt; R_EU
+    APP_AP -- read --&gt; R_AP
+    APP_EU -- write --&gt; L
+    APP_AP -- write --&gt; L
+    CONSUL -. monitor .-&gt; L
+    CONSUL -. monitor .-&gt; F1
 
     classDef leader fill:#2a1530,stroke:#ff7ab6,color:#e8eef5
     classDef sync fill:#1a2530,stroke:#64c8ff,color:#e8eef5
@@ -160,10 +158,8 @@ graph TD
     class CONSUL ctl
 </pre>
 <p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">单 leader 写入 + 同 AZ semi-sync 副本（保 RPO）+ 跨 AZ async（保读容量）+ 跨 region async（保就近读）。Orchestrator 负责健康检查与自动 failover。</p>
-
-<h2>关键技术点</h2>
-
-<h3>1. 拓扑选型：Leader-Follower vs Multi-leader vs Leaderless</h3>
+<h2 data-tts="c3df2e03437171d5">关键技术点</h2>
+<h3 data-tts="9722db1492c67ce7">1. 拓扑选型：Leader-Follower vs Multi-leader vs Leaderless</h3>
 <p><strong>原理</strong>：复制拓扑决定了写路径走哪里、冲突由谁裁决。三种基本模式：</p>
 <ul>
 <li><strong>Leader-Follower（单主）</strong>：所有写经过 leader，follower 异步/同步复制 leader 的 WAL。<em>无写冲突</em>，故障切换是核心难点。</li>
@@ -208,8 +204,7 @@ graph TD
 <li><strong>Riak / Shopping Cart</strong>：Amazon 购物车经典 multi-master + CRDT，节点分区时两边都加商品，合并取并集（宁多不丢）。</li>
 <li><strong>Apple iCloud Notes / Figma</strong>：客户端-服务端本质是 multi-leader，用 OT/CRDT 解决并发编辑冲突。</li>
 </ul></div>
-
-<h3>2. Sync vs Async vs Semi-sync：一致性、延迟、可用性的三角</h3>
+<h3 data-tts="0ca635fb26ca25bc">2. Sync vs Async vs Semi-sync：一致性、延迟、可用性的三角</h3>
 <p><strong>原理</strong>：leader 收到写之后，什么时候回 ACK 给客户端？取决于复制是同步还是异步。</p>
 <ul>
 <li><strong>Sync</strong>：等所有副本都写入再 ACK。<em>0 数据丢失</em>但 1 个副本慢全集群慢，1 个挂全集群不可写。</li>
@@ -224,15 +219,15 @@ sequenceDiagram
     participant A as Async Replica
 
     Note over C,A: Semi-sync (Postgres synchronous_commit=on, 1 副本)
-    C->>L: write x=1
-    L->>L: WAL fsync
-    L->>S: stream WAL
-    L->>A: stream WAL
-    S-->>L: ACK (durable)
-    L-->>C: OK (此时已有 2 副本)
-    A-->>L: ACK (later, 延迟)
+    C-&gt;&gt;L: write x=1
+    L-&gt;&gt;L: WAL fsync
+    L-&gt;&gt;S: stream WAL
+    L-&gt;&gt;A: stream WAL
+    S--&gt;&gt;L: ACK (durable)
+    L--&gt;&gt;C: OK (此时已有 2 副本)
+    A--&gt;&gt;L: ACK (later, 延迟)
 
-    Note over C,A: 若 S 卡住超时, 退化为 async (可用性 > 一致性)
+    Note over C,A: 若 S 卡住超时, 退化为 async (可用性 &gt; 一致性)
 </pre>
 <div class="tradeoff">
 <strong>三种语义的边界：</strong>
@@ -266,8 +261,7 @@ synchronous_standby_names = 'ANY 1 (replica1, replica2, replica3)'
 <li><strong>Spanner / CockroachDB</strong>：Paxos/Raft 多数派 ACK，没有传统主从概念；用 TrueTime / HLC 保证全局顺序，写延迟跨区域可低至 10 ms（同区域多数派）。</li>
 <li><strong>Aurora</strong>：分离存储层用 6 副本（3 AZ × 2），写要求 4/6 ACK，读要求 3/6；底层 quorum 自动避开慢副本。</li>
 </ul></div>
-
-<h3>3. Replication Lag：你以为一致性是 0 或 1，其实是渐变光谱</h3>
+<h3 data-tts="122515dd04c1d45e">3. Replication Lag：你以为一致性是 0 或 1，其实是渐变光谱</h3>
 <p><strong>原理</strong>：异步复制必然有 lag（毫秒到分钟）。lag 引发的三大异常：</p>
 <ol>
 <li><strong>Read-your-writes 违反</strong>：用户更新头像后刷新，读到 follower（lag 未到），看到旧头像，以为系统坏了。</li>
@@ -291,9 +285,9 @@ client.last_seen_lsn = write_response.lsn  # 存 session/cookie
 def read(doc_id, min_lsn):
     replica = pick_least_loaded_replica()
     current = replica.current_lsn()
-    if current >= min_lsn:
+    if current &gt;= min_lsn:
         return replica.read(doc_id)
-    elif current + ACCEPTABLE_GAP >= min_lsn:
+    elif current + ACCEPTABLE_GAP &gt;= min_lsn:
         replica.wait_for_lsn(min_lsn, timeout=50)  # ms
         return replica.read(doc_id)
     else:
@@ -312,8 +306,7 @@ def read(doc_id, min_lsn):
 <li><strong>Facebook TAO</strong>：social graph 缓存层，写穿透到主区域，followers 异步失效；读自己写的特殊路由。</li>
 <li><strong>Vitess @primary / @replica</strong>：应用显式指定路由 hint（<code>SELECT ... /*vt+ ROUTE=primary */</code>），把决策权交给业务。</li>
 </ul></div>
-
-<h3>4. Failover：主挂了之后真正发生的事</h3>
+<h3 data-tts="76c676557594531a">4. Failover：主挂了之后真正发生的事</h3>
 <p><strong>原理</strong>：failover 包含 4 步：（a）检测主故障；（b）选新主；（c）切换路由；（d）老主复活时的角色裁定。<em>每一步都能制造 outage</em>。</p>
 <pre class="mermaid">
 sequenceDiagram
@@ -325,14 +318,14 @@ sequenceDiagram
 
     Note over L,R2: 正常 — L 写, R1 sync ACK, R2 lag 800ms
     L--xO: 心跳超时 10s
-    O->>R1: 检查 R1 LSN
-    O->>R2: 检查 R2 LSN
+    O-&gt;&gt;R1: 检查 R1 LSN
+    O-&gt;&gt;R2: 检查 R2 LSN
     Note over O: R1 lsn=1000, R2 lsn=880<br/>选 R1 最新
-    O->>R1: PROMOTE
-    O->>App: 切路由到 R1 作为新 leader
-    R1->>R2: 重新建立复制
+    O-&gt;&gt;R1: PROMOTE
+    O-&gt;&gt;App: 切路由到 R1 作为新 leader
+    R1-&gt;&gt;R2: 重新建立复制
     Note over L: L 网络恢复, 自认还是 leader<br/>但 fencing token 已失效
-    O->>L: DEMOTE / kill
+    O-&gt;&gt;L: DEMOTE / kill
     Note over L: 旧 L 上 lsn 1000~1010 的写若未 ACK 直接丢<br/>若已 ACK 给客户端 — 数据丢失
 </pre>
 <div class="tradeoff">
@@ -353,7 +346,7 @@ class Leader:
 
 # 路由层 / 副本拒绝低 epoch 的写
 def accept_write(req):
-    if req.epoch < current_known_epoch:
+    if req.epoch &lt; current_known_epoch:
         return REJECT  # 旧主的 zombie write 在此被拦
     return APPLY
 
@@ -369,8 +362,7 @@ def accept_write(req):
 <li><strong>AWS RDS / Aurora Multi-AZ</strong>：standby 自动 failover，60-120 秒 RTO；Aurora 因存储共享，failover 只是『换个计算节点 attach 同一份存储』，10-30 秒搞定。</li>
 <li><strong>etcd / CockroachDB / Spanner</strong>：Raft 内置 leader election，秒级；无『传统 failover』概念，多数派活着即可写。</li>
 </ul></div>
-
-<h2>扩展与优化</h2>
+<h2 data-tts="29df77c7a38e3bee">扩展与优化</h2>
 <ul>
 <li><strong>读流量分配带 lag 阈值熔断</strong>：副本 lag &gt; 5 秒自动从负载均衡剔除（YouTube Vitess、AWS RDS 都支持）。否则用户读到几分钟前数据，比直接报错更糟。</li>
 <li><strong>跨区域不要同步复制</strong>：跨洋 RTT 100-200 ms，每次写多收一次罚款。跨区域必 async + 本地强一致读 + 远端最终一致读。</li>
@@ -378,8 +370,7 @@ def accept_write(req):
 <li><strong>Logical vs Physical replication</strong>：物理复制（Postgres streaming, MySQL binlog ROW）字节级一致快但版本/平台绑死；逻辑复制（Postgres logical decoding, Debezium）跨大版本/异构系统但慢、有约束（DDL、序列、大事务）。升级、迁移、跨云用逻辑；HA 用物理。</li>
 <li><strong>多 region 写：先 CDN / edge cache，再考虑 multi-leader</strong>。99% 的 latency 问题靠就近读副本和 edge 缓存解决，无需引入 multi-leader 的冲突地狱。</li>
 </ul>
-
-<h2>常见陷阱与面试问题</h2>
+<h2 data-tts="dd2f9ca1460fd6a0">常见陷阱与面试问题</h2>
 <div class="callout">
 <strong>1. 把 read replica 当 backup</strong>：DROP TABLE 在主上，几毫秒后副本也 DROP 了。备份必须是 PITR snapshot，不是副本。</div>
 <div class="callout">
@@ -398,8 +389,7 @@ def accept_write(req):
 <li>Multi-leader 配置下如何处理『同一行被两个 region 同时改』？LWW / CRDT / 业务裁决各适合什么？</li>
 <li>Postgres semi-sync 把 <code>synchronous_commit</code> 设 <code>remote_apply</code> 比 <code>on</code> 多保证什么？代价？</li>
 </ol>
-
-<h2>深入资源</h2>
+<h2 data-tts="cb3caad0d0deb209">深入资源</h2>
 <ul>
 <li><strong>《Designing Data-Intensive Applications》Ch 5 — Replication</strong>（Kleppmann）：本主题最权威单章。leader-based / multi-leader / leaderless 的完整谱系。</li>
 <li><strong>GitHub 2018-10-21 Incident Report</strong>：<code>github.blog/2018-10-30-oct21-post-incident-analysis</code>。跨区域 auto-failover 灾难的教科书级 RCA。</li>
@@ -409,9 +399,7 @@ def accept_write(req):
 <li><strong>Patroni 文档 + Zalando 工程博客</strong>：Postgres 生产 HA 的工业级参考。</li>
 <li><strong>Vitess 官方文档 — Reparenting</strong>：MySQL failover 工程化最完整的开源实现。</li>
 </ul>
-
-<h2>深入思考</h2>
-
+<h2 data-tts="c664d6f50c129fad">深入思考</h2>
 <details>
 <summary>1. 为什么 Spanner / CockroachDB 这种 Raft 多数派写延迟反而比传统 semi-sync 主从『更稳定』？这跟 tail latency 有什么关系？</summary>
 <div class="answer">
@@ -424,7 +412,6 @@ def accept_write(req):
 <p>反过来代价是：（a）至少 3 节点（2 节点 Raft 退化），成本更高；（b）实现复杂度（leader election、log compaction、配置变更）远超主从。所以小规模 OLTP 仍偏 semi-sync，超大规模 / 全球部署用 Raft 类。<strong>从 semi-sync 到 quorum 是『可用性 - 复杂度』曲线上的明确升级，而非简单替换</strong>。</p>
 </div>
 </details>
-
 <details>
 <summary>2. GitHub 2018 那次 outage，技术上『自动 failover 不要跨区域』就能避免吗？还是更深层？为什么 Orchestrator 没识别那是『43 秒网络分区』而不是『真主库挂了』？</summary>
 <div class="answer">
@@ -438,7 +425,6 @@ def accept_write(req):
 <p>类比：自动驾驶车在城市道路。Tesla 选『大胆自动 + 偶尔追尾』；Waymo 选『谨慎自动 + 必要时人工接管』。GitHub 那次是前者哲学撞墙，转向后者。<strong>分布式系统的成熟度不是『多自动化』而是『多懂得在哪里停下来等人』</strong>。</p>
 </div>
 </details>
-
 <details>
 <summary>3. 容量估算：100 万 DAU 的 SaaS，主 Postgres 10k 写 QPS、读 50k QPS。CFO 想省钱问：『真的需要 5 个 read replica 吗？能不能砍到 2 个？』给一个有数字的分析。</summary>
 <div class="answer">
@@ -470,7 +456,6 @@ def accept_write(req):
 <p>『副本数』从来不是孤立配置，是整个读路径架构的结果。</p>
 </div>
 </details>
-
 <details>
 <summary>4. CRDT 听起来是 multi-leader 冲突的银弹（自动合并、无需协调）。它有什么硬性限制？为什么 Google Docs / Figma 即使用 OT/CRDT 也仍然需要一个 server-side authority？</summary>
 <div class="answer">
@@ -486,7 +471,6 @@ def accept_write(req):
 <p><strong>结论</strong>：CRDT 是『多写不冲突合并』的工具，不是『完全无 server』的架构。它把 server 的角色从『仲裁每一次写』降到『协调元事件 + 持久化』。理解这一点能避免『用 CRDT 重写一切』的陷阱。<em>真正 leaderless 的系统几乎不存在；只是 leader 的职责被压缩到了最小</em>。</p>
 </div>
 </details>
-
 <details>
 <summary>5. 跨章节：分片 (Day 4) + 复制 (Day 5) 一起部署，故障域怎么算？比如 32 shard × 3 副本 = 96 节点，一个 AZ 挂了，业务可用性是？</summary>
 <div class="answer">
@@ -508,9 +492,8 @@ def accept_write(req):
 <p><em>面试金句</em>：『分片是水平扩展，复制是故障保险，两者解决不同问题且互相放大对方的复杂度——任何只谈一个的方案都是不完整的』。</p>
 </div>
 </details>
-
-<script src="https://hub.cissychen.com/comments.js" defer></script>
-<script src="https://hub.cissychen.com/search.js" defer></script>
-<script src="https://hub.cissychen.com/index-button.js" defer></script>
-<script src="https://hub.cissychen.com/i18n-tts.js" defer></script>
+<script defer="" src="https://hub.cissychen.com/comments.js"></script>
+<script defer="" src="https://hub.cissychen.com/search.js"></script>
+<script defer="" src="https://hub.cissychen.com/index-button.js"></script>
+<script defer="" src="https://hub.cissychen.com/i18n-tts.js"></script>
 </div></body></html>

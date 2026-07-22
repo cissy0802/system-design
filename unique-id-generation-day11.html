@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<html lang="zh-CN"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>Day 11 · 唯一 ID 生成 — System Design</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -101,7 +102,6 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 </script>
 </head><body><div class="container">
-
 <header>
 <div class="meta">
 <span class="tag day">Day 11</span>
@@ -111,10 +111,9 @@ document.addEventListener('DOMContentLoaded',()=>{
 <span class="tag">UUIDv7</span>
 <span class="tag">KSUID/ULID</span>
 </div>
-<h1>唯一 ID 生成 — 时间、随机与索引的三角博弈<span class="en">Unique ID Generation: UUID, Snowflake, KSUID, ULID</span></h1>
+<h1 data-tts="470624489c55b7f7">唯一 ID 生成 — 时间、随机与索引的三角博弈<span class="en">Unique ID Generation: UUID, Snowflake, KSUID, ULID</span></h1>
 </header>
-
-<h2>问题场景 + 需求约束</h2>
+<h2 data-tts="1ff1265fb9836a74">问题场景 + 需求约束</h2>
 <p>设计一个全球聊天产品的消息 ID（参考 Discord / Slack / WhatsApp）。规模假设：<strong>3 亿 DAU、峰值 100w 消息/秒、消息按 channel 分片到上百个 Cassandra 节点</strong>。每条消息要分配一个 ID，决定它在 DB 中的物理位置、在客户端的排序、在 URL 里的样子。</p>
 <p>关键需求：</p>
 <ul>
@@ -125,8 +124,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 <li><strong>不泄露业务量</strong>：自增 ID 让对手通过 <code>id_today - id_yesterday</code> 算出日活，是早期 Twitter 的隐私事故。</li>
 <li><strong>客户端可生成</strong>：离线发消息时本地先生成 ID，上线后服务端不重新分配，保证幂等。</li>
 </ul>
-
-<h2>高层架构</h2>
+<h2 data-tts="78722d0bca99f5d2">高层架构</h2>
 <pre class="mermaid">
 graph TD
     ZK["ZooKeeper / etcd<br/><i>worker_id 分配</i>"]
@@ -137,10 +135,10 @@ graph TD
     CLIENT["移动客户端<br/><i>UUIDv7 本地生成<br/>离线消息</i>"]
     CASS[("Cassandra<br/><i>partition by channel<br/>cluster by id DESC</i>")]
 
-    ZK -.分配.-> APP1 & APP2 & APPN
-    NTP -.同步.-> APP1 & APP2 & APPN
-    APP1 & APP2 & APPN --> CASS
-    CLIENT -->|带 client_id| APP1
+    ZK -.分配.-&gt; APP1 &amp; APP2 &amp; APPN
+    NTP -.同步.-&gt; APP1 &amp; APP2 &amp; APPN
+    APP1 &amp; APP2 &amp; APPN --&gt; CASS
+    CLIENT --&gt;|带 client_id| APP1
 
     classDef coord fill:#0e2030,stroke:#5eead4,color:#e8eef5
     classDef app fill:#1a2530,stroke:#64c8ff,color:#e8eef5
@@ -153,10 +151,8 @@ graph TD
 </pre>
 <p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">ID 生成是 <em>library 模式</em>，没有独立服务可挂；ZK 只在启动时分配 worker_id，运行时无依赖</p>
 <p><strong>组件职责</strong>：ZooKeeper 启动时给每个 app 实例分一个 worker_id（10 bit = 1024 个槽），重启时归还。NTP 保证机器时钟不漂移（一般 &lt; 10ms 误差），<strong>时钟回拨是 Snowflake 系命门</strong>。App 嵌入 ID lib 直接出 ID，无网络调用。客户端离线场景用 UUIDv7 本地生成，服务端原样接受（保证发送幂等）。</p>
-
-<h2>关键技术点</h2>
-
-<h3>1. UUID 各版本：v4 随机 vs v7 时间序</h3>
+<h2 data-tts="c3df2e03437171d5">关键技术点</h2>
+<h3 data-tts="e97edd0dce4d96e1">1. UUID 各版本：v4 随机 vs v7 时间序</h3>
 <p><strong>原理</strong>：UUID 是 128-bit。<em>v4</em> 122 bit 全随机，冲突概率 ~2⁻¹²²，无需协调，但<strong>对 B-tree 索引是灾难</strong>——每次插入打在随机叶子页，page split + cache miss 暴增。<em>v7</em>（<a href="https://www.rfc-editor.org/rfc/rfc9562.html">RFC 9562</a> 2024 年定稿）前 48 bit 是毫秒级 Unix 时间戳，后 74 bit 随机/单调，<strong>字典序 = 时间序</strong>，新插入永远在 B-tree 右侧，page split 几乎为零。</p>
 <div class="tradeoff">
 <strong>Trade-off：</strong>
@@ -184,8 +180,7 @@ def uuid7() -&gt; bytes:
 <li><strong>Stripe API 对象 ID</strong>：用 <code>ch_</code>/<code>pi_</code> 前缀 + 16+ 字节随机，是 v4 风格（KV 存储不怕随机插入，且要求强抗猜测）。</li>
 <li><strong>OpenJDK</strong>：<a href="https://bugs.openjdk.org/browse/JDK-8334015">JEP 已支持 UUIDv7</a>，标志 v7 正式进入主流。</li>
 </ul></div>
-
-<h3>2. Snowflake 类 ID：64-bit 三段式</h3>
+<h3 data-tts="3d8088a157978aa8">2. Snowflake 类 ID：64-bit 三段式</h3>
 <p><strong>原理</strong>：Twitter <a href="https://blog.twitter.com/engineering/en_us/a/2010/announcing-snowflake">2010 年开源 Snowflake</a>，64 bit = 1 符号位 + 41 bit 毫秒时间戳（自定 epoch，可用 ~69 年）+ 10 bit worker_id（1024 台机器）+ 12 bit 序列号（同毫秒同机器最多 4096 个）。<strong>4096 × 1024 = 419 万 ID/ms = 41 亿/秒</strong>，远超任何单一系统需求。比 UUID 省一半空间，且天然<em>大致时间序</em>。</p>
 <div class="tradeoff">
 <strong>Trade-off：vs UUIDv7 / vs DB sequence</strong>
@@ -228,8 +223,7 @@ class Snowflake:
 <li><strong>Instagram</strong>：<a href="https://instagram-engineering.com/sharding-ids-at-instagram-1cf5a71e5a5c">41 bit 时间 + 13 bit shard_id + 10 bit seq</a>，在 Postgres 内用 stored procedure 生成，不依赖外部服务——『把 Snowflake 写进数据库』的经典范式。</li>
 <li><strong>Sony Sonyflake</strong>：39 bit 10ms 精度时间戳 + 8 bit seq + 16 bit machine_id，换来 174 年寿命 + 65536 台机器，适合机器多但 QPS 不极端的场景。</li>
 </ul></div>
-
-<h3>3. 时钟回拨：Snowflake 的命门</h3>
+<h3 data-tts="991768dab8900fb6">3. 时钟回拨：Snowflake 的命门</h3>
 <p><strong>原理</strong>：Snowflake 的唯一性<em>完全依赖时间戳单调递增</em>。NTP 一次回拨 100ms，机器在这 100ms 内生成的 ID 就可能<strong>和过去重复</strong>。leap second（闰秒）、虚拟机暂停恢复、运维误操作改时间，都触发过生产事故。</p>
 <div class="tradeoff">
 <strong>三种主流解法：</strong>
@@ -254,8 +248,7 @@ def next_id(self):
     # ... 正常分配 seq
 </code></pre>
 <div class="callout"><strong>真实事故模式：</strong>VM 从 snapshot 恢复后时间倒退几小时；某次 NTP 配错指向有问题的源，全集群同时倒退 30 秒，生成的 ID 与历史 ID 重复，引发主键冲突写入失败——这种情况只能<em>下线该实例 + 等到真实时间超过 last_ts</em>。</div>
-
-<h3>4. ULID / KSUID / UUIDv7 三剑客对比</h3>
+<h3 data-tts="f872e9ea0cbda7c0">4. ULID / KSUID / UUIDv7 三剑客对比</h3>
 <p><strong>原理</strong>：三者都想解决『字典序 = 时间序 + 全分布式 + 无中心』。差别在 bit 数、编码、是否单调严格。</p>
 <table>
 <thead><tr><th></th><th>UUIDv7</th><th>ULID</th><th>KSUID</th></tr></thead>
@@ -290,8 +283,7 @@ Snowflake: 1773294523890106368                  ← 19 位十进制数字
 <li><strong>ULID</strong>：<a href="https://github.com/ulid/spec">canonical spec</a> 强制要求同毫秒内 ID 单调递增（实现要用 monotonic factory）；MongoDB ObjectID 是类似思路（12 字节 = 4 时间 + 5 random + 3 counter）。</li>
 <li><strong>Stripe</strong>：用<em>带类型前缀</em>的随机字符串（<code>cus_</code>, <code>ch_</code>），不属任何标准，但展示了『可读性 + 类型安全 + 抗猜测』的产品级 ID 设计。</li>
 </ul></div>
-
-<h2>扩展与优化</h2>
+<h2 data-tts="260096ddf44c291b">扩展与优化</h2>
 <ul>
 <li><strong>worker_id 不够用</strong>：10 bit = 1024 上限，容器化时代很快撞墙。Discord / Sonyflake 通过<em>缩短时间戳精度</em>（10ms 一格）省下 bit 给 worker_id。</li>
 <li><strong>多区部署</strong>：bit 拆分为 <code>region(3) + dc(3) + worker(4)</code>，让 ID 也能定位物理位置。Twitter 内部就是这样。</li>
@@ -299,14 +291,12 @@ Snowflake: 1773294523890106368                  ← 19 位十进制数字
 <li><strong>从 UUIDv4 迁移到 UUIDv7</strong>：直接换生成函数，旧数据保留——v7 的版本号 4 bit 与 v4 不同，类型不冲突；索引性能会随新数据占比慢慢恢复。</li>
 <li><strong>监控信号</strong>：每秒生成数（是否接近 4096/ms/worker 上限）、时钟漂移、worker_id 冲突告警。</li>
 </ul>
-
-<h2>常见陷阱 + 面试问题</h2>
+<h2 data-tts="28a0cfc41bfe0f36">常见陷阱 + 面试问题</h2>
 <div class="callout"><strong>陷阱 1：把 UUIDv4 当 PK 用在大表</strong>。"UUID 反正全球唯一" 听起来安全，但 B-tree 插入性能崩塌往往要写到 5000 万行才发现，那时已经晚了。新项目直接 v7。</div>
 <div class="callout"><strong>陷阱 2：以为 Snowflake 一定全局递增</strong>。它只是<em>大致时间序</em>——同毫秒内不同 worker 生成的 ID 大小由 worker_id 决定，不是真单调。代码不能依赖『新 ID 一定 &gt; 旧 ID』。</div>
 <div class="callout"><strong>陷阱 3：把 ID 当时间戳用</strong>。从 Snowflake 解出来的时间是<em>生成时间</em>，不是<em>事件时间</em>；客户端离线时事件时间和生成时间可能差几天。</div>
 <div class="callout"><strong>陷阱 4：worker_id 被复用</strong>。机器漂移、容器调度让两个进程拿到同一个 worker_id → 必产生重复 ID。ZooKeeper 临时节点 + 心跳是标配。</div>
 <div class="callout"><strong>陷阱 5：泄露业务量</strong>。自增 ID 让对手算出『今天发了多少条消息』。早期 Twitter 因此暴露增长数据。任何对外可见的 ID 都要至少加随机段。</div>
-
 <p><strong>面试可能追问：</strong></p>
 <ol>
 <li>峰值 1000w/s，64-bit Snowflake 够不够？bit 分配怎么改？</li>
@@ -315,8 +305,7 @@ Snowflake: 1773294523890106368                  ← 19 位十进制数字
 <li>时钟回拨发生时，你设计的系统怎么响应？多大回拨需要熔断？</li>
 <li>客户端能不能本地生成 ID？要满足什么前提？</li>
 </ol>
-
-<h2>深入资源</h2>
+<h2 data-tts="7a59bfe9c4a0949a">深入资源</h2>
 <div class="resources">
 <ul>
 <li><a href="https://blog.twitter.com/engineering/en_us/a/2010/announcing-snowflake">Twitter Engineering: Announcing Snowflake (2010)</a> — 原始论证，看『为什么 ZooKeeper + 64 bit + 时间戳』</li>
@@ -326,9 +315,7 @@ Snowflake: 1773294523890106368                  ← 19 位十进制数字
 <li><a href="https://github.com/ulid/spec">ULID spec</a> &amp; <a href="https://github.com/segmentio/ksuid">Segment KSUID</a> — 两套 sortable ID 的 reference 实现</li>
 </ul>
 </div>
-
-<h2>深入思考</h2>
-
+<h2 data-tts="672ed72485a2ee47">深入思考</h2>
 <details>
 <summary>1. UUIDv4 做 MySQL 主键插入性能崩，根本原因不是『随机』本身。到底慢在哪？为什么 UUIDv7 能解？</summary>
 <div class="answer">
@@ -342,7 +329,6 @@ Snowflake: 1773294523890106368                  ← 19 位十进制数字
 <p><em>含义</em>：用 v4 + 单独的 BIGINT 自增 PK + UUID 是 unique key，是历史上的折中方案；现在直接 v7 更干净。</p>
 </div>
 </details>
-
 <details>
 <summary>2. Snowflake 的 12 bit 序列号支持 4096/ms = 410w/s。但生产中常见的『单进程 30w/s 就开始抛错』，为什么？</summary>
 <div class="answer">
@@ -361,7 +347,6 @@ Snowflake: 1773294523890106368                  ← 19 位十进制数字
 <p>Discord、Baidu UidGenerator、美团 Leaf 都在这个量级做过专门优化。</p>
 </div>
 </details>
-
 <details>
 <summary>3. 系统里同时存在两种 ID（老的 BIGINT 自增 + 新的 Snowflake），如何无停机迁移？</summary>
 <div class="answer">
@@ -381,7 +366,6 @@ Snowflake: 1773294523890106368                  ← 19 位十进制数字
 <p>整个过程通常 3-6 个月，关键是<em>不要急于删老 ID</em>——保留双写 1-2 个月观察。</p>
 </div>
 </details>
-
 <details>
 <summary>4. 设计聊天系统时，发送方客户端在飞机上离线生成 ID 一周后上线发送，会发生什么？怎么处理？</summary>
 <div class="answer">
@@ -396,7 +380,6 @@ Snowflake: 1773294523890106368                  ← 19 位十进制数字
 <p><strong>更深的设计哲学</strong>：永远不要让一个字段同时承担『唯一标识』『时间排序』『因果排序』三件事——三者的时间语义不同（生成时间 / 接收时间 / 事件发生时间）。Slack 的 <code>ts</code> 字段是 server_ts、<code>client_msg_id</code> 是 UUID，分得很清楚。</p>
 </div>
 </details>
-
 <details>
 <summary>5. 如果让你重新设计一个『面向用户可见』的 ID（出现在 URL、收据、support 工单），UUIDv7 / ULID / 自定义 Base62 怎么选？</summary>
 <div class="answer">
@@ -412,10 +395,9 @@ Snowflake: 1773294523890106368                  ← 19 位十进制数字
 <p>反例：早期 Twitter URL 里的 tweet ID 是自增 + 后改 Snowflake，<em>暴露了发推量</em>；现在虽然换了 Snowflake 但仍能反推时间——产品发布时的时间戳设计要慎重。</p>
 </div>
 </details>
-
 <div class="nav"><a href="index.html">← 回到 index</a></div>
-<script src="https://hub.cissychen.com/comments.js" defer></script>
-<script src="https://hub.cissychen.com/search.js" defer></script>
-<script src="https://hub.cissychen.com/index-button.js" defer></script>
-<script src="https://hub.cissychen.com/i18n-tts.js" defer></script>
+<script defer="" src="https://hub.cissychen.com/comments.js"></script>
+<script defer="" src="https://hub.cissychen.com/search.js"></script>
+<script defer="" src="https://hub.cissychen.com/index-button.js"></script>
+<script defer="" src="https://hub.cissychen.com/i18n-tts.js"></script>
 </div></body></html>

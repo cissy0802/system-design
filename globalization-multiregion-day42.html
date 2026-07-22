@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<html lang="zh-CN"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>Day 42 · 全球化与多区域 (Multi-region) — System Design</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -97,7 +98,6 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 </script>
 </head><body><div class="container">
-
 <header>
 <div class="meta">
 <span class="tag day">Day 42</span>
@@ -107,37 +107,33 @@ document.addEventListener('DOMContentLoaded',()=>{
 <span class="tag">多活架构</span>
 <span class="tag">跨区一致性</span>
 </div>
-<h1>全球化与多区域 — 光速是最后的约束<span class="en">Multi-region: Data Residency, Active-Active, Cross-region Consistency, Latency</span></h1>
+<h1 data-tts="567852f54aac85dc">全球化与多区域 — 光速是最后的约束<span class="en">Multi-region: Data Residency, Active-Active, Cross-region Consistency, Latency</span></h1>
 </header>
-
-<h2>问题场景与约束</h2>
+<h2 data-tts="046bf491e2e7783f">问题场景与约束</h2>
 <p>设计一个 <strong>1 亿全球 DAU</strong> 的社交电商，用户分布北美 / 欧盟 / 亚太三大区。目标：<em>就近读 p99 &lt; 150ms</em>（跨洋 RTT 就有 120-180ms，单靠一个中心区域必然超标）；<em>单区域整体故障 RTO &lt; 5 分钟</em>；<em>欧盟用户 PII 必须留在欧盟境内</em>（GDPR 第 44 条跨境传输限制）。</p>
 <p>为什么这是 System Design 里最难的一类题：<strong>光速不可谈判</strong>。北京到弗吉尼亚单程约 90ms，一次跨区同步写要 180ms RTT——你无法用工程手段消除，只能用架构绕开。多区域的全部难点就是：<em>哪些操作允许跨区、哪些必须留在本区、数据冲突谁赢</em>。</p>
-
-<h2>高层架构</h2>
+<h2 data-tts="b9dd63a826f87e96">高层架构</h2>
 <div class="mermaid">
 graph TD
-  U1[北美用户] --> DNS{GeoDNS / Anycast<br/>就近解析}
-  U2[欧盟用户] --> DNS
-  U3[亚太用户] --> DNS
-  DNS --> E1[us-east 边缘<br/>Zuul/LB]
-  DNS --> E2[eu-west 边缘]
-  DNS --> E3[ap-south 边缘]
-  E1 --> A1[区域服务集群]
-  E2 --> A2[区域服务集群]
-  E3 --> A3[区域服务集群]
-  A1 --> D1[(区域主库)]
-  A2 --> D2[(区域主库 · EU PII 驻留)]
-  A3 --> D3[(区域主库)]
+  U1[北美用户] --&gt; DNS{GeoDNS / Anycast<br/>就近解析}
+  U2[欧盟用户] --&gt; DNS
+  U3[亚太用户] --&gt; DNS
+  DNS --&gt; E1[us-east 边缘<br/>Zuul/LB]
+  DNS --&gt; E2[eu-west 边缘]
+  DNS --&gt; E3[ap-south 边缘]
+  E1 --&gt; A1[区域服务集群]
+  E2 --&gt; A2[区域服务集群]
+  E3 --&gt; A3[区域服务集群]
+  A1 --&gt; D1[(区域主库)]
+  A2 --&gt; D2[(区域主库 · EU PII 驻留)]
+  A3 --&gt; D3[(区域主库)]
   D1 -.异步复制.- D3
   D3 -.异步复制.- D1
   D2 -.仅非PII复制.- D1
 </div>
 <p><strong>组件职责</strong>：GeoDNS/Anycast 按用户地理位置把请求路由到最近区域；每个区域是<em>自包含</em>的全栈（边缘→服务→数据库），本区故障不拖垮其他区（Netflix 的 Isolation 原则）。跨区数据默认<strong>异步复制</strong>——同步复制会把每次写变成跨洋 RTT。欧盟主库对 PII 只做<em>选择性复制</em>：非敏感数据（商品目录）全局同步，PII 留在 eu-west。核心张力：<strong>就近=低延迟但数据分散，集中=强一致但高延迟</strong>。</p>
-
-<h2>关键技术点</h2>
-
-<h3>① 流量路由与故障转移 — 就近接入 vs 会话粘性</h3>
+<h2 data-tts="c3df2e03437171d5">关键技术点</h2>
+<h3 data-tts="82e9f35dad58532a">① 流量路由与故障转移 — 就近接入 vs 会话粘性</h3>
 <p class="tradeoff"><strong>核心 trade-off</strong>：把用户钉在「归属区」读写最简单一致，但归属区挂了要能秒切别的区，切换时的会话/数据一致性是坑。</p>
 <p><strong>【原理】</strong>三层路由手段：<em>GeoDNS</em>（按 resolver 地理位置返回不同 IP，粒度粗、有 DNS 缓存 TTL 滞后）；<em>Anycast</em>（同一 IP 全球广播，BGP 自动选最近入口，切换快但连接可能中途跳区）；<em>应用层路由</em>（边缘网关按 user_id 查「归属区」表再转发，最精确）。生产里通常组合用：Anycast 进边缘，边缘再按用户归属区做 L7 转发。</p>
 <table>
@@ -156,19 +152,17 @@ def route(user_id):
         if health[r].ok and r != home:
             return r  # 注意：切区后可能读到复制滞后的数据</code></pre>
 <p class="case"><strong>现实案例</strong>：<strong>Netflix</strong> 用 Zuul 做边缘路由，可运行时改路由、故障时把整个区流量 evacuate 到另一区（<a href="https://netflixtechblog.com/active-active-for-multi-regional-resiliency-c47719f6685b">Active-Active 博客</a>）。<strong>Cloudflare</strong> 全球 Anycast，同一 IP 落到最近 PoP。<strong>AWS Route 53</strong> 提供 latency-based + geolocation routing 组合。</p>
-
-<h3>② 多活的数据一致性 — 谁能写、冲突谁赢</h3>
+<h3 data-tts="b79c91239fd3c136">② 多活的数据一致性 — 谁能写、冲突谁赢</h3>
 <p class="tradeoff"><strong>核心 trade-off</strong>：真·多活（各区都可写同一份数据）延迟最低但要解冲突；单写归属区无冲突但归属区不可用时写请求受阻；全局强一致（Spanner）无冲突但每次提交付跨区延迟。</p>
 <p><strong>【原理】</strong>三种范式：<em>(a) Active-Active + LWW（Last-Writer-Wins）</em>：各区都能写，异步双向复制，冲突按时间戳取最新——简单但会<strong>丢更新</strong>（两区并发改同一 key，输的那次静默消失）。<em>(b) 单写归属区（home region）</em>：每条数据有唯一 owner 区，写只在 owner 发生，其他区读副本、写要转发——无冲突，代价是跨区写延迟 + owner 故障时的可用性。<em>(c) 全局共识 + TrueTime</em>：Spanner 用 GPS+原子钟把时钟不确定性收敛到几 ms，Paxos 跨区同步提交，给外部一致性——延迟是跨区 RTT 量级。</p>
 <pre><code># LWW 冲突解决（DynamoDB Global Tables 语义）
 def merge(local, remote):
     # 每条 item 带系统时间戳，取时间戳更大的胜出
-    return remote if remote.ts > local.ts else local
+    return remote if remote.ts &gt; local.ts else local
     # 危险：ts 相等或时钟偏移时行为未定义 → 用逻辑时钟/version vector 更稳</code></pre>
 <p><strong>选型心法</strong>：能容忍偶发丢更新的数据（点赞数、last-seen）用 LWW；不能丢的（账户余额、库存）用单写归属区或强一致 store；跨区计数用 <em>CRDT</em>（G-Counter 各区独立累加、合并取和，天然无冲突）。</p>
 <p class="case"><strong>现实案例</strong>：<strong>DynamoDB Global Tables</strong> 默认 MREC 模式 = 多活 + LWW，1-2 秒内跨区收敛（<a href="https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/GlobalTables.html">AWS 文档</a>）。<strong>Google Spanner</strong> 用 TrueTime 做全球外部一致性事务（<a href="https://research.google/pubs/spanner-googles-globally-distributed-database-2/">OSDI 2012 论文</a>）。<strong>Netflix</strong> 用 Cassandra 多向异步复制承接跨区最终一致。</p>
-
-<h3>③ 数据驻留与合规 — 把数据钉在地理边界内</h3>
+<h3 data-tts="b25b62ae796687f9">③ 数据驻留与合规 — 把数据钉在地理边界内</h3>
 <p class="tradeoff"><strong>核心 trade-off</strong>：全局复制体验最好但违反 GDPR；严格驻留合规但欧盟用户去美国出差就访问不到自己数据（需就近 + 归属区兜底）。</p>
 <p><strong>【原理】</strong>合规要求 PII 物理留在特定法域。做法是<em>按地理分区（geo-partitioning）</em>：以 region 作为分片键的一部分，欧盟用户的行只落在 eu 节点，复制拓扑也被约束在法域内。关键区分：<strong>敏感数据（PII）</strong>驻留 + 不出境，<strong>非敏感数据</strong>（商品、汇率）全局复制。难点是<em>关联查询</em>——订单在 eu、推荐模型在 us，得靠 ID 引用而非跨境 JOIN。</p>
 <pre><code>-- CockroachDB：把表按 region 分区并钉住位置
@@ -177,8 +171,7 @@ ALTER TABLE users SET LOCALITY REGIONAL BY ROW;
 -- Super Region 保证：既满足驻留，又能在 eu 内部跨区存活</code></pre>
 <p><strong>陷阱</strong>：备份和日志也是 PII！很多团队主库驻留了，却把 binlog / 审计日志 / 分析管道统一汇到美国数仓——照样违规。合规边界要覆盖<em>全数据生命周期</em>。</p>
 <p class="case"><strong>现实案例</strong>：<strong>CockroachDB</strong> 的 <code>REGIONAL BY ROW</code> + Super Region 专门解「驻留 vs 区域存活」的两难（<a href="https://www.cockroachlabs.com/docs/stable/data-domiciling">数据驻留文档</a>）。<strong>Stripe / Salesforce</strong> 为欧盟客户提供 EU-only 数据处理选项。</p>
-
-<h3>④ 跨区延迟优化 — 减少跨洋往返次数</h3>
+<h3 data-tts="dbfe7ef6ffd9b082">④ 跨区延迟优化 — 减少跨洋往返次数</h3>
 <p class="tradeoff"><strong>核心 trade-off</strong>：读本地副本快但可能 stale；每次跨区确认最新则被 RTT 支配。优化的本质是<em>把跨区往返从「每请求」降到「后台异步」</em>。</p>
 <p><strong>【原理】</strong>三招：<em>(1) 读本地写归属</em>——读永远打本区副本（0 跨区），写才可能跨区，因为读远多于写。<em>(2) 批量/流水线</em>——把 N 次跨区调用合并成一次，或用异步复制而非同步等待。<em>(3) 边缘计算</em>——静态与可缓存内容在 PoP 就地返回，动态请求才回源。核心指标是 <strong>跨区往返次数</strong>，不是带宽——一次 180ms RTT 比传 1MB 还贵。</p>
 <pre><code># 反模式：一个请求里串行 3 次跨区调用 = 3×180ms = 540ms
@@ -187,11 +180,9 @@ price = call_us(get_price)       # 跨区
 tax = call_us(calc_tax)          # 跨区
 # 正解：本区副本 + 后台异步同步，请求路径 0 跨区</code></pre>
 <p class="case"><strong>现实案例</strong>：<strong>Cloudflare Workers</strong> 在 300+ PoP 就近执行逻辑，避免回源跨洋。<strong>Netflix</strong> 把用户可见路径全部服务多区部署，请求不跨区（<a href="https://netflixtechblog.com/active-active-for-multi-regional-resiliency-c47719f6685b">Active-Active</a>）。</p>
-
-<h2>扩展与优化</h2>
+<h2 data-tts="8f6d67ba6e142ce8">扩展与优化</h2>
 <p>演进路线：<strong>单区 → 主备（DR，跨区异步复制 + 手动 failover）→ 读多活（写归属区、读全球副本）→ 全多活（各区可写 + 冲突解决）</strong>。多数公司停在「读多活」就够了——全多活的冲突治理成本极高。下一步瓶颈：跨区复制带宽与滞后（用 CDC + Kafka MirrorMaker 做管道）；failover 演练（Netflix 用 Chaos Kong 定期真的关掉一个区验证）；全局二级索引（跨区维护索引一致性是深水区，常退化成异步最终一致）。</p>
-
-<h2>常见陷阱与面试追问</h2>
+<h2 data-tts="2ded507174766fea">常见陷阱与面试追问</h2>
 <ul>
 <li><strong>「多活就是各区都能写」——错</strong>。真多活要付冲突解决代价，多数「多活」其实是读多活/写归属区。面试要能区分。</li>
 <li><strong>异步复制滞后下的读己写（read-your-writes）</strong>：用户在 eu 写、故障切到 us 读，可能读到旧值。补救：sticky 到归属区、或写后短时间强制读归属区。</li>
@@ -200,8 +191,7 @@ tax = call_us(calc_tax)          # 跨区
 <li><strong>成本盲区</strong>：跨区数据传输费（AWS 跨区 egress）+ 每区冗余容量，多活约等于 2-3× 基础设施成本。面试官爱问「多花的钱换到了什么 SLA」。</li>
 <li><strong>追问：Spanner 靠什么给全球强一致？</strong> TrueTime——用 GPS+原子钟把时钟误差 bound 在几 ms，提交时「commit-wait」等过不确定窗口，保证外部一致性。这是用硬件换一致性。</li>
 </ul>
-
-<h2>深入资源</h2>
+<h2 data-tts="c2cd3342c1ad2658">深入资源</h2>
 <ul>
 <li>《Designing Data-Intensive Applications》(Kleppmann) — 第 5 章复制、第 9 章一致性与共识，多区问题的理论底座。</li>
 <li>Netflix TechBlog — <a href="https://netflixtechblog.com/active-active-for-multi-regional-resiliency-c47719f6685b">Active-Active for Multi-Regional Resiliency</a>，工业界多活的经典拆解。</li>
@@ -209,18 +199,16 @@ tax = call_us(calc_tax)          # 跨区
 <li>AWS — <a href="https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/GlobalTables.html">DynamoDB Global Tables 工作原理</a>，多活 + LWW 的产品化实现。</li>
 <li>Cockroach Labs — <a href="https://www.cockroachlabs.com/docs/stable/data-domiciling">Data Domiciling with CockroachDB</a>，驻留与区域存活的工程解法。</li>
 </ul>
-
-<h2>深入思考</h2>
+<h2 data-tts="699177a8dbaa6729">深入思考</h2>
 <details><summary>为什么说「同步跨区复制」在洲际尺度上几乎不可用？临界点在哪？</summary><div class="answer">同步复制要求写请求等所有（或多数）副本确认才返回。洲际 RTT 是 100-180ms，同步写就把每次写延迟抬到这个量级，且写吞吐被最慢副本卡死。临界点是 RTT 与你的延迟 SLO 之比：同城多可用区 RTT &lt;2ms，同步复制没问题（这就是为什么 AZ 级同步很常见）；跨洲 RTT 上百 ms，同步就崩。所以业界普遍「同城同步、跨洲异步」。Spanner 是例外——它接受跨区 commit 延迟，用 TrueTime 换强一致，本质是为「必须全球强一致」的场景付延迟税。</div></details>
 <details><summary>LWW 会静默丢更新，为什么 DynamoDB 还敢默认用它？什么数据绝不能用？</summary><div class="answer">因为多数多活 workload 的并发同 key 写极罕见（用户通常在一个区活动），且很多数据语义上「最新即正确」（用户资料、last-seen、配置）。丢的那次更新在这些场景无伤大雅。但<strong>累加型</strong>（余额、库存、计数）绝不能用 LWW——两区各 +1，LWW 只保留一个，钱就凭空消失。这类要么用单写归属区串行化，要么用 CRDT（如 PN-Counter，各区独立记增减、合并求和，无损）。判据：这个字段是「覆盖写」还是「累加/集合运算」？后者必须 CRDT 或单写。</div></details>
 <details><summary>欧盟用户去美国出差，如何既满足数据驻留又让他访问到自己的数据？</summary><div class="answer">数据物理留在 eu（驻留满足），但请求可以从任何地方发起。做法：用户的归属区仍是 eu，美国边缘收到请求后按归属区把<em>数据操作</em>转发回 eu 处理，只有计算在美国、数据不离境。代价是这次访问要付一次美→欧跨区 RTT（体验降级但合规）。或者：把可跨境的非 PII（浏览、目录）就近服务，仅涉及 PII 的操作回 eu。关键是分清「数据驻留」约束的是<strong>数据的物理存储位置</strong>，不是<strong>请求的发起位置</strong>——想清楚这点就能设计出合规又可用的方案。</div></details>
 <details><summary>你加了第三个区域来提升可用性，反而可能降低可用性——什么情况下会这样？</summary><div class="answer">当多个区域共享一个全局强一致的中心组件时。比如三个区都依赖一个中心化的全局配置服务 / 分布式锁 / 单调 ID 分配器——这个中心组件的可用性成了所有区的上界，区数越多、对它的依赖越多，它挂了炸得越大（放大爆炸半径）。另一种：跨区做同步 quorum 写，加区反而让 quorum 更容易因某区慢而拖累整体 P99。可用性不是区域数的单调增函数——只有当各区<em>真正独立</em>（无共享强一致依赖）时，增区才增可用性。这正是 Netflix「每区自包含」原则的深意。</div></details>
 <details><summary>估算：1 亿 DAU、跨区异步复制，若 us↔eu 链路滞后 2 秒，一次区域 failover 大概丢多少写？</summary><div class="answer">粗估：1 亿 DAU 若写 QPS 峰值约 50 万（假设人均每日几十次写、峰谷比 ~5）。failover 时未复制到备区的写 ≈ 复制滞后窗口 × 写 QPS = 2s × 50万 = <strong>约 100 万条写在途未同步</strong>，硬 failover 会丢这部分（除非故障区的 WAL 事后可恢复重放）。这就是为什么 RPO（可容忍丢多少数据）和滞后强相关：要 RPO≈0 就得同步复制（但付延迟）或双写 + 事后对账。面试里给出这个量级估算 + 指出 RPO/RTO/延迟的三角取舍，比背概念强得多。</div></details>
-
 <div class="nav"><a href="index.html">← 回到 index</a></div>
 </div>
-<script src="https://hub.cissychen.com/comments.js" defer></script>
-<script src="https://hub.cissychen.com/search.js" defer></script>
-<script src="https://hub.cissychen.com/index-button.js" defer></script>
-<script src="https://hub.cissychen.com/i18n-tts.js" defer></script>
+<script defer="" src="https://hub.cissychen.com/comments.js"></script>
+<script defer="" src="https://hub.cissychen.com/search.js"></script>
+<script defer="" src="https://hub.cissychen.com/index-button.js"></script>
+<script defer="" src="https://hub.cissychen.com/i18n-tts.js"></script>
 </body></html>

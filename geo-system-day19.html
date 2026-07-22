@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<html lang="zh-CN"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>Day 19 · 地理系统 (Geospatial Systems) — System Design</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -97,7 +98,6 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 </script>
 </head><body><div class="container">
-
 <header>
 <div class="meta">
 <span class="tag day">Day 19</span>
@@ -106,10 +106,9 @@ document.addEventListener('DOMContentLoaded',()=>{
 <span class="tag">S2 / H3 / Geohash</span>
 <span class="tag">Uber Dispatch</span>
 </div>
-<h1>地理系统 — 把球面切成格子，再在格子里找最近的人<span class="en">Geospatial Systems: Geohash vs S2 vs H3, Nearby Queries, Uber Dispatch</span></h1>
+<h1 data-tts="96a4b7b81d9784e3">地理系统 — 把球面切成格子，再在格子里找最近的人<span class="en">Geospatial Systems: Geohash vs S2 vs H3, Nearby Queries, Uber Dispatch</span></h1>
 </header>
-
-<h2>问题场景与需求约束</h2>
+<h2 data-tts="b2c7fc3308a09e77">问题场景与需求约束</h2>
 <p>设计一个 <strong>5000 万 DAU 的网约车「附近的司机」服务</strong>：乘客点开 App，要在 <strong>p99 &lt; 100ms</strong> 内返回半径 3km 内、最近的 20 个可用司机，并据此派单。难点在<em>读写都重</em>——这不是「设计 Yelp 静态门店搜索」那种以读为主的场景。</p>
 <ul>
 <li><strong>写极重</strong>：峰值 200 万在线司机，每 4 秒上报一次 GPS → <strong>50 万 location writes/s</strong>，且每条写都让旧位置失效。</li>
@@ -119,8 +118,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 <li><strong>地理倾斜</strong>：机场、演唱会、早高峰 CBD —— 局部密度可能是平均值的 100 倍，是热点的天然温床。</li>
 </ul>
 <p>核心三问：<em>① 怎么把经纬度变成可索引的 key（地理编码）；② 怎么高效查半径内的点（附近查询）；③ 百万动点怎么分片不打爆单机（dispatch 架构）。</em></p>
-
-<h2>高层架构</h2>
+<h2 data-tts="cbf89b65a4550e83">高层架构</h2>
 <pre class="mermaid">
 graph TD
     R["乘客 App<br/><i>发起 nearby 请求</i>"]
@@ -133,11 +131,11 @@ graph TD
     N3["Geo Shard C"]
     DB[("位置存储<br/>Redis GEO / 内存")]
 
-    D -->|① location update| GW --> DISP
-    R -->|② nearby+派单| GW --> DISP
-    DISP -->|③ 按 cell 路由| RING
-    RING --> N1 & N2 & N3
-    N1 & N2 & N3 -.->|④ 持久化兜底| DB
+    D --&gt;|① location update| GW --&gt; DISP
+    R --&gt;|② nearby+派单| GW --&gt; DISP
+    DISP --&gt;|③ 按 cell 路由| RING
+    RING --&gt; N1 &amp; N2 &amp; N3
+    N1 &amp; N2 &amp; N3 -.-&gt;|④ 持久化兜底| DB
 
     classDef client fill:#1a2530,stroke:#64c8ff,color:#e8eef5
     classDef svc fill:#0e2030,stroke:#5eead4,color:#e8eef5
@@ -150,10 +148,8 @@ graph TD
 </pre>
 <p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">司机位置先地理编码成 cell ID，再用 cell ID 做分片键路由到对应 shard；查询只触达「目标 cell + 邻居 cell」所在的少数 shard</p>
 <p><strong>组件职责</strong>：网关维持司机长连收 GPS；<em>Dispatch（Uber 叫 DISCO）</em>把经纬度编码为 geo cell，用<em>一致性哈希环</em>（Uber 用 Ringpop）按 cell 把 supply/demand 分片到内存节点；每个 shard 在内存维护「cell → 司机集合」网格，查询只读「中心 cell + 一圈邻居」。<strong>真相在内存</strong>，位置存储（Redis GEO 或异步落盘）只兜底崩溃恢复。</p>
-
-<h2>关键技术点</h2>
-
-<h3>1. 地理编码：Geohash vs S2 vs H3 — 怎么把球面切成可索引的格子</h3>
+<h2 data-tts="c3df2e03437171d5">关键技术点</h2>
+<h3 data-tts="8bf66eceb083a94c">1. 地理编码：Geohash vs S2 vs H3 — 怎么把球面切成可索引的格子</h3>
 <p><strong>原理</strong>：二维经纬度直接建 B-Tree 索引没用——范围查询要同时约束两个维度。核心思路是用<em>空间填充曲线（space-filling curve）把 2D 降到 1D</em>：把经纬度编码成一个保持局部性的整数/字符串，<strong>空间相邻 ≈ 编码相邻</strong>，于是「附近」退化成「前缀相同」或「ID 区间相邻」，能用普通的有序索引（B-Tree / sorted set）查。三种主流方案的差异在于「用什么形状的格子、怎么填充曲线」。</p>
 <table>
 <thead><tr><th></th><th>Geohash</th><th>S2 (Google)</th><th>H3 (Uber)</th></tr></thead>
@@ -192,8 +188,7 @@ def geohash(lat, lon, precision_bits=50):
 <li><strong>Uber H3</strong>：用六边形做定价、派单、供需热力分析，2018 开源（<a href="https://www.uber.com/en-US/blog/h3/">H3 blog</a> / <a href="https://github.com/uber/h3">github.com/uber/h3</a>），现已是行业事实标准。</li>
 <li><strong>Redis GEO</strong>：<code>GEOADD</code>/<code>GEOSEARCH</code> 底层把 geohash 编码塞进 sorted set 的 score，用 ZRANGEBYSCORE 做范围查。</li>
 </ul></div>
-
-<h3>2. 附近查询：网格桶 vs 四叉树/R-Tree — 怎么避开 O(N) 全表扫</h3>
+<h3 data-tts="2f80e3eb176dcf90">2. 附近查询：网格桶 vs 四叉树/R-Tree — 怎么避开 O(N) 全表扫</h3>
 <p><strong>原理</strong>：朴素做法是算乘客到每个司机的距离再排序，O(N) 在百万动点下必死。两条主流路线：<em>① 固定网格（grid bucketing）</em>——把空间切成等大 cell，每个司机挂到一个 cell 桶，查询时只看「中心 cell + 周围 8 个邻居」桶里的候选，再精算距离；<em>② 树形索引（quadtree / R-Tree）</em>——按密度自适应划分，稀疏区大格、密集区细格。动点高频更新场景，固定网格胜出，因为<strong>update 是 O(1) 的「从旧桶删、加到新桶」，而树要维护平衡、分裂合并代价高</strong>。</p>
 <div class="tradeoff">
 <strong>Trade-off：</strong>
@@ -216,7 +211,7 @@ def nearby(lat, lon, radius_m, k=20):
     return heapq.nsmallest(k, in_range)    # top-k, O(M log k)
 </code></pre>
 <div class="callout">
-<strong>边界陷阱</strong>：只查中心 cell 会漏掉「就在格子边线外侧」的近邻——它物理很近但落在邻居 cell。所以<em>必须查中心 + 一圈邻居</em>（H3 的 <code>kRing</code> / S2 的 cell neighbors）。这也是 geohash 直接做附近查询不可靠的根因。</p>
+<strong>边界陷阱</strong>：只查中心 cell 会漏掉「就在格子边线外侧」的近邻——它物理很近但落在邻居 cell。所以<em>必须查中心 + 一圈邻居</em>（H3 的 <code>kRing</code> / S2 的 cell neighbors）。这也是 geohash 直接做附近查询不可靠的根因。
 </div>
 <div class="case">
 <strong>现实案例：</strong>
@@ -225,8 +220,7 @@ def nearby(lat, lon, radius_m, k=20):
 <li><strong>Uber</strong>：派单不用树，而是用内存网格 + 一致性哈希分片承接高频动点（见技术点 4）。</li>
 <li><strong>Tile38 / Redis GEO</strong>：geofence、附近查询用 geohash 网格 + sorted set，适合中等规模实时定位。</li>
 </ul></div>
-
-<h3>3. 距离计算与去重：haversine、近似与正确性陷阱</h3>
+<h3 data-tts="24208f7773684e8c">3. 距离计算与去重：haversine、近似与正确性陷阱</h3>
 <p><strong>原理</strong>：cell 只能粗筛候选，最终排序得算真实球面距离。<em>haversine 公式</em>算两个经纬度的大圆距离（geodesic），比平面欧氏距离正确（地球是球）。但 haversine 含三角函数，对候选集每个点算一次也有成本，所以工程上常<strong>先用便宜的近似（如经纬度差的平方、或直接用 cell 距离）粗排，只对 top 候选算精确 haversine</strong>。另一个常被忽略的点：派单要的是<em>道路 ETA 而非直线距离</em>——直线最近的司机可能隔着一条河，真实到达时间反而最长。</p>
 <div class="tradeoff">
 <strong>Trade-off：</strong>
@@ -254,8 +248,7 @@ def haversine(lat1, lon1, lat2, lon2):
 <li><strong>Redis GEO</strong>：<code>GEODIST</code> 内部用 haversine 算两点距离，单位可选 m/km。</li>
 <li><strong>地图导航</strong>（Google Maps / 高德）：直线距离只用于初筛，真实路线走 contraction hierarchies 等图最短路算法。</li>
 </ul></div>
-
-<h3>4. Dispatch 架构：百万动点的地理分片与热点治理</h3>
+<h3 data-tts="6fdb58f7cfff4c27">4. Dispatch 架构：百万动点的地理分片与热点治理</h3>
 <p><strong>原理</strong>：单机内存放不下也扛不住全球司机的读写，必须分片。<em>关键决策：用 geo cell 而非 user ID 做分片键</em>——因为附近查询本质是地理局部的，按 cell 分片能让「一次查询只命中少数相邻 shard」，避免 fan-out 到所有节点。Uber 的 DISCO 用 <strong>Ringpop（一致性哈希 + gossip 成员协议）</strong>把 geo cell 映射到节点：同一片区域的 supply（司机）和 demand（乘客）落在同一/相邻节点上，匹配在本地完成。节点增删时只迁移环上相邻的一段 cell，不全量 rehash。</p>
 <div class="tradeoff">
 <strong>Trade-off：分片键怎么选</strong>
@@ -282,8 +275,7 @@ def dispatch_nearby(lat, lon, radius):
 <li><strong>Lyft</strong>：同样用地理网格 + 实时供需匹配，定价与派单依赖 geohash/H3 类网格做区域聚合。</li>
 <li><strong>DoorDash / 美团</strong>：外卖调度是同构问题——骑手是动点 supply，订单是 demand，按配送区域（geo cell）分片匹配。</li>
 </ul></div>
-
-<h2>扩展与优化（增长后怎么办）</h2>
+<h2 data-tts="19183a3aad2b728a">扩展与优化（增长后怎么办）</h2>
 <ul>
 <li><strong>读扩展</strong>：位置数据是「读多写多」，给每个 geo shard 加内存只读副本（异步同步），nearby 查询打副本，写仍走主。</li>
 <li><strong>热点动态再分片</strong>：监控每 cell 的密度/QPS，机场等热 cell 自动降分辨率（切子 cell）分散到多节点；冷区合并 cell 省内存。</li>
@@ -291,8 +283,7 @@ def dispatch_nearby(lat, lon, radius):
 <li><strong>持久化与恢复</strong>：内存网格定期 snapshot + WAL，节点重启能快速重建；位置过期用 TTL（司机 30s 没上报即视为离线）。</li>
 <li><strong>多区域</strong>：地理天然可按大区切分（北美/欧洲/亚太各自集群），跨区查询极少，是天然的 sharding 边界。</li>
 </ul>
-
-<h2>常见陷阱 + 面试追问</h2>
+<h2 data-tts="1c7c743029a38af4">常见陷阱 + 面试追问</h2>
 <div class="callout">
 <strong>1. 只查中心 cell 漏掉边界近邻。</strong> geohash 共享前缀长 = 物理近，但<em>反之不成立</em>（边界两侧物理很近、前缀完全不同）。必须查「中心 + 一圈邻居」cell，这是面试最爱的陷阱。
 </div>
@@ -308,17 +299,14 @@ def dispatch_nearby(lat, lon, radius):
 <div class="callout">
 <strong>5. 把动点当静态门店建 R-Tree。</strong> 每秒 50 万 update 会把树的重平衡打挂。动点用内存网格（O(1) 换桶），R-Tree 留给静态数据。
 </div>
-
-<h2>深入资源</h2>
+<h2 data-tts="5b305aa2b0bf85f1">深入资源</h2>
 <ul>
 <li><strong>《Designing Data-Intensive Applications》第 3 章</strong>（Kleppmann）：多维索引、R-Tree、空间填充曲线与 PostGIS 的本质讨论。</li>
 <li><strong>Google S2 Geometry</strong>：<a href="https://s2geometry.io/">s2geometry.io</a> + <a href="https://opensource.googleblog.com/2017/12/announcing-s2-library-geometry-on-sphere.html">2017 开源公告</a>，Hilbert 曲线与球面 cell 层级。</li>
 <li><strong>Uber H3</strong>：<a href="https://www.uber.com/en-US/blog/h3/">H3 blog</a> + <a href="https://github.com/uber/h3">github.com/uber/h3</a>，六边形网格的设计取舍。</li>
 <li><strong>High Scalability：How Uber Scales Their Real-time Market Platform</strong>（<a href="https://highscalability.com/how-uber-scales-their-real-time-market-platform/">2015</a>）：DISCO、Ringpop、地理分片的经典拆解。</li>
 </ul>
-
-<h2>深入思考（点击展开答案）</h2>
-
+<h2 data-tts="dd0ce9d1bfaf75cf">深入思考（点击展开答案）</h2>
 <details>
 <summary>1. 为什么六边形比正方形「更适合」做地理网格？给出至少两个数学上的理由，以及它的代价。</summary>
 <div class="answer">
@@ -327,7 +315,6 @@ def dispatch_nearby(lat, lon, radius):
 <p><strong>代价：</strong> 六边形无法完美铺满球面——欧拉定理决定了铺球必然要插入恰好 12 个五边形（落在 icosahedron 顶点）。且父 cell 装不下整数个子 cell（切 7 个子时边缘要借相邻 cell），所以 H3 层级是<em>近似</em>嵌套，跨分辨率聚合有边界误差。S2 的四边形则能严格四叉嵌套——这正是它在「需要精确层级范围扫描」场景（数据库地理键）更受青睐的原因。</p>
 </div>
 </details>
-
 <details>
 <summary>2. 半径 3km 的查询，cell 边长选 500m 还是 5km，分别会怎样？怎么定 cell 大小？</summary>
 <div class="answer">
@@ -336,7 +323,6 @@ def dispatch_nearby(lat, lon, radius):
 <p><strong>定 cell 大小的原则</strong>：让 <em>cell 边长 ≈ 典型查询半径</em>，使一次查询命中「中心 + 1～2 圈」即可，桶数和桶内候选数都可控。但单一分辨率应付不了「3km 找车 vs 100km 找城际拼车」的跨尺度需求——所以生产系统用<strong>多分辨率</strong>：按查询半径动态选 resolution（H3/S2 都内建层级），大半径用粗 cell、小半径用细 cell。Uber 还会按区域密度调分辨率，CBD 用更细的 cell。</p>
 </div>
 </details>
-
 <details>
 <summary>3. 司机每 4 秒上报一次位置 = 50 万 writes/s。这些写真的都要落数据库吗？怎么扛？</summary>
 <div class="answer">
@@ -350,7 +336,6 @@ def dispatch_nearby(lat, lon, radius):
 <p>对比账户余额——「低频、必须持久、强一致」绝不能丢。位置数据正相反：<em>承认它易失、用最新上报自愈</em>，是廉价扛住海量写的根本。</p>
 </div>
 </details>
-
 <details>
 <summary>4. 演唱会散场，3 万人同时在一个 cell 叫车。这个 hot cell 怎么不把单节点打挂？</summary>
 <div class="answer">
@@ -364,7 +349,6 @@ def dispatch_nearby(lat, lon, radius):
 <p>这和 Day 2 的 hot key、Day 4 的 sharding hot spot 是<em>同构问题</em>——解法永远是「再切细 + 副本 + 本地缓存 + 需求侧限流」的组合。</p>
 </div>
 </details>
-
 <details>
 <summary>5. 为什么不直接用 Postgres + PostGIS 的 GiST 索引搞定一切？它的边界在哪？</summary>
 <div class="answer">
@@ -377,10 +361,9 @@ def dispatch_nearby(lat, lon, radius):
 <p><strong>结论：</strong>选型由<em>更新频率</em>决定——静态地理数据用 PostGIS；百万级高频动点用内存网格 + 一致性哈希分片（Uber 路线）。把动点硬塞进 R-Tree 是最常见的过度工程。</p>
 </div>
 </details>
-
 </div>
-<script src="https://hub.cissychen.com/comments.js" defer></script>
-<script src="https://hub.cissychen.com/search.js" defer></script>
-<script src="https://hub.cissychen.com/index-button.js" defer></script>
-<script src="https://hub.cissychen.com/i18n-tts.js" defer></script>
+<script defer="" src="https://hub.cissychen.com/comments.js"></script>
+<script defer="" src="https://hub.cissychen.com/search.js"></script>
+<script defer="" src="https://hub.cissychen.com/index-button.js"></script>
+<script defer="" src="https://hub.cissychen.com/i18n-tts.js"></script>
 </body></html>

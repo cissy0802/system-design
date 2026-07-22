@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<html lang="zh-CN"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>Day 3 · 数据库选型 (Database Selection) — System Design</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -97,7 +98,6 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 </script>
 </head><body><div class="container">
-
 <header>
 <div class="meta">
 <span class="tag day">Day 3</span>
@@ -107,14 +107,12 @@ document.addEventListener('DOMContentLoaded',()=>{
 <span class="tag">OLTP/OLAP</span>
 <span class="tag">ACID/BASE</span>
 </div>
-<h1>数据库选型 — 不是『SQL 还是 NoSQL』那么简单<span class="en">Database Selection: SQL vs NoSQL, OLTP vs OLAP, ACID vs BASE</span></h1>
+<h1 data-tts="e2b325e60a54e04e">数据库选型 — 不是『SQL 还是 NoSQL』那么简单<span class="en">Database Selection: SQL vs NoSQL, OLTP vs OLAP, ACID vs BASE</span></h1>
 </header>
-
-<h2>问题场景</h2>
+<h2 data-tts="fefe4ac6b876cbf4">问题场景</h2>
 <p>面试官问『你为什么选 MongoDB』，资深工程师会被这种问题问翻车——因为正确答案不是『因为它快』，而是『因为我的访问模式是按 user_id 聚合读、写多读少、schema 经常变』。<strong>数据库选型不是技术信仰，是约束推导</strong>：数据模型、访问模式、一致性要求、规模、运维成本，五个轴决定一切。</p>
 <p>反面案例多得很：Uber 2016 年从 Postgres 迁到 MySQL（因为 Postgres 复制协议的写放大），又在 2020 年自研 Schemaless 在 MySQL 上跑 KV；Pinterest 2012 年从 MongoDB 迁到 MySQL + 自家分片；Discord 2017 年从 MongoDB 迁到 Cassandra（消息存储 1 亿条/天），2023 年又迁到 ScyllaDB；Stripe 至今主库仍是 MongoDB——但他们用一套精密的应用层一致性。<em>没有最优数据库，只有最匹配的</em>。</p>
-
-<h2>需求与约束（面试必问）</h2>
+<h2 data-tts="6083095e71783d21">需求与约束（面试必问）</h2>
 <ul>
 <li><strong>访问模式</strong>：是『按主键点查』『按二级索引扫』『范围查询』『join 多表』还是『全表聚合』？这决定数据库类型。</li>
 <li><strong>读写比与 QPS</strong>：写 100k QPS 的场景，Postgres 单机不够（极限约 50k），需要 Cassandra / DynamoDB / 分片 MySQL。</li>
@@ -124,8 +122,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 <li><strong>Schema 稳定性</strong>：业务还在快速迭代（NoSQL 灵活）还是已稳定（SQL 结构化更安全）。</li>
 <li><strong>运维能力</strong>：团队会调 Postgres 还是 Cassandra？托管（Aurora / DynamoDB）还是自建？</li>
 </ul>
-
-<h2>高层架构（典型数据栈）</h2>
+<h2 data-tts="d6ae039b1d0a66e6">高层架构（典型数据栈）</h2>
 <pre class="mermaid">
 graph LR
     APP["Application<br/><i>API / Service</i>"]
@@ -136,13 +133,13 @@ graph LR
     DWH["Data Warehouse<br/><i>Snowflake / BigQuery · OLAP</i>"]
     LAKE["Data Lake<br/><i>S3 + Iceberg · 冷数据</i>"]
 
-    APP --> CACHE
-    APP --> OLTP
-    APP --> SEARCH
-    OLTP -->|binlog| QUEUE
-    QUEUE --> DWH
-    QUEUE --> SEARCH
-    QUEUE --> LAKE
+    APP --&gt; CACHE
+    APP --&gt; OLTP
+    APP --&gt; SEARCH
+    OLTP --&gt;|binlog| QUEUE
+    QUEUE --&gt; DWH
+    QUEUE --&gt; SEARCH
+    QUEUE --&gt; LAKE
 
     classDef app fill:#1a2530,stroke:#64c8ff,color:#e8eef5
     classDef cache fill:#1a1a30,stroke:#ffb450,color:#e8eef5
@@ -154,10 +151,8 @@ graph LR
     class QUEUE,DWH,LAKE olap
 </pre>
 <p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">现代后端往往是『多数据库共存』：OLTP 跑交易、OLAP 跑分析、Search 跑搜索、Cache 抗读</p>
-
-<h2>关键技术点</h2>
-
-<h3>1. SQL vs NoSQL：不是二元对立，是数据模型选择</h3>
+<h2 data-tts="c3df2e03437171d5">关键技术点</h2>
+<h3 data-tts="e95915024e5c8862">1. SQL vs NoSQL：不是二元对立，是数据模型选择</h3>
 <p><strong>原理</strong>：『NoSQL』是个糟糕的命名，它其实是 4 类完全不同的数据库的总称：</p>
 <table>
 <thead><tr><th>类型</th><th>代表</th><th>数据模型</th><th>典型场景</th></tr></thead>
@@ -193,8 +188,7 @@ graph LR
 <li><strong>Facebook</strong>：用户数据用 MySQL（分片几千个）+ TAO（graph 缓存层）；广告系统用 MySQL；消息用 HBase。</li>
 <li><strong>Uber</strong>：从 Postgres → MySQL → Schemaless（自建 KV on MySQL）→ Docstore（自建分布式 SQL）。</li>
 </ul></div>
-
-<h3>2. OLTP vs OLAP：行存 vs 列存的本质区别</h3>
+<h3 data-tts="f0be087d8f8b3d2e">2. OLTP vs OLAP：行存 vs 列存的本质区别</h3>
 <p><strong>原理</strong>：交易系统（OLTP）和分析系统（OLAP）的访问模式完全相反：</p>
 <ul>
 <li><strong>OLTP</strong>：每次读写少量行（按主键）、写多、低延迟（ms）、ACID。例如『查 user 123 的订单』『扣库存』。</li>
@@ -214,8 +208,8 @@ graph LR
         C3["age: [30, 25, 28]"]
         C4["country: [US, UK, JP]"]
     end
-    Row -->|"SELECT * WHERE id=2 ✅"| Q1["点查快"]
-    Col -->|"AVG(age) GROUP BY country ✅"| Q2["聚合快 · 压缩 10x"]
+    Row --&gt;|"SELECT * WHERE id=2 ✅"| Q1["点查快"]
+    Col --&gt;|"AVG(age) GROUP BY country ✅"| Q2["聚合快 · 压缩 10x"]
     classDef row fill:#0e2030,stroke:#5eead4,color:#e8eef5
     classDef col fill:#2a1530,stroke:#ff7ab6,color:#e8eef5
     class Row,R1,R2,R3 row
@@ -245,8 +239,7 @@ graph LR
 <li><strong>Airbnb</strong>：OLTP Postgres + CDC → Druid / Presto 做实时分析；夜间 Spark + S3 跑数仓。</li>
 <li><strong>Databricks Lakehouse</strong>：S3 + Delta Lake（列存 Parquet + 事务日志），尝试『一份数据两种用』。</li>
 </ul></div>
-
-<h3>3. ACID vs BASE：一致性的两种哲学</h3>
+<h3 data-tts="dfa946d8620fb437">3. ACID vs BASE：一致性的两种哲学</h3>
 <p><strong>ACID</strong>（Atomicity, Consistency, Isolation, Durability）：传统 RDBMS 的承诺。<strong>BASE</strong>（Basically Available, Soft state, Eventual consistency）：NoSQL 的妥协。</p>
 <table>
 <thead><tr><th></th><th>ACID</th><th>BASE</th></tr></thead>
@@ -268,7 +261,7 @@ BEGIN;
 SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
 
 SELECT balance FROM accounts WHERE id = 1 FOR UPDATE;
--- 如果 balance >= 100, 扣款
+-- 如果 balance &gt;= 100, 扣款
 UPDATE accounts SET balance = balance - 100 WHERE id = 1;
 UPDATE accounts SET balance = balance + 100 WHERE id = 2;
 
@@ -292,29 +285,28 @@ COMMIT;
 <li><strong>TiDB</strong>：PingCAP 的 MySQL 兼容分布式 SQL，国内大量电商用它做 OLTP+OLAP。</li>
 <li><strong>Cassandra</strong>：BASE 教科书，靠 quorum read/write（R + W &gt; N）调一致性。Discord、Apple、Netflix 在用。</li>
 </ul></div>
-
-<h3>4. 选型决策树：Postgres / DynamoDB / Cassandra / Redis</h3>
+<h3 data-tts="a32f36dd30283684">4. 选型决策树：Postgres / DynamoDB / Cassandra / Redis</h3>
 <p><strong>原理</strong>：四个主流选项覆盖 90% 场景。下面是一个实用决策路径。</p>
 <pre class="mermaid">
 graph TD
-    Start{"需要事务 & Join?"}
-    Start -->|"是"| SQL_q{"数据量 > 1TB?"}
-    Start -->|"否"| KV_q{"延迟要求 < 1ms?"}
+    Start{"需要事务 &amp; Join?"}
+    Start --&gt;|"是"| SQL_q{"数据量 &gt; 1TB?"}
+    Start --&gt;|"否"| KV_q{"延迟要求 &lt; 1ms?"}
 
-    SQL_q -->|"否"| PG["✅ Postgres<br/><i>事务 · 复杂查询 · JSONB</i>"]
-    SQL_q -->|"是"| Dist_q{"全球多区?"}
+    SQL_q --&gt;|"否"| PG["✅ Postgres<br/><i>事务 · 复杂查询 · JSONB</i>"]
+    SQL_q --&gt;|"是"| Dist_q{"全球多区?"}
 
-    Dist_q -->|"是"| Span["✅ Spanner / CockroachDB<br/><i>跨区 ACID</i>"]
-    Dist_q -->|"否"| TiDB["✅ TiDB / Vitess<br/><i>分布式 MySQL</i>"]
+    Dist_q --&gt;|"是"| Span["✅ Spanner / CockroachDB<br/><i>跨区 ACID</i>"]
+    Dist_q --&gt;|"否"| TiDB["✅ TiDB / Vitess<br/><i>分布式 MySQL</i>"]
 
-    KV_q -->|"是"| Redis["✅ Redis<br/><i>内存 KV · 缓存 · 排行榜</i>"]
-    KV_q -->|"否"| Scale_q{"QPS > 50k 写 & 海量数据?"}
+    KV_q --&gt;|"是"| Redis["✅ Redis<br/><i>内存 KV · 缓存 · 排行榜</i>"]
+    KV_q --&gt;|"否"| Scale_q{"QPS &gt; 50k 写 &amp; 海量数据?"}
 
-    Scale_q -->|"是"| Wide_q{"托管 / 自建?"}
-    Scale_q -->|"否"| PG2["✅ Postgres<br/><i>通常够用</i>"]
+    Scale_q --&gt;|"是"| Wide_q{"托管 / 自建?"}
+    Scale_q --&gt;|"否"| PG2["✅ Postgres<br/><i>通常够用</i>"]
 
-    Wide_q -->|"托管"| DDB["✅ DynamoDB<br/><i>无运维 · 按访问付费</i>"]
-    Wide_q -->|"自建"| Cass["✅ Cassandra / Scylla<br/><i>多区写 · BASE</i>"]
+    Wide_q --&gt;|"托管"| DDB["✅ DynamoDB<br/><i>无运维 · 按访问付费</i>"]
+    Wide_q --&gt;|"自建"| Cass["✅ Cassandra / Scylla<br/><i>多区写 · BASE</i>"]
 
     classDef sql fill:#0e2030,stroke:#5eead4,color:#e8eef5
     classDef kv fill:#1a1a30,stroke:#ffb450,color:#e8eef5
@@ -337,8 +329,7 @@ graph TD
 <li><strong>Shopify</strong>：MySQL Vitess（4PB+），按 shop_id 分片，单 shop 一个 pod。</li>
 <li><strong>OpenAI</strong>：用户/账单 Postgres + Redis；API logs 走 ClickHouse。</li>
 </ul></div>
-
-<h2>扩展与优化（增长后怎么办）</h2>
+<h2 data-tts="1b7bea6ed0040fb1">扩展与优化（增长后怎么办）</h2>
 <ul>
 <li><strong>Postgres 单机顶不住</strong>：先 read replica（读写分离）→ 垂直分库（按业务拆 user / order / inventory）→ 水平分片（Citus / Vitess / 应用层）。</li>
 <li><strong>跨业务 join</strong>：CDC（Debezium 抓 binlog）→ Kafka → 物化到搜索/数仓，应用层 join 转为下游消费。</li>
@@ -346,8 +337,7 @@ graph TD
 <li><strong>多区</strong>：单区 OLTP（避免分布式事务）+ 异步复制到其他区；或者上 Spanner / CockroachDB（全球 ACID 但写延迟 100ms+）。</li>
 <li><strong>冷数据归档</strong>：热数据留 OLTP（最近 90 天），冷数据走 S3 + Iceberg/Parquet，查询用 Athena/Trino。</li>
 </ul>
-
-<h2>常见陷阱（资深工程师也常翻车）</h2>
+<h2 data-tts="0174181fd8f1c047">常见陷阱（资深工程师也常翻车）</h2>
 <div class="callout">
 <strong>1. 用 MongoDB 当关系库用</strong>：业务一旦稳定，你会发现『没有 join』是诅咒。要么应用层做 N+1（慢），要么数据冗余（写放大、一致性恶梦）。Stripe 至今为此付代价。
 </div>
@@ -366,8 +356,7 @@ graph TD
 <div class="callout">
 <strong>6. 跨数据库分布式事务</strong>：『写 Postgres + 写 Redis』如果一致性敏感，要用 outbox pattern（Day 7 详讲），不要寄希望于 2PC。
 </div>
-
-<h2>面试问题示例</h2>
+<h2 data-tts="7db9d03f0906994d">面试问题示例</h2>
 <ol>
 <li>你设计一个 Twitter，timeline 用什么存？为什么不全用 MySQL？</li>
 <li>Postgres 和 MySQL 选哪个？说出 3 个真实差异（不要说『差不多』）。</li>
@@ -376,19 +365,15 @@ graph TD
 <li>用户量从 10w 到 1 亿，数据库怎么演进？分几个阶段、每个阶段瓶颈是什么。</li>
 <li>HTAP 数据库（TiDB）和『OLTP + CDC 到 OLAP』两套方案，怎么选？</li>
 </ol>
-
-<h2>关键资源</h2>
+<h2 data-tts="aaf0ab885c5a34d4">关键资源</h2>
 <ul>
 <li><strong>《Designing Data-Intensive Applications》Ch 2-3</strong>（Kleppmann）：数据模型与存储引擎的本质讨论，本主题最权威读物。</li>
 <li><strong>《Dynamo: Amazon's Highly Available Key-value Store》</strong>（SOSP 2007）+ <strong>《Spanner: Google's Globally Distributed Database》</strong>（OSDI 2012）：NoSQL 与分布式 SQL 的两座里程碑。</li>
 <li><strong>Discord 工程博客《How Discord Stores Trillions of Messages》</strong>（2023）：MongoDB → Cassandra → ScyllaDB 的迁移史，含 latency 数据。</li>
 </ul>
-
-<h2>English Summary</h2>
+<h2 data-tts="08f4baf82d6ede09">English Summary</h2>
 <p>Database selection is constraint derivation, not technology religion. Five axes determine the choice: data model (relational / KV / document / wide-column / graph / search / time-series), access pattern (point lookup vs range scan vs aggregation vs join), consistency (ACID vs BASE), scale (QPS, data size, geo distribution), and operational cost. Default to Postgres unless you have a specific reason — its versatility (JSONB, full-text, geo, time-series extensions) covers 80% of needs. Reach for DynamoDB / Cassandra when write throughput exceeds ~50k QPS or you need horizontal scale-out; Redis when sub-ms latency is required; columnar warehouses (Snowflake / BigQuery / ClickHouse) when analytical aggregation dominates. Modern stacks combine multiple stores via CDC pipelines: OLTP handles transactions, search handles full-text, warehouse handles analytics.</p>
-
-<h2>深入思考（点击展开答案）</h2>
-
+<h2 data-tts="8e177cf7e9c81324">深入思考（点击展开答案）</h2>
 <details>
 <summary>1. 同一个业务实体（如 user）在 OLTP（Postgres）和 OLAP（Snowflake）里都存了，访问 OLAP 总是滞后几小时。如果产品经理要『实时数据分析』，至少 3 种方案，分别什么代价？</summary>
 <div class="answer">
@@ -403,7 +388,6 @@ graph TD
 <p><em>实战推荐</em>：CDC + ClickHouse 是 2024 年最主流（Cloudflare、Uber、字节都用）；Materialize 适合『SQL 即可表达』的分析。</p>
 </div>
 </details>
-
 <details>
 <summary>2. DynamoDB 的 partition key 选『user_id』，结果有个『superuser』占了 30% 的流量，单 partition 被限流（3000 RCU 上限）。不能改 schema，怎么解？</summary>
 <div class="answer">
@@ -418,7 +402,6 @@ graph TD
 <p><em>本质教训</em>：DynamoDB 的『先想访问模式再设计 partition key』不是说说而已。一旦上线发现 hot key，迁移代价巨大。这也是为什么很多团队用了 DDB 几年后又迁回 Postgres + 分片。</p>
 </div>
 </details>
-
 <details>
 <summary>3. 资深工程师常说『从 Postgres 开始，不行再换』。给一个具体场景，Postgres 真的不行、必须换的临界点（QPS、数据量、特性）在哪？</summary>
 <div class="answer">
@@ -441,7 +424,6 @@ graph TD
 <p><em>实战</em>：Instagram 用 Postgres 跑到 IPO（10 亿 DAU），靠分片 + 良好访问模式设计。所以『Postgres 不够用了』往往是『设计不够好』的代名词。</p>
 </div>
 </details>
-
 <details>
 <summary>4. Cassandra 的『eventual consistency』，应用层怎么处理 stale read？给两个真实场景的设计方案。</summary>
 <div class="answer">
@@ -468,7 +450,6 @@ graph TD
 <p><em>核心理念</em>：BASE 系统的一致性问题要在『产品层』解决，不要妄想在 DB 层解决。Discord 不读 DB 就拿不到新消息？那就推过去。</p>
 </div>
 </details>
-
 <details>
 <summary>5. 容量估算：每天 1 亿条订单，每条 1KB，保留 5 年。OLTP（Postgres）需要多少存储？SSD 还是 HDD？预算多少？</summary>
 <div class="answer">
@@ -500,10 +481,9 @@ graph TD
 <p><em>这道题面试官真正想听</em>：你会不会算放大因子（索引/WAL/备份/bloat）、知不知道分片、知不知道冷热分层省钱。只算原始 180TB 就拍 SSD 一锅端，是新手做法。</p>
 </div>
 </details>
-
 <div class="nav"><a href="index.html">← 回到 index</a></div>
-</div><script src="https://hub.cissychen.com/comments.js" defer></script>
-<script src="https://hub.cissychen.com/search.js" defer></script>
-<script src="https://hub.cissychen.com/index-button.js" defer></script>
-<script src="https://hub.cissychen.com/i18n-tts.js" defer></script>
+</div><script defer="" src="https://hub.cissychen.com/comments.js"></script>
+<script defer="" src="https://hub.cissychen.com/search.js"></script>
+<script defer="" src="https://hub.cissychen.com/index-button.js"></script>
+<script defer="" src="https://hub.cissychen.com/i18n-tts.js"></script>
 </body></html>

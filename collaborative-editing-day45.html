@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<html lang="zh-CN"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>Day 45 · 协作编辑系统 (Collaborative Editing) — System Design</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -53,7 +54,6 @@ details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
 </style>
 </head><body><div class="container">
-
 <header>
 <div class="meta">
 <span class="tag day">Day 45</span>
@@ -62,10 +62,9 @@ details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 <span class="tag">OT vs CRDT</span>
 <span class="tag">Offline Sync</span>
 </div>
-<h1>协作编辑系统 — 让上百人同时敲一个文档还能收敛<span class="en">Collaborative Editing: OT vs CRDT, Conflict Resolution, Offline Sync</span></h1>
+<h1 data-tts="13431b23602240e8">协作编辑系统 — 让上百人同时敲一个文档还能收敛<span class="en">Collaborative Editing: OT vs CRDT, Conflict Resolution, Offline Sync</span></h1>
 </header>
-
-<h2>问题场景 + 需求约束</h2>
+<h2 data-tts="1601c09bc434f05d">问题场景 + 需求约束</h2>
 <p>设计一个 <strong>Google Docs / Figma 级</strong>的实时协作编辑器：单文档最多上百个活跃编辑者同时敲键盘，每次击键即一个操作，所有人 <strong>&lt;100ms 内看到彼此的光标和文字</strong>，允许任意时长离线编辑、重连后自动合并。核心难点只有一个：<em>两个人同时在同一位置插入字符，最终所有副本必须收敛到<strong>字节完全一致</strong>的状态</em>——否则文档就分叉了。</p>
 <ul>
 <li><strong>并发模型</strong>：单文档 active editor 通常 &lt;100，但击键频率高（人均 5-10 ops/s），presence（光标/选区）更新更频繁。</li>
@@ -74,30 +73,27 @@ details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 <li><strong>离线</strong>：断网可编辑任意时长，重连合并不丢改动、不需人工解冲突。</li>
 </ul>
 <div class="callout"><strong>为什么不能用 last-write-wins 整个文档？</strong>因为粒度太粗——你保存时会把别人这几分钟的改动整段覆盖。协作编辑的本质是把编辑<strong>拆成字符级的可合并操作</strong>，而不是整文档快照互相覆盖。</div>
-
-<h2>高层架构</h2>
+<h2 data-tts="6756e6146f80ed31">高层架构</h2>
 <div class="mermaid">
 graph TD
   subgraph Clients["客户端（本地先行 + 离线缓冲）"]
     A["Client A<br/>本地副本 + 待发 op 队列"]
     B["Client B<br/>本地副本 + 待发 op 队列"]
   end
-  A -- "op（WebSocket）" --> S
-  B -- "op（WebSocket）" --> S
+  A -- "op（WebSocket）" --&gt; S
+  B -- "op（WebSocket）" --&gt; S
   S["文档专属进程<br/>Doc Authority（单线程串行化）"]
-  S -- "广播 op / ack" --> A
-  S -- "广播 op / ack" --> B
-  S --> L["Op Log<br/>（有序追加）"]
-  S --> SN["Snapshot Store<br/>（定期快照 + 截断日志）"]
-  R["路由层<br/>consistent hash: doc_id → 进程"] -.-> S
-  P["Presence 通道<br/>光标/选区·不持久化"] -.-> A
-  P -.-> B
+  S -- "广播 op / ack" --&gt; A
+  S -- "广播 op / ack" --&gt; B
+  S --&gt; L["Op Log<br/>（有序追加）"]
+  S --&gt; SN["Snapshot Store<br/>（定期快照 + 截断日志）"]
+  R["路由层<br/>consistent hash: doc_id → 进程"] -.-&gt; S
+  P["Presence 通道<br/>光标/选区·不持久化"] -.-&gt; A
+  P -.-&gt; B
 </div>
 <p>核心是 <strong>每个文档一个专属服务进程</strong>作为权威（authority），把所有 op 串行化成全序日志后广播。客户端永远本地先行渲染，把 op 乐观应用后再异步发往服务端；服务端确认（ack）后本地把它转正。光标/选区这类 presence 走单独临时通道，<strong>永不落盘</strong>。文档冷却后 snapshot 落存储、进程回收。</p>
-
-<h2>关键技术点</h2>
-
-<h3>1. OT（操作变换）— 用中心串行化换纯文本、零 metadata</h3>
+<h2 data-tts="c3df2e03437171d5">关键技术点</h2>
+<h3 data-tts="21087ed1e2063214">1. OT（操作变换）— 用中心串行化换纯文本、零 metadata</h3>
 <p class="tradeoff"><strong>核心 trade-off：</strong>数据结构就是一段纯文本（无膨胀），代价是 transform 函数极难写对、且强依赖中心服务器定序。</p>
 <p><strong>【原理】</strong>每个操作携带<strong>位置索引</strong>（如「在第 5 位插入 X」）。当两个并发操作基于同一状态产生时，直接按各自索引应用会发散。OT 的做法是定义变换函数 <code>T(op_a, op_b)</code>：把 <em>op_a 相对于「已经应用了 op_b」的世界</em>重新计算位置。例如 A 在位置 2 插入、B 在位置 5 插入，B 到达 A 时其位置要 +1（因为 A 已经把后面撑长了）。所有副本沿不同路径 transform，最终收敛到同一状态。</p>
 <pre><code># insert vs insert 的位置变换（简化）
@@ -114,8 +110,7 @@ def transform(op_a, op_b):
 </code></pre>
 <p>难点在<strong>正确性属性 TP1/TP2</strong>：TP1 要求两 op 交换应用后收敛，TP2 要求三个以上并发 op 无论 transform 顺序都收敛。TP2 在去中心化（无全序）下极难满足——学术界多个已发表 OT 算法后来被证明<strong>存在反例</strong>。工业界的规避法：<em>用中心服务器强制全序</em>，从而只需保证 TP1（Jupiter 算法的关键洞察）。</p>
 <div class="case"><strong>Google Docs / Wave</strong> 用的正是 <strong>Jupiter 算法</strong>（AT&amp;T Bell Labs, 1995）——client-server 结构下，每个客户端只跟服务器做两两 transform，服务器维护全序，从而绕开 TP2 的地狱。这是 OT 至今能在超大规模稳定运行的根本原因。</div>
-
-<h3>2. CRDT 序列 — 用稠密位置标识换「无需中心协调」</h3>
+<h3 data-tts="669aa87754b83c90">2. CRDT 序列 — 用稠密位置标识换「无需中心协调」</h3>
 <p class="tradeoff"><strong>核心 trade-off：</strong>操作天生可交换、可离线/P2P 合并，代价是每个字符背负 metadata + 墓碑永不消失。</p>
 <p><strong>【原理】</strong>CRDT 不做 transform，而是给<strong>每个字符分配一个全局唯一、稠密可比较的位置标识</strong>（fractional index / 树上路径）。两个字符之间永远能再插入一个 id（稠密性）。插入 = 生成一个夹在左右邻居 id 之间的新 id；删除 = 打<strong>墓碑（tombstone）</strong>而非物理移除（否则并发引用会指向空）。因为每个 op 只依赖不可变的 id、不依赖当前索引，<strong>任意顺序应用同一批 op 结果相同</strong>——这就是 Strong Eventual Consistency，无需中心定序。</p>
 <pre><code># RGA 风格插入：id = (逻辑时钟, site_id)，按 (前驱 id) 定位
@@ -131,18 +126,15 @@ def delete(target_id):
 </code></pre>
 <p><strong>两个著名的坑</strong>：①<strong>metadata 膨胀</strong>——每字符一个 id，朴素实现可达 <strong>100:1</strong> 的开销；②<strong>interleaving 异常</strong>——两人并发各插入一整段文字，某些 CRDT 算法会把两段<strong>字符级交错</strong>成乱码（Kleppmann 等 2019 年专门有论文剖析）。</p>
 <div class="case"><strong>Automerge</strong>（Martin Kleppmann）用数据库同款的 <strong>columnar encoding</strong> 把 metadata 从 100:1 压到接近 1:1（约比原始数据多 30%）。<strong>Yjs</strong>（Kevin Jahns，YATA 算法）是目前最快的 web 端 CRDT 实现，被大量白板/文档/Notebook 产品采用，周下载量近百万。</div>
-
-<h3>3. 离线优先与因果合并 — CRDT 真正拉开差距的地方</h3>
+<h3 data-tts="2bf5976be6523f80">3. 离线优先与因果合并 — CRDT 真正拉开差距的地方</h3>
 <p class="tradeoff"><strong>核心 trade-off：</strong>OT 重连要拿着旧基线跟服务端缺失的 op 逐一 transform（服务端必须保留 op log）；CRDT 只需交换彼此缺的 op 直接合并——离线越久优势越大。</p>
 <p><strong>【原理】</strong>客户端用 <strong>version vector</strong>（每个 site 的最大逻辑时钟）描述「我已经见过哪些 op」。重连时双方交换 version vector，只补发对方缺的增量。因果顺序由 op 携带的依赖（前驱 id / 逻辑时钟）保证——一个插入 op 必须在它的前驱可见后才能应用。CRDT 的可交换性让「补发的 op 乱序到达」也能正确合并，这正是离线场景的杀手锏。</p>
 <div class="case"><strong>Figma</strong> 的做法很务实：它<strong>受 CRDT 启发但没做完整 CRDT</strong>。允许用户离线任意时长；<strong>重连时客户端下载一份最新文档，再把离线期间的 op 重新 apply 到最新状态之上</strong>。对象属性（如颜色、位置）用 <strong>last-writer-wins</strong>——因为设计文件不像文本需要保留每个字符历史，LWW 足够且实现简单，同一属性并发改只保留一个值。初版 TypeScript，后为性能/稳定性移植到 Rust。</div>
-
-<h3>4. 服务端架构 — per-document 单写权威 + 快照截断</h3>
+<h3 data-tts="39e8ca557163e85e">4. 服务端架构 — per-document 单写权威 + 快照截断</h3>
 <p class="tradeoff"><strong>核心 trade-off：</strong>每文档单进程串行化，隔离好、逻辑简单、天然全序；代价是热文档单点吞吐有上限、需要处理进程路由与迁移。</p>
 <p><strong>【原理】</strong>路由层用 <code>consistent hash(doc_id)</code> 把一个文档的所有连接固定到<strong>同一个进程</strong>。该进程单线程串行处理 op → 保证全序（OT 借此只需 TP1）→ 广播给订阅者 → 追加 op log。op log 无限增长，故定期做 <strong>snapshot</strong>（物化当前文档 + 版本向量）并<strong>截断</strong>旧日志；同时借机 GC 已无并发引用的墓碑。新客户端加入直接拉最近 snapshot + 少量增量，而非重放全部历史。</p>
 <div class="case"><strong>Figma</strong> 为每个多人文档在服务端 <strong>spin up 一个独立进程</strong>作为该文档的权威副本；<strong>Google Docs</strong> 的服务端同样是文档级串行化点。这种「一个文档一个 actor」的模型让并发推理退化为单线程问题——是协作系统里最反直觉但最有效的简化。</div>
-
-<h2>扩展与优化</h2>
+<h2 data-tts="dbeb6e126817f7d7">扩展与优化</h2>
 <ul>
 <li><strong>大文档分块</strong>：把一个巨型文档切成多个子 CRDT / 段，按需加载，避免开一个文档就把上百万节点全灌进内存。</li>
 <li><strong>Rich text</strong>：纯序列 CRDT 处理不好「加粗跨越并发插入」这类富文本，需 <strong>Peritext</strong> 式的区间标记 CRDT。</li>
@@ -150,8 +142,7 @@ def delete(target_id):
 <li><strong>Undo/Redo</strong>：协作下的 undo 是<strong>撤销自己的操作</strong>而非「时间回退」，需 per-user 的可选择性撤销语义。</li>
 <li><strong>多区域</strong>：给文档一个<strong>归属 region</strong>（authority 所在），跨区编辑走归属区，避免全球强一致的往返延迟。</li>
 </ul>
-
-<h2>常见陷阱 + 面试追问</h2>
+<h2 data-tts="9302a6a6243f6a18">常见陷阱 + 面试追问</h2>
 <ul>
 <li><strong>OT transform 函数写错</strong>：insert/delete/delete 各种组合 + tie-break 极易出 bug，且错了是「静默发散」——两人文档不一致却无报错。面试要能说出 TP1/TP2 与「靠中心服务器规避 TP2」。</li>
 <li><strong>CRDT interleaving</strong>：会追问「两人各粘贴一段话，为什么可能交错？」——答：并发插入落在同一 anchor 之间，tie-break 只保证收敛不保证语义连贯。</li>
@@ -160,8 +151,7 @@ def delete(target_id):
 <li><strong>presence 落盘</strong>：把光标位置当持久数据存是典型过度设计——它是易失的、可丢的。</li>
 <li><strong>选 OT 还是 CRDT？</strong>「有稳定中心服务器、要纯文本无膨胀、团队能 hold 住 transform」→ OT（Google Docs）；「要离线优先/P2P/本地优先、能接受 metadata 开销」→ CRDT（Yjs/Automerge）。</li>
 </ul>
-
-<h2>深入资源</h2>
+<h2 data-tts="50e786938d448cdf">深入资源</h2>
 <ul>
 <li><a href="https://www.figma.com/blog/how-figmas-multiplayer-technology-works/">How Figma's multiplayer technology works</a> — Evan Wallace 讲 server-per-document、离线重连、LWW 属性，工业界最好读的一篇。</li>
 <li><a href="https://martin.kleppmann.com/2020/07/06/crdt-hard-parts-hydra.html">CRDTs: The Hard Parts</a> — Martin Kleppmann，讲 metadata 膨胀、columnar encoding、interleaving 等真实难点。</li>
@@ -169,16 +159,14 @@ def delete(target_id):
 <li><a href="https://yjs.dev/">Yjs</a>（Kevin Jahns，YATA）与 <a href="https://automerge.org/">Automerge</a> — 两个最主流的生产级 CRDT 实现，源码即教材。</li>
 <li>Jupiter 算法（Nichols et al., AT&amp;T, 1995）与 Google Wave OT 白皮书 — OT 中心化定序的源头。</li>
 </ul>
-
-<h2>深入思考</h2>
+<h2 data-tts="5a960b547bb6b474">深入思考</h2>
 <details><summary>为什么 Figma 敢用 LWW 丢更新，Google Docs 却不能？同一个「协作编辑」，判据是什么？</summary><div class="answer">判据是<strong>数据的语义单元粒度与用户对「丢失」的容忍</strong>。Figma 的原子是对象属性（一个矩形的颜色、坐标）——两人同时改颜色，保留谁的都是「一个合理结果」，丢掉的那次改动用户一眼能看出并重做，损失有界。文本不同：文本的价值在<strong>字符序列的连续性</strong>，你敲的一句话被整段覆盖是不可接受的信息丢失，且无法一眼恢复。所以文本必须字符级可合并（OT/CRDT），而设计属性用 LWW 就够——<strong>选一致性策略要看「冲突时丢什么、用户能否承受」，而非盲目追求无损合并</strong>。</div></details>
 <details><summary>OT 靠中心服务器规避了 TP2，那 CRDT 的「无需中心」优势在有稳定服务器时是不是就没意义了？</summary><div class="answer">大部分消失，但不是全部。有稳定中心时，OT 只需 TP1、数据结构还是纯文本无膨胀，工程上往往更省。CRDT 剩下的独立价值在<strong>离线时长与拓扑</strong>：①离线一周再重连，CRDT 只需交换缺失 op 直接合并，OT 要服务端保留足够长的 op log 并逐一 transform，运维成本随离线窗口线性上升；②真正 P2P / local-first（无中心、端到端加密下服务端看不到明文也就无法 transform）只能用 CRDT。所以判据是<strong>「你能否始终依赖一个能看到明文、保留全序日志的中心」</strong>——能则 OT 更划算，不能则必须 CRDT。</div></details>
 <details><summary>一个文档一个进程，那「一个文档被百万人围观（如爆款公开文档）」怎么办？单进程扛得住吗？</summary><div class="answer">扛不住写，但要区分读写。真正的<strong>并发编辑者</strong>极少超过几十，写路径的单进程串行化不是瓶颈。瓶颈是<strong>广播扇出</strong>——百万只读订阅者。解法是分层：authority 进程只对少量 editor 串行化 op，再把 op 流推给一组<strong>只读 fan-out 边缘节点</strong>（类似 CDN / pub-sub 扇出树），观众连边缘节点而非 authority。写者与读者物理分离，authority 的连接数被压到可控范围。这本质是把 Day 14 Feed 的 fan-out 和 Day 15 Chat 的扇出思路套进来。</div></details>
 <details><summary>CRDT 的墓碑「永不删除」，那一个存在十年、被反复编辑的文档，是不是迟早被墓碑撑爆？</summary><div class="answer">朴素实现会。工程上靠<strong>version-vector 门槛的墓碑 GC</strong>：当所有已知副本的 version vector 都已越过某删除操作（即不可能再有并发 op 引用被删节点），该墓碑就能安全物理回收。有中心服务器时这很好判定——服务端知道所有活跃副本的进度。难点在<strong>可能永远离线的副本</strong>：若一个客户端离线三年，服务端不能无限等它。实践中设<strong>离线上限</strong>（超过则该副本重连时按「全新客户端」拉最新 snapshot，放弃其陈旧 op），把 GC 的等待时间上界化。这也解释了为什么 Figma 明确处理「离线任意时长」时是<strong>重新下载最新文档再 replay</strong>，而非无脑合并。</div></details>
 <details><summary>本地击键 0 延迟回显（optimistic），但如果服务端最终拒绝了你的 op（如权限撤销、文档被锁），已经显示在你屏幕上的字怎么收场？</summary><div class="answer">这是 optimistic UI 的固有风险：<strong>本地先行意味着可能要回滚</strong>。机制上，本地 op 处于「未确认（pending）」状态，服务端 ack 后才转正。若被拒，客户端要把该 op 及<strong>所有基于它的后续本地 op</strong>一并回退（rebase 到服务端权威状态），再把仍合法的操作重新应用——类似 git 的 rebase。用户体验上会看到自己刚敲的内容「闪一下消失」，所以这类硬拒绝要尽量少（权限检查应前置到进入文档时，而非每个 op）。这揭示了协作编辑与普通 CRUD 的根本差异：<strong>乐观本地状态是「推测」，权威在服务端的全序日志里，冲突/拒绝时以后者为准做补偿</strong>。</div></details>
-
-<script src="https://hub.cissychen.com/comments.js" defer></script>
-<script src="https://hub.cissychen.com/search.js" defer></script>
-<script src="https://hub.cissychen.com/index-button.js" defer></script>
-<script src="https://hub.cissychen.com/i18n-tts.js" defer></script>
+<script defer="" src="https://hub.cissychen.com/comments.js"></script>
+<script defer="" src="https://hub.cissychen.com/search.js"></script>
+<script defer="" src="https://hub.cissychen.com/index-button.js"></script>
+<script defer="" src="https://hub.cissychen.com/i18n-tts.js"></script>
 </div></body></html>

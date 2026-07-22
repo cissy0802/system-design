@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<html lang="zh-CN"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>Day 12 · 搜索系统 (Search Systems) — System Design</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -97,7 +98,6 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 </script>
 </head><body><div class="container">
-
 <header>
 <div class="meta">
 <span class="tag day">Day 12</span>
@@ -107,10 +107,9 @@ document.addEventListener('DOMContentLoaded',()=>{
 <span class="tag">Elasticsearch</span>
 <span class="tag">Vector Search</span>
 </div>
-<h1>搜索系统 — 从倒排索引到语义检索<span class="en">Search Systems: Inverted Index, Lucene Segments, Sharding, Vector ANN</span></h1>
+<h1 data-tts="b37e395b9e01dea6">搜索系统 — 从倒排索引到语义检索<span class="en">Search Systems: Inverted Index, Lucene Segments, Sharding, Vector ANN</span></h1>
 </header>
-
-<h2>问题场景 + 需求约束</h2>
+<h2 data-tts="118e4b917dde768d">问题场景 + 需求约束</h2>
 <p>给一个 <strong>10 亿文档的 IM / 电商搜索</strong>（像 Discord 的消息搜索、淘宝的商品搜索）设计后端：用户输入关键词，要在 200ms 内返回最相关的 20 条。难点不是「装个 Elasticsearch」，而是<em>写入和查询同时要快</em>——文档以 5 万/秒涌入，查询也是 5 万 QPS，还要支持前缀补全、错字容忍、以及「找意思相近的」语义检索。</p>
 <ul>
 <li><strong>规模</strong>：10 亿文档 ×平均 1KB 正文，倒排索引膨胀到原文 30%~150%（取决于是否存 positions / term vectors）。</li>
@@ -119,26 +118,25 @@ document.addEventListener('DOMContentLoaded',()=>{
 <li><strong>相关性</strong>：top-20 的排序质量是产品生死线——搜索不准等于没有。</li>
 <li><strong>约束</strong>：单 Lucene index 上限约 <strong>21 亿文档</strong>（<code>MAX_DOC</code> = 2^31），逼着你从第一天就分片。</li>
 </ul>
-
-<h2>高层架构</h2>
+<h2 data-tts="b6fc4346ddd382d3">高层架构</h2>
 <pre class="mermaid">
 graph TD
     subgraph 写入路径
-      SRC[("源 DB / CDC")] --> Q["索引队列<br/><i>Kafka</i>"]
-      Q --> IW["Index Workers<br/><i>批量 bulk</i>"]
-      IW --> SEG["不可变 Segment<br/><i>Lucene</i>"]
+      SRC[("源 DB / CDC")] --&gt; Q["索引队列<br/><i>Kafka</i>"]
+      Q --&gt; IW["Index Workers<br/><i>批量 bulk</i>"]
+      IW --&gt; SEG["不可变 Segment<br/><i>Lucene</i>"]
     end
     subgraph 查询路径
-      U["用户查询"] --> CO["Coordinator<br/><i>query router</i>"]
-      CO -->|scatter| S1["Shard 1<br/>倒排+HNSW"]
-      CO -->|scatter| S2["Shard 2"]
-      CO -->|scatter| S3["Shard N"]
-      S1 -->|top-k| CO
-      S2 -->|top-k| CO
-      S3 -->|top-k| CO
-      CO -->|gather + rerank| U
+      U["用户查询"] --&gt; CO["Coordinator<br/><i>query router</i>"]
+      CO --&gt;|scatter| S1["Shard 1<br/>倒排+HNSW"]
+      CO --&gt;|scatter| S2["Shard 2"]
+      CO --&gt;|scatter| S3["Shard N"]
+      S1 --&gt;|top-k| CO
+      S2 --&gt;|top-k| CO
+      S3 --&gt;|top-k| CO
+      CO --&gt;|gather + rerank| U
     end
-    SEG -.refresh 1s.-> S1
+    SEG -.refresh 1s.-&gt; S1
 
     classDef src fill:#2a1530,stroke:#ff7ab6,color:#e8eef5
     classDef pipe fill:#0e2030,stroke:#5eead4,color:#e8eef5
@@ -151,10 +149,8 @@ graph TD
 </pre>
 <p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">写入异步批量进队列 → 生成不可变 segment；查询 scatter-gather 到所有 shard，coordinator 归并重排</p>
 <p><strong>组件职责</strong>：写入<em>不直接打索引</em>，先进 Kafka 解耦、削峰、保证 at-least-once；Index Workers 攒批做 bulk 写（单条写 Lucene 极慢）。每个 shard 是一个独立 Lucene index，内含倒排索引（关键词）和 HNSW 图（向量）。Coordinator 负责把查询广播到所有 shard、合并各自的 top-k、做最终重排。</p>
-
-<h2>关键技术点</h2>
-
-<h3>1. 倒排索引：搜索引擎的心脏</h3>
+<h2 data-tts="c3df2e03437171d5">关键技术点</h2>
+<h3 data-tts="105761f19571e017">1. 倒排索引：搜索引擎的心脏</h3>
 <p><strong>一句话 trade-off</strong>：用空间和写入成本，换 O(查询词数) 而非 O(文档数) 的检索。</p>
 <p><strong>原理</strong>：正排是「文档 → 词」，搜索要反过来——<em>倒排索引</em>是「词 → 包含它的文档列表（posting list）」。查询「红色 连衣裙」就是取这两个词的 posting list <strong>求交集</strong>。每个 posting 还存词频（tf）和位置（positions，支持短语查询）。打分用 <strong>BM25</strong>：词频越高、文档越短、词越稀有（IDF），分数越高。词典本身用 <strong>FST</strong>（有限状态转换机）压缩，几百万词条压到几 MB 还能做前缀匹配。</p>
 <div class="tradeoff">
@@ -168,7 +164,7 @@ graph TD
 def intersect(p1, p2):           # p1 短，p2 长
     out = []
     for doc in p1:
-        # 在 p2 上用 skip pointer 跳到 >= doc 的位置
+        # 在 p2 上用 skip pointer 跳到 &gt;= doc 的位置
         if p2.advance_to(doc) == doc:
             out.append(doc)      # 两个 list 都含 → 命中
     return out
@@ -180,8 +176,7 @@ def intersect(p1, p2):           # p1 短，p2 长
 <li><strong>Algolia</strong>：为所有前缀建倒排列表实现毫秒级 instant search（见其 <em>Inside the Algolia Engine</em> 系列）。</li>
 <li><strong>Postgres GIN</strong>：全文搜索的倒排索引就叫 Generalized Inverted Index。</li>
 </ul></div>
-
-<h3>2. 不可变 Segment 与「在线 vs 离线索引」</h3>
+<h3 data-tts="5d98848ebb84f17a">2. 不可变 Segment 与「在线 vs 离线索引」</h3>
 <p><strong>一句话 trade-off</strong>：可见性延迟 vs 写吞吐 vs 查询碎片化，三者拉扯。</p>
 <p><strong>原理</strong>：Lucene 的 segment <strong>一旦写盘就不可变</strong>。新文档不去改旧 segment，而是攒在内存 buffer，定期 <em>refresh</em> 刷成一个新的小 segment 才可被搜索（ES 默认 1s，这就是「近实时 NRT」的由来）。删除/更新不是原地改，而是写 <em>tombstone</em> 标记，查询时过滤、合并时才真正清除。小 segment 越积越多会拖慢查询，后台 <em>merge</em> 把它们合并成大 segment。</p>
 <div class="tradeoff">
@@ -198,8 +193,7 @@ def intersect(p1, p2):           # p1 短，p2 长
 <li><strong>Elasticsearch</strong>：<code>refresh_interval</code> 和 force-merge 是调优写入吞吐的第一旋钮。</li>
 <li><strong>LinkedIn (Galene)</strong>：在线增量索引 + 离线 Hadoop 全量构建双轨并行。</li>
 </ul></div>
-
-<h3>3. 分片、Scatter-Gather 与深分页陷阱</h3>
+<h3 data-tts="80bceb3e2be377ff">3. 分片、Scatter-Gather 与深分页陷阱</h3>
 <p><strong>一句话 trade-off</strong>：分片提供并行与水平扩展，但归并与 tail latency 是代价。</p>
 <p><strong>原理</strong>：10 亿文档放不进单机，按 <em>doc id hash</em> 或 <em>业务维度</em>（Discord 按 guild/DM）切成 N 个 shard。查询走 <strong>scatter-gather</strong>：coordinator 把 query 广播到每个 shard，每个 shard 本地算出自己的 top-k 返回，coordinator 归并出全局 top-k。replica 副本既做高可用又分摊读 QPS。</p>
 <div class="callout"><strong>深分页陷阱：</strong>要第 10000~10020 条（<code>from=10000,size=20</code>）时，<strong>每个 shard 都得返回前 10020 条</strong>给 coordinator 排序——内存和网络随页码线性爆炸。正解是 <code>search_after</code>（基于上一页最后一条的排序值游标）或 <code>scroll</code>（快照遍历）。永远别给用户开放跳到第 N 页。</div>
@@ -216,8 +210,7 @@ def intersect(p1, p2):           # p1 短，p2 长
 <li><strong>Discord</strong>：按 guild/DM 路由分片；并撞上单 Lucene index <code>MAX_DOC</code> ≈ 20 亿的硬上限，被迫多集群（现运行约 40 个 ES 集群，p50 &lt; 100ms）。</li>
 <li><strong>Elasticsearch</strong>：query-then-fetch 两阶段——先各 shard 返回 id+score，归并后再 fetch 命中文档正文，避免传输全部正文。</li>
 </ul></div>
-
-<h3>4. 向量检索：从关键词到语义</h3>
+<h3 data-tts="8b15e506a1b6a94d">4. 向量检索：从关键词到语义</h3>
 <p><strong>一句话 trade-off</strong>：召回率 vs 内存 vs 构建/更新成本，ANN 算法在此三角里选点。</p>
 <p><strong>原理</strong>：关键词搜不到「笔记本电脑」≈「laptop」这种语义近似。把文档和查询都用 embedding 模型映射成向量，<em>语义相近 = 向量距离近</em>。10 亿向量暴力算距离不可行，用 <strong>ANN（近似最近邻）</strong>。<strong>HNSW</strong> 建多层导航图：上层稀疏长边快速逼近，下层稠密短边精修，查询是从顶层贪心下降，复杂度近似对数级。</p>
 <table>
@@ -236,7 +229,7 @@ def search(q, entry, top_layer):
     # 第 0 层做带候选堆的精搜，返回 ef 个候选
     return beam_search(q, cur, layer=0, ef=128)</code></pre>
 <div class="tradeoff">
-<strong>混合检索（Hybrid）才是生产答案：</strong>纯向量丢失精确匹配（型号 "A1706"、人名），纯关键词丢失语义。生产里<em>BM25 + 向量并行召回</em>，用 <strong>RRF（倒数排名融合）</strong>合并两路结果，再用 cross-encoder 精排 top-100。下期推荐系统会深入 rerank。</p>
+<strong>混合检索（Hybrid）才是生产答案：</strong>纯向量丢失精确匹配（型号 "A1706"、人名），纯关键词丢失语义。生产里<em>BM25 + 向量并行召回</em>，用 <strong>RRF（倒数排名融合）</strong>合并两路结果，再用 cross-encoder 精排 top-100。下期推荐系统会深入 rerank。
 </div>
 <div class="case">
 <strong>现实案例：</strong>
@@ -245,8 +238,7 @@ def search(q, entry, top_layer):
 <li><strong>pgvector</strong>：Postgres 扩展，支持 HNSW/IVFFlat，让小团队不用单独上向量库。</li>
 <li><strong>Faiss (Meta)</strong>：IVF-PQ 的工业标杆，十亿级向量的内存压缩方案。</li>
 </ul></div>
-
-<h2>扩展与优化</h2>
+<h2 data-tts="29544a8832e18b87">扩展与优化</h2>
 <ul>
 <li><strong>读写分离</strong>：索引集群（接写）与查询集群（接读）物理隔离，避免 merge 风暴拖垮查询；replica 扩查询 QPS。</li>
 <li><strong>冷热分层</strong>：近期数据放 SSD hot tier，历史数据 force-merge 成大段挪到便宜的 warm/cold tier（Discord/日志类系统的标配）。</li>
@@ -254,8 +246,7 @@ def search(q, entry, top_layer):
 <li><strong>多阶段检索</strong>：召回（BM25+向量，要快要全）→ 粗排 → 精排（贵的模型只跑 top-100），用算力换相关性。</li>
 <li><strong>CDC 入索引</strong>：用 Debezium 把 DB binlog 变更流进 Kafka 再进索引，保证搜索与主库最终一致（呼应 Day 7 Outbox）。</li>
 </ul>
-
-<h2>常见陷阱 + 面试问题</h2>
+<h2 data-tts="0e7aaea18d123cf0">常见陷阱 + 面试问题</h2>
 <ul>
 <li><strong>陷阱：把搜索当数据库的 LIKE。</strong> ES 不是事务库、刷新有延迟、不保证强一致；它是<em>派生数据</em>，源头永远是主库，要能随时从主库重建。</li>
 <li><strong>陷阱：分片数拍脑袋定且不可改。</strong> ES 的 primary shard 数<em>建索引时就固定</em>，改它要 reindex。先做容量估算（单 shard 建议 10~50GB）。</li>
@@ -265,8 +256,7 @@ def search(q, entry, top_layer):
 <li><strong>面试题：</strong><code>from+size</code> 深分页为什么爆？换成什么？（每 shard 取 from+size → <code>search_after</code> 游标）</li>
 <li><strong>面试题：</strong>向量索引 HNSW 删除一个文档为什么麻烦？（图结构原地删会破坏连通性，通常软删 + 周期重建）</li>
 </ul>
-
-<h2>深入资源</h2>
+<h2 data-tts="b231675208a4ecc8">深入资源</h2>
 <ul>
 <li><strong>DDIA</strong>《Designing Data-Intensive Applications》(Kleppmann) 第 3 章「Storage and Retrieval」讲全文索引与 LSM 思想。</li>
 <li><strong>Discord 工程博客</strong>：<em>How Discord Indexes Trillions of Messages</em>（ES 多集群、Rust、MAX_DOC 限制）。</li>
@@ -274,9 +264,7 @@ def search(q, entry, top_layer):
 <li><strong>HNSW 论文</strong>：Malkov &amp; Yashunin, <em>Efficient and robust approximate nearest neighbor search using Hierarchical Navigable Small World graphs</em>（arXiv 1603.09320, IEEE TPAMI 2020）。</li>
 <li><strong>Elasticsearch: The Definitive Guide</strong>（官方）讲 segment、refresh、scatter-gather、query-then-fetch。</li>
 </ul>
-
-<h2>深入思考（点击展开答案）</h2>
-
+<h2 data-tts="81ba51d7d6a030b5">深入思考（点击展开答案）</h2>
 <details>
 <summary>1. refresh_interval 调成 1s 和 30s，对「写吞吐」「查询延迟」「磁盘」各有什么二阶影响？为什么批量导入时反而要设成 -1？</summary>
 <div class="answer">
@@ -284,7 +272,6 @@ def search(q, entry, top_layer):
 <p><strong>批量导入设 -1（关闭自动 refresh）</strong>：历史数据回填时根本没人实时搜它，每秒刷段纯属浪费——关掉后所有文档攒在 buffer，导完手动 refresh 一次 + force-merge 成大段。实测能把导入吞吐提升数倍。这是「可见性延迟」与「写吞吐」trade-off 的极端选择：导入期不要可见性，全要吞吐。</p>
 </div>
 </details>
-
 <details>
 <summary>2. 用户搜一个超热词（如「促销」命中 5000 万文档），scatter-gather 会发生什么？怎么救？</summary>
 <div class="answer">
@@ -292,7 +279,6 @@ def search(q, entry, top_layer):
 <p><strong>救法</strong>：① <em>WAND / Block-Max WAND</em> 动态剪枝——维护当前 top-k 的分数阈值，提前跳过不可能进 top-k 的文档，不必给每个候选都打分；② 高频词结果<em>缓存</em>；③ 加 filter 缩小候选集（时间范围、类目）；④ 用 <em>two-phase</em>：先廉价召回再精排。Lucene 的 BMW 是默认查询加速器，正是为这种长尾热词设计。</p>
 </div>
 </details>
-
 <details>
 <summary>3. 既然有了语义向量检索，为什么不直接抛弃 BM25 倒排索引、全用向量？</summary>
 <div class="answer">
@@ -300,7 +286,6 @@ def search(q, entry, top_layer):
 <p>所以生产是 <strong>hybrid</strong>：BM25 保精确与可解释，向量补语义召回，RRF 融合。Google、淘宝、Elasticsearch 都是两路并行而非二选一。「全用向量」是面试里常见的过度简化陷阱。</p>
 </div>
 </details>
-
 <details>
 <summary>4. 估算：10 亿文档、每文档 1KB，倒排索引大概多大？需要多少 shard、多少内存？</summary>
 <div class="answer">
@@ -309,7 +294,6 @@ def search(q, entry, top_layer):
 <p><strong>内存</strong>：搜索吃 OS page cache（让热段常驻内存）和 JVM heap（FST 词典、缓存）。经验是给文件系统缓存留够装下热点段。<em>若上 HNSW 向量</em>：10 亿 × 768 维 × 4 字节 ≈ 3TB，纯 HNSW 全驻内存不现实 → 必须 IVF-PQ 量化压缩，或只对热数据建向量索引。这一步常暴露候选人对「向量比文本贵一个量级」缺乏直觉。</p>
 </div>
 </details>
-
 <details>
 <summary>5. 搜索索引和主库如何保持一致？双写为什么是反模式？正确做法是什么？（串联 Day 7）</summary>
 <div class="answer">
@@ -317,11 +301,10 @@ def search(q, entry, top_layer):
 <p><strong>正确做法</strong>：① <em>Outbox + CDC</em>——应用只写主库（含一张 outbox 表或直接读 binlog），用 Debezium 把变更可靠地流进 Kafka，索引 worker 消费后写 ES。主库是唯一真相源，ES 是<strong>派生数据</strong>，可随时全量重建。② 消息处理要<em>幂等</em>（按 doc id upsert，带版本号防乱序，旧版本丢弃）。③ 接受<em>最终一致</em>：搜索结果短暂滞后于主库是可接受的（呼应 Day 6）。关键心智：搜索索引永远是「可重建的缓存」，不是真相源。</p>
 </div>
 </details>
-
 <div class="nav"><a href="index.html">← 回到 index</a></div>
 </div>
-<script src="https://hub.cissychen.com/comments.js" defer></script>
-<script src="https://hub.cissychen.com/search.js" defer></script>
-<script src="https://hub.cissychen.com/index-button.js" defer></script>
-<script src="https://hub.cissychen.com/i18n-tts.js" defer></script>
+<script defer="" src="https://hub.cissychen.com/comments.js"></script>
+<script defer="" src="https://hub.cissychen.com/search.js"></script>
+<script defer="" src="https://hub.cissychen.com/index-button.js"></script>
+<script defer="" src="https://hub.cissychen.com/i18n-tts.js"></script>
 </body></html>

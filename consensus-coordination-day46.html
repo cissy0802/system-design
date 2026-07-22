@@ -1,6 +1,7 @@
 <!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Day 46 · 分布式共识与协调 (Consensus & Coordination) — System Design</title>
+
+<html lang="zh-CN"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Day 46 · 分布式共识与协调 (Consensus &amp; Coordination) — System Design</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,"SF Pro Display","Noto Sans SC",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
@@ -97,7 +98,6 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 </script>
 </head><body><div class="container">
-
 <header>
 <div class="meta">
 <span class="tag day">Day 46</span>
@@ -106,10 +106,9 @@ document.addEventListener('DOMContentLoaded',()=>{
 <span class="tag">Raft / Paxos</span>
 <span class="tag">Coordination</span>
 </div>
-<h1>分布式共识与协调 — 让 5 台机器对「一件事」达成一致<span class="en">Distributed Consensus & Coordination: Raft/Paxos, Leader Election, Locks, Quorum & Split-Brain</span></h1>
+<h1 data-tts="dab712ed5b596494">分布式共识与协调 — 让 5 台机器对「一件事」达成一致<span class="en">Distributed Consensus &amp; Coordination: Raft/Paxos, Leader Election, Locks, Quorum &amp; Split-Brain</span></h1>
 </header>
-
-<h2>问题场景 + 需求约束</h2>
+<h2 data-tts="d0a0a0d55d7fc856">问题场景 + 需求约束</h2>
 <p>你要给一个跨 3 个可用区的分布式数据库做<strong>控制面</strong>：谁是当前唯一的 primary（负责写）？某个分片迁移任务此刻能不能启动？服务发现里 <code>db-shard-7</code> 的地址是什么？这些问题都要求<strong>所有节点看到同一个答案，且答案不会因为网络分区裂成两份</strong>——这就是分布式协调，业界的标准答案是 etcd / ZooKeeper / Chubby 这类「共识服务」。</p>
 <p>具体设计目标：一个 <strong>5 节点的强一致协调服务</strong>（类似 etcd）——</p>
 <ul>
@@ -118,8 +117,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 <li><strong>负载画像</strong>：<em>读多写少</em>——配置/服务发现读 QPS 数十万，但写 QPS 通常只有几百到几千（元数据变更是低频事件）。写 P99 &lt; 50ms，watch 通知延迟 &lt; 100ms。</li>
 <li><strong>关键约束</strong>：数据量小（GB 级元数据全放内存），但<strong>正确性零容忍</strong>——协调服务错一次，上层几百个服务集体脑裂。</li>
 </ul>
-
-<h2>高层架构</h2>
+<h2 data-tts="dcba9741f1949ed4">高层架构</h2>
 <pre class="mermaid">
 graph TD
     C["客户端<br/><i>kubelet / 数据库节点</i>"]
@@ -132,15 +130,15 @@ graph TD
     end
     SM["状态机 KV<br/><i>apply committed log</i>"]
 
-    C -->|"①写请求"| L
-    L -->|"②AppendEntries<br/>复制日志"| F1
-    L -->|"②"| F2
-    L -->|"②"| F3
-    L -->|"②"| F4
-    F1 -.->|"③ack"| L
-    F2 -.->|"③ack"| L
-    L -->|"④多数派 ack → commit"| SM
-    SM -.->|"⑤apply 后返回"| C
+    C --&gt;|"①写请求"| L
+    L --&gt;|"②AppendEntries<br/>复制日志"| F1
+    L --&gt;|"②"| F2
+    L --&gt;|"②"| F3
+    L --&gt;|"②"| F4
+    F1 -.-&gt;|"③ack"| L
+    F2 -.-&gt;|"③ack"| L
+    L --&gt;|"④多数派 ack → commit"| SM
+    SM -.-&gt;|"⑤apply 后返回"| C
 
     classDef leader fill:#2a1530,stroke:#ff7ab6,color:#e8eef5
     classDef follower fill:#1a2530,stroke:#64c8ff,color:#e8eef5
@@ -153,10 +151,8 @@ graph TD
 </pre>
 <p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">写请求先进 Leader 的日志，复制到<strong>多数派（3/5）</strong>后才 commit 并 apply 到状态机——「多数派确认」是整个系统安全性的地基</p>
 <p>所有写操作被序列化成一条<strong>复制日志（replicated log）</strong>，每个节点按相同顺序 apply 到状态机 → 得到相同结果，这就是 <em>Replicated State Machine</em> 模型。Leader 负责定序，Follower 只是复制。共识算法（Raft / Paxos / ZAB）解决的核心问题只有一个：<strong>在节点会宕机、网络会丢包和分区的前提下，让所有活着的节点对「日志的第 N 条是什么」达成不可推翻的一致</strong>。</p>
-
-<h2>关键技术点</h2>
-
-<h3>1. 共识的本质 — 为什么必须是「多数派」Quorum</h3>
+<h2 data-tts="c3df2e03437171d5">关键技术点</h2>
+<h3 data-tts="3c36e70781afb175">1. 共识的本质 — 为什么必须是「多数派」Quorum</h3>
 <p class="tradeoff"><strong>核心 trade-off：</strong>多数派 quorum 用「牺牲一半以上节点才不可用」换来「任意两次决议必然有交集，因此不可能矛盾」。这是 CP 系统的数学地基，代价是<strong>可用性上限被 quorum 卡死</strong>。</p>
 <p><strong>【原理】</strong>共识要同时满足：<em>Agreement</em>（所有节点认同同一值）、<em>Validity</em>（认同的值是某人真提过的）、<em>Termination</em>（最终能决定）。关键机制是<strong>多数派交集</strong>：5 节点里任意两个多数派（各 ≥3）必然至少共享 1 个节点，那个节点「记得」上一次的决议，从而阻止出现两个冲突的已提交值。这就是为什么 <code>2f+1</code> 节点只能容忍 <code>f</code> 个故障——你需要活着的多数派来形成新决议，同时保证它与历史决议相交。</p>
 <div class="tradeoff">
@@ -175,7 +171,7 @@ def on_client_write(cmd):
     log.append(entry)                       # 先进自己的日志
     replicate_to_followers(entry)           # 并行 AppendEntries
     # 等待多数派（含自己）确认
-    if acked_count(entry) >= majority:       # 3/5
+    if acked_count(entry) &gt;= majority:       # 3/5
         commit_index = entry.index          # 提交点前移
         apply_to_state_machine(entry)       # 才真正生效
         return OK
@@ -183,13 +179,12 @@ def on_client_write(cmd):
 
 # Follower 收到 AppendEntries：任期落后就拒绝，保证不倒退
 def on_append_entries(req):
-    if req.term < current_term: return REJECT   # 旧 leader
+    if req.term &lt; current_term: return REJECT   # 旧 leader
     if not log_matches(req.prev_index, req.prev_term): return REJECT  # 日志不连续
     log.append(req.entries); return ACK
 </code></pre>
 <div class="case"><strong>现实案例：</strong><strong>etcd</strong>（Kubernetes 的大脑）用 Raft 存全集群元数据；<strong>Google Chubby</strong>（<a href="https://research.google/pubs/the-chubby-lock-service-for-loosely-coupled-distributed-systems/">Burrows, OSDI 2006</a>）用 Paxos，为 GFS/BigTable 做 leader election；<strong>ZooKeeper</strong> 用 ZAB；<strong>Kafka KRaft</strong>（KIP-500）用 Raft 变体的 quorum controller 取代了 ZooKeeper，Kafka 4.0 已彻底移除 ZK 依赖。</div>
-
-<h3>2. Leader Election 与脑裂防护 — term 单调 + 多数派 = 旧王无法复辟</h3>
+<h3 data-tts="d7457435d9c819ea">2. Leader Election 与脑裂防护 — term 单调 + 多数派 = 旧王无法复辟</h3>
 <p class="tradeoff"><strong>核心 trade-off：</strong>用「任期号 term + 多数派选举」保证任意时刻最多一个<em>能提交</em>的 leader；代价是选举期间（几百 ms）整个集群写不可用。</p>
 <p><strong>【原理】</strong>每次选举产生一个<strong>单调递增的 term（Paxos 叫 ballot、ZAB 叫 epoch）</strong>。候选人拿到多数派选票才当选，而多数派交集保证<strong>一个 term 内不可能选出两个 leader</strong>。网络分区时，小分区（≤2 节点）凑不齐多数派选不出新 leader，也 commit 不了任何写；大分区选出 term 更高的新 leader。旧 leader 即使还活着、还以为自己是 leader，它的 <code>AppendEntries</code> 带着旧 term 会被所有人 <strong>REJECT</strong>——这就是<strong>脑裂被数学消灭</strong>的机制：可以有两个「自称 leader」，但只有一个能凑齐多数派提交。</p>
 <div class="tradeoff">
@@ -204,14 +199,13 @@ def on_append_entries(req):
 current_token = 0
 def write(payload, token):
     global current_token
-    if token < current_token:          # 更小 = 旧 leader / 旧租约
+    if token &lt; current_token:          # 更小 = 旧 leader / 旧租约
         raise StaleLeaderError          # 拒绝！哪怕它自认还是 leader
     current_token = token
     persist(payload)
 </code></pre>
 <div class="case"><strong>现实案例：</strong>ZooKeeper 用 <strong>zxid</strong>（epoch+counter）做全序与 fencing；Chubby 提供 <strong>sequencer</strong>（本质就是 fencing token）让下游校验；etcd 的 <strong>lease + revision</strong> 机制让 leader election 结果可被下游验证。Kleppmann 在《DDIA》第 8/9 章反复强调：<em>分布式锁没有 fencing token 就是错的</em>。</div>
-
-<h3>3. 分布式锁的正确姿势 — TTL 不够，fencing token 才是命根</h3>
+<h3 data-tts="0db04db465e1defe">3. 分布式锁的正确姿势 — TTL 不够，fencing token 才是命根</h3>
 <p class="tradeoff"><strong>核心 trade-off：</strong>基于共识服务的锁（ZK/etcd）比 Redis Redlock 慢，但换来<strong>唯一性可证明</strong>；纯 TTL 锁在 GC/网络延迟面前必然出双主。</p>
 <p><strong>【原理】</strong>经典幻觉：客户端 A 拿到锁（TTL=10s），干活时突发 <strong>15s STW GC 停顿</strong>；期间锁过期、B 拿到锁开始写；A 醒来<em>不知道自己已失去锁</em>继续写 → <strong>两客户端同时写同一资源</strong>。TTL 永远堵不住，因为「检查锁」和「用锁」之间总有时间差。唯一正解：锁服务发一个<strong>单调递增的 fencing token</strong>，客户端每次操作把 token 带给下游，存储<strong>拒绝比已见过更小的 token</strong>——醒来的 A 拿旧 token，写直接被打回。</p>
 <div class="tradeoff">
@@ -237,8 +231,7 @@ def acquire_lock(zk):
         wait()
 </code></pre>
 <div class="case"><strong>现实案例：</strong>大量系统用 <strong>ZooKeeper 临时顺序节点</strong>做公平锁与 leader election（HBase HMaster、早期 Kafka controller）。Kleppmann 的经典文章 <a href="https://martin.kleppmann.com/2016/02/08/how-to-do-distributed-locking.html">《How to do distributed locking》</a> 系统性论证了「Redlock 缺 fencing token → 不能用于保护有副作用的操作」，是这个主题的必读辩论。</div>
-
-<h3>4. 线性化读的代价 — 「从 Leader 本地读」是经典 bug</h3>
+<h3 data-tts="e08bac182a0c2074">4. 线性化读的代价 — 「从 Leader 本地读」是经典 bug</h3>
 <p class="tradeoff"><strong>核心 trade-off：</strong>quorum read 安全但慢；lease read 快但赌时钟；follower read 可扩展但可能读到旧值。三选一，取决于你要不要真正的线性化。</p>
 <p><strong>【原理】</strong>直觉上「leader 有最新数据，直接读 leader 内存就行」——<strong>错</strong>。一个 leader 可能刚被多数派罢免、选出了新 leader，而它<em>自己还不知道</em>（网络分区把它孤立了）。此时读它的本地状态会返回<strong>stale 旧值</strong>，破坏线性化。正确做法：读之前 leader 必须<strong>确认自己仍是 leader</strong>——Raft 的 <em>ReadIndex</em>：记下当前 commit index，向多数派发一轮心跳确认领导权仍在，再返回该 index 处的值。</p>
 <div class="tradeoff">
@@ -254,12 +247,11 @@ def linearizable_read(key):
     idx = commit_index                     # 记录当前提交点
     if not confirm_leadership_via_quorum(): # 发一轮心跳，多数派回应才算数
         raise NotLeaderError               # 已被罢免 → 拒绝，转发给真 leader
-    wait_until(applied_index >= idx)       # 等状态机追上该 index
+    wait_until(applied_index &gt;= idx)       # 等状态机追上该 index
     return state_machine.get(key)          # 此刻读到的一定不旧
 </code></pre>
 <div class="case"><strong>现实案例：</strong><a href="https://aphyr.com/posts/316-jepsen-etcd-and-consul">Jepsen 对 etcd/Consul 的分析</a>正是踩在这个坑上——早期 etcd 的「consistent read」直接读本地 leader 状态，Aphyr 测出 <strong>约八成历史非线性化</strong>（能读到 index 5→4→6 这种倒退），此后 etcd 改用 ReadIndex/quorum read。TiKV、CockroachDB 用 leader lease read 在保证正确性的前提下省掉多数往返。</div>
-
-<h2>扩展与优化</h2>
+<h2 data-tts="3d4e4613c45f7346">扩展与优化</h2>
 <ul>
 <li><strong>Learner / 非投票成员</strong>：新节点加入前先做 learner（只复制日志、不参与投票），追上进度后再转正——避免加入瞬间拉低 quorum 可用性（etcd learner、Raft joint consensus）。</li>
 <li><strong>Witness / tiebreaker 节点</strong>：跨 2 个 AZ 部署时放一个只投票不存全量数据的仲裁节点，用低成本换奇数投票权、打破 2-2 平局。</li>
@@ -268,26 +260,22 @@ def linearizable_read(key):
 <li><strong>Batching + pipelining</strong>：多条日志批量 <code>AppendEntries</code> 并允许多个 in-flight，把每秒几百写提到几万。</li>
 <li><strong>Leader placement</strong>：把 leader 放在写流量最密的区，减少客户端→leader 跨洋往返。</li>
 </ul>
-
-<h2>常见陷阱 + 面试问题</h2>
+<h2 data-tts="a7a5b3f78dacce78">常见陷阱 + 面试问题</h2>
 <div class="callout"><strong>1. 偶数节点是纯浪费。</strong> 4 节点的多数派是 3，和 3 节点一样只容忍 1 故障，却多付一台机器成本、还增大分区时 2-2 僵局概率。共识组永远用<strong>奇数</strong>（3/5/7）。</div>
 <div class="callout"><strong>2. 「从 leader 本地读」的 stale bug。</strong> 面试高频陷阱：候选人说「读直接问 leader」，追问「leader 被分区罢免但自己不知道呢？」——必须 ReadIndex/lease 确认领导权。</div>
 <div class="callout"><strong>3. 分布式锁不带 fencing token。</strong> 只靠 TTL/session 就敢去写数据库，GC 停顿一来就双主。能说出「fencing token 单调递增 + 存储端校验」是资深信号。</div>
 <div class="callout"><strong>4. 用 lease 却假设时钟完美。</strong> Leader lease read 的正确性依赖「时钟漂移有上界」；VM 被冻结、NTP 跳变都能击穿它。要么留足安全边际，要么退回 quorum read。</div>
 <div class="callout"><strong>5. 拿共识当高吞吐存储。</strong> 每个写都过多数派复制，天然是低吞吐、强一致的控制面工具。别把用户业务数据的高频写扔进 etcd/ZK——它们是协调器，不是主数据库。</div>
 <p><strong>其他高频追问：</strong>①为什么协调服务不用 2PC？（2PC 协调者单点、参与者会被阻塞，不容错）②5 节点跨 3 AZ 怎么摆才能容忍一个 AZ 挂掉？③Raft 和 Paxos 到底差在哪？④watch 的通知怎么保证不漏（etcd revision + 断点续传）？</p>
-
-<h2>深入资源</h2>
+<h2 data-tts="1edef13c5bc0b6c0">深入资源</h2>
 <ul>
-<li><strong>Raft 论文</strong>《In Search of an Understandable Consensus Algorithm》(Ongaro & Ousterhout, USENIX ATC 2014) — <a href="https://raft.github.io/">raft.github.io</a> 有论文、可视化动画与各语言实现。入门共识的最佳起点。</li>
+<li><strong>Raft 论文</strong>《In Search of an Understandable Consensus Algorithm》(Ongaro &amp; Ousterhout, USENIX ATC 2014) — <a href="https://raft.github.io/">raft.github.io</a> 有论文、可视化动画与各语言实现。入门共识的最佳起点。</li>
 <li><strong>Chubby 论文</strong>《The Chubby Lock Service for Loosely-Coupled Distributed Systems》(<a href="https://research.google/pubs/the-chubby-lock-service-for-loosely-coupled-distributed-systems/">Burrows, OSDI 2006</a>) — Paxos 如何工程化落地成锁服务的一手经验。</li>
 <li><strong>《Designing Data-Intensive Applications》第 8、9 章</strong>(Kleppmann) — 不可靠系统的抽象、一致性与共识的权威梳理，fencing token 论述在此。</li>
 <li><strong>Kleppmann《How to do distributed locking》</strong> — <a href="https://martin.kleppmann.com/2016/02/08/how-to-do-distributed-locking.html">Redlock 之争</a>，讲透分布式锁为何必须 fencing。</li>
 <li><strong>Jepsen: etcd and Consul</strong> — <a href="https://aphyr.com/posts/316-jepsen-etcd-and-consul">Aphyr</a> 用对抗性测试揭穿「consistent read 其实非线性化」，共识系统实战验证范本。</li>
 </ul>
-
-<h2>深入思考（点击展开答案）</h2>
-
+<h2 data-tts="a9a165c5edf04215">深入思考（点击展开答案）</h2>
 <details>
 <summary>1. 多数派是「任意两个 quorum 必相交」的一种实现。Flexible Paxos 说选举 quorum 与复制 quorum 只需相交即可——这揭示了共识的什么本质？能怎么利用？</summary>
 <div class="answer">
@@ -296,7 +284,6 @@ def linearizable_read(key):
 <p><strong>推论</strong>：还能做「网格 quorum」等拓扑，让跨区复制只需本区多数 + 少量远端。本质是把「相交」约束暴露成可调旋钮。</p>
 </div>
 </details>
-
 <details>
 <summary>2. 5 节点要容忍「整个可用区挂掉」，跨 3 个 AZ 该怎么摆？为什么不能 3-1-1 或 2-2-1 随便放？</summary>
 <div class="answer">
@@ -309,7 +296,6 @@ def linearizable_read(key):
 <p><strong>成本优化</strong>：若第三个 AZ 只想放 1 个节点，可用「witness / 无数据仲裁节点」——它只投票不存全量，用低成本换奇数投票权和打破平局的能力。</p>
 </div>
 </details>
-
 <details>
 <summary>3. 客户端持锁时发生 30s GC 停顿。为什么加长 lease 或续租都救不了？为什么只有 fencing token 能根治？</summary>
 <div class="answer">
@@ -319,7 +305,6 @@ def linearizable_read(key):
 <p><strong>fencing token 为何根治</strong>：它把判定权从「客户端不可靠的自我认知」转移到「下游存储的单调校验」。醒来的旧客户端带 token=33 去写，而存储已因新持有者 token=34 把水位抬高，33 &lt; 34 直接被拒。<strong>正确性不再依赖任何时间假设</strong>——哪怕停顿一小时，旧 token 也永远打不进去。这是把「时间问题」转成「单调序问题」。</p>
 </div>
 </details>
-
 <details>
 <summary>4. etcd 默认读要走 quorum（ReadIndex），性能明显更差。follower read 什么情况下才是安全的？CockroachDB 的 leader lease read 又靠什么免掉往返？</summary>
 <div class="answer">
@@ -328,7 +313,6 @@ def linearizable_read(key):
 <p><strong>leader lease read 免往返的原理</strong>：leader 持有一个<em>有时限的领导权租约</em>，只要在租约有效期内，且系统保证「租约到期前不会选出新 leader」（新 leader 选举必须等旧租约过期），那么 leader 就能确信自己仍是唯一 leader，<strong>无需每次心跳确认即可本地读</strong>。代价：正确性依赖<strong>时钟漂移有上界</strong>——VM 冻结、NTP 大幅跳变会击穿它，所以要留安全边际（lease 有效期算得比理论值保守）。</p>
 </div>
 </details>
-
 <details>
 <summary>5. 共识组的写吞吐为什么无法靠「加机器」扩展，反而可能越加越慢？Multi-Raft 是怎么绕开这堵墙的？</summary>
 <div class="answer">
@@ -337,11 +321,10 @@ def linearizable_read(key):
 <p><strong>新代价</strong>：跨 shard 原子操作需额外的分布式事务层（2PC over Raft groups）；shard 分裂/合并/再平衡成为新复杂度；成千上万组的心跳会淹没网络，于是要<em>心跳合并</em>（同节点间多组心跳批成一条）。CockroachDB、TiKV 是这条路线的代表。</p>
 </div>
 </details>
-
 <div class="nav"><a href="index.html">← 回到 index</a></div>
 </div>
-<script src="https://hub.cissychen.com/comments.js" defer></script>
-<script src="https://hub.cissychen.com/search.js" defer></script>
-<script src="https://hub.cissychen.com/index-button.js" defer></script>
-<script src="https://hub.cissychen.com/i18n-tts.js" defer></script>
+<script defer="" src="https://hub.cissychen.com/comments.js"></script>
+<script defer="" src="https://hub.cissychen.com/search.js"></script>
+<script defer="" src="https://hub.cissychen.com/index-button.js"></script>
+<script defer="" src="https://hub.cissychen.com/i18n-tts.js"></script>
 </body></html>

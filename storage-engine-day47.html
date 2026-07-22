@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<html lang="zh-CN"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>Day 47 · 数据库内部与存储引擎 (Storage Engines) — System Design</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -97,7 +98,6 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 </script>
 </head><body><div class="container">
-
 <header>
 <div class="meta">
 <span class="tag day">Day 47</span>
@@ -106,29 +106,27 @@ document.addEventListener('DOMContentLoaded',()=>{
 <span class="tag">B-tree / LSM</span>
 <span class="tag">WAL / MVCC</span>
 </div>
-<h1>数据库内部与存储引擎 — 一次读写在盘上到底发生了什么<span class="en">Database Internals & Storage Engines: B-tree vs LSM, WAL & Crash Recovery, MVCC, Query Optimizer</span></h1>
+<h1 data-tts="adfed2127de04b92">数据库内部与存储引擎 — 一次读写在盘上到底发生了什么<span class="en">Database Internals &amp; Storage Engines: B-tree vs LSM, WAL &amp; Crash Recovery, MVCC, Query Optimizer</span></h1>
 </header>
-
-<h2>问题场景 + 需求约束</h2>
+<h2 data-tts="252a3f3b23e8b840">问题场景 + 需求约束</h2>
 <p>你在为一个<strong>交易/账本系统</strong>选底层存储引擎：订单表写入峰值 <strong>10 万 QPS</strong>，点查（按订单号）<strong>5 万 QPS</strong>，单表数据量增长到 <strong>10 TB+</strong>，宕机后必须<em>零数据丢失</em>恢复（RPO=0），且大量并发读写不能互相阻塞。摆在面前的问题不是「用 MySQL 还是 Postgres」这种表层选择，而是：<strong>这些数据库内部的存储引擎，凭什么保证一次 <code>UPDATE</code> 既快又不丢、还能被别的事务同时读到一致快照</strong>？</p>
 <p>要回答这个，必须打开数据库这个黑盒，看清四件事：<em>数据在盘上怎么组织（B-tree vs LSM）、崩溃了怎么不丢（WAL）、并发读写怎么不打架（MVCC）、一条 SQL 怎么被翻译成最优的盘上访问（优化器）</em>。这也是设计存储密集型系统、以及面试架构师岗位的分水岭。</p>
-
-<h2>高层架构（存储引擎剖面）</h2>
+<h2 data-tts="063b6494fe5b4488">高层架构（存储引擎剖面）</h2>
 <pre class="mermaid">
 graph TD
-    SQL["SQL 查询"] --> PARSE["Parser + Planner<br/><i>基于代价的优化器</i>"]
-    PARSE --> EXEC["Executor<br/><i>Access Method 接口</i>"]
-    EXEC --> AM{"存储引擎"}
-    AM -->|读多| BT["B+Tree<br/><i>InnoDB / Postgres</i>"]
-    AM -->|写多| LSM["LSM-Tree<br/><i>RocksDB / Cassandra</i>"]
+    SQL["SQL 查询"] --&gt; PARSE["Parser + Planner<br/><i>基于代价的优化器</i>"]
+    PARSE --&gt; EXEC["Executor<br/><i>Access Method 接口</i>"]
+    EXEC --&gt; AM{"存储引擎"}
+    AM --&gt;|读多| BT["B+Tree<br/><i>InnoDB / Postgres</i>"]
+    AM --&gt;|写多| LSM["LSM-Tree<br/><i>RocksDB / Cassandra</i>"]
 
-    BT --> BP["Buffer Pool<br/><i>页缓存 · 脏页</i>"]
-    LSM --> MEM["MemTable<br/><i>内存有序表</i>"]
+    BT --&gt; BP["Buffer Pool<br/><i>页缓存 · 脏页</i>"]
+    LSM --&gt; MEM["MemTable<br/><i>内存有序表</i>"]
 
-    WRITE["写路径"] -.先写.-> WAL[("WAL / redo log<br/><i>顺序追加</i>")]
-    BP -->|checkpoint 刷脏页| DISK[("数据文件<br/>heap / SSTable")]
-    MEM -->|flush + compaction| DISK
-    WAL -.崩溃恢复 redo/undo.-> BP
+    WRITE["写路径"] -.先写.-&gt; WAL[("WAL / redo log<br/><i>顺序追加</i>")]
+    BP --&gt;|checkpoint 刷脏页| DISK[("数据文件<br/>heap / SSTable")]
+    MEM --&gt;|flush + compaction| DISK
+    WAL -.崩溃恢复 redo/undo.-&gt; BP
 
     classDef q fill:#1a2530,stroke:#64c8ff,color:#e8eef5
     classDef eng fill:#1a1a30,stroke:#ffb450,color:#e8eef5
@@ -138,10 +136,8 @@ graph TD
     class WAL,DISK dur
 </pre>
 <p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">核心不变量：任何数据落地前，<strong>先写 WAL</strong>（顺序 IO）；数据结构本身决定读/写/空间放大三者的取舍</p>
-
-<h2>关键技术点</h2>
-
-<h3>1. B-tree vs LSM-tree — 读放大与写放大不可兼得</h3>
+<h2 data-tts="c3df2e03437171d5">关键技术点</h2>
+<h3 data-tts="6d1930e1ef0ca2c9">1. B-tree vs LSM-tree — 读放大与写放大不可兼得</h3>
 <p><strong>原理</strong>：磁盘（尤其机械盘和 SSD）的顺序写远快于随机写。<em>B+Tree</em> 把数据<strong>原地（in-place）</strong>组织成有序的页，查找 O(log n) 且每次点查只读一个叶子页——读友好；但更新一行要把对应页读进来、改、再写回，是<strong>随机写</strong>，且一页只改几字节也要整页刷盘（写放大）。<em>LSM-Tree</em> 反过来：写只追加到内存 MemTable，满了就顺序 flush 成不可变的 SSTable，后台再 compaction 合并——<strong>把随机写变成顺序写</strong>，写吞吐极高；代价是一个 key 可能散落在多层 SSTable，点查要查多层（读放大），靠 Bloom Filter 缓解。</p>
 <div class="tradeoff">
 <strong>Trade-off（RUM 三角：Read / Update / Memory 放大，最多优化两个）：</strong>
@@ -170,8 +166,7 @@ def lsm_get(key):
 <li><strong>Cassandra / HBase</strong>：LSM，为高写入吞吐设计，时序与宽表场景标配。</li>
 <li><strong>Uber</strong>：因 Postgres 的写放大/复制成本，<a href="https://www.uber.com/en-US/blog/postgres-to-mysql-migration/">迁到 MySQL/InnoDB</a>——同是 B-tree 家族，索引结构差异决定写成本。</li>
 </ul></div>
-
-<h3>2. WAL 与崩溃恢复 — 先写日志，才敢改数据</h3>
+<h3 data-tts="91a37a12199ef335">2. WAL 与崩溃恢复 — 先写日志，才敢改数据</h3>
 <p><strong>原理</strong>：数据页在内存 buffer pool 里被改成「脏页」，若此时宕机、脏页还没落盘，数据就丢了。<strong>WAL（Write-Ahead Logging）</strong>的铁律：<em>任何对数据页的修改，其 redo 日志必须先顺序写入磁盘并 fsync，才允许脏页刷盘</em>。这样崩溃后重放 WAL 就能重建内存中丢失的修改。顺序写 WAL 也顺便把「多个随机写」摊销成「一次顺序写 + 异步刷脏页」，反而提速。工业标准是 <em>ARIES</em> 算法：三阶段恢复——<strong>Analysis</strong>（找出崩溃时的脏页和活跃事务）、<strong>Redo</strong>（重放到崩溃瞬间的状态，含未提交事务）、<strong>Undo</strong>（回滚未提交事务），配合 LSN、checkpoint、CLR 保证幂等可重入。</p>
 <div class="tradeoff">
 <strong>Trade-off（持久性 vs 延迟，取决于 fsync 时机）：</strong>
@@ -195,8 +190,7 @@ def commit(txn):
 <li><strong>RocksDB</strong>：MemTable 前也有 WAL，flush 成功后对应 WAL 才可删。</li>
 <li><strong>ARIES</strong>（IBM，Mohan 等）：几乎所有关系库崩溃恢复的理论蓝本。</li>
 </ul></div>
-
-<h3>3. MVCC — 读不阻塞写，写不阻塞读</h3>
+<h3 data-tts="8ab504feb848ea33">3. MVCC — 读不阻塞写，写不阻塞读</h3>
 <p><strong>原理</strong>：如果读写都靠锁互斥，一个长事务的读会把写全堵死。<strong>MVCC（多版本并发控制）</strong>让每次更新<em>不覆盖旧行</em>而是产生一个新版本，每行带创建/删除的事务时间戳（xmin/xmax）。事务开始时拿一个<strong>快照</strong>，读取时只看「对我可见」的版本——于是<em>读永远不加锁、看到一致快照，写也不用等读</em>。这就是 <code>REPEATABLE READ</code> / Snapshot Isolation 的实现基础。代价是旧版本会堆积，必须回收：Postgres 靠 <em>VACUUM</em> 清理死元组，InnoDB 靠 <em>purge</em> 线程清理 undo。</p>
 <div class="tradeoff">
 <strong>Trade-off（旧版本放哪 → 决定写放大与回收痛点）：</strong>
@@ -224,9 +218,8 @@ def visible(tuple, snapshot):
 <li><strong>Oracle</strong>：undo segment + SCN，「ORA-01555 snapshot too old」即历史版本被覆盖。</li>
 <li><strong>CockroachDB / Spanner</strong>：MVCC + 时间戳，把版本时间戳和分布式一致性结合。</li>
 </ul></div>
-
-<h3>4. 索引内部与查询优化器 — 一条 SQL 的最优盘上路径</h3>
-<p><strong>原理</strong>：同一条 <code>SELECT ... WHERE a=? AND b>?</code> 可以有多种执行方式：全表扫、走 a 的索引再过滤、走复合索引 (a,b) 直接定位。<strong>基于代价的优化器（CBO）</strong>用<em>统计信息</em>（直方图、distinct 值数、行数）估算每种方案要读多少页、结果集多大，选代价最小的。索引本身是 B+Tree：<em>聚簇索引</em>叶子存整行，<em>二级索引</em>叶子存主键（需回表），<em>覆盖索引</em>让查询列全在索引里、免回表。选择性（selectivity）是关键——低选择性列（如性别）走索引反而更慢。</p>
+<h3 data-tts="66f5d1fcd8970709">4. 索引内部与查询优化器 — 一条 SQL 的最优盘上路径</h3>
+<p><strong>原理</strong>：同一条 <code>SELECT ... WHERE a=? AND b&gt;?</code> 可以有多种执行方式：全表扫、走 a 的索引再过滤、走复合索引 (a,b) 直接定位。<strong>基于代价的优化器（CBO）</strong>用<em>统计信息</em>（直方图、distinct 值数、行数）估算每种方案要读多少页、结果集多大，选代价最小的。索引本身是 B+Tree：<em>聚簇索引</em>叶子存整行，<em>二级索引</em>叶子存主键（需回表），<em>覆盖索引</em>让查询列全在索引里、免回表。选择性（selectivity）是关键——低选择性列（如性别）走索引反而更慢。</p>
 <div class="tradeoff">
 <strong>Trade-off：</strong>
 <ul>
@@ -237,7 +230,7 @@ def visible(tuple, snapshot):
 <pre><code>-- 用 EXPLAIN 看优化器到底怎么走
 EXPLAIN ANALYZE
 SELECT order_id, amount FROM orders
-WHERE user_id = 42 AND created_at > '2026-01-01';
+WHERE user_id = 42 AND created_at &gt; '2026-01-01';
 -- 期望: Index Scan using idx_user_created (user_id, created_at)
 -- 若见 Seq Scan + Filter → 统计过期或选择性误判, 先 ANALYZE orders;
 -- 复合索引 (user_id, created_at): user_id 等值在前, 范围列在后
@@ -250,8 +243,7 @@ WHERE user_id = 42 AND created_at > '2026-01-01';
 <li><strong>CockroachDB / TiDB</strong>：分布式 CBO，还要估算跨节点数据分布与网络代价。</li>
 <li><strong>「隐式类型转换致索引失效」</strong>：字符串列传数字、函数包裹列（<code>WHERE date(t)=...</code>）都会让索引用不上，是最高频线上慢查询。</li>
 </ul></div>
-
-<h2>扩展与优化（增长后怎么办）</h2>
+<h2 data-tts="2ba19d2256c9f1b1">扩展与优化（增长后怎么办）</h2>
 <ul>
 <li><strong>写扛不住</strong>：读多写少继续 B-tree + 加读副本；写吞吐瓶颈考虑换 LSM 引擎（MyRocks / TiKV），用顺序写换随机写。</li>
 <li><strong>单机 10TB 到顶</strong>：分片（见 Day 4），每片仍是独立存储引擎；跨片查询交给上层。</li>
@@ -259,15 +251,13 @@ WHERE user_id = 42 AND created_at > '2026-01-01';
 <li><strong>VACUUM / purge 跟不上</strong>：拆分长事务、调 autovacuum 激进度、监控表膨胀率与 undo 长度。</li>
 <li><strong>WAL 成瓶颈</strong>：组提交 + 更快的 WAL 盘（独立 NVMe）；异地灾备用 WAL 流式复制（物理复制 / CDC）。</li>
 </ul>
-
-<h2>常见陷阱 + 面试追问</h2>
+<h2 data-tts="bedbce617d270bb0">常见陷阱 + 面试追问</h2>
 <div class="callout"><strong>1. 「LSM 一定比 B-tree 快」？</strong> 错。LSM 只在<em>写密集</em>时赢；点查多、范围扫多、读延迟敏感的场景，B-tree 的低读放大更优。选引擎先看读写比。</div>
 <div class="callout"><strong>2. 关了 fsync 换吞吐？</strong> <code>innodb_flush_log_at_trx_commit=2</code> 或 <code>synchronous_commit=off</code> 会在崩溃时丢已回复 OK 的事务。账本/支付绝不能碰，这是 RPO≠0。</div>
 <div class="callout"><strong>3. Postgres 更新很慢 / 表越来越大？</strong> 多半是 MVCC 死元组堆积 + 每次更新动全部索引。长事务阻塞 VACUUM 是头号元凶。</div>
 <div class="callout"><strong>4. 建了索引却没用上？</strong> 最左前缀不匹配、列被函数/隐式转换包裹、选择性太低、统计过期——用 <code>EXPLAIN</code> 验证而不是猜。</div>
 <p style="margin-top:14px"><strong>面试高频追问：</strong>①「为什么顺序写比随机写快，SSD 上还成立吗？」②「WAL 里既有 redo 又有 undo，各自作用？ARIES 三阶段？」③「MVCC 下两个事务同时更新同一行会怎样（写写冲突/first-committer-wins）？」④「聚簇索引 vs 二级索引，回表是什么，覆盖索引怎么避免？」⑤「Snapshot Isolation 能防住哪些异常，防不住什么（write skew）？」</p>
-
-<h2>深入资源</h2>
+<h2 data-tts="e149562be11d34ea">深入资源</h2>
 <ul>
 <li><strong>《Designing Data-Intensive Applications》第 3 章</strong>（Kleppmann）：B-tree vs LSM、WAL、存储引擎权衡的最佳入门。</li>
 <li><strong>《Database Internals》</strong>（Alex Petrov）：B+Tree、LSM、ARIES、并发控制的系统性深挖。</li>
@@ -275,9 +265,7 @@ WHERE user_id = 42 AND created_at > '2026-01-01';
 <li><a href="https://github.com/facebook/rocksdb/wiki">RocksDB Wiki</a>：LSM 引擎、compaction 策略、Bloom Filter 的工程细节。</li>
 <li><a href="https://www.uber.com/en-US/blog/postgres-to-mysql-migration/">Uber Engineering: Postgres→MySQL</a>：MVCC 写放大与索引架构差异的真实案例。</li>
 </ul>
-
-<h2>深入思考（点击展开答案）</h2>
-
+<h2 data-tts="2044b8e0d0006e33">深入思考（点击展开答案）</h2>
 <details>
 <summary>1. SSD 时代随机写已经不慢了，为什么 LSM「顺序写」的优势仍然成立？</summary>
 <div class="answer">
@@ -290,7 +278,6 @@ WHERE user_id = 42 AND created_at > '2026-01-01';
 <p>结论：SSD 缩小了差距，但没抹平；真正要比的是<em>端到端写放大</em>和延迟毛刺，而非单纯 IOPS。</p>
 </div>
 </details>
-
 <details>
 <summary>2. 一个跑了 3 小时的分析事务，导致 Postgres 主库磁盘暴涨、写变慢。机理链条是什么？</summary>
 <div class="answer">
@@ -304,7 +291,6 @@ WHERE user_id = 42 AND created_at > '2026-01-01';
 <p><strong>修法</strong>：拆分/限时长事务（<code>idle_in_transaction_session_timeout</code>）、把分析查询放只读副本、监控 <code>pg_stat_activity</code> 里的 <code>xact_start</code> 和最老快照年龄、必要时 <code>VACUUM FULL</code> 或 pg_repack 回收空间。这也是「OLTP 和 OLAP 要分库」的底层理由之一。</p>
 </div>
 </details>
-
 <details>
 <summary>3. Snapshot Isolation 看似很强，但它防不住 write skew。举个真实例子，怎么修？</summary>
 <div class="answer">
@@ -317,7 +303,6 @@ WHERE user_id = 42 AND created_at > '2026-01-01';
 <p><strong>修法</strong>：①<strong>Serializable Snapshot Isolation（SSI）</strong>——Postgres 的 <code>SERIALIZABLE</code> 会检测读写依赖环并中止一个事务。②<strong>显式加锁物化冲突</strong>——<code>SELECT ... FOR UPDATE</code> 锁住相关行，或对「值班人数」这个聚合加一把锁/一行计数器，把隐式冲突变成显式写写冲突。</p>
 </div>
 </details>
-
 <details>
 <summary>4. 为什么二级索引通常存「主键值」而不是「行的物理地址」？各自代价？</summary>
 <div class="answer">
@@ -329,7 +314,6 @@ WHERE user_id = 42 AND created_at > '2026-01-01';
 <p>本质是「间接层放哪」的取舍：主键间接层换来更新时索引稳定（写省），物理地址换来读时少一跳（读省）——又一次 read/write 放大的对立。</p>
 </div>
 </details>
-
 <details>
 <summary>5. 崩溃恢复时，WAL 里为什么要重放「未提交」事务的修改，再回滚它们？直接跳过不行吗？</summary>
 <div class="answer">
@@ -342,11 +326,10 @@ WHERE user_id = 42 AND created_at > '2026-01-01';
 <p>「跳过未提交的」听起来省事，但你根本<em>无法知道</em>磁盘上哪些未提交改动已经落盘——不重放到已知状态，就没有安全的回滚基线。</p>
 </div>
 </details>
-
 <div class="nav"><a href="index.html">← 回到 index</a></div>
 </div>
-<script src="https://hub.cissychen.com/comments.js" defer></script>
-<script src="https://hub.cissychen.com/search.js" defer></script>
-<script src="https://hub.cissychen.com/index-button.js" defer></script>
-<script src="https://hub.cissychen.com/i18n-tts.js" defer></script>
+<script defer="" src="https://hub.cissychen.com/comments.js"></script>
+<script defer="" src="https://hub.cissychen.com/search.js"></script>
+<script defer="" src="https://hub.cissychen.com/index-button.js"></script>
+<script defer="" src="https://hub.cissychen.com/i18n-tts.js"></script>
 </body></html>

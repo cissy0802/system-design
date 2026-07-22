@@ -1,6 +1,7 @@
 <!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Day 43 · 隐私与合规架构 (Privacy & Compliance) — System Design</title>
+
+<html lang="zh-CN"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Day 43 · 隐私与合规架构 (Privacy &amp; Compliance) — System Design</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,"SF Pro Display","Noto Sans SC",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
@@ -97,7 +98,6 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 </script>
 </head><body><div class="container">
-
 <header>
 <div class="meta">
 <span class="tag day">Day 43</span>
@@ -108,25 +108,23 @@ document.addEventListener('DOMContentLoaded',()=>{
 <span class="tag">审计追踪</span>
 <span class="tag">同意管理</span>
 </div>
-<h1>隐私与合规架构 — 当「删除」不再是 DELETE<span class="en">Privacy & Compliance: Right to Erasure, Anonymization, Audit Trail, Consent</span></h1>
+<h1 data-tts="0746652c98cbd491">隐私与合规架构 — 当「删除」不再是 DELETE<span class="en">Privacy &amp; Compliance: Right to Erasure, Anonymization, Audit Trail, Consent</span></h1>
 </header>
-
-<h2>问题场景与约束</h2>
+<h2 data-tts="15e4e75349550a08">问题场景与约束</h2>
 <p>设计一个 <strong>5000 万用户的多租户 SaaS 数据平台</strong>，用户覆盖欧盟。用户点「删除我的账号」，你必须在 <strong>30 天内</strong>（GDPR Article 17）把他的 PII 从<em>所有地方</em>抹掉——但数据散落在 40 个微服务的 OLTP 库、Snowflake 数仓、Redis 缓存、Kafka 事件流、ES 索引，以及<strong>过去 90 天的每一份 DB 备份</strong>里。</p>
 <p>为什么这是最反直觉的 System Design 题：<strong>分布式系统所有的设计习惯都在跟合规作对</strong>。append-only、不可变日志、多副本、事件溯源——全为「数据永不丢」；而 GDPR 要的恰是「让特定数据彻底消失并能证明」。约束还包括：删除须<em>可验证</em>、不能<em>误删</em>法定保留数据（税务/反欺诈有最短保留期）、脱敏数据不能被<em>重识别</em>、每次 PII 访问都要留痕。</p>
-
-<h2>高层架构</h2>
+<h2 data-tts="b054956b1b7187d5">高层架构</h2>
 <div class="mermaid">
 graph TD
-  U[用户 DSAR 请求<br/>删除/导出/撤回同意] --> ORCH[隐私编排器<br/>DSAR Orchestrator]
-  CAT[(PII 数据目录<br/>Data Catalog / Registry)] -.定位数据.-> ORCH
-  ORCH -->|fan-out 删除| SVC1[微服务 A]
-  ORCH -->|fan-out 删除| SVC2[微服务 B ...N]
-  ORCH -->|销毁密钥| KV[[Key Vault<br/>KMS / crypto-shred]]
-  KV -.持有 per-user DEK.-> DB[(加密数据存储)]
-  ORCH -->|每步落证据| AUD[[审计日志<br/>append-only 哈希链]]
-  CG[同意网关<br/>Consent Gate] -.拦截每次处理.-> SVC1
-  CG -.拦截每次处理.-> SVC2
+  U[用户 DSAR 请求<br/>删除/导出/撤回同意] --&gt; ORCH[隐私编排器<br/>DSAR Orchestrator]
+  CAT[(PII 数据目录<br/>Data Catalog / Registry)] -.定位数据.-&gt; ORCH
+  ORCH --&gt;|fan-out 删除| SVC1[微服务 A]
+  ORCH --&gt;|fan-out 删除| SVC2[微服务 B ...N]
+  ORCH --&gt;|销毁密钥| KV[[Key Vault<br/>KMS / crypto-shred]]
+  KV -.持有 per-user DEK.-&gt; DB[(加密数据存储)]
+  ORCH --&gt;|每步落证据| AUD[[审计日志<br/>append-only 哈希链]]
+  CG[同意网关<br/>Consent Gate] -.拦截每次处理.-&gt; SVC1
+  CG -.拦截每次处理.-&gt; SVC2
   classDef ctrl fill:#1a2530,stroke:#64c8ff,color:#e8eef5
   classDef store fill:#2a1530,stroke:#ff7ab6,color:#e8eef5
   classDef sec fill:#1a1a30,stroke:#ffb450,color:#e8eef5
@@ -136,10 +134,8 @@ graph TD
 </div>
 <p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">编排器是「删除的事务协调者」；数据目录回答「PII 在哪」；密钥库让删除退化成删一把密钥；审计链证明「确实做了」</p>
 <p>四个核心能力：<strong>①编排器</strong>把删除扇出成几十个子任务并追踪完成（本质是长事务 / Saga）；<strong>②数据目录</strong>解决「PII 散在哪」这个最致命的问题；<strong>③密钥库 + crypto-shredding</strong> 把「在备份里物理删除」的不可能任务变成「删一把密钥」；<strong>④同意网关</strong>在每次处理前检查用户是否授权了该用途。</p>
-
-<h2>关键技术点</h2>
-
-<h3>1. 删除权：Crypto-shredding vs 物理删除 vs Tombstone</h3>
+<h2 data-tts="c3df2e03437171d5">关键技术点</h2>
+<h3 data-tts="254e1b79b2cc3bc3">1. 删除权：Crypto-shredding vs 物理删除 vs Tombstone</h3>
 <p><strong>原理</strong>：GDPR 的删除不要求物理擦除，只要求数据<em>永久不可恢复</em>。这打开了一条捷径——<strong>crypto-shredding（加密粉碎）</strong>：给每个用户一把独立的数据加密密钥 DEK，用它加密该用户所有 PII；删除时<em>只销毁这把 DEK</em>，散落在 40 个库和 90 份备份里的密文瞬间全部变成无法解密的乱码，无需追杀每一份副本。欧盟数据保护委员会（前 Article 29 工作组）承认加密擦除是有效删除方式。</p>
 <div class="tradeoff">
 <strong>Trade-off：</strong>
@@ -167,8 +163,7 @@ def erase_user(user_id):
 <li><strong>信封加密（envelope encryption）</strong>是业界标准模式：AWS KMS / GCP Cloud KMS 都以 per-entity DEK + KEK 包裹为一等公民，crypto-shred 即删 KEK。</li>
 <li><strong>Kafka 社区</strong>：topic 是 append-only 无法就地删单条，crypto-shredding 成为 Kafka 上做 GDPR 删除的主流方案（每条消息 PII 用 per-key DEK 加密，删 key 即失效）。</li>
 </ul></div>
-
-<h3>2. 数据脱敏：伪匿名化 vs 匿名化（重识别是死穴）</h3>
+<h3 data-tts="bea5100bea8f55dd">2. 数据脱敏：伪匿名化 vs 匿名化（重识别是死穴）</h3>
 <p><strong>原理</strong>：数仓要做分析、测试环境要仿真数据，但不能直接用真 PII。两条路径法律后果<em>完全不同</em>：<strong>伪匿名化（pseudonymization）</strong>——把姓名换成 token、但保留一张可逆映射表——数据<em>仍属于</em> PII，仍受 GDPR 全约束（映射表泄露即前功尽弃）；<strong>匿名化（anonymization）</strong>——彻底切断与个人的关联、不可逆——才<em>脱离</em> GDPR 管辖。难点是「彻底」几乎做不到：去掉姓名远远不够，<em>准标识符（quasi-identifier）</em>的组合能重识别——经典结论：邮编 + 生日 + 性别三者组合就能唯一定位美国绝大多数人。</p>
 <div class="tradeoff">
 <strong>Trade-off（隐私 vs 数据效用，此消彼长）：</strong>
@@ -184,8 +179,7 @@ def erase_user(user_id):
 <li><strong>美国人口普查局</strong>：2020 普查首次全面采用差分隐私发布统计，是 DP 最大规模的生产落地。</li>
 <li><strong>GDPR 实务共识</strong>：伪匿名化被明确列为「安全措施」（Article 32）而非「脱管手段」——很多团队误以为 token 化就能随便用数据做分析，这是高频合规事故点。</li>
 </ul></div>
-
-<h3>3. 审计追踪：不可篡改地证明「谁碰了 PII」</h3>
+<h3 data-tts="517e7a969200285d">3. 审计追踪：不可篡改地证明「谁碰了 PII」</h3>
 <p><strong>原理</strong>：合规不仅要「做对」，还要能<em>举证做对了</em>。审计日志记录每一次 PII 的访问 / 修改 / 删除 / 导出——谁、何时、为何、动了哪条。要求是 <strong>append-only + tamper-evident（防篡改可检测）</strong>：即便 DBA 有 root，也不能悄悄改历史。核心技术是<strong>哈希链</strong>：每条日志带上「前一条的哈希」，形成链条，改中间任一条会让后续所有哈希对不上——和区块链同源思想（见 Day 36），但无需共识，单机 Merkle/哈希链即可。</p>
 <pre><code># Tamper-evident 审计链 (伪代码)
 def append_audit(actor, action, subject_id, purpose):
@@ -205,8 +199,7 @@ def append_audit(actor, action, subject_id, purpose):
 <li><strong>金融/医疗合规</strong>（SOX、HIPAA、PCI-DSS）普遍要求不可否认审计，WORM + 哈希链是标准配置。</li>
 <li><strong>数据库领域</strong>：AWS QLDB / SQL Server Ledger 把 Merkle 化的不可篡改历史做进引擎，原生提供密码学可验证审计。</li>
 </ul></div>
-
-<h3>4. 同意管理：把「用户授权了什么用途」当作真相源</h3>
+<h3 data-tts="90be7a6e4ab4503a">4. 同意管理：把「用户授权了什么用途」当作真相源</h3>
 <p><strong>原理</strong>：GDPR 的核心是<em>目的限制（purpose limitation）</em>——为「发货」收集的地址不能拿去「精准广告」。所以同意不是注册时勾一次的 checkbox，而是一个 <strong>(用户 × 用途 × 状态 × 时间)</strong> 的真相源，且必须能<em>实时传播</em>到每个下游处理点：营销服务处理前先问「这个用户同意 marketing 了吗？」——像 policy / feature flag 一样在数据流里当门禁。撤回同意（withdraw）要像删除一样级联：不仅停止未来处理，已流入下游管道的数据也要按用途清理。</p>
 <div class="tradeoff">
 <strong>Trade-off：</strong>
@@ -222,16 +215,14 @@ def append_audit(actor, action, subject_id, purpose):
 <li><strong>CDP / 埋点平台</strong>（如 Segment 一类）：在采集入口按用户同意的用途分流事件，未授权用途直接不落库，从源头做 purpose limitation。</li>
 <li><strong>Cookie 同意横幅</strong>：前端 CMP 是面向用户的一端，后端才是真相源与执行点。</li>
 </ul></div>
-
-<h2>扩展与优化</h2>
+<h2 data-tts="e36b69d9620ef3d8">扩展与优化</h2>
 <ul>
 <li><strong>数据目录自动化</strong>：手工维护「PII 在哪」必然漂移。用 schema 扫描 + 分类器（正则/ML 识别邮箱、身份证、信用卡）自动打标签，编排器据此扇出，避免漏删。</li>
 <li><strong>删除即 Saga</strong>：跨 40 个服务是长事务，用编排器 + 每服务幂等删除接口 + 重试 + 死信，任一步失败可补偿重放；核对「所有子任务 done」才对用户标记完成。</li>
 <li><strong>法定保留豁免</strong>：删除前先过「保留策略引擎」——税务发票、反欺诈记录有法定最短保留期，这些字段脱敏而非删除，删的是可删部分。</li>
 <li><strong>数据本地化联动</strong>：欧盟 PII 的密钥与密文都留在欧盟区（见 Day 42 多区域），crypto-shred 的密钥库也要按区隔离。</li>
 </ul>
-
-<h2>常见陷阱 + 面试问题</h2>
+<h2 data-tts="0e057ce769ca39e3">常见陷阱 + 面试问题</h2>
 <div class="callout"><strong>1. 备份里的数据怎么删？</strong> 这是压垮物理删除方案的问题——你无法 UPDATE 一份冷备份。标准答案：<em>要么</em> crypto-shred（删密钥，备份里的密文报废）；<em>要么</em>接受「备份按保留期自然滚动过期，期间用访问控制 + 记录『此用户已请求删除，恢复备份时须重新执行删除』」。面试官最爱追这个。</div>
 <div class="callout"><strong>2. 审计日志不可篡改，那审计日志里的 PII 怎么删？</strong> 悖论：审计要 append-only，删除权要能抹除。解法是<em>审计里只存引用不存 PII 明文</em>（存 user_id 的假名 / 哈希 + 用途，不存姓名邮箱原文），或对审计中的 PII 同样 crypto-shred。别把 PII 明文写进不可删的链。</div>
 <div class="callout"><strong>3. 伪匿名 ≠ 匿名。</strong> 大量团队把 token 化数据当「已脱敏」随意用于分析——只要映射表还在，法律上它<em>仍是 PII</em>，删除请求照样要覆盖它。这是审计中最常见的失分点。</div>
@@ -242,8 +233,7 @@ def append_audit(actor, action, subject_id, purpose):
 <li>用户撤回了广告同意，但事件已进入 Kafka 下游管道。怎么保证下游停止用它做广告，并证明？</li>
 <li>append-only 审计链和「删除权」直接冲突，你如何同时满足两者？</li>
 </ul>
-
-<h2>深入资源</h2>
+<h2 data-tts="b571b1e917172eda">深入资源</h2>
 <ul>
 <li><strong>《Designing Data-Intensive Applications》Ch 12</strong>（Kleppmann）：结尾专门讨论数据的伦理、追踪与「被遗忘」的系统性难题。</li>
 <li><strong>GDPR Article 17 &amp; 25 原文</strong>：删除权与「Privacy by Design / by Default」——合规架构的法条起点。</li>
@@ -251,17 +241,15 @@ def append_audit(actor, action, subject_id, purpose):
 <li><strong>Sweeney, <em>k-Anonymity</em></strong>（2002）：准标识符与重识别的奠基论文；配合差分隐私（Dwork）理解隐私的数学边界。</li>
 <li><strong>AWS KMS / Kafka crypto-shredding 官方与社区文档</strong>：信封加密与 per-key 删除的工程落地。</li>
 </ul>
-
-<h2>深入思考</h2>
+<h2 data-tts="da181687ddfc9fc2">深入思考</h2>
 <details><summary>Crypto-shredding 把「删数据」变成「删密钥」，但如果攻击者在你删密钥<em>之前</em>就拷走了密文，事后你还能声称「已删除」吗？</summary><div class="answer">不能完全声称。crypto-shred 的保证是「<strong>此后</strong>无人（含你自己）能再解密」，防的是持续持有密文者（备份、数仓、离职员工的旧快照）未来解密。但它<em>不能撤销已发生的泄露</em>——若攻击者在密钥有效期内已解密导出明文，删密钥无济于事。这是 crypto-shredding 的边界：它是<em>删除</em>机制，不是<em>泄露补救</em>机制。所以它满足 Article 17（此后不可恢复），但不改变泄露仍需按 Article 33/34 上报的义务。两件事正交：删除保证「未来的不可访问性」，泄露关注「过去的已访问性」。</div></details>
 <details><summary>你为每个用户生成一把 DEK 做 crypto-shredding。5000 万用户就是 5000 万把密钥——KMS 撑得住吗？瓶颈在哪，怎么绕？</summary><div class="answer">每次读写都调 KMS 解 5000 万把 DEK 会打爆 KMS。工程上用<strong>两层信封 + 缓存</strong>：KMS 里只存少量 KEK（主密钥），每用户 DEK 用 KEK 加密后<em>和密文存在一起</em>（wrapped DEK），读时本地缓存解开的 DEK（几秒 TTL），避免每次打 KMS。删除销毁的是「解开该用户 DEK 的能力」：若共享 KEK，则要删掉散在备份里的 wrapped DEK（又回到老问题）；真正干净的是<em>per-user KEK</em>——删除=在 KMS 删这一把 KEK，O(1) 且不依赖追备份。代价是 KMS 要承载千万级密钥的生命周期，这正是云 KMS「密钥即资源」要解决的规模问题。题眼：把「密钥数量」（靠分层）和「KMS 调用频率」（靠缓存）两个维度分开优化。</div></details>
 <details><summary>审计日志既要「不可篡改」又要「能删其中的 PII」，看似矛盾。除了「日志里不存明文」，还有别的架构解法吗？</summary><div class="answer">有，分层解耦：把审计拆成<strong>不可变的「事件骨架」+ 可删的「PII 载荷」</strong>。骨架（谁、何时、什么类型操作、指向载荷的引用哈希）进哈希链、永不可改，证明「发生过一次对 user X 的访问」；PII 载荷（具体值）单独存在可 crypto-shred 的存储里。删除时销毁载荷密钥，骨架完好、链不断、篡改仍可检测，但载荷已不可读——「审计完整性」由骨架保证，「删除权」由密钥销毁保证，各归其位。更进一步可用<em>可编辑区块链</em>（redactable，chameleon hash 允许授权方不破坏链验证地改某条），但复杂度陡增，多数场景「骨架+载荷分离」已足够。核心心法：两个约束冲突时，往往不是二选一，而是把对象<em>拆成受不同约束的两部分</em>。</div></details>
 <details><summary>「删除即 Saga」跨 40 个服务，若第 37 个服务永久删不掉（比如一个已废弃、无人维护的系统还存着该用户数据），整个删除请求算成功还是失败？合规上怎么办？</summary><div class="answer">合规上<strong>不能算成功</strong>——Article 17 要求删除「所有」副本，漏一处即未履行。但「僵尸系统」确实存在。正确处理分两层：<em>技术上</em>，编排器必须把该子任务标记 failed 并持续重试 + 告警，绝不能静默吞掉（最危险的是「39/40 成功就报完成」，第 40 处 PII 成了合规地雷）；<em>治理上</em>，这暴露的是数据目录不完整 / 存在影子副本——根因是当初复制 PII 时没登记进目录。这也是 crypto-shredding 的战略价值：若这 40 个服务存的都是<em>同一 per-user 密钥加密的密文</em>，你根本不需每个服务配合——删中央那把密钥，僵尸系统里的密文自动报废。它把「N 个分布式删除必须全部成功」的 AND 难题，压成「删一把密钥」的单点操作。</div></details>
 <details><summary>差分隐私给了数学保证，为什么业界大量「匿名化」数据集仍被重识别？DP 没被普遍采用的真实障碍是什么？</summary><div class="answer">因为大多数「匿名化」根本不是 DP，而是<em>去标识 + k-匿名</em>这类<strong>语法匿名</strong>，对「攻击者拥有外部辅助数据」毫无保证。经典翻车：Netflix Prize 数据集被 IMDb 公开评分交叉重识别。这些数据「删了姓名、做了 k-匿名」，但准标识符 + 外部知识组合仍能定位；DP 的强大正在于它对<em>任意背景知识</em>都成立。那为什么 DP 没普及？三个真实障碍：①<strong>效用损失</strong>——噪声让细粒度 / 小样本查询几乎不可用；②<strong>隐私预算 ε 会耗尽</strong>——同一数据反复查询每次泄一点，多团队共享时预算管理极难；③<strong>ε 取多少</strong>无普适答案，大了没保护、小了没数据。所以 DP 在<em>聚合统计发布</em>（普查、遥测）落地好，在<em>行级细节分析</em>里仍难替代。理解这个断层，比记住「DP 很安全」重要。</div></details>
-
 <div class="nav"><a href="index.html">← 回到 index</a></div>
-<script src="https://hub.cissychen.com/comments.js" defer></script>
-<script src="https://hub.cissychen.com/search.js" defer></script>
-<script src="https://hub.cissychen.com/index-button.js" defer></script>
-<script src="https://hub.cissychen.com/i18n-tts.js" defer></script>
+<script defer="" src="https://hub.cissychen.com/comments.js"></script>
+<script defer="" src="https://hub.cissychen.com/search.js"></script>
+<script defer="" src="https://hub.cissychen.com/index-button.js"></script>
+<script defer="" src="https://hub.cissychen.com/i18n-tts.js"></script>
 </div></body></html>

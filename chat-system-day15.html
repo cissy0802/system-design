@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<html lang="zh-CN"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>Day 15 · 聊天系统 (Chat System) — System Design</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -97,7 +98,6 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 </script>
 </head><body><div class="container">
-
 <header>
 <div class="meta">
 <span class="tag day">Day 15</span>
@@ -107,10 +107,9 @@ document.addEventListener('DOMContentLoaded',()=>{
 <span class="tag">Delivery Guarantee</span>
 <span class="tag">E2E Encryption</span>
 </div>
-<h1>聊天系统 — 10 亿用户、5000 万并发长连接的实时递交<span class="en">Chat System: WebSocket vs Long Polling, Message Storage, Delivery Guarantees, E2E Encryption</span></h1>
+<h1 data-tts="ecfa8b12ee9226d8">聊天系统 — 10 亿用户、5000 万并发长连接的实时递交<span class="en">Chat System: WebSocket vs Long Polling, Message Storage, Delivery Guarantees, E2E Encryption</span></h1>
 </header>
-
-<h2>问题场景 + 需求约束</h2>
+<h2 data-tts="faba122c2dbcd5b5">问题场景 + 需求约束</h2>
 <p>给一个 <strong>10 亿用户、5000 万并发在线</strong>的即时通讯系统（WhatsApp、Discord、微信）设计后端。Feed（Day 14）是<em>读放大</em>问题——一条内容被几百万人刷；聊天反过来是<em>连接放大</em>问题——几千万条永不关闭的长连接要随时双向推送。难点不在「存消息」，而在<strong>如何维持海量空闲长连接、并保证每条消息恰好递交一次、有序、不丢</strong>。</p>
 <ul>
 <li><strong>规模</strong>：10 亿用户，峰值 <strong>5000 万并发长连接</strong>，每天数百亿条消息（WhatsApp 公开过单日 1000 亿+ 量级），消息发送峰值百万 QPS。</li>
@@ -118,24 +117,21 @@ document.addEventListener('DOMContentLoaded',()=>{
 <li><strong>延迟 SLO</strong>：在线对在线端到端 p99 &lt; 200ms；离线消息上线后秒级补齐。</li>
 <li><strong>递交语义</strong>：消息<em>不可丢</em>、<em>不可乱序</em>、<em>不可重复展示</em>——这是聊天与 Feed 最大的不同，用户对丢消息零容忍。</li>
 <li><strong>隐私</strong>：1:1 与群聊需 <strong>E2E 加密</strong>，服务端能路由密文但读不到明文。</li></ul>
-
-<h2>高层架构</h2>
+<h2 data-tts="7b26f7a626298643">高层架构</h2>
 <p>核心是<strong>把「连接」和「逻辑」解耦</strong>：接入层（Gateway）只管维持长连接和收发字节；业务层无状态，可水平扩展。关键组件是 <em>Session Registry</em>——记录「用户 → 当前连在哪个 Gateway 节点」的路由表，是消息找到收件人的寻址核心。发送方的消息先落 <strong>持久化存储</strong>（保证不丢），再查 Registry 把消息<em>路由</em>到收件人所在的 Gateway 推下去；收件人离线则留在存储里等上线拉取。</p>
 <div class="mermaid">
 graph LR
-  A[发送端 App] -->|WebSocket| GW1[Gateway 节点A<br/>维持长连接]
-  GW1 --> CH[Chat Service<br/>无状态业务层]
-  CH -->|1 持久化| DB[(消息存储<br/>ScyllaDB/Cassandra)]
-  CH -->|2 查路由| REG[(Session Registry<br/>用户→Gateway)]
-  CH -->|3 投递| MQ[消息路由/队列]
-  MQ --> GW2[Gateway 节点B]
-  GW2 -->|WebSocket push| B[接收端 App]
-  GW2 -.离线.-> DB
+  A[发送端 App] --&gt;|WebSocket| GW1[Gateway 节点A<br/>维持长连接]
+  GW1 --&gt; CH[Chat Service<br/>无状态业务层]
+  CH --&gt;|1 持久化| DB[(消息存储<br/>ScyllaDB/Cassandra)]
+  CH --&gt;|2 查路由| REG[(Session Registry<br/>用户→Gateway)]
+  CH --&gt;|3 投递| MQ[消息路由/队列]
+  MQ --&gt; GW2[Gateway 节点B]
+  GW2 --&gt;|WebSocket push| B[接收端 App]
+  GW2 -.离线.-&gt; DB
 </div>
-
-<h2>关键技术点</h2>
-
-<h3>1. 长连接接入层：WebSocket 持久连接 vs 轮询</h3>
+<h2 data-tts="c3df2e03437171d5">关键技术点</h2>
+<h3 data-tts="8c138fa365b69392">1. 长连接接入层：WebSocket 持久连接 vs 轮询</h3>
 <p><strong>一句话 trade-off</strong>：用「服务端维持千万级有状态连接的复杂度」换「真双向、低延迟、低空载开销的实时推送」。</p>
 <p><strong>原理</strong>：聊天要服务端<em>主动推</em>。三条路线：<strong>短轮询</strong>（定时 HTTP 拉）延迟高、空载请求海量浪费；<strong>长轮询</strong>（hold 住请求直到有数据）省一些但每条消息仍要一次完整 HTTP 往返、连接频繁重建；<strong>WebSocket</strong> 一次握手升级成全双工长连接，之后双向推送几乎零额外开销，是现代聊天的默认。代价是 Gateway 变成<em>有状态</em>：每个连接占内存+fd，节点重启/扩缩容会断开海量连接。所以接入层要选<strong>高并发轻量连接</strong>的运行时——WhatsApp 用 Erlang/BEAM，Discord 用 Elixir，二者都基于 <em>actor 模型</em>：每条连接是一个独立的轻量进程（不是 OS 线程），调度由 VM 管，单机扛百万连接。</p>
 <div class="tradeoff">
@@ -154,8 +150,7 @@ graph LR
 <li><strong>WhatsApp</strong>：用 Erlang + 调优后的 FreeBSD，做到<em>单机 200 万+ 并发连接</em>，每连接一个 Erlang 进程直接点对点投递（<a href="https://highscalability.com/how-whatsapp-grew-to-nearly-500-million-users-11000-cores-an/">High Scalability 对 WhatsApp 架构的拆解</a>）。</li>
 <li><strong>Discord</strong>：用 Elixir 把 WebSocket 网关扩到<em>500 万并发用户</em>，每连接一个 GenServer 会话进程，跨节点与 guild 进程通信（<a href="https://discord.com/blog/how-discord-scaled-elixir-to-5-000-000-concurrent-users">Discord 工程博客《How Discord Scaled Elixir to 5,000,000 Concurrent Users》</a>）。</li>
 </ul></div>
-
-<h3>2. 消息存储与扇出：分区设计与热点</h3>
+<h3 data-tts="126bae9af8ea0f16">2. 消息存储与扇出：分区设计与热点</h3>
 <p><strong>一句话 trade-off</strong>：用「按会话+时间分桶的分区键」换「避免大群单分区被打爆的热点」。</p>
 <p><strong>原理</strong>：消息要先<em>持久化</em>再投递（不能只靠内存，否则节点挂了就丢）。读模式是「拉某会话最近 N 条 / 某时间点之后的消息」，天然适合 <strong>宽列存储</strong>（Cassandra/ScyllaDB）：分区键 <code>channel_id</code>，聚簇键用<em>时间有序的消息 ID</em>（Snowflake，呼应 Day 11），同会话消息物理相邻、按时间排好。陷阱是<strong>热点分区</strong>：超大群（百万人同一频道）所有消息挤进单一 <code>channel_id</code> 分区，读写全压一个副本组，p99 飙升。解法是<em>分桶</em>——把分区键改成 <code>(channel_id, time_bucket)</code>，按时间窗口（如每 N 天）切分桶，把大分区横向打散。1:1 与群聊用同一套：1:1 也建模成一个只有两人的 channel。</p>
 <div class="tradeoff">
@@ -180,8 +175,7 @@ CREATE TABLE messages (
 <ul>
 <li><strong>Discord</strong>：消息表用 <code>(channel_id, bucket)</code> 复合分区键分桶，正是为了防止活跃大频道形成热点分区；后来从 Cassandra 迁到 <strong>ScyllaDB</strong>（C++ 写、无 GC），177 节点缩到 72 节点，历史消息读 p99 从 40–125ms 降到稳定 ~15ms（<a href="https://discord.com/blog/how-discord-stores-trillions-of-messages">Discord 工程博客《How Discord Stores Trillions of Messages》</a>）。</li>
 </ul></div>
-
-<h3>3. 消息递交保证：去重、ACK 与有序</h3>
+<h3 data-tts="ce8676fb1f5e1a5e">3. 消息递交保证：去重、ACK 与有序</h3>
 <p><strong>一句话 trade-off</strong>：用「at-least-once + 客户端幂等去重」换「比 exactly-once 简单得多、又不丢不重的工程实现」。</p>
 <p><strong>原理</strong>：网络会丢包、客户端会重连重发，真正的 exactly-once 在分布式下代价极高（呼应 Day 8）。聊天系统的通行解是 <strong>at-least-once 投递 + 端侧幂等</strong>：发送端给每条消息带一个<em>客户端生成的幂等 ID</em>（client message id），服务端按它去重——重试不会产生两条。投递则靠 <strong>ACK 链</strong>：消息每经一跳（服务端收到、对端收到、对端已读）回一个 ACK，没收到 ACK 就重发。有序性靠<em>每会话单调递增的 seq</em>：客户端按 seq 排序、检测空洞（收到 5 但没收到 4 → 主动拉 4），把「服务端保证全序」的重担卸到客户端的<em>会话内</em>排序，避免昂贵的全局有序。</p>
 <pre><code># 发送 + 幂等去重 + ACK 重试 (pseudo-code)
@@ -193,8 +187,8 @@ def send(msg):
     # 重连后用 client_id 去重，服务端: INSERT IF NOT EXISTS
 
 def on_receive(msg):                     # 接收端
-    if msg.seq <= last_seen: return      # 重复，丢弃
-    if msg.seq > last_seen + 1:
+    if msg.seq &lt;= last_seen: return      # 重复，丢弃
+    if msg.seq &gt; last_seen + 1:
         fetch_gap(last_seen+1, msg.seq)  # 检测空洞，回补
     deliver(msg); send_ack(msg.seq); last_seen = msg.seq
 </code></pre>
@@ -205,8 +199,7 @@ def on_receive(msg):                     # 接收端
 <li><strong>WhatsApp</strong>：离线消息存服务端，待收件人上线再投递并删除；多重 ACK（已送达 ✓✓、已读蓝勾）本质就是 ACK 链的产品化表达。</li>
 <li><strong>消息队列语义</strong>：at-least-once + 消费端幂等是业界处理「不丢又不重」的标准范式（呼应 Day 8 投递语义）。</li>
 </ul></div>
-
-<h3>4. E2E 加密：Double Ratchet 与群组 Sender Keys</h3>
+<h3 data-tts="bdb48876a7244960">4. E2E 加密：Double Ratchet 与群组 Sender Keys</h3>
 <p><strong>一句话 trade-off</strong>：用「服务端彻底读不到明文、且密钥管理复杂」换「前向保密 + 后向恢复的强隐私」。</p>
 <p><strong>原理</strong>：E2E 下服务端只是<em>密文的搬运工</em>。业界标准是 <strong>Signal Protocol</strong>：用 <em>X3DH</em> 在双方（可能一方离线）间协商初始共享密钥，再用 <strong>Double Ratchet</strong> 持续演进——每条消息用一把<em>一次性</em>消息密钥，发完即弃。两个棘轮：DH 棘轮（每轮交换新 DH 公钥）+ KDF 棘轮（链式派生）。由此得到两个核心安全性质：<strong>前向保密</strong>（forward secrecy，今天密钥泄露解不开昨天的消息）+ <strong>后向恢复</strong>（post-compromise security，泄露后续上新 DH 又恢复安全）。群聊不能两两 N² 配对，用 <em>Sender Keys</em>：每人有一把发送链密钥分发给群成员，自己加密一次、群内复用，把扇出从 N² 降到 N。</p>
 <div class="tradeoff">
@@ -222,8 +215,7 @@ def on_receive(msg):                     # 接收端
 <li><strong>Signal / WhatsApp</strong>：均用 Signal Protocol 的 Double Ratchet 做 1:1 E2E，群聊用 Sender Keys；WhatsApp 2016 年全量上线（<a href="https://signal.org/docs/specifications/doubleratchet/">Signal 官方《The Double Ratchet Algorithm》规范</a>）。</li>
 <li><strong>覆盖面</strong>：Signal Protocol 已被 WhatsApp、Google Messages（RCS）、Messenger 等采用，日活覆盖数十亿用户。</li>
 </ul></div>
-
-<h2>扩展与优化（增长后怎么办）</h2>
+<h2 data-tts="ee3c8b2d6b074aed">扩展与优化（增长后怎么办）</h2>
 <ul>
 <li><strong>Gateway 与业务分离扩容</strong>：连接数涨 → 加 Gateway 节点；业务量涨 → 加无状态 Chat Service。两者解耦后各自独立扩，互不拖累。</li>
 <li><strong>就近接入 + 多区域</strong>：Gateway 按用户地理就近部署降握手延迟；跨区会话靠异步复制路由（呼应 Day 5）。</li>
@@ -231,16 +223,14 @@ def on_receive(msg):                     # 接收端
 <li><strong>分层存储</strong>：热消息（近期）放快存储+缓存，冷消息归档到便宜介质——聊天历史极少回读但要永久留存。</li>
 <li><strong>瓶颈识别</strong>：监控单机连接数/内存、presence 广播放大、热点分区 p99、离线消息积压、Registry 查询延迟——热点大群与 presence 风暴是最常见的长尾根因。</li>
 </ul>
-
-<h2>常见陷阱 + 面试问题</h2>
+<h2 data-tts="8f62e82feb1f2b5c">常见陷阱 + 面试问题</h2>
 <div class="callout"><strong>1. 把 WebSocket 连接当成可靠投递通道。</strong> 连接随时会断。投递成功的定义必须是「持久化落库」，不是「写进 socket」。先落库再回 ACK。</div>
 <div class="callout"><strong>2. 忽略 Session Registry。</strong> 面试最爱追问「A 发给 B，系统怎么知道 B 连在哪台机？」——答不出路由层，整个设计就是空中楼阁。</div>
 <div class="callout"><strong>3. 追求 exactly-once。</strong> 正解几乎永远是 at-least-once + 客户端幂等去重（client message id）。强答 exactly-once 暴露对分布式投递语义的误解。</div>
 <div class="callout"><strong>4. 大群直接写扩散到每人收件箱。</strong> 百万人群会写爆。大群该用共享会话日志、读时拉，未读单独算。</div>
 <div class="callout"><strong>5. 热点分区没分桶。</strong> 用 <code>channel_id</code> 单独做分区键，活跃大频道会打爆单分区。要 <code>(channel_id, bucket)</code> 分桶。</div>
 <p><strong>高频追问</strong>：① 5000 万连接怎么在内存里维持，瓶颈是什么？② A 发给离线的 B，消息生命周期怎么走？③ 多设备登录，消息怎么在设备间同步且不重不漏？④ 群成员 100 万，一条消息怎么扇出不打爆系统？⑤ E2E 开了之后，服务端搜索和内容审核还怎么做？</p>
-
-<h2>深入资源</h2>
+<h2 data-tts="6201c005881187da">深入资源</h2>
 <ul>
 <li><strong>Discord 工程博客《How Discord Stores Trillions of Messages》</strong>：分桶分区键、Cassandra→ScyllaDB 迁移、热点分区治理的一手材料。</li>
 <li><strong>Discord 工程博客《How Discord Scaled Elixir to 5,000,000 Concurrent Users》</strong>：actor 模型 WebSocket 网关、会话进程、跨节点路由的实战。</li>
@@ -248,48 +238,41 @@ def on_receive(msg):                     # 接收端
 <li><strong>Signal 官方《The Double Ratchet Algorithm》</strong>（Perrin &amp; Marlinspike）：E2E 前向保密/后向恢复的权威规范。</li>
 <li><strong>《Designing Data-Intensive Applications》</strong>（Kleppmann）：派生数据、有序日志与投递语义的系统化框架。</li>
 </ul>
-
-<h2>深入思考（点击展开答案）</h2>
-
+<h2 data-tts="bdaceedc39a9fcfb">深入思考（点击展开答案）</h2>
 <details>
 <summary>1. 一台 Gateway 维持 200 万空闲长连接，CPU 几乎不忙，为什么仍可能先撑不住？瓶颈到底在哪？真正的限制怎么估？</summary>
 <div class="answer">
 <p><strong>瓶颈是内存与文件描述符，不是 CPU</strong>。空闲连接不耗算力，但每条都占：内核 socket 缓冲（收发各几 KB~几十 KB）+ 应用层会话状态 + 一个 fd。200 万连接光内核缓冲就可能几十 GB。<strong>估算</strong>：若每连接综合占 ~10KB，200 万 × 10KB ≈ 20GB——还没算业务态。所以要 ① 调内核（fd 上限、socket 缓冲、ephemeral port）；② 选轻量连接运行时（BEAM 进程而非 OS 线程）；③ 压缩每连接的应用态。这正是 WhatsApp 调优 FreeBSD、用 Erlang 的原因——把「每连接固定成本」压到极低，单机连接数才能上百万。</p>
 </div>
 </details>
-
 <details>
 <summary>2. A 给 B 发消息，B 此刻离线。从落库到 B 上线看到消息，完整生命周期怎么走？哪几步出错会丢消息或重复？</summary>
 <div class="answer">
 <p><strong>流程</strong>：① A 的消息到 Chat Service，先<em>持久化</em>（带 client_id 幂等键）→ 回 A 一个 ACK（A 显示「已送达服务器」✓）；② 查 Registry 发现 B 无活跃连接 → 消息留在存储/B 的待投递队列；③ B 上线，建立 WebSocket，Registry 登记 B→GatewayX；④ B 拉取「上次 seq 之后」的离线消息 → 投递 → B 回 ACK → 服务端标记已送达。<strong>易错点</strong>：若第①步「先回 ACK 再落库」，宕机就丢且 A 以为成功；若 B 拉取后没基于 seq 去重，重连重拉会<em>重复展示</em>；若 Registry 没及时登记 B 上线，新消息可能短暂投不到。每步都要可重试 + 幂等兜底。</p>
 </div>
 </details>
-
 <details>
 <summary>3. 100 万人的大群，一条消息怎么送达所有在线成员而不打爆系统？这跟 Day 14 的 Feed fanout 是同一个问题吗？</summary>
 <div class="answer">
 <p><strong>本质同构于 Feed 的 push/pull 抉择</strong>。给 100 万人各写一份收件箱 = fanout-on-write 写爆炸，不可行。大群用 <strong>共享会话日志</strong>（消息存一份）+ <em>读时拉</em>：成员各自按「上次读到的 seq」拉增量；在线成员靠 Registry 找到其 Gateway 批量推<em>通知</em>（而非整条复制）。差别在：Feed 多为<em>异步可容忍秒级</em>，聊天要<em>实时推送</em>，所以「在线成员实时 notify + 各自拉」是折中。进一步优化：把同群在线成员按 Gateway 聚合，一个 Gateway 收一次再本地扇给该节点上的成员，减少跨节点流量——Discord 的 guild 进程就是这种聚合点。</p>
 </div>
 </details>
-
 <details>
 <summary>4. E2E 加密后服务端读不到明文。那「在所有聊天里搜索关键词」「云端多设备同步历史」还怎么实现？为什么 Discord 干脆不做 E2E？</summary>
 <div class="answer">
 <p><strong>搜索</strong>：服务端无法建倒排索引（密文无意义）→ 只能<em>客户端本地</em>解密后建索引、本地搜，换设备就搜不到旧历史。<strong>多设备同步</strong>：要么每设备独立参与密钥协商（各自一套会话），要么设备间安全传输会话密钥/历史——都比明文同步复杂得多。<strong>Discord 的取舍</strong>：它的核心价值是<em>服务端能力</em>——全文搜索、内容审核、垃圾/未成年人保护、机器人生态、AI 功能，这些都要服务端读明文。E2E 与这些<em>根本冲突</em>。所以 E2E 与否是<strong>产品定位决策</strong>：隐私优先（Signal/WhatsApp）vs 服务端功能优先（Discord/Slack）。没有纯技术意义上的「更对」。</p>
 </div>
 </details>
-
 <details>
 <summary>5. 系统升级要重启一批 Gateway，几百万连接瞬间断开同时重连。会发生什么？怎么设计才不雪崩？</summary>
 <div class="answer">
 <p><strong>风险是惊群重连（thundering herd）</strong>：几百万客户端同时断开 → 同时重连 → 握手、鉴权、Registry 写、离线消息拉取全在一瞬间挤进来，可能把刚恢复的 Gateway 和后端再次打垮，陷入「连上又被压垮」的振荡。<strong>缓解</strong>：① 客户端<em>带抖动的指数退避</em>重连（呼应 Day 23 的 retry+jitter），把重连摊到时间轴上；② Gateway <em>滚动重启</em>而非全量（Day 22），每次只断一小批；③ 重连鉴权和离线拉取走<em>限流/排队</em>，保护后端；④ 用<em>连接迁移/优雅停机</em>，提前通知客户端去连别的节点而非硬断。核心思想：永远不要让海量客户端的行为<em>同步对齐</em>——抖动是打散同步性的关键工具。</p>
 </div>
 </details>
-
 <div class="nav"><a href="index.html">← 回到 index</a></div>
 </div>
-<script src="https://hub.cissychen.com/comments.js" defer></script>
-<script src="https://hub.cissychen.com/search.js" defer></script>
-<script src="https://hub.cissychen.com/index-button.js" defer></script>
-<script src="https://hub.cissychen.com/i18n-tts.js" defer></script>
+<script defer="" src="https://hub.cissychen.com/comments.js"></script>
+<script defer="" src="https://hub.cissychen.com/search.js"></script>
+<script defer="" src="https://hub.cissychen.com/index-button.js"></script>
+<script defer="" src="https://hub.cissychen.com/i18n-tts.js"></script>
 </body></html>

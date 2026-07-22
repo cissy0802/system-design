@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<html lang="zh-CN"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>Day 52 · 给混沌工程装一个正确性 oracle — System Design</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -97,7 +98,6 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 </script>
 </head><body><div class="container">
-
 <header>
 <div class="meta">
 <span class="tag day">Day 52</span>
@@ -107,29 +107,27 @@ document.addEventListener('DOMContentLoaded',()=>{
 <span class="tag">Differential Testing</span>
 <span class="tag">Resilience</span>
 </div>
-<h1>给混沌工程装一个正确性 oracle — 故障下「还活着」不等于「答对了」<span class="en">Adding a Correctness Oracle to Chaos Engineering: Alive ≠ Correct</span></h1>
+<h1 data-tts="ad96e3d22f3bc1bd">给混沌工程装一个正确性 oracle — 故障下「还活着」不等于「答对了」<span class="en">Adding a Correctness Oracle to Chaos Engineering: Alive ≠ Correct</span></h1>
 </header>
-
-<h2>问题场景 + 需求约束</h2>
+<h2 data-tts="09848f89d526f55b">问题场景 + 需求约束</h2>
 <p>你有一个<strong>实时 GMV 聚合 API</strong>：底层 10 亿行订单、256 个 shard，要在 <strong>p99 &lt; 200ms</strong> 内返回「某商家过去 30 天成交额」，扛 <strong>50k QPS</strong>。你已做了 Day 44 的混沌工程——每天注入 shard 超时、replica 落后、丢包，验证系统「扛得住」。</p>
 <p>但有个洞：某次注入「shard-137 超时」，服务<em>没挂</em>、错误率 0、p99 甚至更快——因为它悄悄跳过那个 shard，把 255/256 的部分和当完整答案返回。商家 GMV 少了 0.4%，<strong>零告警</strong>。这就是 <em>gray failure</em> 的<strong>差分可观测性</strong>（Microsoft, HotOS 2017）：失败检测器没发现，应用却在受害。</p>
 <div class="callout"><strong>核心命题：</strong>传统故障注入只装了<em>可用性 oracle</em>（还在返 2xx 吗？错误率 &lt; X 吗？），没装<em>正确性 oracle</em>（故障下返回的<strong>值</strong>对不对？）。「静默返回错结果」比「直接崩」危险——崩了会告警，错了没人知道。本期给混沌工程补上这只缺失的眼睛。</div>
 <p><strong>约束</strong>：oracle 要<em>在线</em>跑；要容忍<em>合法降级</em>（部分结果在设计上被允许）；判定本身误报不能多，否则重蹈 Day 51——低底率下误报淹没真报。</p>
-
-<h2>高层架构（生成器 → 双路执行 → 归一化 → 差分 → 三态裁决）</h2>
+<h2 data-tts="133e8be68e58495d">高层架构（生成器 → 双路执行 → 归一化 → 差分 → 三态裁决）</h2>
 <pre class="mermaid">
 graph TD
-    GEN["场景生成器<br/><i>AI/规则 产故障场景</i>"] --> INJ["故障注入器<br/><i>FIT · shard 超时/replica lag</i>"]
-    Q["同一请求<br/>+ 冻结种子"] --> REF["参照路径<br/><i>无故障 · 独立实现</i>"]
-    Q --> EXP["实验路径<br/><i>被注入故障</i>"]
-    INJ -.施加.-> EXP
-    REF --> NR["归一化<br/>定序/量化/屏蔽非确定"]
-    EXP --> NE["归一化"]
-    NR --> CMP{"差分比对<br/>checksum"}
-    NE --> CMP
-    CMP -->|一致| PASS["✅ 通过"]
-    CMP -->|受控差异| DEG["🟡 可接受降级<br/>标注 + 记账"]
-    CMP -->|越界差异| BUG["🔴 正确性 bug<br/>→ 自动中止 + 归档"]
+    GEN["场景生成器<br/><i>AI/规则 产故障场景</i>"] --&gt; INJ["故障注入器<br/><i>FIT · shard 超时/replica lag</i>"]
+    Q["同一请求<br/>+ 冻结种子"] --&gt; REF["参照路径<br/><i>无故障 · 独立实现</i>"]
+    Q --&gt; EXP["实验路径<br/><i>被注入故障</i>"]
+    INJ -.施加.-&gt; EXP
+    REF --&gt; NR["归一化<br/>定序/量化/屏蔽非确定"]
+    EXP --&gt; NE["归一化"]
+    NR --&gt; CMP{"差分比对<br/>checksum"}
+    NE --&gt; CMP
+    CMP --&gt;|一致| PASS["✅ 通过"]
+    CMP --&gt;|受控差异| DEG["🟡 可接受降级<br/>标注 + 记账"]
+    CMP --&gt;|越界差异| BUG["🔴 正确性 bug<br/>→ 自动中止 + 归档"]
 
     classDef gen fill:#1a1a30,stroke:#ffb450,color:#e8eef5
     classDef path fill:#0e2030,stroke:#5eead4,color:#e8eef5
@@ -142,10 +140,8 @@ graph TD
 </pre>
 <p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">关键：参照路径不受故障影响、且尽量用独立实现，才能当「真值」；差异经归一化后再判，避免非确定性刷屏</p>
 <p>四个组件各司其职：<strong>生成器</strong>产故障场景（AI 只坐这个席位）；<strong>故障注入器</strong>只作用于实验路径；<strong>参照路径</strong>提供「本该返回什么」的真值；<strong>归一化 + 差分</strong>把「静默错结果」变成一个可 diff 的信号，落到<em>三态</em>而非二态。</p>
-
-<h2>关键技术点</h2>
-
-<h3>1. 差分 oracle：用「参照跑」造真值，而不是硬编码期望</h3>
+<h2 data-tts="c3df2e03437171d5">关键技术点</h2>
+<h3 data-tts="5809021e06fb94bc">1. 差分 oracle：用「参照跑」造真值，而不是硬编码期望</h3>
 <p><strong>原理</strong>：oracle 最难的是「对的答案从哪来」。硬编码 golden file 只覆盖固定输入，5w QPS 真实流量没法枚举。<em>差分测试</em>（McKeeman 1998）给另一条路：<strong>同一输入喂给两个应等价的执行，比结果</strong>。混沌里「两个执行」= 无故障<em>参照路径</em> vs 被注入故障的<em>实验路径</em>；归一化后不一致，就是故障导致了错误输出。真值是「跑出来的」，随流量覆盖长尾。</p>
 <div class="tradeoff">
 <strong>Trade-off（三种 oracle）：</strong>
@@ -172,8 +168,7 @@ def differential_check(req, fault):
 <li><strong>差分测试谱系</strong>：Csmith 用差分找出 GCC/LLVM 数百个编译器 bug（同一程序不同编译器结果应一致）；同一思路搬到分布式即「故障路径 vs 参照路径」。</li>
 <li><strong>Gray Failure</strong>（Microsoft, HotOS 2017）：正式提出「差分可观测性」——失败检测器与应用对「什么算失败」认知不一致，正是正确性 oracle 要弥合的缝。</li>
 </ul></div>
-
-<h3>2. 归一化层：不做这层，误报会把你淹死</h3>
+<h3 data-tts="22c58fc9818650b9">2. 归一化层：不做这层，误报会把你淹死</h3>
 <p><strong>原理</strong>：两条路的输出天然带<em>非确定性</em>：分页顺序不同、浮点求和顺序不同（IEEE 754 下 <code>a+b+c ≠ c+b+a</code>）、含 <code>now()</code>/自增 ID/随机 tie-break、map 遍历不定。直接 checksum 会<strong>次次不等</strong>，oracle 沦为噪声源。归一化层抹平「无关差异」只留「语义差异」：<em>全列定序</em>（按稳定 key 排）、<em>浮点量化</em>（舍入到业务精度，如金额到分）、<em>屏蔽非确定函数</em>（时间/随机/机器名→占位符）。</p>
 <div class="tradeoff">
 <strong>Trade-off（归一化强度）：</strong>
@@ -199,11 +194,10 @@ def normalize(rows):
 <li><strong>数据库回归/影子测试</strong>：Postgres、TiDB 等做查询正确性回归时，对结果集统一 <code>ORDER BY</code> + 浮点规约后再 diff，正是同一层。</li>
 <li><strong>编译器差分</strong>：Csmith 刻意<em>不生成</em>依赖未定义行为（UB）的程序——等价于「在源头屏蔽非确定性」，否则差分全是假阳。</li>
 </ul></div>
-
-<h3>3. 三态裁决：故障下「结果变了」常常是合法的</h3>
+<h3 data-tts="b3616d2c59f7b3f4">3. 三态裁决：故障下「结果变了」常常是合法的</h3>
 <p><strong>原理</strong>：二态（通过/失败）在混沌里必然误报——因为<strong>很多降级是设计允许的</strong>。shard 超时后返回「255/256 的部分结果 + <code>partial=true</code> 标记」是正确行为；replica 落后导致读到 1 秒前的值，在最终一致语义下也合法。所以裁决要三态：<em>PASS</em>（归一化后完全一致）、<em>可接受降级</em>（差异落在<strong>预先声明的降级契约</strong>内——如标了 partial、或差值 &lt; 声明的 staleness 窗口）、<em>正确性 bug</em>（差异越界，或声称完整却缺数据）。<strong>关键区别：漏掉数据却不声明</strong> = bug；<strong>漏掉数据且如实声明 partial</strong> = 可接受。</p>
 <div class="tradeoff">
-<strong>Trade-off：</strong>为什么不做二态？二态把「合法降级」也报成失败，误报率飙升，在低底率场景（Day 51）直接淹没真报；工程师随后批量静默，真 bug 也被一起静默。三态把「降级」单列一档<em>记账但不 page</em>，让 page 的精确率地板守得住。代价是要<strong>显式写降级契约</strong>——但这个契约本来就该有（它就是你的 SLA 语义）。</p>
+<strong>Trade-off：</strong>为什么不做二态？二态把「合法降级」也报成失败，误报率飙升，在低底率场景（Day 51）直接淹没真报；工程师随后批量静默，真 bug 也被一起静默。三态把「降级」单列一档<em>记账但不 page</em>，让 page 的精确率地板守得住。代价是要<strong>显式写降级契约</strong>——但这个契约本来就该有（它就是你的 SLA 语义）。
 </div>
 <pre><code>def classify(ref, exp, fault):
     if exp.claims_complete and exp.rows &lt; ref.rows:
@@ -221,8 +215,7 @@ def normalize(rows):
 <li><strong>搜索/推荐的「可接受降级」</strong>：一个 shard 挂了返回 top-K 的近似结果，标注 <code>degraded</code>，属于 🟡 而非 🔴——前提是<em>如实声明</em>。</li>
 <li><strong>最终一致读</strong>：Dynamo 系读到旧值在 staleness 窗口内算 🟡；超窗口或读到「不该存在」的值才算 🔴。</li>
 </ul></div>
-
-<h3>4. 独立参照路径 + AI 只坐生成器席</h3>
+<h3 data-tts="3923fbb473469892">4. 独立参照路径 + AI 只坐生成器席</h3>
 <p><strong>原理</strong>：差分 oracle 的命门是<strong>错误趋同（correlated failure）</strong>——参照路径和实验路径共享同一段 bug 代码，两边一起算错、checksum 照样相等，给你一个虚假 PASS。防法：参照跑走<em>尽量独立的实现或路径</em>（不同代码、不加故障、甚至离线批处理重算），让失败模式不相关。这与 Day 51「独立 oracle vs 自任裁判」同构：共享盲区会让「相乘降误报」退化成「不降」。<strong>推论</strong>：让 <em>AI/LLM 只坐生成器席</em>——产刁钻故障场景、排列注入点——但<em>不当裁判</em>。裁判必须是确定性的差分 + 契约判定，否则你在正确性回路里塞了个自身会「静默出错」的组件。</p>
 <div class="tradeoff">
 <strong>Trade-off（参照路径怎么选）：</strong>
@@ -238,8 +231,7 @@ def normalize(rows):
 <li><strong>Netflix</strong>：混沌实验用 AI/自动化<em>挑选</em>高价值实验场景与爆炸半径，裁决仍交给 error budget 等确定性指标，AI 不进裁判席。</li>
 <li><strong>金融对账</strong>：账务系统用独立的对账批处理（不同代码路径）重算余额与在线系统比对——典型的「独立参照防错误趋同」。</li>
 </ul></div>
-
-<h2>扩展与优化（增长后怎么办）</h2>
+<h2 data-tts="71af224fac3b1173">扩展与优化（增长后怎么办）</h2>
 <ul>
 <li><strong>采样而非全量</strong>：50k QPS 不可能每条都跑双路（成本翻倍）。按请求指纹分层采样——高价值/高风险查询（大商家、结算类）提采样率，长尾降采样，并 <code>log</code> 出被跳过的比例，别让「采样」冒充「全覆盖」。</li>
 <li><strong>影子流量</strong>：参照路径用镜像流量在旁路跑，不占主链路延迟预算；只在差分命中时才触发昂贵的深挖。</li>
@@ -247,15 +239,13 @@ def normalize(rows):
 <li><strong>从演练搬进生产</strong>：成熟后把差分 oracle 挂到真实故障上做持续监控——这时它就是「正确性 SLI」。</li>
 <li><strong>瓶颈识别</strong>：盯 oracle 自身的<em>误报率</em>与<em>参照路径成本</em>；误报率一涨，先查归一化层泄漏，别急着调判定阈值。</li>
 </ul>
-
-<h2>常见陷阱 + 面试追问</h2>
+<h2 data-tts="e4c6041781261b01">常见陷阱 + 面试追问</h2>
 <div class="callout"><strong>1. 只验可用性就以为验了正确性。</strong> 「错误率 0 + p99 正常」完全兼容「静默返回错结果」。追问：注入 shard 超时后服务更快返回了，是好事还是危险信号？（答：可能跳过了 shard 返回部分结果，危险信号。）</div>
 <div class="callout"><strong>2. 忘了归一化就上差分。</strong> 浮点求和顺序、分页顺序、<code>now()</code> 会让 oracle 次次报错，一周内被工程师关掉。追问：两路都「对」为什么 checksum 不等？</div>
 <div class="callout"><strong>3. 二态裁决。</strong> 把合法降级报成失败，误报淹没真报（接 Day 51）。追问：partial 结果算不算 bug？（答：如实声明=🟡，谎称完整=🔴。）</div>
 <div class="callout"><strong>4. 参照路径与实验路径共享 buggy 代码。</strong> 错误趋同 → 假 PASS。追问：两路都调用同一个算错的聚合函数，oracle 会发现吗？（不会。）</div>
 <div class="callout"><strong>5. 让 LLM 当正确性裁判。</strong> 裁判自身会静默出错，等于在正确性回路里塞了个不可靠 oracle（接 Day 44/51）。AI 只该产场景，不该判对错。</div>
-
-<h2>深入资源</h2>
+<h2 data-tts="55e39085ec509b0c">深入资源</h2>
 <ul>
 <li><strong>Netflix TechBlog — 《ChAP: Chaos Automation Platform》</strong>：experiment/control 双集群 + error budget 熔断的工程化。</li>
 <li><strong>Jepsen — Elle</strong>（Kingsbury &amp; Alvaro, VLDB 2021，<code>jepsen-io/elle</code>）：黑盒差分式一致性检查器的范本。</li>
@@ -263,9 +253,7 @@ def normalize(rows):
 <li><strong>Principles of Chaos Engineering</strong>（principlesofchaos.org）：稳态假设与实验方法论（本期给它补正确性维度）。</li>
 <li><strong>《DDIA》</strong>（Kleppmann）第 7–9 章：隔离级别、一致性与故障模型，判定「什么算合法降级」的理论底座。</li>
 </ul>
-
-<h2>深入思考（点击展开答案）</h2>
-
+<h2 data-tts="d39c8ccd7de5f7a0">深入思考（点击展开答案）</h2>
 <details>
 <summary>1. 若参照路径本身偶尔也会错（比如它也依赖同一套下游），差分 oracle 会给出假 PASS。除了「换独立实现」，还有哪些低成本手段降低这种共模风险？</summary>
 <div class="answer">
@@ -279,7 +267,6 @@ def normalize(rows):
 <p>成本序：不变式 &lt; 版本错开 &lt; 探针 &lt; 多参照投票。生产常「不变式 + 探针」打底，关键路径才上多参照。</p>
 </div>
 </details>
-
 <details>
 <summary>2. 归一化里「浮点量化精度」怎么定？设太粗漏报、太细误报，有没有原则性的选法而非拍脑袋？</summary>
 <div class="answer">
@@ -292,7 +279,6 @@ def normalize(rows):
 <p>反模式：用一个全局「模糊阈值」近似比较——那只是把误报/漏报旋钮藏进一个魔数。</p>
 </div>
 </details>
-
 <details>
 <summary>3. 差分 oracle 要「同一输入喂两路」，但实时写入系统里，两路读到的底层数据可能本就不同（并发写、replica lag）。这时怎么定义「同一输入」？</summary>
 <div class="answer">
@@ -305,7 +291,6 @@ def normalize(rows):
 <p>本质：<strong>正确性 oracle 的前提是可复现的输入</strong>；拿不到快照语义时，就把不可复现的部分显式降级为「可接受差异」，而不是让它冒充 bug 或被静默。</p>
 </div>
 </details>
-
 <details>
 <summary>4. 上线正确性 oracle 后，团队发现「可接受降级」这一档占了 95% 的告警。这是好事还是坏事？该怎么用这个数字？</summary>
 <div class="answer">
@@ -318,7 +303,6 @@ def normalize(rows):
 <p>正确用法：<strong>🟡 是趋势指标（降级发生率，像 error budget），🔴 才 page</strong>。🟡 上升是「该还债」的领先信号，不是「调阈值让它闭嘴」的理由。</p>
 </div>
 </details>
-
 <details>
 <summary>5. 传统混沌工程的稳态假设是「业务指标（如每秒下单数）在实验组和对照组无显著差异」。给它加正确性 oracle 后，稳态假设该怎么扩展？两者会冲突吗？</summary>
 <div class="answer">
@@ -327,11 +311,10 @@ def normalize(rows):
 <p>两者不是冗余而是<strong>正交</strong>：① 抓「塌了」，② 抓「悄悄错了」。真正的稳态 = 既没塌也没错——这就是可用性 oracle 永远替代不了正确性 oracle 的原因。</p>
 </div>
 </details>
-
 <div class="nav"><a href="index.html">← 回到 index</a></div>
 </div>
-<script src="https://hub.cissychen.com/comments.js" defer></script>
-<script src="https://hub.cissychen.com/search.js" defer></script>
-<script src="https://hub.cissychen.com/index-button.js" defer></script>
-<script src="https://hub.cissychen.com/i18n-tts.js" defer></script>
+<script defer="" src="https://hub.cissychen.com/comments.js"></script>
+<script defer="" src="https://hub.cissychen.com/search.js"></script>
+<script defer="" src="https://hub.cissychen.com/index-button.js"></script>
+<script defer="" src="https://hub.cissychen.com/i18n-tts.js"></script>
 </body></html>

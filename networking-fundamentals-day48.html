@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<html lang="zh-CN"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>Day 48 · 网络基础 (Networking Fundamentals) — System Design</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -97,7 +98,6 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 </script>
 </head><body><div class="container">
-
 <header>
 <div class="meta">
 <span class="tag day">Day 48</span>
@@ -106,14 +106,12 @@ document.addEventListener('DOMContentLoaded',()=>{
 <span class="tag">TCP/UDP · QUIC</span>
 <span class="tag">DNS · TLS · LB</span>
 </div>
-<h1>网络基础 — 一次请求在网线上到底走了几个来回<span class="en">Networking Fundamentals: TCP/UDP, HTTP/1.1·2·3·QUIC, DNS, TLS Handshake, L4 vs L7 LB</span></h1>
+<h1 data-tts="3c5d1dfd7ddc8162">网络基础 — 一次请求在网线上到底走了几个来回<span class="en">Networking Fundamentals: TCP/UDP, HTTP/1.1·2·3·QUIC, DNS, TLS Handshake, L4 vs L7 LB</span></h1>
 </header>
-
-<h2>问题场景 + 需求约束</h2>
+<h2 data-tts="a080161cdca923e0">问题场景 + 需求约束</h2>
 <p>你在为一个<strong>全球 API 平台</strong>设计接入层：<strong>5000 万用户</strong>散布五大洲，移动端占七成，网络丢包率常态 <strong>1–3%</strong>；API 请求 p99 延迟目标 <strong>&lt; 150ms</strong>，其中<em>连接建立</em>（DNS + TCP + TLS）往往就吃掉移动端首字节时间的一半。一个从东京发往美西机房的请求，光物理往返（RTT）就 ~120ms，握手若要 3 个 RTT 就是 360ms——用户还没看到一个字节。</p>
 <p>问题不在「加机器」，而在<strong>每一个 RTT 都要抠</strong>：<em>DNS 怎么把用户导到最近的健康机房、传输层用 TCP 还是 UDP、握手怎么从 3 个 RTT 压到 0、负载均衡在第 4 层还是第 7 层做</em>。这四件事决定了首包延迟，也是架构师面试里区分「会调 Nginx」和「懂网络」的分水岭。</p>
-
-<h2>高层架构（一次请求的网络路径）</h2>
+<h2 data-tts="a12d1dd22671ab48">高层架构（一次请求的网络路径）</h2>
 <pre class="mermaid">
 graph LR
     U["客户端<br/><i>移动/浏览器</i>"]
@@ -122,10 +120,10 @@ graph LR
     L7["L7 LB / 网关<br/><i>TLS 终止 · 路由</i>"]
     APP["App 集群"]
 
-    U -->|"① 域名→IP"| DNS
-    U -->|"② TCP/QUIC 握手"| EDGE
-    EDGE -->|"③ TLS 握手 + HTTP"| L7
-    L7 -->|"④ keep-alive 连接池"| APP
+    U --&gt;|"① 域名→IP"| DNS
+    U --&gt;|"② TCP/QUIC 握手"| EDGE
+    EDGE --&gt;|"③ TLS 握手 + HTTP"| L7
+    L7 --&gt;|"④ keep-alive 连接池"| APP
 
     classDef client fill:#1a2530,stroke:#64c8ff,color:#e8eef5
     classDef edge fill:#0e2030,stroke:#5eead4,color:#e8eef5
@@ -136,10 +134,8 @@ graph LR
 </pre>
 <p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">DNS 决定去哪个机房；L4 决定进哪台边缘；L7 终止 TLS 并按路径/租户路由；到源站复用长连接省握手</p>
 <p>四个组件各管一段延迟：<strong>DNS</strong> 把用户就近导流（Anycast 让「最近」由 BGP 路由自动决定）；<strong>L4 LB</strong> 按连接四元组转发、吞吐极高但不看内容；<strong>L7 LB/网关</strong> 终止 TLS、看到 HTTP 报文才能做路径路由、限流、灰度；到源站用<strong>连接池 keep-alive</strong> 摊掉握手。理解这条链，才能定位「慢在哪个 RTT」。</p>
-
-<h2>关键技术点</h2>
-
-<h3>1. TCP vs UDP：可靠有序 vs 无连接低延迟</h3>
+<h2 data-tts="c3df2e03437171d5">关键技术点</h2>
+<h3 data-tts="aa7cfd57cb7e0e79">1. TCP vs UDP：可靠有序 vs 无连接低延迟</h3>
 <p><strong>原理</strong>：TCP 提供<em>可靠、有序、面向连接的字节流</em>——三次握手建连、序列号 + ACK 重传丢包、滑动窗口做流控、拥塞控制（Cubic/BBR）避免压垮网络。代价是：建连要 1 个 RTT，且<strong>字节流的「有序」是把双刃剑</strong>——一个包丢了，后面已到达的字节也必须在内核缓冲区里干等重传，这就是<em>队头阻塞（HOL blocking）</em>的根源。UDP 则是<em>无连接的数据报</em>：发出去不管到没到、不排序、无拥塞控制，零握手、零队头阻塞，但可靠性/有序/拥塞全得应用层自己造。</p>
 <div class="tradeoff">
 <strong>Trade-off：</strong>
@@ -160,8 +156,7 @@ graph LR
 <li><strong>Google / YouTube</strong>：把 QUIC（后来标准化为 HTTP/3）大规模上线，正是看中 UDP 上重建传输层以消灭队头阻塞、支持连接迁移。</li>
 <li><strong>视频会议 / 游戏</strong>：Zoom、实时游戏走 UDP（含 WebRTC），宁可丢帧也不等重传——迟到的数据没有价值。</li>
 </ul></div>
-
-<h3>2. HTTP 演进：队头阻塞的三层围剿</h3>
+<h3 data-tts="139e9dd7b5e1f40f">2. HTTP 演进：队头阻塞的三层围剿</h3>
 <p><strong>原理</strong>：HTTP 性能史，本质是<em>与队头阻塞的三次战争</em>。<strong>HTTP/1.1</strong> 一条连接一次只能处理一个请求（pipelining 因实现问题几乎废弃），浏览器只好开 6 条 TCP 并发——这是<em>连接级</em>队头阻塞。<strong>HTTP/2</strong> 在<em>一条</em> TCP 上做<em>应用层多路复用</em>：把请求切成带 stream id 的 frame 交错传输，解决了应用层队头阻塞——但所有 stream 仍共享一条 TCP 字节流，<strong>一个 TCP 包丢失会卡住全部并发 stream</strong>（传输层队头阻塞仍在，且比 HTTP/1.1 更痛，因为 6 条连接的损失被压进 1 条）。<strong>HTTP/3</strong> 干脆抛弃 TCP，在 QUIC 上跑：每条 stream 有独立的序列空间，丢包只卡它自己那条流，其余照常交付——队头阻塞被<em>彻底</em>解决。</p>
 <div class="tradeoff">
 <strong>三代对比：</strong>
@@ -183,24 +178,23 @@ graph LR
 <li><strong>Cloudflare</strong>：<a href="https://blog.cloudflare.com/http3-the-past-present-and-future/">《HTTP/3: past, present and future》</a>详解为何 TCP 队头阻塞在高丢包链路上惩罚 HTTP/2，而 QUIC 每流独立可解；其<a href="https://blog.cloudflare.com/http-3-vs-http-2/">HTTP/3 vs HTTP/2 实测</a>显示弱网下 HTTP/3 首字节更快。</li>
 <li><strong>Google</strong>：搜索、YouTube 长期用 QUIC/HTTP/3，移动弱网延迟收益最大。</li>
 </ul></div>
-
-<h3>3. TLS 握手：从 2-RTT 到 0-RTT，以及重放的坑</h3>
+<h3 data-tts="312745d7df833f37">3. TLS 握手：从 2-RTT 到 0-RTT，以及重放的坑</h3>
 <p><strong>原理</strong>：TLS 在明文 TCP 上叠加加密。<strong>TLS 1.2</strong> 需要 <em>2 个 RTT</em>（ClientHello→ServerHello+证书→密钥交换→Finished）才能发第一个字节，叠加 TCP 的 1-RTT 就是 3 个 RTT。<strong>TLS 1.3</strong> 砍掉一轮协商，只要 <em>1 个 RTT</em>；对回访用户用会话票据（session ticket）可做 <strong>0-RTT</strong>：客户端在第一个包里就带上应用数据（early data），握手与数据并行。QUIC 更进一步，把传输握手和 TLS 握手合并，新连接 1-RTT、回访 0-RTT。省下的每个 RTT 在跨洋链路上就是几十上百毫秒。</p>
 <pre class="mermaid">
 sequenceDiagram
     participant C as Client
     participant S as Server
     Note over C,S: TLS 1.2 (2-RTT)
-    C->>S: ClientHello
-    S->>C: ServerHello + Cert
-    C->>S: KeyExchange + Finished
-    S->>C: Finished ✓ 才能发数据
+    C-&gt;&gt;S: ClientHello
+    S-&gt;&gt;C: ServerHello + Cert
+    C-&gt;&gt;S: KeyExchange + Finished
+    S-&gt;&gt;C: Finished ✓ 才能发数据
     Note over C,S: TLS 1.3 0-RTT (回访)
-    C->>S: ClientHello + early data (请求已在此)
-    S->>C: 响应 + Finished
+    C-&gt;&gt;S: ClientHello + early data (请求已在此)
+    S-&gt;&gt;C: 响应 + Finished
 </pre>
 <div class="tradeoff">
-<strong>0-RTT 的代价 = 重放攻击（replay）：</strong>early data 在握手完成前发出，服务端无法确认它是否被攻击者<em>录下重发</em>。所以 <strong>0-RTT 数据只能承载幂等操作</strong>（GET、幂等查询），绝不能是 <code>POST /transfer</code> 这类非幂等写——否则一次转账可能被重放成两次。工程上：浏览器只在 0-RTT 里发 GET；服务端对非幂等请求强制回退到完整 1-RTT 握手。</p>
+<strong>0-RTT 的代价 = 重放攻击（replay）：</strong>early data 在握手完成前发出，服务端无法确认它是否被攻击者<em>录下重发</em>。所以 <strong>0-RTT 数据只能承载幂等操作</strong>（GET、幂等查询），绝不能是 <code>POST /transfer</code> 这类非幂等写——否则一次转账可能被重放成两次。工程上：浏览器只在 0-RTT 里发 GET；服务端对非幂等请求强制回退到完整 1-RTT 握手。
 </div>
 <div class="case">
 <strong>现实案例：</strong>
@@ -208,8 +202,7 @@ sequenceDiagram
 <li><strong>Cloudflare</strong>：<a href="https://blog.cloudflare.com/introducing-0-rtt/">《Introducing 0-RTT》</a>说明 0-RTT 的重放风险，其做法是带 query string 的请求透明关闭 0-RTT；<a href="https://blog.cloudflare.com/tls-1-3-overview-and-q-and-a/">TLS 1.3 概览</a>强调服务端不得用 0-RTT 数据执行非幂等操作。</li>
 <li><strong>TLS 1.3（RFC 8446）</strong>：把握手压到 1-RTT 并把 0-RTT 标准化，同时明确 anti-replay 是应用层责任。</li>
 </ul></div>
-
-<h3>4. DNS + L4 vs L7 负载均衡：流量怎么落到最近的健康机房</h3>
+<h3 data-tts="20606f819cc9f51c">4. DNS + L4 vs L7 负载均衡：流量怎么落到最近的健康机房</h3>
 <p><strong>原理</strong>：请求发出前先要 <em>DNS 解析</em>——递归解析器逐级问 root→TLD→权威服务器，靠 <strong>TTL 缓存</strong>避免每次都走全程。全球化用两招：<strong>GeoDNS</strong> 按解析者地理位置返回不同 IP；<strong>Anycast</strong> 让同一个 IP 在多地宣告，BGP 自动把用户路由到网络最近的节点。流量到了机房，负载均衡分两层：<strong>L4</strong>（传输层）只看 IP:Port 四元组做连接转发，不解密、吞吐极高、常配 DSR（回包绕过 LB 直返）；<strong>L7</strong>（应用层）终止 TLS、解析 HTTP，才能按 URL 路径/Header/Cookie 路由、做金丝雀、限流、WAF——代价是每连接都要解密解析，成本高得多。</p>
 <div class="tradeoff">
 <strong>L4 vs L7：</strong>
@@ -235,8 +228,7 @@ Client --DNS/Anycast--&gt; [L4 LB: 一致性哈希选边缘, DSR 回程]
 <li><strong>Cloudflare / AWS</strong>：Anycast 把同一 IP 宣告到全球边缘，DDoS 流量被就近分摊；AWS 用 NLB（L4）+ ALB（L7）分层。</li>
 <li><strong>Envoy</strong>：作为 L7 网关/Service Mesh 数据面，做 TLS 终止、按 Header 灰度、重试与熔断（见 Day 23 可靠性）。</li>
 </ul></div>
-
-<h2>扩展与优化</h2>
+<h2 data-tts="fb39b643e07ad387">扩展与优化</h2>
 <ul>
 <li><strong>连接复用打底</strong>：到源站永远用 keep-alive 连接池，把 TCP+TLS 握手摊到成百上千请求上——这是省 RTT 性价比最高的一招。</li>
 <li><strong>0-RTT 递进</strong>：TLS 1.3 → HTTP/3 0-RTT，回访用户首包近乎零握手；但严守幂等约束。</li>
@@ -244,8 +236,7 @@ Client --DNS/Anycast--&gt; [L4 LB: 一致性哈希选边缘, DSR 回程]
 <li><strong>拥塞控制升级</strong>：长肥管道（高带宽高延迟，如跨洋）从 Cubic 换 BBR，按实测带宽/RTT 建模，吞吐更稳。</li>
 <li><strong>下一步</strong>：多区域就近路由与故障转移（Day 42）、边缘缓存卸载回源（Day 28）。</li>
 </ul>
-
-<h2>常见陷阱 + 面试问题</h2>
+<h2 data-tts="ca19deb25574c85a">常见陷阱 + 面试问题</h2>
 <div class="callout"><strong>1. 「升级 HTTP/2 就快了」</strong>：在高丢包移动网，HTTP/2 单连接反而被 TCP 队头阻塞拖累，可能不如 HTTP/1.1 多连接。根治要下沉到 QUIC/HTTP/3——队头阻塞在传输层，不在应用层。</div>
 <div class="callout"><strong>2. 0-RTT 拿来发写请求</strong>：early data 可被重放，非幂等操作（转账、下单）绝不能走 0-RTT，否则一次操作被重放成两次。</div>
 <div class="callout"><strong>3. DNS TTL 设太长</strong>：故障切换时旧 IP 被缓存到 TTL 过期才更新，几分钟不可用。灾备场景 TTL 要短（30–60s），但太短又加解析压力——权衡。</div>
@@ -258,17 +249,14 @@ Client --DNS/Anycast--&gt; [L4 LB: 一致性哈希选边缘, DSR 回程]
 <li>Anycast 怎么实现「就近」？它对 TCP 长连接有什么隐患（路由抖动换节点）？</li>
 <li>TLS 1.3 0-RTT 为什么快、为什么危险？你会怎么在网关层安全启用它？</li>
 </ol>
-
-<h2>深入资源</h2>
+<h2 data-tts="541d71eb48271962">深入资源</h2>
 <ul>
 <li><strong>《High Performance Browser Networking》</strong>（Ilya Grigorik，<a href="https://hpbn.co/">hpbn.co</a> 免费在线）：TCP/UDP/TLS/HTTP 各层延迟来源与优化的权威教材。</li>
 <li><strong>Cloudflare Blog</strong>：<a href="https://blog.cloudflare.com/http3-the-past-present-and-future/">HTTP/3 past-present-future</a>、<a href="https://blog.cloudflare.com/tls-1-3-overview-and-q-and-a/">TLS 1.3 概览</a>、<a href="https://blog.cloudflare.com/introducing-0-rtt/">0-RTT</a>——队头阻塞与握手优化的一手讲解。</li>
 <li><strong>《Designing Data-Intensive Applications》</strong>（Kleppmann）第 8 章：网络的不可靠性、超时与分区，把「网络」放进分布式系统语境。</li>
 <li><strong>RFC 9000 (QUIC) / RFC 9114 (HTTP/3) / RFC 8446 (TLS 1.3)</strong>：协议一手规范，读握手与 0-RTT anti-replay 部分即可。</li>
 </ul>
-
-<h2>深入思考（点击展开答案）</h2>
-
+<h2 data-tts="bddd3c44d5dc4189">深入思考（点击展开答案）</h2>
 <details>
 <summary>1. 东京用户访问美西机房，一次冷启动 HTTPS 请求（HTTP/2）要几个 RTT？换 HTTP/3 + 0-RTT 能压到多少？跨洋 RTT 按 120ms 估。</summary>
 <div class="answer">
@@ -278,7 +266,6 @@ Client --DNS/Anycast--&gt; [L4 LB: 一致性哈希选边缘, DSR 回程]
 <p>这也解释了为什么大厂死磕握手 RTT：物理光速不可谈判，唯一能省的就是来回次数。</p>
 </div>
 </details>
-
 <details>
 <summary>2. 为什么 HTTP/2 的队头阻塞比 HTTP/1.1 的「更隐蔽也更痛」？升级前怎么判断该不该上 HTTP/2？</summary>
 <div class="answer">
@@ -286,7 +273,6 @@ Client --DNS/Anycast--&gt; [L4 LB: 一致性哈希选边缘, DSR 回程]
 <p><strong>判断</strong>：看目标用户网络质量。数据中心内部/低丢包 → HTTP/2 收益明确；大量移动弱网/跨洋 → 要么保留多连接，要么直接上 HTTP/3（QUIC 每流独立，从根上免疫）。别只看「版本号更高」。</p>
 </div>
 </details>
-
 <details>
 <summary>3. Anycast 让「同一个 IP 全球最近节点响应」，但它对 TCP 长连接暗藏什么风险？为什么 UDP/QUIC 反而更适配 Anycast？</summary>
 <div class="answer">
@@ -294,7 +280,6 @@ Client --DNS/Anycast--&gt; [L4 LB: 一致性哈希选边缘, DSR 回程]
 <p><strong>QUIC 为何更配</strong>：QUIC 用<em>连接 ID</em>而非四元组标识连接，且支持<strong>连接迁移</strong>——即便包被路由到新节点、或客户端换了 IP/端口，凭连接 ID 仍能认领这条连接、无需重握手。这让 Anycast + 长连接第一次真正可行，也是移动端换 WiFi/蜂窝不断连的底层原因。</p>
 </div>
 </details>
-
 <details>
 <summary>4. L7 负载均衡要终止 TLS 才能看 HTTP，这给延迟、安全、成本各带来什么？为什么很多大厂用 L4+L7 两层而非纯 L7？</summary>
 <div class="answer">
@@ -302,7 +287,6 @@ Client --DNS/Anycast--&gt; [L4 LB: 一致性哈希选边缘, DSR 回程]
 <p><strong>为何两层</strong>：<em>L4 扛量、L7 扛智能</em>。L4（Maglev/LVS/NLB）用一致性哈希把海量连接均匀撒给一组 L7，自己不解密、吞吐极高、还能配 DSR 让回包绕过 LB 直返客户端（省一半带宽）；L7 只需处理分到自己的那份连接做精细路由。纯 L7 顶在最前面既贵又难水平扩展，还把 DDoS 直接引到解密层。分层等于「先粗筛再精调」。</p>
 </div>
 </details>
-
 <details>
 <summary>5. 「省 RTT」在整篇里反复出现。把 DNS、TCP、TLS、HTTP 四层能省 RTT 的手段串成一张清单，指出哪些有一致性/安全代价。</summary>
 <div class="answer">
@@ -316,11 +300,10 @@ Client --DNS/Anycast--&gt; [L4 LB: 一致性哈希选边缘, DSR 回程]
 <p>贯穿主线：<strong>物理光速定死了单个 RTT，架构能做的只有「减少来回次数」和「把来回摊薄」，而每一次激进省 RTT（0-RTT/TFO）几乎都在拿安全或一致性换延迟。</strong></p>
 </div>
 </details>
-
 <div class="nav"><a href="index.html">← 回到 index</a></div>
 </div>
-<script src="https://hub.cissychen.com/comments.js" defer></script>
-<script src="https://hub.cissychen.com/search.js" defer></script>
-<script src="https://hub.cissychen.com/index-button.js" defer></script>
-<script src="https://hub.cissychen.com/i18n-tts.js" defer></script>
+<script defer="" src="https://hub.cissychen.com/comments.js"></script>
+<script defer="" src="https://hub.cissychen.com/search.js"></script>
+<script defer="" src="https://hub.cissychen.com/index-button.js"></script>
+<script defer="" src="https://hub.cissychen.com/i18n-tts.js"></script>
 </body></html>

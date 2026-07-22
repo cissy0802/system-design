@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<html lang="zh-CN"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>Day 7 · 分布式事务 (Distributed Transactions) — System Design</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -94,7 +95,6 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 </script>
 </head><body><div class="container">
-
 <header>
 <div class="meta">
 <span class="tag day">Day 7</span>
@@ -104,10 +104,9 @@ document.addEventListener('DOMContentLoaded',()=>{
 <span class="tag">Saga / Outbox</span>
 <span class="tag">Microservices</span>
 </div>
-<h1>分布式事务 — 别做，做了也尽量做小<span class="en">2PC / 3PC · Saga (Orchestration vs Choreography) · Transactional Outbox · Idempotency · Why Microservices Avoid Distributed Transactions</span></h1>
+<h1 data-tts="8e5d6b1c68145730">分布式事务 — 别做，做了也尽量做小<span class="en">2PC / 3PC · Saga (Orchestration vs Choreography) · Transactional Outbox · Idempotency · Why Microservices Avoid Distributed Transactions</span></h1>
 </header>
-
-<h2>问题场景与约束</h2>
+<h2 data-tts="0450f31caf6e8c80">问题场景与约束</h2>
 <p>设计一个跨境电商「<strong>下单结账</strong>」流程，单次结账要同时完成 5 件事：</p>
 <ol>
 <li><strong>订单服务</strong> 写订单（自己 Postgres）</li>
@@ -118,8 +117,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 </ol>
 <p>规模：<strong>峰值 5k TPS 下单</strong>，单笔结账 <strong>P99 ≤ 800ms</strong>，<strong>0 笔超卖、0 笔重复扣款</strong>。5 个服务由 5 个团队拥有，<em>没有共享数据库</em>。任何中间步骤都可能失败：服务挂掉、网络分区、Stripe 504、消息丢失。</p>
 <p>问题：这 5 步如何保证『要么都成功，要么都不发生（或可观测地补偿）』？这就是<strong>分布式事务</strong>。今天讲：教科书的 2PC/3PC 为什么在生产里几乎没人用、Saga 怎么落地、Outbox 怎么解 dual-write、为什么<em>『最佳的分布式事务就是不做』</em>。</p>
-
-<h2>高层架构</h2>
+<h2 data-tts="41578a12da053e81">高层架构</h2>
 <pre class="mermaid">
 graph TD
     Client["客户端"]
@@ -148,21 +146,21 @@ graph TD
     CDC["Debezium CDC<br/><i>读 outbox 表</i>"]
     Kafka["Kafka<br/>order.events"]
 
-    Client --> Orch
-    Orch -->|1 createOrder| OrdSvc
-    Orch -->|2 reserveStock| InvSvc
-    Orch -->|3 charge| PaySvc
-    Orch -->|4 deductPoints| PtsSvc
-    Orch -.->|5 async notify| Kafka
-    OrdSvc --> OrdDB
-    InvSvc --> InvDB
-    PaySvc --> Stripe
-    PtsSvc --> PtsDB
+    Client --&gt; Orch
+    Orch --&gt;|1 createOrder| OrdSvc
+    Orch --&gt;|2 reserveStock| InvSvc
+    Orch --&gt;|3 charge| PaySvc
+    Orch --&gt;|4 deductPoints| PtsSvc
+    Orch -.-&gt;|5 async notify| Kafka
+    OrdSvc --&gt; OrdDB
+    InvSvc --&gt; InvDB
+    PaySvc --&gt; Stripe
+    PtsSvc --&gt; PtsDB
 
-    OrdDB -.-> CDC
-    InvDB -.-> CDC
-    CDC --> Kafka
-    Kafka --> Notify
+    OrdDB -.-&gt; CDC
+    InvDB -.-&gt; CDC
+    CDC --&gt; Kafka
+    Kafka --&gt; Notify
 
     classDef orch fill:#2a1530,stroke:#ff7ab6,color:#e8eef5
     classDef ext fill:#3a2010,stroke:#ffb450,color:#e8eef5
@@ -170,10 +168,8 @@ graph TD
     class Stripe ext
 </pre>
 <p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px"><strong>核心思路</strong>：用 Saga（Temporal/Cadence 编排）串起 5 步，每步是本地事务 + 失败时反向补偿；事件流走 Outbox + CDC（保证『DB 写成功 ⇒ Kafka 必发』）；通知这类弱事务用最终一致。整个系统<em>没有一个 2PC</em>。</p>
-
-<h2>关键技术点</h2>
-
-<h3>1. 2PC / 3PC：教科书答案，生产负债</h3>
+<h2 data-tts="c3df2e03437171d5">关键技术点</h2>
+<h3 data-tts="048ab8f56481eb1e">1. 2PC / 3PC：教科书答案，生产负债</h3>
 <p><strong>原理</strong>：两阶段提交（Two-Phase Commit）由一个 <em>coordinator</em> 协调多个 <em>participant</em>：</p>
 <ul>
 <li><strong>Phase 1 (prepare)</strong>：coordinator 问所有参与者『能不能提交？』，每个参与者写 prepare log + 锁住资源，返回 yes/no。</li>
@@ -190,8 +186,8 @@ graph TD
 <strong>谁还在用 2PC</strong>：传统企业 XA 事务（Oracle + MQ + 另一 Oracle，同一 DBA 团队管控）、分布式数据库内部（Spanner 跨 shard 用 2PC + Paxos，但参与者本身是 Paxos group，不阻塞）。<em>跨微服务、跨外部 API → 永远不要 2PC</em>。
 </div>
 <pre><code># 2PC 灾难场景 — 为什么 Pat Helland 称其为"Maginot Line"
-# T = 0   coord -> all: PREPARE
-# T = 10ms all -> coord: YES (各自锁住资源, 写 prepare log)
+# T = 0   coord -&gt; all: PREPARE
+# T = 10ms all -&gt; coord: YES (各自锁住资源, 写 prepare log)
 # T = 11ms coord 崩溃 ⚠
 # T = ∞   participants 持锁等待 coord 重启
 #         其他事务全部阻塞, 业务停摆
@@ -208,8 +204,7 @@ graph TD
 <li><strong>MySQL XA</strong>：支持 XA 协议但<em>官方文档警告</em> binlog 与 InnoDB 协同存在 prepare-after-commit 边缘 case，大型互联网公司基本弃用。</li>
 <li><strong>Java JTA / Atomikos</strong>：J2EE 时代用于跨 DB + JMS 事务，云原生时代基本被 Saga + Outbox 替代。</li>
 </ul></div>
-
-<h3>2. Saga：把『一个大事务』拆成『N 个本地事务 + N-1 个补偿』</h3>
+<h3 data-tts="ad093135fae7a90c">2. Saga：把『一个大事务』拆成『N 个本地事务 + N-1 个补偿』</h3>
 <p><strong>原理</strong>：1987 年 Garcia-Molina &amp; Salem 在 SIGMOD 提出 <em>Saga</em>，原本是为『单库内长事务』设计（避免长时间锁）。微服务时代被借用解决跨服务事务：<strong>把跨服务事务拆成一串本地事务 T1…Tn；任一 Ti 失败，则按反向顺序执行已完成步骤的补偿事务 C(i-1)…C1</strong>。</p>
 <p>不再保证 ACID 的隔离性，但保证<em>最终一致 + 业务语义可撤销</em>。两种落地模式：</p>
 <table>
@@ -227,26 +222,26 @@ sequenceDiagram
     participant Pay as Payment (Stripe)
     participant Pts as Points Svc
 
-    C->>O: placeOrder()
-    O->>Ord: 1 createOrder (PENDING)
-    Ord-->>O: orderId=42
-    O->>Inv: 2 reserveStock(sku, qty)
-    Inv-->>O: reserved
-    O->>Pay: 3 charge($100, idempKey=42)
-    Pay-->>O: paid (charge_xyz)
-    O->>Pts: 4 deductPoints(user, 50, idempKey=42)
+    C-&gt;&gt;O: placeOrder()
+    O-&gt;&gt;Ord: 1 createOrder (PENDING)
+    Ord--&gt;&gt;O: orderId=42
+    O-&gt;&gt;Inv: 2 reserveStock(sku, qty)
+    Inv--&gt;&gt;O: reserved
+    O-&gt;&gt;Pay: 3 charge($100, idempKey=42)
+    Pay--&gt;&gt;O: paid (charge_xyz)
+    O-&gt;&gt;Pts: 4 deductPoints(user, 50, idempKey=42)
     Pts--xO: 失败! 积分不足
     Note over O: Saga 反向补偿开始
-    O->>Pay: C3 refund(charge_xyz, idempKey=42-refund)
-    O->>Inv: C2 releaseStock(sku, qty, idempKey=42-rel)
-    O->>Ord: C1 markFailed(42, reason="points")
-    O-->>C: 失败: 积分不足, 已全部回滚
+    O-&gt;&gt;Pay: C3 refund(charge_xyz, idempKey=42-refund)
+    O-&gt;&gt;Inv: C2 releaseStock(sku, qty, idempKey=42-rel)
+    O-&gt;&gt;Ord: C1 markFailed(42, reason="points")
+    O--&gt;&gt;C: 失败: 积分不足, 已全部回滚
 </pre>
 <pre><code># Temporal Workflow 风格伪代码 (Python SDK)
 @workflow.defn
 class PlaceOrderSaga:
     @workflow.run
-    async def run(self, req: OrderReq) -> Result:
+    async def run(self, req: OrderReq) -&gt; Result:
         compensations = []          # 已成功步骤的补偿动作栈
         try:
             order = await activity.execute(create_order, req)
@@ -289,8 +284,7 @@ class PlaceOrderSaga:
 <li><strong>AWS Step Functions</strong>：托管 orchestration 服务，原生支持 saga 模式（参考 AWS Compute Blog "Implementing the saga pattern" 2021）。</li>
 <li><strong>Chris Richardson — <a href="https://microservices.io/patterns/data/saga.html">microservices.io/patterns/data/saga.html</a></strong>：saga 模式的工业级权威文档，含 orchestration / choreography 对比与示例。</li>
 </ul></div>
-
-<h3>3. Outbox Pattern：消灭『dual write』，把分布式事务降级为本地事务</h3>
+<h3 data-tts="3830950ae5db52cc">3. Outbox Pattern：消灭『dual write』，把分布式事务降级为本地事务</h3>
 <p><strong>问题</strong>：服务要『写 DB』+『发 Kafka 事件』。两个动作不在一个事务里，<em>必有不一致窗口</em>：</p>
 <ul>
 <li>DB 成功、Kafka 失败 → 下游永远收不到 → 数据丢失</li>
@@ -313,12 +307,12 @@ graph LR
     Cons2["Analytics Consumer"]
     Cons3["Notification Consumer"]
 
-    App -- "BEGIN<br/>INSERT orders<br/>INSERT outbox<br/>COMMIT" --> DB
-    DB -. WAL .-> Debez
-    Debez --> K
-    K --> Cons1
-    K --> Cons2
-    K --> Cons3
+    App -- "BEGIN<br/>INSERT orders<br/>INSERT outbox<br/>COMMIT" --&gt; DB
+    DB -. WAL .-&gt; Debez
+    Debez --&gt; K
+    K --&gt; Cons1
+    K --&gt; Cons2
+    K --&gt; Cons3
 </pre>
 <pre><code># Outbox 落地 — Postgres + Debezium
 CREATE TABLE orders (id BIGSERIAL PK, user_id ..., amount ..., status ...);
@@ -369,8 +363,7 @@ COMMIT;        -- 原子: 两表要么都成功要么都失败
 <li><strong>LinkedIn Brooklin / Databus</strong>：早期 CDC 实践，Brooklin 把 outbox-style 流接到 Kafka / Espresso，支撑全公司事件总线。</li>
 <li><strong>Eventuate Tram</strong>（Chris Richardson）：Java 实现的 outbox + saga 框架，开箱即用。</li>
 </ul></div>
-
-<h3>4. Idempotency：分布式事务的『最后防线』</h3>
+<h3 data-tts="2d46c154e61c12f2">4. Idempotency：分布式事务的『最后防线』</h3>
 <p><strong>原理</strong>：分布式系统里所有 RPC、消息、回调都是 <em>at-least-once</em>——网络超时无法区分『请求丢了』还是『响应丢了』，重试是必然。<strong>幂等性</strong>保证『同一操作执行 N 次的效果等同于执行 1 次』，是 saga 重试、outbox 重投、补偿动作的安全网。</p>
 <table>
 <thead><tr><th>实现方式</th><th>原理</th><th>适用</th></tr></thead>
@@ -404,7 +397,7 @@ def handle(key, req):
         return row.response_body                # 直接返回缓存
 
     if row and row.status == 'in_progress':
-        if now() - row.locked_at > LEASE:
+        if now() - row.locked_at &gt; LEASE:
             pass                                # lease 过期, 可重试
         else:
             raise Conflict("request in flight")
@@ -438,8 +431,7 @@ def handle(key, req):
 <li><strong>Kafka transactions + idempotent producer</strong>：producer 端单 partition 幂等，跨 partition 事务（read-process-write）；但消费端仍需自己去重。</li>
 <li><strong>PayPal / Square / Adyen</strong>：所有 charge / refund API 都要求 idempotency key，否则拒绝服务。这是支付行业的『默认 contract』。</li>
 </ul></div>
-
-<h2>扩展与优化</h2>
+<h2 data-tts="a101dd665a35ef47">扩展与优化</h2>
 <ul>
 <li><strong>Saga + 编排引擎是事实标准</strong>：超过 3 步的跨服务流程，<em>不要手写状态机</em>。直接上 Temporal / Cadence / AWS Step Functions / Azure Durable Functions，免费拿到持久化、重试、可视化、版本化。</li>
 <li><strong>Outbox 的替代</strong>：CockroachDB / TiDB 的 <em>changefeed</em> 直接吐 Kafka，跳过 Debezium；MongoDB / DynamoDB 的 <em>change streams</em> 同理。如果新建项目，优先选自带 CDC 的数据库。</li>
@@ -448,8 +440,7 @@ def handle(key, req):
 <li><strong>事务 ID 透传与追踪</strong>：saga 跨服务时把 <em>saga_id / step_id</em> 作为 trace 头透传，结合 OpenTelemetry 形成完整链路；出问题能秒级定位卡在哪一步。</li>
 <li><strong>避免分布式事务的根本武器：领域边界</strong>。如果你发现 90% 的业务流程都跨同两个服务，<em>它们大概率应该合并成一个服务</em>。微服务边界画错才会逼你做分布式事务。</li>
 </ul>
-
-<h2>常见陷阱与面试问题</h2>
+<h2 data-tts="c2e3d5416a716e61">常见陷阱与面试问题</h2>
 <div class="callout">
 <strong>1. 把 Saga 当 ACID：忘了隔离性消失。</strong> Saga 期间订单可能处于『已下单未支付』中间态，被读取后业务可能基于错误状态决策。要么用 semantic lock 标记 pending，要么业务接受『可见的中间状态』并设计 UX 兜底。</div>
 <div class="callout">
@@ -469,8 +460,7 @@ def handle(key, req):
 <li>Idempotency key 的过期策略？过期后客户端再用同一 key 重试会发生什么？怎么避免重复扣款？</li>
 <li>『微服务要不要避免分布式事务』——你如何回答？给一个『把分布式事务转化为领域重新划分』的例子。</li>
 </ol>
-
-<h2>深入资源</h2>
+<h2 data-tts="43b135e76de1a4b3">深入资源</h2>
 <ul>
 <li><strong>《Designing Data-Intensive Applications》Ch 7 §Transactions + Ch 9 §Atomic Commit and Two-Phase Commit</strong>（Kleppmann）：2PC、分布式事务局限的最完整工业级讨论。</li>
 <li><strong>Pat Helland — <a href="https://queue.acm.org/detail.cfm?id=3025012">Life Beyond Distributed Transactions: An Apostate's Opinion (ACM Queue 2017 / CIDR 2007)</a></strong>：业内共识级文章，论证『大规模系统不能依赖分布式事务』，奠定 saga / messaging / entity 思想基础。</li>
@@ -481,9 +471,7 @@ def handle(key, req):
 <li><strong>Uber Cadence — <a href="https://www.uber.com/blog/announcing-cadence/">Announcing Cadence 1.0 (2024)</a></strong>；<strong>DoorDash — <a href="https://careersatdoordash.com/blog/building-reliable-workflows-cadence-as-a-fallback-for-event-driven-processing/">Building Reliable Workflows with Cadence (2024)</a></strong>：saga orchestration 在 hyperscale 公司的真实使用。</li>
 <li><strong>Temporal — <a href="https://temporal.io/blog/what-is-durable-execution">The definitive guide to Durable Execution</a></strong>：现代『saga + 持久化 workflow』平台的理论与实践。</li>
 </ul>
-
-<h2>深入思考</h2>
-
+<h2 data-tts="4d76832820b29efb">深入思考</h2>
 <details>
 <summary>1. 跨服务转账：A 扣 100、B 加 100。设计 saga + 失败模式分析。如果 B 加完后 saga orchestrator 自己挂了，怎么办？</summary>
 <div class="answer">
@@ -505,7 +493,6 @@ def handle(key, req):
 <p><strong>更深的反思</strong>：这个例子常被用来证明 saga 弱。但在<em>真实银行系统</em>里，转账压根不靠分布式事务——它靠 <em>双重记账（double-entry bookkeeping）</em>：账本不是『改 A 改 B』而是『记一条 debit、记一条 credit』，两条记录的总和必为 0。任何不平衡靠日终对账发现。这是几百年的金融工程智慧，远早于分布式数据库。<em>启示：很多『需要分布式事务』的需求，换个数据模型就消失了</em>。</p>
 </div>
 </details>
-
 <details>
 <summary>2. Saga 的隔离性消失了——给一个『读到中间态导致 bug』的真实例子。怎么解决？</summary>
 <div class="answer">
@@ -521,7 +508,6 @@ def handle(key, req):
 <p><strong>深层原理</strong>：Saga 用『最终一致 + 可见中间态』换『跨服务可行 + 高吞吐』。如果业务无法容忍中间态可见，<em>这部分数据就不该跨服务</em>——应该合在一个服务内用本地事务。这又回到了『领域边界画对』。</p>
 </div>
 </details>
-
 <details>
 <summary>3. Outbox 引入了『从 DB 到 Kafka 的秒级延迟』。如果业务需要『订单写入后立即被搜索索引到』怎么办？给 3 个方案。</summary>
 <div class="answer">
@@ -548,7 +534,6 @@ def handle(key, req):
 <p><strong>更深的反思</strong>：『立即一致』几乎总是<em>过度设计</em>。Google、Amazon 的搜索都有索引延迟。<em>问业务方『真的 1 秒都不能等吗？』</em>——80% 情况下答案是 5 秒可接受。剩下 20% 用方案 1（双读）就能搞定。把『立即一致』当默认是性能与可用性的隐形税。</p>
 </div>
 </details>
-
 <details>
 <summary>4. 跨章节：Day 6 (Consistency) 说『按数据类型选一致性』，今天说『避免分布式事务』。把两者结合，为同一个电商系统画出『一致性 + 事务策略』地图。</summary>
 <div class="answer">
@@ -579,7 +564,6 @@ def handle(key, req):
 <p><strong>架构师的核心能力</strong>：能在 5 分钟内为一个新业务画出这张表，每一行的选择都有数字支持（QPS、SLO、违反代价）。这才是『资深』和『架构师』的真正分界。</p>
 </div>
 </details>
-
 <details>
 <summary>5. 反直觉：『最好的分布式事务就是不做』——给一个『把分布式事务通过领域重新划分消灭』的真实例子。</summary>
 <div class="answer">
@@ -609,9 +593,8 @@ def handle(key, req):
 <p><strong>架构师的成熟标志</strong>：识别『复杂度藏在哪里』，并把它放在<em>最容易理解和演进</em>的位置。<em>不是消灭复杂度，而是把它放在恰当的地方</em>。这一原则不仅适用于分布式事务，适用于所有系统设计决策——本质上和『把不一致放在 UX 层、把一致性放在 DB 层』是同一种思维。</p>
 </div>
 </details>
-
-<script src="https://hub.cissychen.com/comments.js" defer></script>
-<script src="https://hub.cissychen.com/search.js" defer></script>
-<script src="https://hub.cissychen.com/index-button.js" defer></script>
-<script src="https://hub.cissychen.com/i18n-tts.js" defer></script>
+<script defer="" src="https://hub.cissychen.com/comments.js"></script>
+<script defer="" src="https://hub.cissychen.com/search.js"></script>
+<script defer="" src="https://hub.cissychen.com/index-button.js"></script>
+<script defer="" src="https://hub.cissychen.com/i18n-tts.js"></script>
 </div></body></html>

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<html lang="zh-CN"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>Day 21 · 监控与可观测性 (Observability) — System Design</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -97,7 +98,6 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 </script>
 </head><body><div class="container">
-
 <header>
 <div class="meta">
 <span class="tag day">Day 21</span>
@@ -107,10 +107,9 @@ document.addEventListener('DOMContentLoaded',()=>{
 <span class="tag">SLO</span>
 <span class="tag">OpenTelemetry</span>
 </div>
-<h1>可观测性 — 当系统挂了，你能问出『为什么』吗<span class="en">Observability: Metrics, Logs, Traces, OpenTelemetry & SLO-driven On-call</span></h1>
+<h1 data-tts="06bb38d9ecd480b3">可观测性 — 当系统挂了，你能问出『为什么』吗<span class="en">Observability: Metrics, Logs, Traces, OpenTelemetry &amp; SLO-driven On-call</span></h1>
 </header>
-
-<h2>问题场景 + 需求约束</h2>
+<h2 data-tts="0d98546cb837716d">问题场景 + 需求约束</h2>
 <p>设计一个支撑 <strong>1000+ 微服务、每秒百万 span</strong> 的可观测性平台。某天上午 p99 延迟从 80ms 飙到 2s，用户开始投诉——你要在 <strong>5 分钟内定位到是哪个服务、哪个依赖、哪类请求出了问题</strong>。这不是『加几个监控图』，而是一个数据规模堪比业务本身的系统。</p>
 <p><strong>监控（monitoring）回答『系统是否健康』（已知问题），可观测性（observability）回答『为什么不健康』（未知问题）。</strong>前者是预设好的 dashboard 和告警，后者是事故现场任意切片、下钻的能力。</p>
 <ul>
@@ -120,8 +119,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 <li><strong>留存</strong>：metrics 高分辨率存几天、降采样存一年；trace 存几天；日志按合规要求。</li>
 <li><strong>基数（cardinality）</strong>：metric label 的笛卡尔积，决定存储成本上不上天——这是最容易爆炸的维度。</li>
 </ul>
-
-<h2>高层架构</h2>
+<h2 data-tts="cfb312c71532980b">高层架构</h2>
 <pre class="mermaid">
 graph LR
     APP["服务 + OTel SDK<br/><i>埋点 / context 传播</i>"]
@@ -133,14 +131,14 @@ graph LR
     A["告警引擎<br/><i>Alertmanager</i>"]
     OC["On-call<br/><i>PagerDuty</i>"]
 
-    APP -->|OTLP| COL
-    COL --> M
-    COL --> T
-    COL --> L
-    M --> Q
-    T --> Q
-    L --> Q
-    M --> A -->|burn rate 超限| OC
+    APP --&gt;|OTLP| COL
+    COL --&gt; M
+    COL --&gt; T
+    COL --&gt; L
+    M --&gt; Q
+    T --&gt; Q
+    L --&gt; Q
+    M --&gt; A --&gt;|burn rate 超限| OC
 
     classDef svc fill:#1a2530,stroke:#64c8ff,color:#e8eef5
     classDef pipe fill:#0e2030,stroke:#5eead4,color:#e8eef5
@@ -153,10 +151,8 @@ graph LR
 </pre>
 <p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">SDK 统一埋点 → Collector 做采样/路由解耦应用与后端 → 三种信号靠 trace_id / exemplar 互相跳转</p>
 <p><strong>关键设计</strong>：应用只依赖 OTel SDK + Collector，不绑定任何后端厂商（避免 vendor lock-in）。Collector 是控制点——采样、限流、PII 脱敏、降采样都在这里做，<strong>改采样策略不用重新发布几百个服务</strong>。</p>
-
-<h2>关键技术点</h2>
-
-<h3>1. 三支柱 Metrics / Logs / Traces — 不是三个工具，而是一份数据的三种切片</h3>
+<h2 data-tts="c3df2e03437171d5">关键技术点</h2>
+<h3 data-tts="23e659bf57e980bf">1. 三支柱 Metrics / Logs / Traces — 不是三个工具，而是一份数据的三种切片</h3>
 <p><strong>原理</strong>：<em>Metrics</em> 是预聚合的数值时间序列（counter/gauge/histogram），便宜、适合 dashboard 与告警，但只有你预先定义的维度。<em>Logs</em> 是离散事件，信息最全但检索贵、无结构难关联。<em>Traces</em> 把一个请求跨服务的因果链串成一棵 span 树，回答『慢在哪一跳』。三者的本质区别是<strong>基数承受力</strong>：metric 加一个高基数 label（如 user_id）会让时间序列数爆炸成百万级；trace/structured-log 天生适合高基数。</p>
 <div class="tradeoff">
 <strong>Trade-off：</strong>
@@ -173,8 +169,7 @@ graph LR
 <li><strong>Prometheus + Grafana</strong>：metrics 用 exemplar 直接挂 trace_id，dashboard 一键跳 Tempo trace，是开源界的事实标准缝合方案。</li>
 <li><strong>Google</strong>：内部 Monarch（metrics）+ Dapper（trace）分工，Borgmon 是 Prometheus 的思想源头。</li>
 </ul></div>
-
-<h3>2. 分布式追踪与 OpenTelemetry — context 传播 + 采样的两难</h3>
+<h3 data-tts="1ab535db2edf0635">2. 分布式追踪与 OpenTelemetry — context 传播 + 采样的两难</h3>
 <p><strong>原理</strong>：一个请求经过 A→B→C，要把它们的 span 归到同一棵树，靠 <em>context propagation</em>：入口生成 <code>trace_id</code>，每跳生成 <code>span_id</code> 并记录 <code>parent_id</code>，通过 HTTP header（W3C <code>traceparent</code>）往下游传。OpenTelemetry（OTel）统一了这套 API/SDK/协议（OTLP），让埋点与后端解耦。核心难题是<strong>采样</strong>：百万 span/s 全存会破产，但采样又可能漏掉出错的那条。</p>
 <div class="tradeoff">
 <strong>Head sampling vs Tail sampling：</strong>
@@ -204,8 +199,7 @@ processors:
 <li><strong>OpenTelemetry</strong>：CNCF 项目，由 OpenTracing + OpenCensus 合并，已成跨语言埋点事实标准，被 AWS / Azure / Datadog 等全面支持。</li>
 <li><strong>Uber Jaeger</strong>：大规模生产追踪系统，开源后进 CNCF，自适应采样按服务流量动态调整每秒采样配额。</li>
 </ul></div>
-
-<h3>3. SLI / SLO / SLA 与 Error Budget — 把『可靠性』变成可决策的预算</h3>
+<h3 data-tts="a4cecfdbe8c6fba9">3. SLI / SLO / SLA 与 Error Budget — 把『可靠性』变成可决策的预算</h3>
 <p><strong>原理</strong>：<em>SLI</em>（指标）= 好请求 / 总请求，如『延迟 &lt; 200ms 的请求占比』。<em>SLO</em>（目标）= 对 SLI 设的内部门槛，如『99.9% 月度』。<em>SLA</em>（协议）= 对外承诺 + 违约赔偿，通常比 SLO 松（留缓冲）。关键发明是 <strong>error budget（错误预算）= 1 − SLO</strong>：99.9% 意味着一个月可以『坏』43 分钟。这把可靠性从『越高越好』的口水仗，变成<strong>一个可以花的预算</strong>——预算没花完就允许大胆发版（创新），花超了就冻结发布专心修稳定性。它对齐了产品团队和 SRE 的激励。</p>
 <div class="tradeoff">
 <strong>告警怎么用 error budget：传统阈值 vs burn rate</strong>
@@ -216,12 +210,12 @@ processors:
 <pre><code># 多窗口 burn rate 告警 (PromQL 思路)
 # 快窗 1h 与慢窗 5m 同时超 14.4x 才 page (防抖)
 (
-  error_budget_burn_rate{window="1h"} > 14.4
+  error_budget_burn_rate{window="1h"} &gt; 14.4
   and
-  error_budget_burn_rate{window="5m"} > 14.4
+  error_budget_burn_rate{window="5m"} &gt; 14.4
 )
 # burn_rate = (1 - SLI) / (1 - SLO)
-#   = 实际错误率 / 预算允许错误率;  >1 表示在透支预算
+#   = 实际错误率 / 预算允许错误率;  &gt;1 表示在透支预算
 </code></pre>
 <div class="case">
 <strong>现实案例：</strong>
@@ -229,8 +223,7 @@ processors:
 <li><strong>Google SRE</strong>：error budget 是《SRE Book》核心思想——『100% 不是正确的可靠性目标』，<a href="https://sre.google/workbook/alerting-on-slos/">SRE Workbook 的 Alerting on SLOs</a> 详述多窗口多燃烧率告警公式。</li>
 <li><strong>各大厂 status page</strong>：对外 SLA（如『99.95% 或退款』）普遍比内部 SLO 松一档，给运维留 buffer。</li>
 </ul></div>
-
-<h3>4. Metrics 聚合陷阱 — 为什么 p99 不能再求平均</h3>
+<h3 data-tts="b4b2692ca3ba4ff2">4. Metrics 聚合陷阱 — 为什么 p99 不能再求平均</h3>
 <p><strong>原理</strong>：百分位数（percentile）<strong>不可二次聚合</strong>。十台机器各自的 p99 求平均，得不到全局 p99——这是数学上错的。正确做法：客户端用 <em>histogram</em>（按 bucket 累计计数），把各机器的 bucket 计数<em>相加</em>后再用 <code>histogram_quantile()</code> 在查询时算分位数。<em>summary</em> 类型在客户端就把分位数算死了，跨实例无法合并。这也是 Prometheus 官方推荐 histogram &gt; summary 的核心原因。</p>
 <div class="tradeoff">
 <strong>Histogram vs Summary：</strong>
@@ -245,8 +238,7 @@ processors:
 <li><strong>Prometheus 官方文档</strong>：明确警告『aggregating percentiles is meaningless』，给出 histogram + <code>histogram_quantile()</code> 才能跨实例算全局分位（<a href="https://prometheus.io/docs/practices/histograms/">Histograms and summaries</a>）。</li>
 <li><strong>Prometheus Native Histogram</strong>：新一代稀疏直方图，bucket 自动按指数分布，解决了传统固定 bucket 的精度/成本两难。</li>
 </ul></div>
-
-<h2>扩展与优化</h2>
+<h2 data-tts="945e518fd84967a8">扩展与优化</h2>
 <ul>
 <li><strong>基数治理</strong>：metric label 上线前评审；用 Collector 在写入前 drop/relabel 高基数 label，把 user_id 这类放进 trace/log 而非 metric。</li>
 <li><strong>降采样（downsampling）</strong>：原始 15s 分辨率存几天，5m/1h 聚合存一年（Thanos / Mimir / VictoriaMetrics）。冷数据下沉对象存储省钱。</li>
@@ -254,26 +246,22 @@ processors:
 <li><strong>多区/多租户</strong>：每区独立采集、全局聚合视图；多租户要做查询隔离与配额，防一个团队的烂查询拖垮共享 TSDB。</li>
 <li><strong>eBPF 自动埋点</strong>：无侵入采集系统调用/网络延迟（Pixie / Cilium），补足代码埋点盲区。</li>
 </ul>
-
-<h2>常见陷阱 + 面试追问</h2>
+<h2 data-tts="ba59ddd534700d6d">常见陷阱 + 面试追问</h2>
 <div class="callout"><strong>1. 看均值不看分位</strong>：平均延迟 80ms 很美好，但 p99 是 2s——1% 的用户在受苦，而恰恰是高价值重度用户。永远监控分位数。</div>
 <div class="callout"><strong>2. 高基数 label 炸 TSDB</strong>：给 metric 加 <code>user_id</code> / <code>request_id</code> / 完整 URL，时间序列从几千暴涨到几百万，Prometheus OOM。高基数维度属于 trace/log。</div>
 <div class="callout"><strong>3. head sampling 丢了出错请求</strong>：1% 头部采样下，偶发的 0.1% 错误请求几乎采不到，事故时无 trace 可看。错误/慢请求要 tail sampling 兜底。</div>
 <div class="callout"><strong>4. 告警疲劳</strong>：几百条静态阈值告警，80% 是噪音 → on-call 麻木 → 真事故被淹没。改 SLO burn-rate 告警 + 严格区分 page（要人立刻起床）与 ticket。</div>
 <div class="callout"><strong>5. 可观测性系统自己挂了</strong>：监控和被监控系统共用基础设施，故障时监控也瞎。可观测性栈要独立部署、独立故障域，并有外部黑盒探测兜底。</div>
 <p style="margin-top:14px"><strong>高频面试题：</strong>① metrics / logs / traces 各解决什么、为什么不能只用一个？② head vs tail sampling 的取舍，tail 怎么保证同 trace 的 span 聚齐？③ SLO / error budget 怎么定，burn-rate 多窗口告警为什么比静态阈值好？④ 为什么 p99 不能跨机器求平均？histogram 和 summary 怎么选？⑤ 怎么控制可观测性成本（采样 + 基数 + 降采样三板斧）？</p>
-
-<h2>深入资源</h2>
+<h2 data-tts="b7d96711c978b613">深入资源</h2>
 <ul>
-<li><strong>《Site Reliability Engineering》& 《SRE Workbook》</strong>（Google，免费在线 sre.google）：SLI/SLO/error budget 与 burn-rate 告警的权威来源。</li>
+<li><strong>《Site Reliability Engineering》&amp; 《SRE Workbook》</strong>（Google，免费在线 sre.google）：SLI/SLO/error budget 与 burn-rate 告警的权威来源。</li>
 <li><strong>《Dapper, a Large-Scale Distributed Systems Tracing Infrastructure》</strong>（Google，2010）：分布式追踪与采样的奠基论文。</li>
 <li><strong>Prometheus 官方文档 — Histograms and summaries</strong>：分位数聚合陷阱与 histogram 选型。</li>
 <li><strong>Honeycomb 博客 / Charity Majors（charity.wtf）</strong>：observability 2.0、高基数、对 three pillars 的批判。</li>
 <li><strong>《Designing Data-Intensive Applications》</strong>（Kleppmann）第 1 章：可靠性/可维护性中关于监控可观测性的讨论。</li>
 </ul>
-
-<h2>深入思考（点击展开答案）</h2>
-
+<h2 data-tts="a930c709edbcc7ce">深入思考（点击展开答案）</h2>
 <details>
 <summary>1. 一个 metric 加 user_id label 看似方便，为什么是灾难？算一笔账：1000 万用户 × 10 个其他 label 维度会怎样？</summary>
 <div class="answer">
@@ -285,7 +273,6 @@ processors:
 <p><strong>本质</strong>：metric 适合『有界、低基数』维度（枚举型）。user_id、request_id、完整 URL、错误堆栈是『无界、高基数』，属于 trace 和结构化日志——它们的成本随<em>事件</em>而非<em>维度笛卡尔积</em>增长。这正是 Honeycomb 主张『宽事件』的理由：高基数查询是调试的核心能力，但要放对存储。治理手段：上线前评审 label、Collector 端 relabel drop、对疑似高基数维度做 cardinality 监控告警。</p>
 </div>
 </details>
-
 <details>
 <summary>2. Tail sampling 要等一条 trace 的所有 span 聚齐再决策。在多个 Collector 实例的集群里，这引入了什么棘手的分布式问题？</summary>
 <div class="answer">
@@ -299,7 +286,6 @@ processors:
 <p>这就是为什么很多团队用『head 低采样保底 + tail 只对 error/slow 兜底』的混合：把 tail 的状态压力限制在少量值得保留的 trace 上。</p>
 </div>
 </details>
-
 <details>
 <summary>3. SLO 定 99.9% 还是 99.99%？多一个 9 的真实代价是什么？为什么『越高越好』是错的？</summary>
 <div class="answer">
@@ -312,7 +298,6 @@ processors:
 <p>所以 SLO 应该<strong>从业务/用户体验反推</strong>『多可靠才够』，而不是工程师追求完美。100% 是错误目标：它消灭了 error budget，等于禁止一切变更，反而因无法迭代而更脆弱。正确的 SLO 是『刚好让用户不抱怨』的那条线，把剩下的预算花在发布速度上。</p>
 </div>
 </details>
-
 <details>
 <summary>4. 串联 Day 6（一致性）：metrics 本身是『最终一致 + 有损』的。这对告警意味着什么风险？</summary>
 <div class="answer">
@@ -326,7 +311,6 @@ processors:
 <p><strong>设计含义</strong>：告警要容忍数据的最终一致性——用多窗口（短窗抓急性、长窗去抖）、设置 <code>for</code> 持续时间避免单点毛刺、对『监控数据本身缺失』单独告警。永远别假设 dashboard 上的数字是当下精确真相。</p>
 </div>
 </details>
-
 <details>
 <summary>5. 事故中,从『p99 报警』到『定位根因服务』,理想的下钻路径是什么?三支柱在这条链上各自扮演什么角色?</summary>
 <div class="answer">
@@ -340,11 +324,10 @@ processors:
 <p><strong>角色分工</strong>:metric=雷达(便宜、全覆盖、发现异常),trace=GPS(因果定位到哪一跳),log=显微镜(单点细节)。三者靠 trace_id/exemplar 缝合;缺任何一环,下钻就断链,只能靠人肉猜——这正是『三个割裂工具』vs『真正可观测性』的差别。</p>
 </div>
 </details>
-
 <div class="nav"><a href="index.html">← 回到 index</a></div>
 </div>
-<script src="https://hub.cissychen.com/comments.js" defer></script>
-<script src="https://hub.cissychen.com/search.js" defer></script>
-<script src="https://hub.cissychen.com/index-button.js" defer></script>
-<script src="https://hub.cissychen.com/i18n-tts.js" defer></script>
+<script defer="" src="https://hub.cissychen.com/comments.js"></script>
+<script defer="" src="https://hub.cissychen.com/search.js"></script>
+<script defer="" src="https://hub.cissychen.com/index-button.js"></script>
+<script defer="" src="https://hub.cissychen.com/i18n-tts.js"></script>
 </body></html>

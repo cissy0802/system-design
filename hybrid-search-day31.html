@@ -1,6 +1,7 @@
 <!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Day 31 · 混合检索与重排序 (Hybrid Search & Reranking) — System Design</title>
+
+<html lang="zh-CN"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Day 31 · 混合检索与重排序 (Hybrid Search &amp; Reranking) — System Design</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,"SF Pro Display","Noto Sans SC",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
@@ -97,7 +98,6 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 </script>
 </head><body><div class="container">
-
 <header>
 <div class="meta">
 <span class="tag day">Day 31</span>
@@ -107,14 +107,12 @@ document.addEventListener('DOMContentLoaded',()=>{
 <span class="tag">Reranking</span>
 <span class="tag">Multi-stage</span>
 </div>
-<h1>混合检索与重排序 — BM25 与向量的多阶段拼接<span class="en">Hybrid Search & Reranking: BM25 + Vector, Multi-stage Retrieval, RRF, Cross-encoder, Snippets</span></h1>
+<h1 data-tts="d65020281cda1cd5">混合检索与重排序 — BM25 与向量的多阶段拼接<span class="en">Hybrid Search &amp; Reranking: BM25 + Vector, Multi-stage Retrieval, RRF, Cross-encoder, Snippets</span></h1>
 </header>
-
-<h2>问题场景 + 需求约束</h2>
+<h2 data-tts="a0a6230317679185">问题场景 + 需求约束</h2>
 <p>为一个 <strong>5000 万 SKU 的电商目录</strong>设计搜索：既要 <code>iPhone 15 Pro 256GB</code> 这种<em>精确型号/SKU</em> 命中，也要「适合露营的轻便保暖外套」这种<em>自然语言意图</em>命中。纯关键词搜索对第二类查询召回为零（用户没打「外套」就搜不到）；纯向量搜索对第一类又会把「iPhone 14」「iPhone 15 标准版」混进来，丢掉精确性。</p>
 <p>关键数字：peak <strong>5k QPS</strong>、p99 <strong>&lt; 150ms</strong>、每查返回 top-24、目录 50M 文档、向量 768 维。约束：召回不能漏（漏 = 用户买不到 = 直接损失 GMV），但精排预算有限（cross-encoder 很贵）。这逼出整套<strong>多阶段</strong>设计——便宜的召回拉宽，昂贵的精排收窄。</p>
-
-<h2>高层架构</h2>
+<h2 data-tts="211267e49e469a62">高层架构</h2>
 <pre class="mermaid">
 graph LR
     Q["Query<br/><i>纠错/分词/改写</i>"]
@@ -126,9 +124,9 @@ graph LR
     SNIP["Snippet 高亮<br/><i>query-biased</i>"]
     R["Top-24"]
 
-    Q --> BM --> FUSE
-    Q --> VEC --> FUSE
-    FUSE -->|top-200| RANK -->|top-50| BIZ --> SNIP --> R
+    Q --&gt; BM --&gt; FUSE
+    Q --&gt; VEC --&gt; FUSE
+    FUSE --&gt;|top-200| RANK --&gt;|top-50| BIZ --&gt; SNIP --&gt; R
 
     classDef q fill:#1a2530,stroke:#64c8ff,color:#e8eef5
     classDef rec fill:#0e2030,stroke:#5eead4,color:#e8eef5
@@ -141,10 +139,8 @@ graph LR
 </pre>
 <p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">漏斗：召回拉到几百（高 recall、低成本）→ 精排收到几十（高 precision、高成本）→ 业务重排定最终序</p>
 <p>核心思想：<strong>把「找全」和「排准」拆成不同阶段</strong>。召回层用两条便宜的通道（关键词 + 语义）并行拉候选，融合去重；精排层只对几百个候选跑昂贵模型；最后叠加价格、库存、广告等业务信号。每一阶段的延迟预算和候选数严格递减。</p>
-
-<h2>关键技术点</h2>
-
-<h3>1. 混合检索：BM25 vs 稠密向量，为什么必须都要</h3>
+<h2 data-tts="c3df2e03437171d5">关键技术点</h2>
+<h3 data-tts="e090c1267b984673">1. 混合检索：BM25 vs 稠密向量，为什么必须都要</h3>
 <p>核心 trade-off：<em>词法精确 vs 语义泛化，两者的盲区正好互补</em>。</p>
 <p><strong>原理</strong>：<strong>BM25</strong>（Okapi BM25，Robertson/Spärck Jones）是 TF-IDF 的概率改良版，按词频 + 逆文档频率打分，并对文档长度归一化、对高频词做饱和（一个词出现 10 次不等于 5 次的两倍价值）。它走<em>倒排索引</em>，对精确词、罕见词（SKU、型号、人名）、否定与布尔逻辑极强。<strong>稠密向量</strong>把 query 和文档各编码成一个 768 维向量（bi-encoder，如 BERT 类双塔），算余弦相似度，捕捉<em>语义</em>——「laptop」匹配「notebook computer」，「便宜」匹配「平价」。但它对精确 token 不敏感，且会「自信地编造相关性」。</p>
 <div class="tradeoff">
@@ -166,8 +162,7 @@ def retrieve(q):
 <li><strong>Elastic</strong>：官方推混合检索，BM25 + kNN 两个 retriever 并行后 RRF 融合，「精确词匹配 SKU/罕见词 + 自然语言语义」一并拿到（<a href="https://www.elastic.co/elasticsearch/hybrid-search">elastic.co/elasticsearch/hybrid-search</a>）。</li>
 <li><strong>DoorDash</strong>：明确选「灵活的混合系统」——关键词检索保证规则可控，再叠 LLM 做文档与查询理解（<a href="https://careersatdoordash.com/blog/how-doordash-leverages-llms-for-better-search-retrieval/">careersatdoordash.com 搜索博客</a>）。</li>
 </ul></div>
-
-<h3>2. 多阶段检索：召回 / 粗排 / 精排的漏斗</h3>
+<h3 data-tts="fb70eca5a6e4ebc4">2. 多阶段检索：召回 / 粗排 / 精排的漏斗</h3>
 <p>核心 trade-off：<em>每阶段在「候选数」与「单条评估成本」之间做反向权衡</em>。</p>
 <p><strong>原理</strong>：不可能对 5000 万文档都跑昂贵模型。多阶段把检索建成漏斗：<strong>召回（recall）</strong>从全库拉几百个，目标是「别漏」，用最便宜的 BM25/ANN；<strong>精排（precision）</strong>只对这几百个跑重模型，目标是「排准」。关键在于<em>每阶段成本 × 候选数 ≈ 常数</em>——召回单条近乎免费但数量大，精排单条很贵但数量少，乘起来才落在延迟预算内。ANN（如 <strong>HNSW</strong> 分层可导航小世界图）就是召回阶段「用近似换速度」的代表：放弃精确 KNN，换 sub-ms 的对数级查找。</p>
 <div class="tradeoff">
@@ -188,8 +183,7 @@ final = business_rerank(cand)[:24]      # 价格/库存/广告/个性化
 <li><strong>Vespa</strong>：phased ranking——first-phase 用便宜函数扫全部候选，second-phase 只对 top 跑重模型（如 ColBERT MaxSim），把延迟控制住（<a href="https://docs.vespa.ai/en/ranking/phased-ranking.html">docs.vespa.ai 分阶段排序</a>）。</li>
 <li><strong>DoorDash</strong>：自建搜索引擎做多阶段检索与排序，公开称延迟下降约 50%（ByteByteGo 拆解过其架构）。</li>
 </ul></div>
-
-<h3>3. 融合与重排序：RRF vs 加权，bi-encoder vs cross-encoder</h3>
+<h3 data-tts="f91af123adfde6c5">3. 融合与重排序：RRF vs 加权，bi-encoder vs cross-encoder</h3>
 <p>核心 trade-off：<em>融合解决「两套分数不可比」，重排序解决「双塔精度不够」，但 cross-encoder 慢两个数量级</em>。</p>
 <p><strong>原理</strong>：BM25 分数（无上界）和余弦相似度（0~1）<em>量纲不同</em>，直接加权平均会被某一路主导。<strong>RRF（Reciprocal Rank Fusion，Cormack 2009）</strong>只看<em>排名</em>不看分数：文档得分 = Σ 1/(k + rank)，k 常取 60，天然解决量纲不可比问题，且无需归一化。融合后进精排：<strong>bi-encoder</strong>（召回用的双塔）query 和文档<em>独立</em>编码、可离线建索引；<strong>cross-encoder</strong> 把 query+文档<em>拼接</em>一起喂模型，让两者 token 充分交互，精度高得多，但必须在线现算、无法预存——这正是它只能放在精排（候选已缩到几十个）的原因。</p>
 <table>
@@ -221,8 +215,7 @@ scores = cross_encoder.predict([(q, d.text) for d in candidates])
 <li><strong>Elasticsearch</strong>：RRF 是内置 retriever，按 1/(k+rank) 融合 BM25 与 kNN 列表，官方文档详述（<a href="https://www.elastic.co/docs/reference/elasticsearch/rest-apis/reciprocal-rank-fusion">elastic.co RRF 文档</a>）。</li>
 <li><strong>Cohere Rerank</strong>：产品化的 cross-encoder——把 query 与候选文档拼接、按语义相关性重排，超长文档自动切块多次推理（<a href="https://docs.cohere.com/docs/rerank">docs.cohere.com/docs/rerank</a>）。</li>
 </ul></div>
-
-<h3>4. Snippet 生成与高亮：让结果「看起来相关」</h3>
+<h3 data-tts="40ac348859048523">4. Snippet 生成与高亮：让结果「看起来相关」</h3>
 <p>核心 trade-off：<em>展示的是<strong>解释</strong>而非<strong>检索</strong>——选错片段，再准的排序用户也不点</em>。</p>
 <p><strong>原理</strong>：Snippet 是<em>query-biased summarization</em>：不是取文档前两句，而是选「最能体现与本次 query 相关」的窗口。经典做法滑动一个固定长度窗口，按窗口内 query 词命中数、词稀有度（IDF 高的词权重大）、词间距打分，取最高窗口并对命中词做 <code>&lt;em&gt;</code> 高亮。难点：高亮必须落在<em>渲染后</em>的原文 offset 上（分词、stemming、Unicode 归一化后位置会偏），错位会高亮错字符。</p>
 <pre><code># query-biased 片段：选命中最密集、稀有词最多的窗口
@@ -233,7 +226,7 @@ def best_snippet(doc_tokens, q_terms, W=160):
         # 命中数 + IDF 加权 + 覆盖不同 query 词的多样性
         s = sum(idf(t) for t in win if t in qset) \
             + 2*len({t for t in win if t in qset})
-        if s > best[0]: best, lo = (s, i), i
+        if s &gt; best[0]: best, lo = (s, i), i
     return highlight(doc_tokens[lo:lo+W], qset)  # 命中词包 &lt;em&gt;
 </code></pre>
 <div class="tradeoff">
@@ -242,8 +235,7 @@ def best_snippet(doc_tokens, q_terms, W=160):
 <div class="case">
 <strong>现实案例：</strong>Google/Bing 的搜索结果摘要长期用 query-biased 抽取 + 高亮；现代 RAG 系统则把 snippet 直接喂给 LLM 作为「带出处的上下文」，高亮变成 citation 锚点。
 </div>
-
-<h2>扩展与优化</h2>
+<h2 data-tts="39ccca0f7975ba47">扩展与优化</h2>
 <ul>
 <li><strong>学习式融合 / 学习排序（LTR）</strong>：用点击日志训练 GBDT（LambdaMART）或神经排序模型替代手调 α，把 BM25 分、向量分、CTR、价格等做特征统一打分。</li>
 <li><strong>稀疏神经检索（SPLADE）</strong>：让模型在倒排索引上做「词项扩展」，兼得 BM25 的可解释与神经的语义，省掉一套 ANN。</li>
@@ -251,8 +243,7 @@ def best_snippet(doc_tokens, q_terms, W=160):
 <li><strong>个性化与多目标</strong>：精排后叠加用户画像、库存、利润、广告 bid，常做成多目标加权或多塔模型，注意别让商业目标压垮相关性。</li>
 <li><strong>多区域 / 成本</strong>：cross-encoder GPU 贵，按 query 价值分级——头部高价值查询上重 reranker，长尾查询只用融合结果。</li>
 </ul>
-
-<h2>常见陷阱 + 面试问题</h2>
+<h2 data-tts="3593b001261580c0">常见陷阱 + 面试问题</h2>
 <div class="callout"><strong>1. 直接把 BM25 分和余弦相似度加权平均。</strong> 量纲不可比，结果被无上界的 BM25 主导。要么 RRF（只用 rank），要么先按 query 归一化再加权。</div>
 <div class="callout"><strong>2. 用 cross-encoder 做召回。</strong> 它无法预建索引、必须在线现算，对全库跑 = 延迟爆炸。cross-encoder 只能在候选缩到几十~几百后用。</div>
 <div class="callout"><strong>3. 只看 NDCG/precision 不看 recall。</strong> 漏召回在精排阶段<em>无法补救</em>——召回没捞到的文档，精排再强也排不出来。召回层的 recall@k 是上限。</div>
@@ -265,18 +256,15 @@ def best_snippet(doc_tokens, q_terms, W=160):
 <li>5000 万文档、768 维向量，HNSW 索引大概占多少内存？怎么估？</li>
 <li>召回阶段 recall@200 只有 85%，精排再好也救不回那 15%——怎么提召回？</li>
 </ol>
-
-<h2>深入资源</h2>
+<h2 data-tts="d2e3bf108f15b44d">深入资源</h2>
 <ul>
 <li><strong>Elasticsearch — Reciprocal Rank Fusion / Hybrid search</strong>：RRF 公式与混合检索官方实现（<a href="https://www.elastic.co/docs/reference/elasticsearch/rest-apis/reciprocal-rank-fusion">RRF 文档</a> · <a href="https://www.elastic.co/elasticsearch/hybrid-search">hybrid search</a>）。</li>
-<li><strong>Vespa Blog & Docs — Phased Ranking / Hybrid Search</strong>：多阶段排序与 BM25+向量融合的工程实践（<a href="https://blog.vespa.ai/redefining-hybrid-search-possibilities-with-vespa/">Vespa hybrid search</a>）。</li>
+<li><strong>Vespa Blog &amp; Docs — Phased Ranking / Hybrid Search</strong>：多阶段排序与 BM25+向量融合的工程实践（<a href="https://blog.vespa.ai/redefining-hybrid-search-possibilities-with-vespa/">Vespa hybrid search</a>）。</li>
 <li><strong>Cohere — Rerank</strong>：cross-encoder 重排序的产品化与用法（<a href="https://docs.cohere.com/docs/rerank">docs.cohere.com/docs/rerank</a>）。</li>
 <li><strong>DoorDash Engineering</strong>：用 LLM 改进搜索检索的混合系统设计（<a href="https://careersatdoordash.com/blog/how-doordash-leverages-llms-for-better-search-retrieval/">careersatdoordash.com</a>）。</li>
 <li><strong>《DDIA》Ch 3</strong>（Kleppmann）：倒排索引与存储引擎的本质讨论，理解 BM25 召回的底层。</li>
 </ul>
-
-<h2>深入思考（点击展开答案）</h2>
-
+<h2 data-tts="9cc29073b59ff7b3">深入思考（点击展开答案）</h2>
 <details>
 <summary>1. 召回 recall@200=85%，精排 NDCG 很高，但线上 GMV 不涨。瓶颈在哪？怎么定位？</summary>
 <div class="answer">
@@ -284,7 +272,6 @@ def best_snippet(doc_tokens, q_terms, W=160):
 <p>定位方法：① 离线用人工标注/点击日志算 <strong>recall@k 上限</strong>——把已知应命中的文档拿去查召回，看进没进候选；② 拆 query 类型，大概率是<em>语义型/长尾</em> query 召回差（向量没覆盖好）或<em>精确型</em>被向量噪声挤掉；③ A/B 把 k 从 200 提到 500，若 GMV 涨说明召回是瓶颈。修法：扩召回通道、提 ANN 的 efSearch、引入 SPLADE，而不是继续优化精排。<strong>核心洞察：多阶段漏斗里，上游的 recall 是下游一切的天花板。</strong></p>
 </div>
 </details>
-
 <details>
 <summary>2. RRF 的 k=60 调成 k=1 或 k=1000，排序行为各自怎么变？</summary>
 <div class="answer">
@@ -293,7 +280,6 @@ def best_snippet(doc_tokens, q_terms, W=160):
 <p>k=60 是经验折中：既保留头部区分度，又让中段文档（在两条通道都中等排名的）能靠「共识」浮上来——这正是混合检索想要的「两边都觉得相关的更可信」。调参方向：想强调单通道强信号就减小 k，想强调跨通道一致性就增大 k。</p>
 </div>
 </details>
-
 <details>
 <summary>3. 5000 万文档、768 维 float32 向量、HNSW，内存大概多少？怎么估？</summary>
 <div class="answer">
@@ -302,7 +288,6 @@ def best_snippet(doc_tokens, q_terms, W=160):
 <p><strong>合计 ~200–230 GB</strong>，单机内存放不下/很贵。这就是为什么大规模要么<strong>分片</strong>（按 shard 拆到多机，查询 scatter-gather），要么用 <strong>PQ/量化</strong>把 3 KB 压到几百字节（IVF-PQ 可压 8–32 倍）换召回率，要么<strong>磁盘 ANN</strong>（DiskANN）把图放 SSD。面试官想看你<em>会做数量级估算并据此选架构</em>，而不是背 HNSW 公式。</p>
 </div>
 </details>
-
 <details>
 <summary>4. 为什么 cross-encoder 精度高却不能用于召回？这背后是什么计算结构上的根本限制？</summary>
 <div class="answer">
@@ -310,7 +295,6 @@ def best_snippet(doc_tokens, q_terms, W=160):
 <p>对 5000 万文档，召回阶段要评估的对数是「query × 全库」，cross-encoder 就是 5000 万次前向，秒级都打不住。所以它只能放在候选已缩到几十~几百的精排阶段。<strong>洞察：交互越充分精度越高，但交互让结果无法预计算——精度与可摊销性是一对根本矛盾，多阶段架构正是用它来分工。</strong>ColBERT 的「late interaction」就是想在两者间取中间态。</p>
 </div>
 </details>
-
 <details>
 <summary>5. 向量召回会「自信地召回不相关结果」——它永远返回最近邻，哪怕全库没有真正相关的。怎么防？</summary>
 <div class="answer">
@@ -318,11 +302,10 @@ def best_snippet(doc_tokens, q_terms, W=160):
 <p>防御手段：① <strong>相似度阈值</strong>——余弦低于阈值的直接丢，宁可返回少或空也不返回噪声（但阈值随 query 漂移，难统一）；② <strong>用 BM25 兜底/校验</strong>——混合检索里若向量召回的文档一个 query 词都不含、BM25 分也极低，降权或剔除；③ <strong>cross-encoder 精排做守门</strong>——它能给出绝对相关性分数，把低分的滤掉；④ <strong>OOD/置信检测</strong>——监控 query 嵌入到最近邻的距离分布，异常远的判为「无好结果」走兜底文案。<strong>关键认知：向量检索给的是<em>相对</em>排序，不是<em>绝对</em>相关性判断——绝对判断要靠阈值或 cross-encoder 补。</strong></p>
 </div>
 </details>
-
 <div class="nav"><a href="index.html">← 回到 index</a></div>
 </div>
-<script src="https://hub.cissychen.com/comments.js" defer></script>
-<script src="https://hub.cissychen.com/search.js" defer></script>
-<script src="https://hub.cissychen.com/index-button.js" defer></script>
-<script src="https://hub.cissychen.com/i18n-tts.js" defer></script>
+<script defer="" src="https://hub.cissychen.com/comments.js"></script>
+<script defer="" src="https://hub.cissychen.com/search.js"></script>
+<script defer="" src="https://hub.cissychen.com/index-button.js"></script>
+<script defer="" src="https://hub.cissychen.com/i18n-tts.js"></script>
 </body></html>

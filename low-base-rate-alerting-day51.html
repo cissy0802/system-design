@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<html lang="zh-CN"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>Day 51 · 低底率下的告警系统 (Alerting Under a Low Base Rate) — System Design</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -97,7 +98,6 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 </script>
 </head><body><div class="container">
-
 <header>
 <div class="meta">
 <span class="tag day">Day 51</span>
@@ -107,10 +107,9 @@ document.addEventListener('DOMContentLoaded',()=>{
 <span class="tag">Signal Detection</span>
 <span class="tag">Observability</span>
 </div>
-<h1>低底率下的告警系统 — 报告级误报如何淹没真报<span class="en">Alerting Under a Low Base Rate: Why Report-Level False Positives Drown the Truth</span></h1>
+<h1 data-tts="17866a5698fca685">低底率下的告警系统 — 报告级误报如何淹没真报<span class="en">Alerting Under a Low Base Rate: Why Report-Level False Positives Drown the Truth</span></h1>
 </header>
-
-<h2>问题场景 + 需求约束</h2>
+<h2 data-tts="79bfdc769c79597b">问题场景 + 需求约束</h2>
 <p>你给一个<strong>数万实例的生产平台</strong>设计自动告警系统：一堆探针、断言、异常检测器、再加一个 LLM「判官」在每次判定上盖章「这是不是事故」。规模是关键——每天约 <strong>1000 万次检查</strong>，而<em>真正值得 page 人的事故底率极低</em>：假设一天只有约 <strong>5 起</strong>真事故，那么单次检查为「真」的先验概率约 <strong>5 × 10⁻⁷</strong>。</p>
 <p>直觉会说「我检测器很准，FP 才 0.1%」——但这正是<strong>基率谬误（base-rate fallacy）</strong>：0.1% 乘以一千万次检查，一天就是 <strong>1 万条误报</strong>，把那 5 条真报彻底淹没，P(真│报) ≈ 5/10005 ≈ <strong>0.05%</strong>。工程师收到的 2000 条里才 1 条真，几周后所有人学会同一动作——<em>把告警全部划过去</em>。此时召回再高也没意义：<strong>没人看的真报等于漏报</strong>。这与 Day 50「Code Review 当信号检测」同源，但这里的敌人不是噪声，而是<em>底率</em>。</p>
 <ul>
@@ -119,8 +118,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 <li><strong>可行动性 + 时机</strong>：每条 page 必须紧急、可执行、用户可见；三天后的离线扫描无价值。</li>
 <li><strong>兜底裁判要独立</strong>：谁盖「这是真事故」的章？裁判与检测器共享失败模式，则兜底形同虚设。</li>
 </ul>
-
-<h2>高层架构（底率漏斗 → 独立兜底 → 分诊 → page）</h2>
+<h2 data-tts="4f09ca0a77d3396b">高层架构（底率漏斗 → 独立兜底 → 分诊 → page）</h2>
 <pre class="mermaid">
 graph LR
     SRC["1000 万次检查/天<br/><i>探针 · 断言 · 异常检测</i>"]
@@ -130,10 +128,10 @@ graph LR
     PAGE["Page 人类<br/><i>&lt;10 条/天</i>"]
     ARCH[("归档 / 静默<br/>可查不打扰")]
 
-    SRC -->|海量| DET -->|1万候选| ORA
-    ORA -->|独立判定| TRI -->|precision≥90%| PAGE
-    TRI -.降级噪声.-> ARCH
-    DET -.低置信.-> ARCH
+    SRC --&gt;|海量| DET --&gt;|1万候选| ORA
+    ORA --&gt;|独立判定| TRI --&gt;|precision≥90%| PAGE
+    TRI -.降级噪声.-&gt; ARCH
+    DET -.低置信.-&gt; ARCH
 
     classDef src fill:#1a2530,stroke:#64c8ff,color:#e8eef5
     classDef det fill:#1a1a30,stroke:#ffb450,color:#e8eef5
@@ -146,10 +144,8 @@ graph LR
     class ARCH src
 </pre>
 <p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">底率漏斗每一级都在提升 precision：检测器保召回，独立 oracle 打破相关性，分诊层守精确率地板，最终只有 &lt;10 条/天进人的视野</p>
-
-<h2>关键技术点</h2>
-
-<h3>1. 基率谬误的贝叶斯数学：precision 被底率压垮</h3>
+<h2 data-tts="c3df2e03437171d5">关键技术点</h2>
+<h3 data-tts="36bb5057ca718f32">1. 基率谬误的贝叶斯数学：precision 被底率压垮</h3>
 <p><strong>原理</strong>：告警系统的可用性由 <em>P(真│告警)</em>（贝叶斯检出率 / precision）决定，而它不只取决于检测器的召回率，更被<strong>底率 base rate</strong> 支配。贝叶斯公式：<code>P(真│报) = TPR·B / (TPR·B + FPR·(1−B))</code>。当底率 <code>B</code> 极小，分母被 <code>FPR·(1−B)</code> 主导——哪怕 TPR=99%，只要 FPR 没低到与 B 同量级，precision 就趋近于 0。这就是 Axelsson 在入侵检测里证明的结论：<strong>限制 IDS 实用性的从来不是检出率，而是误报率</strong>。</p>
 <div class="tradeoff">
 <strong>Trade-off（三种应对方向，各有代价）：</strong>
@@ -178,8 +174,7 @@ precision(0.99, 1e-5, 1e-4)    # ≈ 0.908   —— 过了精确率地板
 <li><strong>Google SRE</strong>：明确用 precision/recall 定义告警质量，坚持 <em>symptom-based / SLO-based 告警</em>——只在用户可见的症状面判定，本质就是「抬底率、缩判定域」。</li>
 <li><strong>安全 SOC / 大型 IDS</strong>：安全告警长期困于「告警疲劳」，团队每天面对海量低 precision 告警，正是底率谬误在生产的体现。</li>
 </ul></div>
-
-<h3>2. 精确率地板：分诊层是可用性的守门人</h3>
+<h3 data-tts="d12a510c1c78afe7">2. 精确率地板：分诊层是可用性的守门人</h3>
 <p><strong>原理</strong>：单检测器压不动底率，就把 precision 交给<strong>分诊 / 降噪层（triage）</strong>——它不产生新信号，只对候选做去重、聚合、置信打分、跨检测器投票，仅放行超过<em>精确率地板</em>（如 precision≥90%）的判定。低于地板的降级到「可查询但不打扰」的归档池。关键心态：<strong>宁可漏报进归档，也不让噪声进 pager</strong>——一条噪声的代价不是它自己，而是它侵蚀了对<em>所有</em>后续告警的信任。</p>
 <div class="tradeoff">
 <strong>Trade-off：</strong>
@@ -194,7 +189,7 @@ def triage(candidates, floor=0.9, window="5m"):
     for g in groups:
         # 独立检测器越多同时命中，置信越高（近似乘法降噪）
         conf = calibrated_confidence(g.detectors, g.signals)
-        if conf >= floor:
+        if conf &gt;= floor:
             page(dedup_key=g.root_cause, evidence=g.top_signals)
         else:
             archive(g)        # 可查询、进指标，但绝不打扰 on-call
@@ -206,8 +201,7 @@ def triage(candidates, floor=0.9, window="5m"):
 <li><strong>PagerDuty / Opsgenie</strong>：事件聚合、去重、抑制（suppression）、依赖压制——商业化的分诊降噪层，卖点就是把噪声挡在 pager 之外。</li>
 <li><strong>Netflix</strong>：以 SLO/症状告警为核心，把内部指标异常降级为可观测信号而非直接 page，守住 on-call 的 pager precision。</li>
 </ul></div>
-
-<h3>3. 独立 Oracle 兜底 vs LLM 自任裁判：相关性是隐形杀手</h3>
+<h3 data-tts="d5bf976d65a75b2a">3. 独立 Oracle 兜底 vs LLM 自任裁判：相关性是隐形杀手</h3>
 <p><strong>原理</strong>：低底率下最诱人的偷懒是——让生成告警的模型<em>自己</em>当裁判。但<strong>兜底降噪只在它与被兜底层<em>失败模式独立</em>时才成立</strong>。串联两层把 FPR 相乘（0.1%×1%）的前提是独立；若裁判和检测器共享盲区（同模型、同 prompt、同训练分布），它们会<em>在同样输入上一起错</em>——误报相关、漏报也相关，等效 FPR 从「相乘」退化成「几乎不降」。真正的兜底要用<strong>独立 oracle</strong>：确定性断言、差分复核（同输入跑参照路径比对，见 Day 52）、或不同架构/信号源的第二判定器。</p>
 <div class="tradeoff">
 <strong>Trade-off：</strong>
@@ -234,8 +228,7 @@ def confirm(alert):
 <li><strong>差分测试（differential testing）</strong>：编译器/数据库领域用多实现交叉比对找 bug，独立实现的失败模式正交，是 oracle 独立性的经典工程化。</li>
 <li><strong>Google SRE — 多信号确认</strong>：关键告警要求多个独立信号源（症状 + 依赖 + 用户侧）同时成立才升级，降低单一来源相关误报。</li>
 </ul></div>
-
-<h3>4. 度量陷阱：报告级 vs 判定级误报率</h3>
+<h3 data-tts="49faefca9cf0a036">4. 度量陷阱：报告级 vs 判定级误报率</h3>
 <p><strong>原理</strong>：团队最爱说「我们检测器误报率只有 0.1%」——这是<strong>判定级（per-decision）FP 率</strong>，好看但骗人。工程师真正承受的是<strong>报告级（per-report）precision</strong>：打开 pager 的 N 条里有几条是真的。判定级 0.1% 在 10⁻⁷ 底率下对应报告级 precision 0.05%——同一系统，一个指标「优秀」，一个「不可用」。更深一层是<em>活动指标 vs 结果指标</em>（承 Day 50）：告警数、覆盖率、检测器数量都是活动指标，涨了不代表变好；真正的结果指标是<strong>真事故被及时发现的比例</strong>与 <strong>on-call 对 pager 的信任度</strong>。</p>
 <table>
 <thead><tr><th>指标</th><th>类型</th><th>陷阱</th><th>该看什么</th></tr></thead>
@@ -251,8 +244,7 @@ def confirm(alert):
 <li><strong>Google SRE</strong>：用 precision/recall 而非「告警数」评估告警质量，并把「不该被 page 却被 page」列为需要根治的问题，正是拒绝活动指标。</li>
 <li><strong>安全 SOC 行业</strong>：长期用「告警量」衡量 SIEM 价值，导致告警疲劳成灾——教科书级的报告级/活动指标度量陷阱。</li>
 </ul></div>
-
-<h2>扩展与优化（增长后怎么办）</h2>
+<h2 data-tts="9ad91b0a69e9d37a">扩展与优化（增长后怎么办）</h2>
 <ul>
 <li><strong>底率随规模继续下降</strong>：实例翻 10 倍、检查翻 10 倍，真事故底率反而更小——precision 持续恶化。对策是让判定域随规模<em>收敛</em>（只在 SLO 违约面判定），而非随规模膨胀。</li>
 <li><strong>自适应阈值</strong>：按每类检测器历史 precision 动态调地板，长期低 precision 者自动降权或下线。</li>
@@ -260,8 +252,7 @@ def confirm(alert):
 <li><strong>与混沌工程对接（承 Day 44）</strong>：用故障注入制造<em>已知真事故</em>，直接量测告警的召回与首报延迟——否则低底率下根本没有足够真样本评估召回。</li>
 <li><strong>成本视角</strong>：每条误报的成本不是 CPU，是 on-call 的注意力和信任——用「打扰一次人的等效成本」给阈值定价。</li>
 </ul>
-
-<h2>常见陷阱 + 面试追问</h2>
+<h2 data-tts="d05d66901aefe475">常见陷阱 + 面试追问</h2>
 <div class="callout">
 <strong>1. 「我检测器 99% 准」≠ 系统可用。</strong> 面试必追：底率多少？把 precision 算出来。答不出贝叶斯换算=没理解本质，最经典的失分点。</div>
 <div class="callout">
@@ -272,17 +263,14 @@ def confirm(alert):
 <strong>4. 用告警数/覆盖率证明进步。</strong> 活动指标。追问：ack 率、忽略率、真报占比多少？没人看的系统覆盖率 100% 也是死的。</div>
 <div class="callout">
 <strong>5. 忽略聚合窗口的双刃。</strong> 聚合抬 precision，但窗口过大会把两起独立事故合并、或延迟首报。追问：一次雪崩式级联故障，你的聚合会不会把 root cause 藏起来？</div>
-
-<h2>深入资源</h2>
+<h2 data-tts="d184706682235110">深入资源</h2>
 <ul>
 <li><strong>Stefan Axelsson, "The Base-Rate Fallacy and the Difficulty of Intrusion Detection"</strong>（ACM TISSEC, 2000）：本主题理论奠基，贝叶斯证明误报率才是瓶颈。</li>
 <li><strong>Google SRE Workbook — "Alerting on SLOs"</strong>：precision/recall 定义告警质量、symptom-based 告警的工程实践（sre.google/workbook/alerting-on-slos）。</li>
 <li><strong>《Designing Data-Intensive Applications》(Kleppmann)</strong>：可靠性与故障检测章节，理解「检测本身也会错」。</li>
 <li><strong>Jepsen (jepsen.io)</strong>：独立 oracle 判定分布式一致性的范式教材，理解「裁判为何必须独立」。</li>
 </ul>
-
-<h2>深入思考（点击展开答案）</h2>
-
+<h2 data-tts="dd311282e420c2cf">深入思考（点击展开答案）</h2>
 <details>
 <summary>1. 底率 10⁻⁷、想让报告级 precision 达到 90%，单检测器的 FPR 需要压到多少？这现实吗？给出数量级与替代路径。</summary>
 <div class="answer">
@@ -296,7 +284,6 @@ def confirm(alert):
 <p>洞察：<em>低底率问题几乎永远靠「抬 B + 独立层」解，而不是靠让某个检测器变神。</em></p>
 </div>
 </details>
-
 <details>
 <summary>2. 为什么「再加一层 LLM 裁判」有时几乎不降误报？用相关性把它讲清楚。</summary>
 <div class="answer">
@@ -304,7 +291,6 @@ def confirm(alert):
 <p>这也是为什么真正的兜底要<strong>换失败模式</strong>：确定性断言的错误来自规则写漏（与模型幻觉正交）；差分 oracle 的错误来自参照路径 bug（独立实现）；不同架构的第二检测器盲区不同。<em>独立性不是「有没有第二层」，而是「第二层会不会在同样的地方跟着错」。</em></p>
 </div>
 </details>
-
 <details>
 <summary>3. 你把判定域从 1000 万次缩到 1 万次高危检查，precision 大幅改善——但代价藏在哪？如何量化你漏掉了什么？</summary>
 <div class="answer">
@@ -318,7 +304,6 @@ def confirm(alert):
 <p>决策标准：域外漏报里有没有「高严重度」的？precision 换召回可以，但不能把 Sev1 换出去——那类必须无论底率多低都保留判定。</p>
 </div>
 </details>
-
 <details>
 <summary>4. 一次级联雪崩故障会同时触发成百上千个检测器。你的聚合/去重层是帮手还是帮凶？</summary>
 <div class="answer">
@@ -332,7 +317,6 @@ def confirm(alert):
 <p><em>对策</em>：聚合要带因果/依赖拓扑（不是纯时间相似），保留并高亮「最上游」告警；对高严重度信号用「先报再聚合」而非「先聚合再报」，用拓扑而非时间窗定义同因。</p>
 </div>
 </details>
-
 <details>
 <summary>5. on-call 已经不看 pager 了——这个「信任崩塌」状态在指标上长什么样？如何早于崩塌前发现？</summary>
 <div class="answer">
@@ -346,10 +330,9 @@ def confirm(alert):
 <p>核心：<strong>告警系统真正的 SLO 不在机器侧，在人侧——「人是否还相信它」。</strong>信任一旦烧穿，重建成本远高于当初省下的降噪工作。</p>
 </div>
 </details>
-
 </div>
-<script src="https://hub.cissychen.com/comments.js" defer></script>
-<script src="https://hub.cissychen.com/search.js" defer></script>
-<script src="https://hub.cissychen.com/index-button.js" defer></script>
-<script src="https://hub.cissychen.com/i18n-tts.js" defer></script>
+<script defer="" src="https://hub.cissychen.com/comments.js"></script>
+<script defer="" src="https://hub.cissychen.com/search.js"></script>
+<script defer="" src="https://hub.cissychen.com/index-button.js"></script>
+<script defer="" src="https://hub.cissychen.com/i18n-tts.js"></script>
 </body></html>

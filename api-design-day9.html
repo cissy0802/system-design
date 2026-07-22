@@ -221,7 +221,7 @@ ORDER BY id LIMIT 20;
 <li><strong>Google API 规范</strong>：<a href="https://google.aip.dev/158">AIP-158</a> 强制用 <em>opaque（不可解析）的 page_token</em>——把分页实现细节藏在 token 里，将来能换底层实现而不破坏调用方。</li>
 </ul>
 </div>
-<h3 data-tts="0037101f593d457a">3. 版本管理：让契约「永不破坏」</h3>
+<h3 data-tts="9473f09a2bc4c6c4">3. 版本管理：让契约「永不破坏」</h3>
 <p style="color:#5eead4">核心 trade-off：<strong>显式版本（/v2）的破坏自由</strong> vs <strong>日期版本 + 兼容层的零破坏，但永久维护成本</strong>。</p>
 <p><strong>原理</strong>：先分清<em>什么是破坏性变更</em>——<em>加</em>字段/端点是<strong>向后兼容</strong>的（老客户端忽略新字段）；<em>删</em>字段、<em>改</em>类型/语义、<em>改</em>默认值才是 <strong>breaking</strong>。三种版本策略：(1) <em>URL 路径</em>（<code>/v1</code> /<code>/v2</code>）——直观，但每个大版本要并行维护整套代码；(2) <em>Header 协商</em>——URL 干净，但不可见、易被代理/缓存忽略；(3) <em>日期版本 + 兼容层</em>（Stripe 法）——账号<em>pin</em>在注册时的版本，核心逻辑<em>只写最新</em>，响应经一条<em>向后 transform 链</em>降级回客户端 pinned 的格式。新老客户端永远不破，代价是兼容层逐年累积。</p>
 <div class="mermaid">
@@ -308,7 +308,7 @@ if resp.status == 429:
 <li><strong>Google — <a href="https://google.aip.dev/158">AIP-158: Pagination</a></strong>：opaque page_token 与标准 List 方法的规范。</li>
 <li><strong>GitHub — <a href="https://github.blog/developer-skills/github/the-github-graphql-api/">The GitHub GraphQL API</a></strong> / <strong>Netflix — <a href="https://netflixtechblog.com/how-netflix-scales-its-api-with-graphql-federation-part-1-ae3557c187e2">GraphQL Federation</a></strong>：REST→GraphQL 与联邦超图的工业级动机。</li>
 </ul>
-<h2 data-tts="a6242cd574bf0f07">深入思考</h2>
+<h2 data-tts="1d64268e0c40a19a">深入思考</h2>
 <details>
 <summary>1. GraphQL 消除了 over/under-fetching，却几乎丢掉了 REST 在 HTTP/CDN 缓存上的天然优势。为什么？persisted query 怎么部分挽回？</summary>
 <div class="answer">

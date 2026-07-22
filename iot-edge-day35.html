@@ -1,6 +1,7 @@
 <!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Day 35 · 物联网与边缘 (IoT & Edge) — System Design</title>
+
+<html lang="zh-CN"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Day 35 · 物联网与边缘 (IoT &amp; Edge) — System Design</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,"SF Pro Display","Noto Sans SC",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
@@ -97,7 +98,6 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 </script>
 </head><body><div class="container">
-
 <header>
 <div class="meta">
 <span class="tag day">Day 35</span>
@@ -107,10 +107,9 @@ document.addEventListener('DOMContentLoaded',()=>{
 <span class="tag">Edge</span>
 <span class="tag">Time-Series DB</span>
 </div>
-<h1>物联网与边缘 — 千万设备每 10 秒一次心跳的吞吐工程<span class="en">IoT & Edge: Ingestion at Scale, MQTT, Edge Compute, Time-Series Storage</span></h1>
+<h1 data-tts="da9a1823dd47d14b">物联网与边缘 — 千万设备每 10 秒一次心跳的吞吐工程<span class="en">IoT &amp; Edge: Ingestion at Scale, MQTT, Edge Compute, Time-Series Storage</span></h1>
 </header>
-
-<h2>问题场景 + 需求约束</h2>
+<h2 data-tts="09559fc2525d3777">问题场景 + 需求约束</h2>
 <p>设计一个 <strong>1000 万台联网设备</strong>的遥测后端（电动车队 / 工业传感器 / 智能电表）：每台设备每 <strong>10 秒</strong>上报一次电池、温度、GPS、电流等 20 个指标。这类系统和请求-响应 Web 后端是两种物种——<em>写远多于读</em>（99% 是写入），连接是<em>长连接</em>而非短请求，网络<em>不可靠</em>（车进隧道、传感器断电），且数据<em>一旦写入几乎不改</em>。</p>
 <ul>
 <li><strong>写入 QPS</strong>：1000 万 ÷ 10s × 20 指标 = <strong>2000 万 points/s</strong>。峰值（车队早高峰同时上线）再翻 2-3 倍。</li>
@@ -119,8 +118,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 <li><strong>延迟 SLO</strong>：摄取 p99 &lt; 1s（告警链路），仪表盘聚合查询 p95 &lt; 500ms；但<em>设备侧的告警判断要 &lt; 100ms</em>——所以要边缘计算。</li>
 <li><strong>可靠性</strong>：丢一个温度采样无所谓（下一帧覆盖），丢一个"电池过热"告警是事故——QoS 要分级。</li>
 </ul>
-
-<h2>高层架构</h2>
+<h2 data-tts="27a7e728c81660ed">高层架构</h2>
 <pre class="mermaid">
 graph LR
     D["设备 / 传感器<br/><i>千万级</i>"]
@@ -132,11 +130,11 @@ graph LR
     OBJ[("对象存储<br/>冷数据 · Parquet")]
     AL["告警 / 仪表盘"]
 
-    D -->|MQTT| EG -->|MQTT/QoS| BR
-    BR --> K --> SP
-    SP --> TSDB
-    SP --> OBJ
-    TSDB --> AL
+    D --&gt;|MQTT| EG --&gt;|MQTT/QoS| BR
+    BR --&gt; K --&gt; SP
+    SP --&gt; TSDB
+    SP --&gt; OBJ
+    TSDB --&gt; AL
 
     classDef dev fill:#1a2530,stroke:#64c8ff,color:#e8eef5
     classDef edge fill:#0e2030,stroke:#5eead4,color:#e8eef5
@@ -149,10 +147,8 @@ graph LR
 </pre>
 <p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">四段职责分明：边缘<em>减量</em>、broker <em>收连接</em>、Kafka <em>削峰解耦</em>、TSDB <em>压缩存储</em>。任何一段直连下游都会被流量打爆。</p>
 <p>核心思路是<strong>层层减量、层层解耦</strong>。边缘网关把原始采样本地聚合成摘要，砍 90% 回传带宽；MQTT broker 专职维持海量长连接、做 QoS 投递；Kafka 是关键的<strong>削峰蓄水池</strong>——broker 输出抖动剧烈（早高峰 3 倍）而 TSDB 写入恒定，Kafka 吸收差值；流处理做去重、乱序重排、降采样后落库。</p>
-
-<h2>关键技术点</h2>
-
-<h3>1. 设备协议：MQTT vs HTTP vs CoAP</h3>
+<h2 data-tts="c3df2e03437171d5">关键技术点</h2>
+<h3 data-tts="8d96a092b5ca76fb">1. 设备协议：MQTT vs HTTP vs CoAP</h3>
 <p><strong>1 句话</strong>：长连接 + pub/sub 的 MQTT 用<em>连接复用</em>换<em>有状态服务器</em>，是海量低功耗设备的默认选择。</p>
 <p><strong>原理</strong>：HTTP 是<em>请求-响应 + 每次新建 TCP/TLS</em>，对每 10 秒发一个 2 字节温度的设备，握手开销（几 KB）是 payload 的上千倍，还无法服务端主动推送（要远程关阀门只能让设备轮询）。<strong>MQTT</strong> 是 OASIS 标准的<em>发布-订阅</em>协议：设备与 broker 建一条长连接，按 topic（如 <code>fleet/car42/battery</code>）发布；header 最小仅 2 字节；支持服务端主动下发、遗嘱消息（Last Will，设备掉线自动通知）、保留消息。代价是 broker 必须<em>有状态</em>地维持千万连接与每设备的会话。</p>
 <div class="tradeoff">
@@ -177,8 +173,7 @@ client.publish("fleet/car42/alert", payload, qos=1)   # 至少一次 + 下游幂
 <li><strong>HiveMQ / AWS IoT Core</strong>：均以 MQTT 为核心协议，<a href="https://www.hivemq.com/blog/mqtt-vs-http-protocols-in-iot-iiot/">HiveMQ 的对比文章</a>实测多消息场景下 MQTT 吞吐远超 HTTP。</li>
 <li><strong>Facebook Messenger</strong>：早年移动端推送就用 MQTT，正是看中长连接省电、低延迟下发的特性。</li>
 </ul></div>
-
-<h3>2. 边缘计算：在数据产生地就近处理</h3>
+<h3 data-tts="9a1990c4940c2366">2. 边缘计算：在数据产生地就近处理</h3>
 <p><strong>1 句话</strong>：边缘用<em>本地算力</em>换<em>回传带宽 + 响应延迟</em>，但引入运维与一致性难题。</p>
 <p><strong>原理</strong>：不是所有数据都值得回传云端。一台车每秒产生 MB 级传感器流，但云端真正需要的是<em>摘要</em>（每分钟均值）和<em>异常</em>（温度超阈值）。<strong>边缘网关</strong>（车载计算单元 / 工厂网关）在本地做三件事：① <em>过滤降采样</em>——20 个原始采样聚合成 1 条；② <em>本地决策</em>——过热立即断电，不等云端 200ms 往返；③ <em>断网缓冲</em>——车进隧道时本地存盘，重连后补传。这把"云端集中处理"变成"边缘-云协同"。</p>
 <div class="tradeoff">
@@ -207,8 +202,7 @@ def on_sample(s):
 <li><strong>工业 IoT（PLC + 网关）</strong>：工厂网关本地跑规则引擎做安全联锁，毫秒级停机，云端只收聚合 KPI。</li>
 <li><strong>CDN 边缘（同构思路）</strong>：Cloudflare Workers / Lambda@Edge 把计算下沉到离用户最近处——边缘计算在 Web 与 IoT 是同一哲学。</li>
 </ul></div>
-
-<h3>3. 摄取管道：削峰、解耦、背压</h3>
+<h3 data-tts="223a9789a75ea65f">3. 摄取管道：削峰、解耦、背压</h3>
 <p><strong>1 句话</strong>：broker 和 TSDB 之间必须有 Kafka 这层<em>缓冲</em>，否则写入抖动会反压击穿整条链路。</p>
 <p><strong>原理</strong>：摄取的本质矛盾是<em>输入抖动</em>（早高峰车队同时上线，瞬时 3 倍）vs <em>下游恒定吞吐</em>（TSDB 写入能力固定）。若 broker 直写 TSDB，峰值时 TSDB 写满 → 反压到 broker → broker 连接堆积 → 设备重连风暴 → 雪崩。<strong>Kafka 作蓄水池</strong>：broker 全速写 Kafka（顺序写，极快），消费者按 TSDB 能承受的速率拉取。Kafka 还提供<em>解耦</em>——同一份数据可被告警、TSDB 落库、ML 训练多个消费组独立消费，互不影响。分区键用 <code>device_id</code> 保证同设备数据有序。</p>
 <div class="tradeoff">
@@ -225,8 +219,7 @@ def on_sample(s):
 <li><strong>Uber</strong>：司机/乘客 App 的位置上报同样走 Kafka 缓冲再分发给派单、ETA、风控多个消费组。</li>
 <li><strong>LinkedIn</strong>：Kafka 的发源地，正是为解决"多源高吞吐数据如何解耦分发给多个消费者"而生。</li>
 </ul></div>
-
-<h3>4. 时序数据库：压缩、降采样、基数爆炸</h3>
+<h3 data-tts="2a4dac156adbfa0c">4. 时序数据库：压缩、降采样、基数爆炸</h3>
 <p><strong>1 句话</strong>：时序场景的特殊性（写多改少、时间递增、数值相邻相似）让专用压缩比通用 DB 省 10 倍存储。</p>
 <p><strong>原理</strong>：遥测数据有强规律——<em>时间戳近似等差</em>、<em>相邻数值变化小</em>（温度不会从 25 跳到 5000）。Facebook 的 <strong>Gorilla</strong>（VLDB 2015）利用这两点：时间戳用 <em>delta-of-delta</em>（存二阶差，等间隔采样的差几乎全是 0），数值用 <em>XOR 压缩</em>（相邻浮点 XOR 后高位全 0，只存有效位），把每个 point 从 16 字节压到平均 <strong>1.37 字节（约 12 倍）</strong>，从而能全内存存储、查询提速数十倍。<strong>TimescaleDB</strong> 走另一条路：基于 Postgres，用 <em>hypertable</em> 按时间自动切 chunk，旧 chunk 转列存压缩（约 10 倍），保留完整 SQL 生态。</p>
 <table>
@@ -256,8 +249,7 @@ SELECT add_retention_policy('telemetry', INTERVAL '90 days'); -- 冷数据归档
 <li><strong>TimescaleDB</strong>：<a href="https://www.tigerdata.com/blog/timescaledb-vs-influxdb-for-time-series-data-timescale-influx-sql-nosql-36489299877">Timescale 官方对比</a>详述 hypertable/chunk/列存压缩设计，主打"时序 + 完整 SQL"。</li>
 <li><strong>Prometheus</strong>：监控领域事实标准，本地 TSDB 用类 Gorilla 的 delta+XOR 编码 + 2 小时 block。</li>
 </ul></div>
-
-<h2>扩展与优化</h2>
+<h2 data-tts="00dec52beee200de">扩展与优化</h2>
 <ul>
 <li><strong>分层存储（热温冷）</strong>：近 7 天热数据在 TSDB（SSD/内存），7-90 天降采样后温存，90 天以上转 Parquet 进对象存储（S3），查询走 Trino/Athena。成本下降一个数量级。</li>
 <li><strong>降采样金字塔</strong>：原始秒级 → 分钟级 → 小时级连续聚合，仪表盘按时间窗自动选粒度，避免扫海量原始点。</li>
@@ -265,16 +257,14 @@ SELECT add_retention_policy('telemetry', INTERVAL '90 days'); -- 冷数据归档
 <li><strong>OTA 与设备影子（Device Shadow）</strong>：设备常离线，云端维护"影子"状态（期望 vs 实际），设备上线后同步——AWS IoT Device Shadow 即此模式。</li>
 <li><strong>多区域</strong>：设备就近接入区域 broker，遥测本地落库 + 异步汇聚到全局分析层，降低跨洋延迟。</li>
 </ul>
-
-<h2>常见陷阱 + 面试追问</h2>
+<h2 data-tts="655f2b0ebe463c43">常见陷阱 + 面试追问</h2>
 <div class="callout"><strong>1. 全用 QoS 2</strong>：图省心给所有消息上 exactly-once，broker 要为每条消息存四次握手状态，千万设备直接压垮。按数据价值分级是基本功。</div>
 <div class="callout"><strong>2. 高基数 tag</strong>：把 <code>trip_id</code>/时间戳/随机 ID 当 tag，series 数量爆炸，TSDB 内存 OOM。这是面试 TSDB 必问的坑。</div>
 <div class="callout"><strong>3. broker 直写 DB 无缓冲</strong>：忘了 Kafka 削峰，早高峰反压雪崩。面试官爱问"流量突增 3 倍怎么办"。</div>
 <div class="callout"><strong>4. 忽略时钟与乱序</strong>：设备时钟不准、断网补传导致数据乱序到达。要用 event-time + watermark（见 Day 20），不能按到达顺序写。</div>
 <div class="callout"><strong>5. 重连风暴（Thundering Herd）</strong>：broker 重启或网络抖动，千万设备同时重连握手把集群打死。重连必须带<em>随机退避 + jitter</em>。</div>
 <div class="callout"><strong>6. 没区分"丢得起"与"丢不起"</strong>：温度采样可丢，告警/计费不可丢。下游消费必须幂等（用 <code>device_id + ts</code> 去重）。</div>
-
-<h2>深入资源</h2>
+<h2 data-tts="de31d355a9882c5d">深入资源</h2>
 <ul>
 <li><strong>《Gorilla: A Fast, Scalable, In-Memory Time Series Database》</strong>（<a href="https://dl.acm.org/doi/10.14778/2824032.2824078">VLDB 2015</a>）：时序压缩的奠基之作，delta-of-delta + XOR 必读。</li>
 <li><strong>HiveMQ MQTT Essentials / <a href="https://www.hivemq.com/blog/mqtt-vs-http-protocols-in-iot-iiot/">MQTT vs HTTP</a></strong>：MQTT 协议、QoS、会话机制最系统的教程。</li>
@@ -282,9 +272,7 @@ SELECT add_retention_policy('telemetry', INTERVAL '90 days'); -- 冷数据归档
 <li><strong><a href="https://www.tigerdata.com/blog/timescaledb-vs-influxdb-for-time-series-data-timescale-influx-sql-nosql-36489299877">TimescaleDB vs InfluxDB</a></strong>：hypertable/chunk/压缩与基数权衡。</li>
 <li><strong>《Designing Data-Intensive Applications》</strong>（Kleppmann，流处理与存储章节）：摄取管道与背压的底层原理。</li>
 </ul>
-
-<h2>深入思考（点击展开答案）</h2>
-
+<h2 data-tts="ae5e8fbf046ba325">深入思考（点击展开答案）</h2>
 <details>
 <summary>1. 2000 万 points/s、压缩后 3.5TB/天，但客户要求"任意设备任意时刻可秒级回查"。全留热存放不下，全归档查不动，怎么设计?</summary>
 <div class="answer">
@@ -292,7 +280,6 @@ SELECT add_retention_policy('telemetry', INTERVAL '90 days'); -- 冷数据归档
 <p>"任意设备秒级回查"的关键是<strong>分区裁剪</strong>：冷层按 <code>device_id</code> 哈希分桶 + 按天分区，查单设备单日只扫一个小 Parquet 文件，秒级返回。代价是<em>跨设备聚合</em>慢（要扫多文件），但那是分析查询，可接受分钟级。本质：原始数据冷归档 + 聚合数据热常驻，把成本和延迟解耦。</p>
 </div>
 </details>
-
 <details>
 <summary>2. 一个城市突发大停电，几十万智能电表同时断网又同时恢复供电重连。会发生什么? 怎么防?</summary>
 <div class="answer">
@@ -305,7 +292,6 @@ SELECT add_retention_policy('telemetry', INTERVAL '90 days'); -- 冷数据归档
 <p>这就是 Day 23"重试必带 jitter"在 IoT 的放大版——设备数量让任何同步行为都变成 DDoS。</p>
 </div>
 </details>
-
 <details>
 <summary>3. 为什么 MQTT broker 难水平扩展，而无状态 HTTP 服务加机器就行? 加一个 broker 节点要解决什么?</summary>
 <div class="answer">
@@ -318,7 +304,6 @@ SELECT add_retention_policy('telemetry', INTERVAL '90 days'); -- 冷数据归档
 <p>这正是 EMQX 选 <strong>Erlang/OTP</strong> 的原因——其轻量进程（每连接一进程，开销几 KB）+ 内置分布式（节点间透明消息传递）天生为"海量有状态长连接"设计。换成线程模型的语言，百万连接的上下文切换就先把自己拖垮了。</p>
 </div>
 </details>
-
 <details>
 <summary>4. 边缘网关本地跑了"温度 &gt; 80 就断电"的规则，现在要把阈值改成 75。这个看似一行的改动，在千万设备规模下为什么是难题?</summary>
 <div class="answer">
@@ -331,7 +316,6 @@ SELECT add_retention_policy('telemetry', INTERVAL '90 days'); -- 冷数据归档
 <p>本质：边缘把"一处部署"换成"N 处部署"，运维从中心化的易更新退化成分布式的灰度/一致性/回滚——这是边缘最大的隐性成本。</p>
 </div>
 </details>
-
 <details>
 <summary>5. 设备时钟普遍不准（廉价 RTC 漂移、断网补传），数据"事件时间"乱序到达。直接按到达顺序写 TSDB 会错在哪? 怎么办?</summary>
 <div class="answer">
@@ -345,11 +329,10 @@ SELECT add_retention_policy('telemetry', INTERVAL '90 days'); -- 冷数据归档
 <p>核心认知：IoT 的"时间"有两个——发生时间和到达时间，可能差几小时。聚合/告警/计费都必须以<em>发生时间</em>为准。</p>
 </div>
 </details>
-
 <div class="nav"><a href="index.html">← 回到 index</a></div>
 </div>
-<script src="https://hub.cissychen.com/comments.js" defer></script>
-<script src="https://hub.cissychen.com/search.js" defer></script>
-<script src="https://hub.cissychen.com/index-button.js" defer></script>
-<script src="https://hub.cissychen.com/i18n-tts.js" defer></script>
+<script defer="" src="https://hub.cissychen.com/comments.js"></script>
+<script defer="" src="https://hub.cissychen.com/search.js"></script>
+<script defer="" src="https://hub.cissychen.com/index-button.js"></script>
+<script defer="" src="https://hub.cissychen.com/i18n-tts.js"></script>
 </body></html>

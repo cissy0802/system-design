@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<html lang="zh-CN"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>Day 20 · 计算作业系统 (Batch vs Stream) — System Design</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -97,7 +98,6 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 </script>
 </head><body><div class="container">
-
 <header>
 <div class="meta">
 <span class="tag day">Day 20</span>
@@ -107,18 +107,16 @@ document.addEventListener('DOMContentLoaded',()=>{
 <span class="tag">Lambda/Kappa</span>
 <span class="tag">Exactly-once</span>
 </div>
-<h1>计算作业系统 — 批处理与流处理的统一战争<span class="en">Data Processing: Batch vs Stream, Lambda/Kappa, Watermark, Exactly-once</span></h1>
+<h1 data-tts="3edc84a687e4fad9">计算作业系统 — 批处理与流处理的统一战争<span class="en">Data Processing: Batch vs Stream, Lambda/Kappa, Watermark, Exactly-once</span></h1>
 </header>
-
-<h2>问题场景 + 需求约束</h2>
+<h2 data-tts="66394b69091b3c69">问题场景 + 需求约束</h2>
 <p>为一个流媒体平台设计<strong>事件处理平台</strong>：客户端每次播放、暂停、卡顿都打一条事件，<strong>2 万亿 events/天</strong>（均值 ~2300 万 eps，晚高峰冲到 5000 万）。两类截然不同的消费方：</p>
 <ul>
 <li><strong>实时</strong>：秒级算出每个视频的并发观看数、卡顿率、CTR，喂给推荐与告警。SLO：端到端 <em>p99 &lt; 5s</em>，可容忍极小误差。</li>
 <li><strong>离线</strong>：按合约给内容方<em>精确</em>分成、做 BI 报表。要求 T+1 出账、可回放修正，<em>一分钱都不能错</em>。</li>
 </ul>
 <p>核心矛盾：<strong>同一份数据，一边要低延迟近似、一边要高吞吐精确</strong>。这正是「批 vs 流」「Lambda vs Kappa」之争的源头。关键约束：事件<em>乱序到达</em>（移动端弱网，离线缓存几小时后才上报）、平台<em>失败必须不丢不重</em>（计费场景）。</p>
-
-<h2>高层架构（以可回放日志为中心）</h2>
+<h2 data-tts="072c41c7afd64141">高层架构（以可回放日志为中心）</h2>
 <pre class="mermaid">
 graph LR
     SRC["客户端事件<br/><i>5000万 eps</i>"]
@@ -133,9 +131,9 @@ graph LR
     LAKE[("数据湖<br/>S3 + Iceberg")]
     SERVE["服务层<br/><i>推荐/告警/BI</i>"]
 
-    SRC --> LOG
-    LOG -->|实时消费| SP --> RT --> SERVE
-    LOG -.从头replay.-> BP --> LAKE --> SERVE
+    SRC --&gt; LOG
+    LOG --&gt;|实时消费| SP --&gt; RT --&gt; SERVE
+    LOG -.从头replay.-&gt; BP --&gt; LAKE --&gt; SERVE
 
     classDef src fill:#1a2530,stroke:#64c8ff,color:#e8eef5
     classDef log fill:#1a1a30,stroke:#ffb450,color:#e8eef5
@@ -148,10 +146,8 @@ graph LR
 </pre>
 <p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px"><strong>Kafka 是真相之源</strong>：实时链路在线消费，纠错时从 offset 0 回放同一份数据，无需另建批管道</p>
 <p>三段职责：<em>可回放日志</em>（Kafka/Pulsar）做缓冲与解耦，让生产消费解绑、支持 replay；<em>流处理层</em>（Flink）做有状态的窗口聚合，输出实时指标；<em>存储层</em>分两路——实时指标进 Druid/Redis 供低延迟查询，明细落数据湖（S3+Iceberg）供离线精算与回放。</p>
-
-<h2>关键技术点</h2>
-
-<h3>1. 批 vs 流：有界数据是无界数据的特例</h3>
+<h2 data-tts="c3df2e03437171d5">关键技术点</h2>
+<h3 data-tts="eb9177f62f6f76ab">1. 批 vs 流：有界数据是无界数据的特例</h3>
 <p><strong>原理</strong>：传统认知是「批 = 攒一批跑一次，流 = 来一条算一条」，但更深的洞见是——<em>批处理只是流处理的一个特例</em>：有界数据（bounded）= 知道结尾的无界数据（unbounded）。Spark 的 micro-batch 把流切成小批（200ms 一个），Flink 则是<em>真·逐条</em>流式、把批当成「有头有尾的流」来跑。延迟下限因此天差地别。</p>
 <table>
 <thead><tr><th></th><th>Spark (micro-batch)</th><th>Flink (true streaming)</th><th>纯批 (MapReduce/Spark batch)</th></tr></thead>
@@ -176,8 +172,7 @@ graph LR
 <li><strong>Alibaba</strong>：双 11 大屏与实时风控用 Flink（曾基于 Flink 自研 Blink 分支，后回馈社区）。</li>
 <li><strong>Databricks</strong>：力推 Spark Structured Streaming 的 micro-batch + Continuous 模式，与 Delta Lake 整合做湖仓一体。</li>
 </ul></div>
-
-<h3>2. Lambda vs Kappa：要不要维护两套代码</h3>
+<h3 data-tts="f05fdd0160e68f2a">2. Lambda vs Kappa：要不要维护两套代码</h3>
 <p><strong>原理</strong>：Lambda 架构（Nathan Marz）跑<em>两条链路</em>——batch layer 算精确结果（高延迟）、speed layer 算实时近似（低延迟），查询时把两者合并。问题是<em>同一套业务逻辑要写两遍</em>（一份 Spark、一份 Flink），永远对不齐、维护翻倍。Kappa 架构（Jay Kreps）的洞见：既然流引擎已经成熟，<strong>砍掉批层，只留一条流链路</strong>，要纠错就把日志从头 replay 一遍。</p>
 <div class="tradeoff">
 <strong>Trade-off：</strong>
@@ -200,17 +195,16 @@ graph LR
 <li><strong>Uber</strong>：演进出 Kappa+ 模式，让流作业也能高效重放历史数据做回填，避免另起 Spark 批管道。</li>
 <li><strong>许多团队仍用 Lambda</strong>：当离线精确口径与实时口径业务上本就不同（如最终对账 vs 实时大盘），双链路反而清晰。</li>
 </ul></div>
-
-<h3>3. Event-time 与 Watermark：和乱序、迟到数据讲和</h3>
+<h3 data-tts="8d51713236b24b00">3. Event-time 与 Watermark：和乱序、迟到数据讲和</h3>
 <p><strong>原理</strong>：分清两个时间——<em>event-time</em>（事件真实发生的时刻，写在数据里）与 <em>processing-time</em>（系统处理它的时刻）。网络抖动、移动端离线缓存让两者出现<em>偏移（skew）</em>，事件<em>乱序到达</em>。按 event-time 开窗才能算对「8:00–8:05 这个视频的播放量」，但系统永远无法确定「8:05 的数据是不是全到齐了」。<strong>Watermark</strong> 是引擎对「event-time 已推进到 T，比 T 早的数据基本到齐了」的<em>启发式断言</em>——它一推过窗口右界，就触发计算并关窗。</p>
 <pre class="mermaid">
 graph LR
     subgraph 乱序到达["事件按 processing-time 到达（乱序）"]
       direction LR
-      A["e@8:01"] --> B["e@8:04"] --> C["e@8:02"] --> WM["💧Watermark=8:05"] --> D["e@8:03<br/>迟到!"]
+      A["e@8:01"] --&gt; B["e@8:04"] --&gt; C["e@8:02"] --&gt; WM["💧Watermark=8:05"] --&gt; D["e@8:03<br/>迟到!"]
     end
-    WM -->|触发| W["关闭 8:00-8:05 窗口<br/>输出聚合结果"]
-    D -.allowed lateness.-> W2["更新已发结果<br/>或进 side output"]
+    WM --&gt;|触发| W["关闭 8:00-8:05 窗口<br/>输出聚合结果"]
+    D -.allowed lateness.-&gt; W2["更新已发结果<br/>或进 side output"]
     classDef ev fill:#1a2530,stroke:#64c8ff,color:#e8eef5
     classDef wm fill:#1a1a30,stroke:#ffb450,color:#e8eef5
     classDef win fill:#0e2030,stroke:#5eead4,color:#e8eef5
@@ -229,7 +223,7 @@ graph LR
 stream
   .assignTimestampsAndWatermarks(           // 声明 event-time 与 watermark 策略
      WatermarkStrategy.forBoundedOutOfOrderness(Duration.ofSeconds(10)))
-  .keyBy(e -> e.videoId)
+  .keyBy(e -&gt; e.videoId)
   .window(TumblingEventTimeWindows.of(Time.minutes(5)))
   .allowedLateness(Time.minutes(1))          // 关窗后再容忍 1 分钟迟到
   .sideOutputLateData(lateTag)               // 更晚的旁路输出，离线补
@@ -241,8 +235,7 @@ stream
 <li><strong>Google</strong>：Dataflow / Beam 的 watermark + trigger 模型由 Tyler Akidau 等系统化（《Streaming 101/102》），后成为 Apache Beam 与流处理界的通用语言。</li>
 <li><strong>Flink</strong>：原生支持 event-time、watermark、allowed lateness，是开源界对该模型最完整的实现。</li>
 </ul></div>
-
-<h3>4. Exactly-once：到底是处理一次，还是「效果」一次</h3>
+<h3 data-tts="5067266c7574d109">4. Exactly-once：到底是处理一次，还是「效果」一次</h3>
 <p><strong>原理</strong>：分布式下消息会重发、节点会崩。<em>at-most-once</em>（可能丢）、<em>at-least-once</em>（可能重）易实现；<em>exactly-once</em> 最难。关键澄清：网络层不可能真正「只传一次」，工程上追求的是 <strong>effectively-once</strong>——状态与输出<em>等价于</em>只处理一次。Flink 的做法是 <em>checkpoint</em>：用 Chandy-Lamport 的变体「异步屏障快照（ABS）」，往数据流里插入<em>屏障（barrier）</em>，算子收到屏障就快照自己的状态；崩溃后从上个一致快照恢复、并把 source offset 一起回滚。</p>
 <div class="tradeoff">
 <strong>Trade-off：</strong>
@@ -265,8 +258,7 @@ stream
 <li><strong>Kafka</strong>：通过幂等 producer + 事务（transactional.id）实现 read-process-write 的 exactly-once 语义。</li>
 <li><strong>Netflix / Uber</strong>：计费、对账类作业坚持 exactly-once；纯监控指标常退而求 at-least-once + 幂等，换更低延迟。</li>
 </ul></div>
-
-<h2>扩展与优化（增长后怎么办）</h2>
+<h2 data-tts="97031a6af6f31c90">扩展与优化（增长后怎么办）</h2>
 <ul>
 <li><strong>状态膨胀</strong>：大窗口/长 TTL 让算子状态涨到 TB 级。换 RocksDB 状态后端（落盘+增量 checkpoint），给 key 设 state TTL，热点 key 预聚合。</li>
 <li><strong>反压（backpressure）</strong>：下游慢会沿管道往上游传导。监控算子 busy/backpressure 比例，扩并行度或给慢 sink 加缓冲；本质是 Day 8 消息队列的 backpressure 在算子链上的延伸。</li>
@@ -274,15 +266,13 @@ stream
 <li><strong>回放成本</strong>：纯 Kappa 全量 replay 慢，可保留定期 savepoint/快照做「批式 bootstrap + 流式追平」，避免每次从 offset 0。</li>
 <li><strong>多区与容灾</strong>：跨区跑镜像作业，checkpoint 存对象存储；failover 时从远端 checkpoint 拉起。</li>
 </ul>
-
-<h2>常见陷阱 + 面试问题</h2>
+<h2 data-tts="c820ab5f363e9b9b">常见陷阱 + 面试问题</h2>
 <div class="callout"><strong>1. 用 processing-time 开窗算「每分钟指标」。</strong> 一旦数据乱序或回放，结果全错——回放时所有历史数据都在「现在」涌入，processing-time 窗口会把它们塞进同一分钟。计窗口必须用 event-time。</div>
 <div class="callout"><strong>2. 以为开了 exactly-once 就万事大吉。</strong> 它只保证<em>状态与对 sink 的输出</em>精确；副作用（发邮件、调外部 API）不在事务里，照样可能重复。外部副作用要单独做幂等。</div>
 <div class="callout"><strong>3. Kappa 却没规划 Kafka retention。</strong> 要 replay 30 天却只存 3 天，纠错时数据已被删——Kappa 的可行性<em>直接绑定</em>日志保留期与重算成本。</div>
 <div class="callout"><strong>4. watermark 设太松或太紧。</strong> 太紧→大量迟到丢数；太松→窗口不关、延迟与状态双高。要按真实 skew 分布（看 p99 延迟）来定，并用 allowed lateness 兜底。</div>
 <p><strong>高频追问：</strong>① 为什么说「批是流的特例」？micro-batch 与 true streaming 的延迟下限差在哪？② Lambda 的两套代码具体怎么不一致、Kappa 怎么解决又引入什么新约束？③ Watermark 推进慢导致窗口不关、状态暴涨，怎么排查与缓解？④ 端到端 exactly-once 需要 source、算子、sink 各满足什么条件？⑤ 5000 万 eps、5s SLO，并行度与状态后端怎么估算？</p>
-
-<h2>深入资源</h2>
+<h2 data-tts="de3ab2ecb4979e87">深入资源</h2>
 <ul>
 <li><strong>《Designing Data-Intensive Applications》Ch 10–11</strong>（Kleppmann）：批处理与流处理、流批统一的本质讨论。</li>
 <li><strong>Jay Kreps《Questioning the Lambda Architecture》</strong>（O'Reilly Radar）：Kappa 架构的原始论述。</li>
@@ -290,9 +280,7 @@ stream
 <li><strong>Apache Flink 官方文档 · Stateful Stream Processing / Fault Tolerance</strong>：ABS checkpoint 与端到端 exactly-once 机制。</li>
 <li><strong>Netflix TechBlog《Keystone Real-time Stream Processing Platform》</strong>：万亿级 Kafka+Flink 平台的工程实践。</li>
 </ul>
-
-<h2>深入思考（点击展开答案）</h2>
-
+<h2 data-tts="926ba74515e801dd">深入思考（点击展开答案）</h2>
 <details>
 <summary>1. 为什么说「批处理只是流处理的特例」？这个统一视角在工程上带来什么具体好处？</summary>
 <div class="answer">
@@ -300,7 +288,6 @@ stream
 <p>工程好处：① 业务逻辑写一遍同时服务实时与回填，消除 Lambda 的双份代码与口径漂移；② 测试可用历史数据回放验证流作业正确性；③ 运维只维护一个技术栈。Flink/Beam 正是按这个理念设计——`Bounded` 与 `Unbounded` source 走同一套算子。代价是这个引擎本身比纯批引擎复杂得多（要处理 event-time、状态、容错）。</p>
 </div>
 </details>
-
 <details>
 <summary>2. 一个 event-time 窗口因为某个分区的 watermark 卡住而迟迟不关，怎么定位根因？至少给 3 个方向。</summary>
 <div class="answer">
@@ -314,7 +301,6 @@ stream
 <p>排查靠 Flink Web UI 的 per-operator watermark 指标，逐级看是哪个 subtask 的 watermark 偏低。</p>
 </div>
 </details>
-
 <details>
 <summary>3. 端到端 exactly-once 要 source、算子、sink 三方各满足什么？为什么只做 checkpoint 不够？</summary>
 <div class="answer">
@@ -326,9 +312,8 @@ stream
 <p>所以 exactly-once = <strong>一致快照（内部）+ 原子提交（边界）</strong>。Flink 用两阶段提交把 sink 的可见性与 checkpoint 绑定：checkpoint 成功才 commit 事务，失败则 abort。代价是输出有「提交延迟」——下游只能看到已 commit 的 checkpoint，所以 exactly-once 天然牺牲一点延迟。这也是监控类作业宁愿用 at-least-once + 幂等 upsert 的原因。</p>
 </div>
 </details>
-
 <details>
-<summary>4. 5000 万 eps、端到端 p99 < 5s，粗估流作业的并行度与状态规模，瓶颈最可能在哪？</summary>
+<summary>4. 5000 万 eps、端到端 p99 &lt; 5s，粗估流作业的并行度与状态规模，瓶颈最可能在哪？</summary>
 <div class="answer">
 <p><em>数量级估算（面试就要这个）：</em></p>
 <ul>
@@ -339,7 +324,6 @@ stream
 <p><strong>最可能的瓶颈：</strong>不是 CPU，而是①<em>状态 IO</em>（大 key 基数下 RocksDB 读写放大）；②<em>数据倾斜</em>（热门视频的 key 把单 subtask 打爆，要预聚合/加盐打散）；③<em>checkpoint 时长</em>（状态大时快照久，影响恢复与 exactly-once 提交延迟）。</p>
 </div>
 </details>
-
 <details>
 <summary>5. 串联 Day 5/8：Kappa 的「replay 纠错」和复制延迟、消息投递语义是什么关系？</summary>
 <div class="answer">
@@ -351,9 +335,8 @@ stream
 </ul>
 </div>
 </details>
-
-<script src="https://hub.cissychen.com/comments.js" defer></script>
-<script src="https://hub.cissychen.com/search.js" defer></script>
-<script src="https://hub.cissychen.com/index-button.js" defer></script>
-<script src="https://hub.cissychen.com/i18n-tts.js" defer></script>
+<script defer="" src="https://hub.cissychen.com/comments.js"></script>
+<script defer="" src="https://hub.cissychen.com/search.js"></script>
+<script defer="" src="https://hub.cissychen.com/index-button.js"></script>
+<script defer="" src="https://hub.cissychen.com/i18n-tts.js"></script>
 </div></body></html>

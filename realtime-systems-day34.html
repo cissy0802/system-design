@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<html lang="zh-CN"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>Day 34 · 实时系统 (Real-time Systems) — System Design</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -97,7 +98,6 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 </script>
 </head><body><div class="container">
-
 <header>
 <div class="meta">
 <span class="tag day">Day 34</span>
@@ -107,10 +107,9 @@ document.addEventListener('DOMContentLoaded',()=>{
 <span class="tag">Game Netcode</span>
 <span class="tag">CRDT</span>
 </div>
-<h1>实时系统 — 在 100ms 内让世界保持一致<span class="en">Real-time Systems: Transport, Game Netcode, Authoritative State, Collaborative Sync</span></h1>
+<h1 data-tts="8576b1ef37f794c9">实时系统 — 在 100ms 内让世界保持一致<span class="en">Real-time Systems: Transport, Game Netcode, Authoritative State, Collaborative Sync</span></h1>
 </header>
-
-<h2>问题场景 + 需求约束</h2>
+<h2 data-tts="cf38ac18d1b81b5d">问题场景 + 需求约束</h2>
 <p>设计一个 <strong>10 万并发玩家的实时多人对战后端</strong>（<code>.io</code> 风格 / 轻量 FPS）：玩家在同一房间里移动、射击，每个人都要"几乎瞬间"看到别人的动作。这类系统和 <em>请求-响应</em> Web 后端是两种物种——SLO 不是"p99 &lt; 200ms"，而是 <strong>端到端 p95 &lt; 100ms 且抖动可控</strong>，因为人眼对 50ms 以上的输入延迟与位置跳变极敏感。</p>
 <ul>
 <li><strong>延迟 SLO</strong>：本地输入响应 &lt; 16ms（一帧），对端动作可见 &lt; 100ms，<em>抖动（jitter）比绝对延迟更致命</em>。</li>
@@ -119,8 +118,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 <li><strong>一致性要求</strong>：游戏要<em>权威服务器</em>（防作弊），协作编辑要<em>最终一致</em>（不能丢字）——两类实时系统一致性模型完全不同。</li>
 <li><strong>可靠性</strong>：丢一个位置包无所谓（下帧覆盖），丢一个"开火"事件是事故——可靠与不可靠通道要分开。</li>
 </ul>
-
-<h2>高层架构</h2>
+<h2 data-tts="6219766ad73d1f76">高层架构</h2>
 <pre class="mermaid">
 graph TD
     C["客户端<br/><i>本地预测 + 渲染插值</i>"]
@@ -130,12 +128,12 @@ graph TD
     R[("Redis<br/>会话/房间状态")]
     DB[("持久化 DB<br/>战绩/排行")]
 
-    C -->|① 找对局 HTTPS| MM
-    MM -->|② 返回 server+token| C
-    C <-->|③ 实时双向 UDP| GW
-    GW <-->|④ 转发| GS
-    GS -.房间状态.-> R
-    GS -.异步落库.-> DB
+    C --&gt;|① 找对局 HTTPS| MM
+    MM --&gt;|② 返回 server+token| C
+    C &lt;--&gt;|③ 实时双向 UDP| GW
+    GW &lt;--&gt;|④ 转发| GS
+    GS -.房间状态.-&gt; R
+    GS -.异步落库.-&gt; DB
 
     classDef client fill:#1a2530,stroke:#64c8ff,color:#e8eef5
     classDef edge fill:#0e2030,stroke:#5eead4,color:#e8eef5
@@ -148,10 +146,8 @@ graph TD
 </pre>
 <p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">控制面（撮合、登录）走 HTTPS；数据面（实时状态）走专用低延迟通道，两条路径解耦</p>
 <p><strong>组件职责</strong>：<em>Matchmaker</em> 是无状态 Web 服务，按地理与技能把玩家分到最近区域的房间，返回服务器地址 + token。<em>Edge Gateway</em> 在用户 30ms 内终结 UDP/WebRTC 连接，做 NAT 穿透与抗 DDoS。<em>游戏服务器</em>是有状态房间进程，跑固定频率 tick loop：收集本 tick 全部输入 → 推进物理 → 广播快照。状态主存内存，Redis 只做故障恢复与协调，DB 异步记录结果。<strong>关键是把"实时数据面"和"持久控制面"彻底分开</strong>。</p>
-
-<h2>关键技术点</h2>
-
-<h3>1. 传输层选型：为什么实时系统逃离 TCP</h3>
+<h2 data-tts="c3df2e03437171d5">关键技术点</h2>
+<h3 data-tts="882afe45c6ffd7a8">1. 传输层选型：为什么实时系统逃离 TCP</h3>
 <p>核心 trade-off：<em>TCP 的可靠有序，恰恰是实时系统的毒药</em>。</p>
 <p><strong>原理</strong>：TCP 保证字节流<strong>有序</strong>到达——一旦一个包丢了，后面已到达的包必须在内核缓冲区<strong>排队等重传</strong>，应用层拿不到。这叫<strong>队头阻塞（Head-of-Line blocking）</strong>。游戏里第 100 号位置包丢了，101、102 号已到却被卡住，等重传回来它们早已过时——你为"没人想要的旧数据"付出一次 RTT 的卡顿。实时系统宁愿<em>丢掉过时数据继续往前</em>，也不要有序。所以游戏走 <strong>UDP</strong>（自实现选择性可靠），浏览器走 <strong>WebRTC DataChannel</strong>（UDP 基底，可配 <code>unreliable/unordered</code>）或 <strong>WebTransport（QUIC）</strong>——QUIC 在用户态实现多 stream，单 stream 丢包不阻塞其他 stream，绕开内核 TCP 的队头阻塞。</p>
 <div class="tradeoff">
@@ -173,8 +169,7 @@ graph TD
 <li><strong>Discord 语音</strong>：用 WebRTC（UDP 基底），客户端是基于 WebRTC native 库定制的 C++ 媒体引擎，因为语音同样不能容忍队头阻塞（<a href="https://discord.com/blog/how-discord-handles-two-and-half-million-concurrent-voice-users-using-webrtc">Discord Engineering</a>）。</li>
 <li><strong>QUIC/HTTP3</strong>：Google 设计 QUIC 的初衷之一就是消除 TCP 的队头阻塞，今天的 WebTransport 把这能力开放给实时 Web 应用。</li>
 </ul></div>
-
-<h3>2. 客户端预测 + 服务器和解：把光速藏起来</h3>
+<h3 data-tts="53cbc8b66a505192">2. 客户端预测 + 服务器和解：把光速藏起来</h3>
 <p>核心 trade-off：<em>用"可能要回滚"的乐观本地仿真，换"零感知延迟"的手感</em>。</p>
 <p><strong>原理</strong>：哪怕 RTT 只有 50ms，若按"按下 → 发服务器 → 等回包 → 才移动"，玩家会觉得操作粘滞。解法三件套：<strong>① 客户端预测</strong>——本地立刻按输入移动不等服务器，同时把带<em>序号</em>的输入发出。<strong>② 服务器和解</strong>——服务器权威，回包带"已处理到第 N 号输入 + 权威位置"；客户端以该位置为基准<em>重放</em>第 N 号之后所有未确认的本地输入，得修正后位置。预测对则画面不动，被撞墙等打断则平滑纠正。<strong>③ 实体插值</strong>——其他玩家状态按 tick 离散到达，客户端<em>故意延迟约 100ms 渲染</em>，在两个已知快照间插值，换来丝滑而非瞬移。代价是你看到的"别人"永远是 100ms 前的——这就是 <strong>lag compensation（延迟补偿）</strong>要解决的：射击判定时服务器把目标<em>回退</em>到射击者当时实际看到的位置再算命中。</p>
 <pre><code># 客户端预测 + 和解（伪代码）
@@ -188,7 +183,7 @@ def on_input(cmd):
 def on_server_snapshot(snap):
     me.pos = snap.pos             # ② 以权威位置为准
     # 丢弃已被服务器确认的输入
-    pending = [c for c in pending if c.seq > snap.last_processed_seq]
+    pending = [c for c in pending if c.seq &gt; snap.last_processed_seq]
     for c in pending:             # 重放还没确认的输入
         apply_local(c)            # → 预测对则画面不跳，错则平滑纠正
 
@@ -200,8 +195,7 @@ def on_server_snapshot(snap):
 <li><strong>Gabriel Gambetta 的系列文</strong>是这套范式的经典教材，&lt;500 行 JS 演示了预测/和解/插值/延迟补偿四步（<a href="https://www.gabrielgambetta.com/client-server-game-architecture.html">Fast-Paced Multiplayer</a>）。</li>
 <li><strong>Valve</strong>：CS/Source 系游戏的 lag compensation 会保留约 1 秒的玩家位置历史，命中判定时按射击者 ping 回退世界（<a href="https://developer.valvesoftware.com/wiki/Lag_Compensation">Valve: Lag Compensation</a>）——命中检测必须服务器权威，否则客户端可作弊。</li>
 </ul></div>
-
-<h3>3. 权威服务器与状态同步：tick、快照与兴趣管理</h3>
+<h3 data-tts="2c1c40204e633b45">3. 权威服务器与状态同步：tick、快照与兴趣管理</h3>
 <p>核心 trade-off：<em>同步精度 vs 带宽/CPU</em>——每 tick 给每人发"整个世界"会被带宽与 CPU 双杀。</p>
 <p><strong>原理</strong>：权威服务器跑固定频率 <strong>tick loop</strong>（如 30Hz）：吸收本 tick 全部输入 → 推进确定性物理 → 产出新状态 → 广播。广播三层优化：<strong>① Delta 压缩</strong>——只发"相对该客户端上次确认的快照"的变化字段，静止物体不占带宽。<strong>② 兴趣管理（AOI, Area of Interest）</strong>——玩家只需附近实体，用网格/四叉树做空间索引，每人只收视野内更新。100 人房全互发是 O(n²)=1 万条/tick；AOI 后每人只看附近 ~10 人，降到 O(n·k)。<strong>③ 优先级分层</strong>——近处实体高频更新，远处低频或不发。这把"每 tick 全量"从带宽灾难变成可工程化的稳定流。</p>
 <div class="tradeoff">
@@ -218,13 +212,12 @@ def on_server_snapshot(snap):
 <li><strong>Discord 语音</strong>用 <em>SFU（Selective Forwarding Unit）</em>而非 P2P 网状：大房间 P2P 连接数 O(n²) 会爆炸，改由服务器选择性转发，全球 850+ 语音服务器、13 区域支撑 260 万并发语音（<a href="https://discord.com/blog/how-discord-handles-two-and-half-million-concurrent-voice-users-using-webrtc">Discord Engineering</a>）——正是"中心服务器扇出 + 兴趣裁剪"在音视频上的体现。</li>
 <li><strong>Valve Source</strong>：服务器按 tick 维护权威世界并向各客户端发增量更新，客户端做预测与插值（<a href="https://developer.valvesoftware.com/wiki/Source_Multiplayer_Networking">Source Networking</a>）。</li>
 </ul></div>
-
-<h3>4. 实时协作传输：另一类实时——最终一致而非权威</h3>
+<h3 data-tts="94485e0e445200f2">4. 实时协作传输：另一类实时——最终一致而非权威</h3>
 <p>核心 trade-off：<em>OT 的中心化简单 vs CRDT 的去中心化自由</em>。</p>
 <p><strong>原理</strong>：游戏要"权威 + 防作弊"，但 Figma/Docs 这类<strong>协作编辑</strong>是另一种实时：可离线、可并发改同一文档、绝不能丢字、最终收敛。两大流派：<strong>OT（Operational Transformation）</strong>——把并发操作相互"变换"以保持意图（你在位置 5 插字、我在位置 3 删字，OT 调你的索引），强依赖中心服务器定序，复杂但状态紧凑（Google Docs）。<strong>CRDT</strong>——把数据设计成<em>数学上可交换合并</em>，任意顺序应用都收敛，天然支持 P2P 与离线，但元数据开销大（每字符带唯一 ID 与墓碑）。<strong>LWW（Last-Write-Wins）</strong>是 CRDT 最简形：每字段独立，谁最后写谁赢。</p>
 <pre><code># LWW register（CRDT 最简形）：靠 (timestamp, replica_id) 全序定胜负
 def merge(local, remote):
-    if (remote.ts, remote.node) > (local.ts, local.node):
+    if (remote.ts, remote.node) &gt; (local.ts, local.node):
         return remote          # 较"新"的写入获胜，合并满足交换律/幂等
     return local
 # 难点不在 merge，而在"什么粒度做 LWW"：整个对象?会互相覆盖丢编辑;
@@ -236,34 +229,29 @@ def merge(local, remote):
 <li><strong>Figma</strong>：自述"受 CRDT 启发但<em>不是</em>真 CRDT"——用中心服务器 + 每对象每属性的 <em>LWW register</em>，并发改同一对象的不同属性互不干扰，改同一属性则"后到者胜"；树结构靠父指针 + 服务器拒绝成环操作维持一致；传输用 WebSocket（<a href="https://www.figma.com/blog/how-figmas-multiplayer-technology-works/">How Figma's multiplayer technology works</a>）。</li>
 <li><strong>Google Docs</strong>是 OT 的代表，靠服务器对操作全序定序。<strong>CRDT</strong>则常见于离线优先/本地优先（local-first）与协作库（如 Yjs/Automerge 生态）。</li>
 </ul></div>
-
-<h2>扩展与优化</h2>
+<h2 data-tts="f09fd1650e5d0d14">扩展与优化</h2>
 <ul>
 <li><strong>房间分片与就近接入</strong>：玩家路由到地理最近区域（GeoDNS / Anycast 入口），跨区对战靠中继；房间是天然分片单元，单房不可分，靠加机器横向扩房间数。</li>
 <li><strong>有状态服务的弹性</strong>：游戏服务器有状态，扩缩容不能像无状态 Web 随意杀进程——要<em>排空（draining）</em>：不再分配新房间，等存量对局结束再下线。</li>
 <li><strong>抗作弊</strong>：永远<em>不信客户端</em>。移动做服务器侧合理性校验（速度上限、穿墙检测），命中判定服务器权威，客户端只负责"渲染 + 预测"。</li>
 <li><strong>带宽继续涨</strong>：从 delta 进一步上<em>量化压缩</em>（位置用定点数而非 float）、位打包、按距离降精度。</li>
 </ul>
-
-<h2>常见陷阱 + 面试追问</h2>
+<h2 data-tts="2fed57cd8eaae035">常见陷阱 + 面试追问</h2>
 <div class="callout"><strong>1. 用 TCP/WebSocket 做高频游戏同步。</strong> 队头阻塞会在丢包时制造一连串卡顿。低频回合制可以，30Hz 动作游戏必须 UDP 类通道。聊天/协作编辑反而该用可靠通道。</div>
 <div class="callout"><strong>2. 信任客户端。</strong> "客户端说我打中了就算中"= 外挂天堂。权威判定一定在服务器，预测只为手感。</div>
 <div class="callout"><strong>3. 把绝对延迟当唯一指标。</strong> 稳定 80ms 远胜在 30–150ms 间抖动的连接。要监控 jitter 与丢包，用接收端 jitter buffer 平滑。</div>
 <div class="callout"><strong>4. 全量广播 + O(n²) 扇出。</strong> 100 人房不做 AOI/delta，带宽和 CPU 直接爆。空间索引 + 兴趣管理是大房间的命根子。</div>
 <div class="callout"><strong>5. 协作编辑用"整文档 LWW"。</strong> 粒度太粗会互相覆盖丢编辑。要按字段/字符级别定义合并，想清楚冲突语义（Figma 按属性、文本类按字符）。</div>
 <p><strong>高频面试题</strong>：① 为什么游戏不用 TCP？队头阻塞具体怎么害人？② 客户端预测错了怎么纠正才不突兀？③ 100 人同房每 tick 怎么不把带宽打爆？④ 命中判定为何必须服务器权威，lag compensation 又如何保证公平？⑤ Figma 的协作和一局 FPS，一致性模型差在哪、为什么？</p>
-
-<h2>深入资源</h2>
+<h2 data-tts="048cf713197011d4">深入资源</h2>
 <ul>
 <li><strong>Gabriel Gambetta — Fast-Paced Multiplayer 系列</strong>：客户端预测/和解/插值/延迟补偿四步，含可跑 demo（<a href="https://www.gabrielgambetta.com/client-server-game-architecture.html">gabrielgambetta.com</a>）。</li>
-<li><strong>Valve Developer Community — Source Multiplayer Networking & Lag Compensation</strong>：工业级权威服务器 netcode 的一手文档。</li>
+<li><strong>Valve Developer Community — Source Multiplayer Networking &amp; Lag Compensation</strong>：工业级权威服务器 netcode 的一手文档。</li>
 <li><strong>Discord Engineering — Handling 2.5M Concurrent Voice Users with WebRTC</strong>：SFU、区域化、静音优化等大规模实时音视频经验。</li>
 <li><strong>Figma Blog — How Figma's multiplayer technology works</strong>：LWW register、树一致性、为何不用真 CRDT。</li>
 <li><strong>《Designing Data-Intensive Applications》</strong>（Kleppmann）第 5 章：复制与并发写冲突，是理解 LWW/CRDT 收敛性的底座。</li>
 </ul>
-
-<h2>深入思考（点击展开答案）</h2>
-
+<h2 data-tts="2678cfa56ef44bef">深入思考（点击展开答案）</h2>
 <details>
 <summary>1. 客户端预测让"我"零延迟移动，但"我"看到的别人是 100ms 前。射击时该信谁看到的画面？这背后是怎样的公平性取舍？</summary>
 <div class="answer">
@@ -271,7 +259,6 @@ def merge(local, remote):
 <p>代价转嫁给被击中方：你已躲到墙后，却因对方高 ping 在其"过去时刻"还站在原地，被"隔墙打死"（shot behind cover）。这不是消除不公，而是<strong>在射击者与被击者之间转移不公</strong>。多数动作游戏选 (b)，因为"瞄准了就该命中"更关键；设计上限制回退窗口（如 ≤200ms）给极端高 ping 封顶。</p>
 </div>
 </details>
-
 <details>
 <summary>2. 把 tick rate 从 30Hz 提到 60Hz，延迟和带宽各自如何变化？是不是越高越好？</summary>
 <div class="answer">
@@ -280,7 +267,6 @@ def merge(local, remote):
 <p><strong>不是越高越好</strong>：收益递减——30→60Hz 砍 8ms 很值，60→120Hz 只再砍 4ms 却又翻倍成本；且客户端渲染/网络抖动往往是更大的延迟源。竞技 FPS 常用 64/128 tick，休闲游戏 20–30Hz 足够。<em>手感 vs 成本</em>，按品类定。</p>
 </div>
 </details>
-
 <details>
 <summary>3. CRDT 天然支持离线与 P2P、永不冲突，为什么 Figma 这种"必须强协作"的产品反而选了中心服务器 + LWW，而不是纯 CRDT？</summary>
 <div class="answer">
@@ -290,7 +276,6 @@ def merge(local, remote):
 <p>结论：<em>CRDT 解决"无中心"难题；只要你能保持一个中心，OT/LWW 往往更省更可控</em>。CRDT 真正的主场是 local-first。</p>
 </div>
 </details>
-
 <details>
 <summary>4. 一个房间进程崩溃，内存里 50 人的对局状态全丢。怎么设计才能既不丢关键数据、又不让 checkpoint 拖垮 30Hz 的 tick？</summary>
 <div class="answer">
@@ -303,7 +288,6 @@ def merge(local, remote):
 <p>这本质是 <em>RPO 分级</em>：位置态 RPO 可"无穷"（重算即可），分数态 RPO 要趋近 0。把昂贵的持久化挡在 tick 热路径之外，是有状态实时服务不掉帧的通用手法。</p>
 </div>
 </details>
-
 <details>
 <summary>5. 同样是"实时"，为什么聊天/协作编辑该用 TCP/WebSocket，而动作游戏必须用 UDP？把两者通道选反会怎样？</summary>
 <div class="answer">
@@ -315,11 +299,10 @@ def merge(local, remote):
 <p><strong>选反的后果</strong>：游戏用 TCP → 丢包一卡一卡被吊打；协作编辑用裸 UDP → 丢操作=丢字、乱序=文档损坏，得在应用层把可靠有序重写一遍，等于白费。<em>所以"实时"不是单一需求，先问"丢一条数据是无所谓还是事故"，答案直接决定通道。</em>这也是很多游戏后端<strong>同时</strong>用两条通道的原因：位置走 UDP，关键事件/聊天走可靠通道。</p>
 </div>
 </details>
-
 <div class="nav"><a href="index.html">← 回到 index</a></div>
 </div>
-<script src="https://hub.cissychen.com/comments.js" defer></script>
-<script src="https://hub.cissychen.com/search.js" defer></script>
-<script src="https://hub.cissychen.com/index-button.js" defer></script>
-<script src="https://hub.cissychen.com/i18n-tts.js" defer></script>
+<script defer="" src="https://hub.cissychen.com/comments.js"></script>
+<script defer="" src="https://hub.cissychen.com/search.js"></script>
+<script defer="" src="https://hub.cissychen.com/index-button.js"></script>
+<script defer="" src="https://hub.cissychen.com/i18n-tts.js"></script>
 </body></html>

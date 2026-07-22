@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<html lang="zh-CN"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>Day 54 · Fail Obviously — 给 AI 工作流做失效可见性设计 — System Design</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -97,7 +98,6 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 </script>
 </head><body><div class="container">
-
 <header>
 <div class="meta">
 <span class="tag day">Day 54</span>
@@ -107,16 +107,14 @@ document.addEventListener('DOMContentLoaded',()=>{
 <span class="tag">Verification Cost</span>
 <span class="tag">Reviewer Design</span>
 </div>
-<h1>Fail Obviously — 给 AI 工作流做失效可见性设计<span class="en">Designing Failure Visibility into AI Workflows: The Hardest Irony of Automation</span></h1>
+<h1 data-tts="5ab609ccd56ba4aa">Fail Obviously — 给 AI 工作流做失效可见性设计<span class="en">Designing Failure Visibility into AI Workflows: The Hardest Irony of Automation</span></h1>
 </header>
-
-<h2>问题场景 + 需求约束</h2>
+<h2 data-tts="07e5c146e6c47db5">问题场景 + 需求约束</h2>
 <p>你在给一个 AI 代码生成平台做架构：<strong>每天 5000 个 LLM 补丁</strong>进流水线，人类工程师是最后一道闸。你把「明显能自动化的」都交给了 AI——补丁、单测草稿、changelog——留给人的是<strong>最难自动化的那一小撮：判断这段流畅的代码到底对不对</strong>。上线三个月指标很好看：AI 采纳率 82%、人均审查从 12 分钟降到 3 分钟。然后一个静默 bug 溜过终审进了生产：AI 把 <code>balance -= amount</code> 写成 <code>balance += amount</code>，注释、命名、测试全都自洽，reviewer 3 分钟扫过点了 approve。</p>
 <p>这不是 reviewer 不认真，是 <strong>Lisanne Bainbridge 1983 年《Ironies of Automation》</strong>的处方在 LLM 时代变成了最难一条：你自动化了简单的 95%，把人留在监控席——可人正因不再动手而<em>技能退化</em>，而 LLM 的错误<em>不像传统软件那样大声崩溃，而是「错得流畅」</em>、不主动自曝。监控一个安静的、几乎总是对的系统，恰是人类最不擅长的任务。</p>
-<div class="callout"><strong>核心命题：</strong>在 AI 工作流里，终审人能不能抓住错误，几乎不取决于他多聪明多认真，而取决于三件可被<em>设计</em>的东西——错误有多明显（失效可见性）、核验一个输出有多贵（核验成本）、真错误有多稀有（底率，Day 51）。你要设计的不是「更强的 AI」，而是<strong>一个让 AI 失效自己跳出来、并给终审席配一条比重做便宜得多的核对路径的系统</strong>。</p></div>
+<div class="callout"><strong>核心命题：</strong>在 AI 工作流里，终审人能不能抓住错误，几乎不取决于他多聪明多认真，而取决于三件可被<em>设计</em>的东西——错误有多明显（失效可见性）、核验一个输出有多贵（核验成本）、真错误有多稀有（底率，Day 51）。你要设计的不是「更强的 AI」，而是<strong>一个让 AI 失效自己跳出来、并给终审席配一条比重做便宜得多的核对路径的系统</strong>。</div>
 <p><strong>约束</strong>：吞吐 5000/天、每个终审预算 &lt; 5 分钟、真 bug 底率约 3%、漏检率压到生产事故预算内。设计目标是<em>固定人力下最大化「有效抓取率」</em>，而非让 AI 少犯错（它一定会犯）。</p>
-
-<h2>高层架构（生成 → 可见性层 → oracle → 分诊 → 终审）</h2>
+<h2 data-tts="d1606c681317f957">高层架构（生成 → 可见性层 → oracle → 分诊 → 终审）</h2>
 <pre class="mermaid">
 graph LR
     G["AI 生成器<br/><i>LLM 补丁/agent</i>"]
@@ -124,22 +122,19 @@ graph LR
     O["独立 oracle<br/><i>编译·测试·参照路径</i>"]
     T["分诊层<br/><i>按 风险 × 未验证度 排序</i>"]
     H["终审席<br/><i>人类最后一道闸</i>"]
-    G --> V
-    V --> O
-    O --> T
-    T --> H
-    H -->|校准反馈 + 注入已知错例| G
+    G --&gt; V
+    V --&gt; O
+    O --&gt; T
+    T --&gt; H
+    H --&gt;|校准反馈 + 注入已知错例| G
 </pre>
 <p><strong>职责</strong>：<em>失效可见性层</em>要求 AI 输出的不只是补丁，还有<strong>可被机器核验的结构化断言</strong>（「不改变对外契约」「余额单调递减」）；<em>独立 oracle</em>（承 Day 52 差分正确性 oracle）用与生成路径无关的手段——编译、跑测试、跟参照实现比对——去证伪断言，把「静默错结果」变成「被标红的断言未通过」；<em>分诊层</em>（承 Day 51）按风险与残余不确定性排序，只把值得看的推给终审；<em>终审席</em>是 slow-loop 最后闸，靠注入错例保持手感。关键：<strong>可见性和 oracle 在人之前，不是在人之后。</strong></p>
-
-<h2>关键技术点</h2>
-
-<h3>1. 为什么「错得流畅」是最难的失效模式 — 传统软件 fail loud，LLM fail fluent</h3>
+<h2 data-tts="c3df2e03437171d5">关键技术点</h2>
+<h3 data-tts="451a3969558013a8">1. 为什么「错得流畅」是最难的失效模式 — 传统软件 fail loud，LLM fail fluent</h3>
 <p><strong>【原理】</strong>传统软件的失效<em>响亮</em>：空指针抛异常、类型不匹配编译不过、断言失败进程崩溃——错误自带信号，"fail fast" 是几十年攒下的哲学。LLM 相反：语法永远合法、命名永远合理、解释永远自洽，<strong>它把「不知道」和「知道」渲染成同一种流畅的自信</strong>。人脑对流畅性有根深蒂固的信任偏差（fluency = truth heuristic），于是最危险的不是 AI 犯错，而是它<em>自信且流畅地</em>犯错。叠加 Bainbridge 悖论：终审人因长期只点 approve 而技能退化，恰好在最需要他的那 3% 上最弱。</p>
 <div class="tradeoff"><strong>Trade-off：</strong>三种应对。<em>(a) 让 AI 更准</em>——底率从 3% 压到 1%，但绝对量还在、且 reviewer 更松懈（越准越不看）；<em>(b) 让人更努力</em>——加审查时长，与 5000/天吞吐冲突、且违反 Bainbridge（疲劳监控是人类最差的任务）；<em>(c) 让失效可见</em>——不改准确率，把错误从「流畅隐藏」变成「结构化自曝」。只有 (c) 随吞吐线性扩展，工程重心应压在这里。</div>
 <div class="case"><strong>现实案例：</strong>Bainbridge《Ironies of Automation》(Automatica, 1983) 早在核电与航空就指出：自动化越好，留给人的越是「小概率但致命」的干预，人越没机会练习。<strong>2018–19 737 MAX MCAS</strong> 事故复盘反复回到这条：系统安静地做错事、飞行员来不及建立心智模型。LLM 工作流是同一悖论的软件版。</div>
-
-<h3>2. 失效可见性工程 — 结构化断言 / 可执行自检 / 差异高亮，让错误自曝</h3>
+<h3 data-tts="3af7165802e0580d">2. 失效可见性工程 — 结构化断言 / 可执行自检 / 差异高亮，让错误自曝</h3>
 <p><strong>【原理】</strong>核心动作：<strong>把 AI 输出从「自然语言 + 代码」升级为「代码 + 一组可独立核验的断言」</strong>。断言必须<em>机器可判定</em>（能编译、能跑、能 diff），而非「我认为对」的自然语言自评。再用一条<strong>与生成路径独立的 oracle</strong> 去证伪它——关键在<em>独立</em>：让同一个 LLM 自评，失效是<strong>相关的</strong>（correlated failure），生成错了自评往往同样错，等于没查（承 Day 51）。可见性 = 让错误在到达人眼前就已被标红。</p>
 <pre class="mermaid">
 sequenceDiagram
@@ -147,11 +142,11 @@ sequenceDiagram
     participant SC as 自检(同模型)
     participant OR as 独立 oracle
     participant H as 终审席
-    AI->>SC: "我检查过了，没问题"
+    AI-&gt;&gt;SC: "我检查过了，没问题"
     Note over SC: 相关失效：自评与生成同源同错
-    AI->>OR: 补丁 + 结构化断言
-    OR->>OR: 编译 / 跑测试 / 参照路径比对
-    OR-->>H: 断言#3 未通过 ⚠️ 红色高亮
+    AI-&gt;&gt;OR: 补丁 + 结构化断言
+    OR-&gt;&gt;OR: 编译 / 跑测试 / 参照路径比对
+    OR--&gt;&gt;H: 断言#3 未通过 ⚠️ 红色高亮
     Note over H: 只看被标红的 1 处<br/>核验成本骤降
 </pre>
 <pre><code># pseudo-code：让 AI 输出可核验断言，独立 oracle 证伪
@@ -170,8 +165,7 @@ for c in claims:
 route_to_human(patch, flags, coverage=assertion_coverage(claims, patch))</code></pre>
 <div class="tradeoff"><strong>Trade-off：</strong><em>LLM 自检</em>——零基建，但相关失效使有效性存疑；<em>独立 oracle</em>（编译/测试/参照实现）——能抓真错，但只覆盖「可判定」属性，语义意图仍需人；<em>形式化断言</em>（类型/契约/property test）——最强保证，但写断言有成本、覆盖面窄。务实组合：<strong>可判定属性交给 oracle 自动标红，语义意图留给人，人只看 oracle 没覆盖的残余</strong>。</div>
 <div class="case"><strong>现实案例：</strong><strong>Meta 的 SapFix</strong> 用自动测试作 oracle，AI 生成的修复必须先过可执行核验再给人；<strong>Google</strong> 的大规模自动化改动（Rosie）强制 presubmit 测试 + 结构化 diff 才进 code review；差分 oracle 思路见 Day 52。共同点：<em>人看到的每个输出，都已被一条独立路径审过一遍。</em></div>
-
-<h3>3. 核验成本工程 — 解释只在真降核验成本时才降过度依赖（Vasconcelos/Zhang 边界）</h3>
+<h3 data-tts="73e674b9b07441e3">3. 核验成本工程 — 解释只在真降核验成本时才降过度依赖（Vasconcelos/Zhang 边界）</h3>
 <p><strong>【原理】</strong>直觉是「让 AI 多解释、人就能更好判断」——错。<strong>Vasconcelos 等 (CSCW 2023)</strong> 用成本-收益框架证明：人是否真去核验，取决于<em>核验成本 vs 采纳收益</em>的权衡；解释<strong>只有真正降低了「核验这个输出对不对」的成本时</strong>才减少过度依赖，若只是又一段流畅叙述，反而<em>提高</em>流畅性信任、加重过度依赖。<strong>Zhang 等 (FAT* 2020)</strong> 补上另一半：置信度/解释能否改善判断，取决于人能否据此<em>校准</em>信任、区分该信与不该信。所以目标不是「多给信息」，而是<strong>给终审席一条比自己重做便宜得多、且直接指向对错的核验路径</strong>。</p>
 <div class="tradeoff"><strong>Trade-off：</strong><em>给自然语言解释</em>——成本低，但常常只增流畅信任、不降核验成本（Vasconcelos 的 null 效应多源于此）；<em>给可执行核验</em>（反例、失败测试、参照输出 diff）——真降核验成本，但需要 oracle 基建；<em>给 diff 高亮 + 定位</em>——把「读全文找错」变成「看被标红的 3 行」，性价比最高。判据：一条辅助信息若不能让「核验」变得比「重做」便宜，它就是在制造过度依赖而非减少。</div>
 <pre><code># 核验成本的直观模型：终审席的理性行为
@@ -182,8 +176,7 @@ route_to_human(patch, flags, coverage=assertion_coverage(claims, patch))</code><
 #   2) 压左边：C_verify ↓  ← 失效可见性层的全部意义
 # 反直觉：解释若只加长阅读，C_verify ↑，理性的人反而更少核验</code></pre>
 <div class="case"><strong>现实案例：</strong>代码补全类工具的经验：并排 diff + inline 测试结果比大段 rationale 更能让人抓错；Day 50「Code Review 当信号检测」讲的降噪层（nitpick 过滤、注意力留给高信号项）本质就是核验成本工程——<em>reviewer 注意力是稀缺资源，每条低价值提示都在抬高真错误的核验成本。</em></div>
-
-<h3>4. 终审席位设计四参数 — 底率 · 核验成本 · 练习剂量 · 失效可见性</h3>
+<h3 data-tts="56bcdffdb16a4342">4. 终审席位设计四参数 — 底率 · 核验成本 · 练习剂量 · 失效可见性</h3>
 <p><strong>【原理】</strong>把终审席当可调系统，其有效抓取率由四个参数决定，缺一个都塌：</p>
 <table>
 <tr><th>参数</th><th>含义</th><th>调节手段</th><th>不管它的后果</th></tr>
@@ -195,11 +188,9 @@ route_to_human(patch, flags, coverage=assertion_coverage(claims, patch))</code><
 <p><strong>练习剂量</strong>最反直觉、最常被砍：一个几乎总是对的系统会让人失去练习机会，于是要<em>主动注入已知错例（seeded faults / calibration items）</em>，像混沌工程给人类注入故障——既维持警惕性，又量出终审席的真实抓取率。呼应 Day 44 与 Day 51。</p>
 <div class="tradeoff"><strong>Trade-off：</strong>注入错例 <em>降低</em>通过效率（人多花时间在假错上）却 <em>买到</em>可观测的抓取率和不退化的技能——「先护栏后规模」（Day 41）在人机协同上的翻版。不注入 = 省眼前成本、赌上尾部事故。</div>
 <div class="case"><strong>现实案例：</strong>航空模拟机的定期 recurrent training 是给飞行员「注入错例、维持手感」的制度化版本；TSA 安检的 <strong>TIP（Threat Image Projection）</strong>往 X 光流里随机插入虚拟危险品图像，正是「底率过低时人工插高底率练习信号」——AI 终审席可照搬。</div>
-
-<h2>扩展与优化</h2>
+<h2 data-tts="7025d275987e2660">扩展与优化</h2>
 <p>演进方向：<strong>(1) 断言覆盖率驱动</strong>——把「哪些属性有独立 oracle 覆盖、哪些只能靠人」做成指标，优先给高后果模块补 oracle；<strong>(2) 分级终审</strong>——低风险高覆盖走轻量抽检，高后果低覆盖走双人复核（bulkhead，Day 23）；<strong>(3) 校准闭环</strong>——用注入错例的抓取率反哺分诊阈值，抓取率下滑就自动收紧；<strong>(4) 可见性下沉到生成端</strong>——AI 生成时即产出可核验断言与自证据。瓶颈通常不在 AI 准确率，而在<em>oracle 覆盖面</em>与<em>终审席注意力预算</em>——这两者才是要花钱扩的地方。</p>
-
-<h2>常见陷阱 + 面试问题</h2>
+<h2 data-tts="3d35905c26776eac">常见陷阱 + 面试问题</h2>
 <ul>
 <li><strong>「AI 越准越安全」谬误</strong>：准确率升高会让 reviewer 更松懈（automation complacency），漏检率可能不降反升——底率下降必须<em>同步</em>抬高可见性与练习剂量。</li>
 <li><strong>用 LLM 自评当 oracle</strong>：相关失效使自评在「生成时就错」的 case 上系统性失灵——正是你最需要它工作的那些。oracle 必须与生成路径独立。</li>
@@ -208,8 +199,7 @@ route_to_human(patch, flags, coverage=assertion_coverage(claims, patch))</code><
 <li><strong>忘了给人留练习</strong>：不注入错例，终审席的真实抓取率是黑箱，且会悄悄退化。</li>
 </ul>
 <p><strong>面试追问</strong>：① 怎么量一个「人类终审席」当前的漏检率？（注入错例测抓取率）② 底率从 3% 降到 0.3%，设计要改哪？（可见性与练习剂量加码，纯靠人更不可靠）③ 为什么让 AI 多写解释有时更危险？④ 独立 oracle 覆盖不到语义意图时剩下怎么办？⑤ 这套设计和 Day 41「把人移出快回路」矛盾吗？（不——快回路止血靠自动化，慢回路正确性终审保住人并给他可见性）</p>
-
-<h2>深入资源</h2>
+<h2 data-tts="abc2325a815cbead">深入资源</h2>
 <ul>
 <li><strong>Lisanne Bainbridge, <em>Ironies of Automation</em></strong> (Automatica, 1983) — 人机协同的奠基论文，自动化悖论的原始处方。<a href="https://ckrybus.com/static/papers/Bainbridge_1983_Automatica.pdf" target="_blank">全文</a></li>
 <li><strong>Vasconcelos et al., <em>Explanations Can Reduce Overreliance on AI Systems During Decision-Making</em></strong> (CSCW 2023, <a href="https://arxiv.org/abs/2212.06823" target="_blank">arXiv:2212.06823</a>) — 解释与过度依赖的成本-收益框架。</li>
@@ -217,43 +207,36 @@ route_to_human(patch, flags, coverage=assertion_coverage(claims, patch))</code><
 <li><strong>《Designing Data-Intensive Applications》</strong> (Kleppmann) — 可靠性、故障模型与端到端正确性的系统视角。</li>
 <li>本仓关联：<strong>Day 51 低底率告警</strong>、<strong>Day 52 混沌正确性 oracle</strong>、<strong>Day 50 Code Review 信号检测</strong>、<strong>Day 44 混沌工程</strong>。</li>
 </ul>
-
-<h2>深入思考（点击展开答案）</h2>
-
+<h2 data-tts="5ff093f8655c1d55">深入思考（点击展开答案）</h2>
 <details><summary>底率从 3% 降到 0.3%，为什么「靠更认真的人」是错误答案？</summary>
 <div class="answer">
 <p>这是 Day 51 基率谬误在人机协同的直接后果。底率越低，连续「对的」样本越长，<strong>警惕性衰减（vigilance decrement）</strong>越严重——人监控极稀有信号本就差，几百个 approve 之后碰到第一个真错，心智已默认「都是对的」；同时真错变少 = 手感更差。所以底率下降<em>同时恶化了</em>可见性依赖、警惕性和练习剂量三条。正确做法：把省下的确定性预算投到失效可见性（更多 oracle 标红）和练习剂量（注入错例，把「人感知到的底率」抬回可工作区间，像 TSA 的 TIP）。反直觉结论：<strong>你要人为地让终审席「多看到错」，哪怕那些错是你埋的。</strong></p>
 </div>
 </details>
-
 <details><summary>为什么「让 AI 生成更详细的解释」有时会让漏检率上升？</summary>
 <div class="answer">
 <p>Vasconcelos 的成本-收益框架：人是否真去核验，取决于「核验成本 vs 采纳收益」。解释若<strong>降低了核验成本</strong>（如「改了 X 行、可能影响 Y 契约、这里是反例测试」），过度依赖下降。但若只是<strong>又一段流畅自洽的叙述</strong>，它做两件坏事：(1) 没降核验成本（读它还花时间）；(2) 抬高流畅性信任（fluency heuristic）。净效果是理性的人核验更少、漏检上升。判据很干脆：<em>一条辅助信息若不能让「核验对错」比「自己重做」更便宜，它就是在制造过度依赖。</em>可执行反例 &gt; diff 高亮 &gt; 结构化断言 &gt; 自然语言 rationale。</p>
 </div>
 </details>
-
 <details><summary>同一个 LLM 做生成又做自检，失效为什么「相关」？数量上意味着什么？</summary>
 <div class="answer">
 <p>独立性是 oracle 有效的前提。若生成器和检查器是同一模型（或同族、同数据、同 prompt），错误<strong>高度相关</strong>：模型生成时把 <code>+=</code> 当成 <code>-=</code>，自检时同样的语义盲点会让它确认「对的」。数量上：设单次错误率 p，两次独立则漏检率 ≈ p²（3% → 0.09%）；但相关系数接近 1 时漏检率 ≈ p（几乎没改善，还烧一倍算力制造「已核验」假象）。这正是 Day 51「Argus 消融证明器 0/20 vs LLM 自任裁判 20/20」的机理。所以 oracle 必须走独立路径：编译器、真实测试、参照实现，或至少不同模型/信息源的交叉验证。<strong>独立性决定 oracle 是真查还是自我安慰。</strong></p>
 </div>
 </details>
-
 <details><summary>这套「保住人类终审席」的设计，和 Day 41「把人移出快回路」矛盾吗？</summary>
 <div class="answer">
 <p>不矛盾，它们管两个回路。<strong>快回路（止血）</strong>：故障时毫秒级的自动检测、熔断、回滚——人太慢，必须移出交给自动化（Day 41 Knight Capital 教训）。<strong>慢回路（正确性终审）</strong>：判断一个 AI 补丁的语义意图对不对，不需要毫秒级，需要判断力和可见性——这里人是最后一道价值闸，要保住并给他弹药。混淆两者会犯双向错误：把慢回路判断塞进快回路（人来不及），或把快回路止血交给人（Bainbridge：人连建立心智模型的时间都没有）。正确架构是<em>快回路全自动 + 慢回路人在环且高可见性</em>。判据：瓶颈是<strong>速度</strong>还是<strong>正确性判断</strong>？速度归自动化，判断留人并降其核验成本。</p>
 </div>
 </details>
-
 <details><summary>如果给你固定人力，你会先投「更强 oracle」还是「更好分诊」？怎么判断？</summary>
 <div class="answer">
 <p>用有效抓取率的分解判断：≈ (进入人类队列的真错比例) × (人对队列内真错的抓取率)。<strong>若队列里真错太少</strong>（底率被稀释）→ 投分诊，按「风险 × 未验证度」把高信号前置。<strong>若真错进了队列人却没抓住</strong>（可见性差、核验成本高）→ 投 oracle 和 diff 高亮。注入错例的 A/B 就能量出是哪种：埋一批已知错例，看它们(a)有没有进人类队列（分诊问题），(b)进了有没有被抓（可见性/成本问题），<strong>先补漏在前面的那一环</strong>。早期常两个都缺，但 oracle 边际收益更陡——它同时降核验成本、又反哺分诊，一份投入两处受益。</p>
 </div>
 </details>
-
 <div class="nav"><a href="index.html">← 回到 index</a></div>
 </div>
-<script src="https://hub.cissychen.com/comments.js" defer></script>
-<script src="https://hub.cissychen.com/search.js" defer></script>
-<script src="https://hub.cissychen.com/index-button.js" defer></script>
-<script src="https://hub.cissychen.com/i18n-tts.js" defer></script>
+<script defer="" src="https://hub.cissychen.com/comments.js"></script>
+<script defer="" src="https://hub.cissychen.com/search.js"></script>
+<script defer="" src="https://hub.cissychen.com/index-button.js"></script>
+<script defer="" src="https://hub.cissychen.com/i18n-tts.js"></script>
 </body></html>

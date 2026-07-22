@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<html lang="zh-CN"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>Day 40 · 特征平台与 ML 基础设施 — System Design</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -97,7 +98,6 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 </script>
 </head><body><div class="container">
-
 <header>
 <div class="meta">
 <span class="tag day">Day 40</span>
@@ -107,10 +107,9 @@ document.addEventListener('DOMContentLoaded',()=>{
 <span class="tag">Serving Skew</span>
 <span class="tag">A/B</span>
 </div>
-<h1>特征平台与 ML 基础设施 — 训练与推理共用一份特征的工程学<span class="en">Feature Platform & ML Infra: Dual Store, Point-in-Time Correctness, Model Serving, Experimentation</span></h1>
+<h1 data-tts="e394787cded98f57">特征平台与 ML 基础设施 — 训练与推理共用一份特征的工程学<span class="en">Feature Platform &amp; ML Infra: Dual Store, Point-in-Time Correctness, Model Serving, Experimentation</span></h1>
 </header>
-
-<h2>问题场景 + 需求约束</h2>
+<h2 data-tts="adad99d0c505428e">问题场景 + 需求约束</h2>
 <p>设计一个支撑<strong>外卖/风控级别</strong>的特征平台：100+ 模型（配送 ETA、门店排序、欺诈识别）共用一套特征，在线推理峰值 <strong>1000 万次特征读/秒</strong>、单次预测要取 200 个特征、<strong>p99 &lt; 10ms</strong>；同时离线要能为几十亿样本回溯出「当时那一刻」的特征做训练。这就是 DoorDash、Uber 真实的量级。</p>
 <p>核心矛盾：<em>训练用离线批处理（吞吐优先），推理用在线低延迟（延迟优先），但两边必须是同一个特征值</em>——否则模型线下 AUC 0.85、线上掉到 0.79，这就是臭名昭著的 <strong>training-serving skew</strong>。平台要解决三件事：<em>存哪、怎么保证一致、怎么服务与验证</em>。</p>
 <ul>
@@ -119,8 +118,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 <li><strong>point-in-time 正确</strong>：训练标签在 T 时刻产生，特征只能用 T 之前的值，否则<em>标签泄漏</em>。</li>
 <li><strong>可复用/可发现</strong>：Uber Palette 托管 2 万+ 特征供全公司复用，避免每个团队重复造轮子。</li>
 </ul>
-
-<h2>高层架构</h2>
+<h2 data-tts="c08a8d8d329301aa">高层架构</h2>
 <pre class="mermaid">
 graph LR
     SRC["数据源<br/><i>事件流 / 数仓 / DB CDC</i>"]
@@ -134,13 +132,13 @@ graph LR
     TRAIN["训练<br/><i>PIT join 取样本</i>"]
     SERVE["模型服务<br/><i>取特征 + 推理</i>"]
 
-    SRC --> BATCH & STREAM
-    REG -.约束定义.-> BATCH & STREAM
-    BATCH --> OFF
-    BATCH -->|物化 materialize| ON
-    STREAM --> ON
-    OFF --> TRAIN
-    ON --> SERVE
+    SRC --&gt; BATCH &amp; STREAM
+    REG -.约束定义.-&gt; BATCH &amp; STREAM
+    BATCH --&gt; OFF
+    BATCH --&gt;|物化 materialize| ON
+    STREAM --&gt; ON
+    OFF --&gt; TRAIN
+    ON --&gt; SERVE
 
     classDef src fill:#1a2530,stroke:#64c8ff,color:#e8eef5
     classDef comp fill:#0e2030,stroke:#5eead4,color:#e8eef5
@@ -153,10 +151,8 @@ graph LR
 </pre>
 <p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">同一份特征定义（注册表）驱动批与流两条管道，分别落离线/在线两个 Store，喂给训练与推理</p>
 <p><strong>组件职责</strong>：<em>注册表</em>是唯一真相源，声明特征的实体键、类型、转换逻辑与新鲜度 SLA；<em>批计算</em>做重回溯与 T+1 特征、<em>流计算</em>做秒级新鲜特征；<em>离线 Store</em>按时间分区保留全历史（供 point-in-time 取数），<em>在线 Store</em>只存每个实体的<em>最新</em>值（供毫秒读）。这就是业界共识的<strong>双 Store（dual-store）</strong>架构。</p>
-
-<h2>关键技术点</h2>
-
-<h3>1. 双 Store：离线仓库 vs 在线 KV，一个定义两处物化</h3>
+<h2 data-tts="c3df2e03437171d5">关键技术点</h2>
+<h3 data-tts="d78e360cf39a377a">1. 双 Store：离线仓库 vs 在线 KV，一个定义两处物化</h3>
 <p><strong>原理</strong>：训练要「几十亿样本 × 每样本回溯历史特征」，是<em>吞吐型全表扫描</em>，天然属列存数仓（Parquet/Iceberg，按 <code>event_ts</code> 分区）。推理要「给定一个用户，10ms 内取 200 个特征」，是<em>点查型随机读</em>，天然属内存 KV。同一个特征在两个引擎各物化一份，靠注册表保证语义一致。</p>
 <div class="tradeoff">
 <strong>Trade-off（在线 Store 选型）：</strong>
@@ -181,8 +177,7 @@ def fetch_online(entity_ids, feature_names):
 <li><strong>Uber Michelangelo Palette</strong>：<a href="https://www.uber.com/blog/palette-meta-store-journey/">Palette Meta Store</a>——离线用 Hive、在线用 Cassandra，托管 2 万+ 特征全公司复用。</li>
 <li><strong>Feast（开源）</strong>：把「离线 Store + 在线 Store + 注册表」抽象成标准接口，离线可接 BigQuery/Snowflake，在线可接 Redis/DynamoDB。</li>
 </ul></div>
-
-<h3>2. Point-in-Time 正确性：杜绝标签泄漏的核心机制</h3>
+<h3 data-tts="852a029e1b69bd85">2. Point-in-Time 正确性：杜绝标签泄漏的核心机制</h3>
 <p><strong>原理</strong>：训练样本是「(实体, 标签时刻 T, 标签)」，为它拼特征时，<em>只能用 event_ts ≤ T 的最新特征值</em>。若图省事直接 join 特征表的当前值，就把「未来」信息喂给了模型——线下指标虚高、线上崩盘。正确做法是 <strong>point-in-time join（as-of join）</strong>：对每个样本按实体键找「T 之前最近一条」特征。</p>
 <div class="tradeoff">
 <strong>Trade-off（保证一致的两条路线）：</strong>
@@ -205,8 +200,7 @@ for row in labels:
 <li><strong>Google（Rules of ML）</strong>：<a href="https://developers.google.com/machine-learning/guides/rules-of-ml">Rules of Machine Learning</a>（Martin Zinkevich）专门有一节讲 training-serving skew，给出的头号解法就是「把服务时的特征打日志、训练复用这份日志」+「训练与服务复用同一段代码」。</li>
 <li><strong>Airbnb Chronon</strong>：<a href="https://medium.com/airbnb-engineering/chronon-airbnbs-ml-feature-platform-is-now-open-source-d9c4dba859e8">Chronon（前身 Zipline）</a>——用一份特征定义同时生成批与流管道，内建 point-in-time correct 的回溯，正是为消除 skew 而生。</li>
 </ul></div>
-
-<h3>3. 模型服务：特征拉取 + 推理的延迟预算切分</h3>
+<h3 data-tts="60e98fccc5069727">3. 模型服务：特征拉取 + 推理的延迟预算切分</h3>
 <p><strong>原理</strong>：一次线上预测的 p99 预算（如 30ms）要在「取特征 + 前处理 + 模型前向 + 后处理」间分配。经验上<em>取特征常占一半以上延迟</em>——200 个特征散在多个实体、多个 Store。优化点：批量 pipeline 取数、把同请求的特征并发拉取、对高频实体做本地 L1 缓存。</p>
 <div class="tradeoff">
 <strong>Trade-off（服务形态）：</strong>
@@ -221,8 +215,7 @@ for row in labels:
 <li><strong>DoorDash</strong>：在<a href="https://careersatdoordash.com/blog/how-we-applied-client-side-caching/">客户端缓存</a>一文里，给特征读加了进程内缓存，性能提升约 70%——热实体（热门门店）本地命中，Redis 压力骤降。</li>
 <li><strong>Uber Michelangelo</strong>：把在线特征（Cassandra 实时 + 预计算 batch）与模型服务统一编排，配送 ETA 等模型全走这套。</li>
 </ul></div>
-
-<h3>4. A/B 实验平台：让「模型上线」变成可度量的因果实验</h3>
+<h3 data-tts="44dd296e325480ae">4. A/B 实验平台：让「模型上线」变成可度量的因果实验</h3>
 <p><strong>原理</strong>：新模型不能因线下 AUC 涨就上线——线下指标和业务指标（下单率、GMV）常背离。要用<em>随机分流的在线实验</em>建立因果：一致性哈希把用户稳定分到 control/treatment，跑够样本量后比较业务指标的统计显著性，同时盯 <strong>guardrail 指标</strong>（延迟、错误率、退款率）防止「主指标涨、副作用炸」。</p>
 <div class="tradeoff">
 <strong>Trade-off（关键设计点）：</strong>
@@ -238,16 +231,14 @@ def bucket(user_id, exp_key, treat_ratio=0.5):
 </code></pre>
 <div class="case">
 <strong>现实案例：</strong> Netflix、Uber、Airbnb 均自建实验平台，核心都是「稳定分桶 + guardrail 指标 + 方差削减」。Airbnb 的 Chronon 特征定义可直接被实验消费，做到「新特征→上模型→A/B」闭环。</div>
-
-<h2>扩展与优化</h2>
+<h2 data-tts="d9b0683f8dbc48ce">扩展与优化</h2>
 <ul>
 <li><strong>特征新鲜度分级</strong>：秒级走 Flink 流、分钟级走微批、天级走 Spark T+1，按业务价值分配算力，别一刀切实时（成本爆炸）。</li>
 <li><strong>特征监控与漂移检测</strong>：对每个特征持续统计分布，线上分布 vs 训练分布漂移了就告警——skew 常是「无声」发生的。</li>
 <li><strong>成本治理</strong>：在线 Store 内存最贵，用 protobuf/量化压缩、TTL 淘汰冷实体、只物化真被模型引用的特征（靠血缘剪枝）。</li>
 <li><strong>embedding 特征</strong>：向量类特征（用户/物品 embedding）单独走向量存储，与标量特征分层管理。</li>
 </ul>
-
-<h2>常见陷阱 + 面试问题</h2>
+<h2 data-tts="87884b2fbf40a3ba">常见陷阱 + 面试问题</h2>
 <div class="callout"><strong>1. 训练用当前值 join 特征表</strong>：最经典的标签泄漏。必须 point-in-time join，用 <code>event_ts ≤ label_ts</code> 严格约束。</div>
 <div class="callout"><strong>2. 训练与服务两套转换代码</strong>：Python 版和 Java 版对同一特征算出不同值 = skew。共享一份定义/DSL 是根治之道。</div>
 <div class="callout"><strong>3. 把在线 Store 当真相源</strong>：Redis 宕机 RPO 有损，它是最新值的缓存，历史与真相在离线 Store 与数仓。</div>
@@ -259,8 +250,7 @@ def bucket(user_id, exp_key, treat_ratio=0.5):
 <li>双边市场（外卖）里普通用户随机 A/B 为什么会失效？换什么实验设计？</li>
 <li>热实体（顶流门店）特征 QPS 单点过高，怎么扛？（联想 Day 2 缓存热 key）</li>
 </ul>
-
-<h2>深入资源</h2>
+<h2 data-tts="3c5b0ca1f711514e">深入资源</h2>
 <ul>
 <li><strong>DoorDash</strong>：<a href="https://doordash.engineering/2020/11/19/building-a-gigascale-ml-feature-store-with-redis/">Building a Gigascale ML Feature Store with Redis</a>——在线 Store 选型与压缩实战。</li>
 <li><strong>Uber</strong>：<a href="https://www.uber.com/blog/palette-meta-store-journey/">Michelangelo Palette Meta Store Journey</a>——特征注册、复用与元数据。</li>
@@ -268,9 +258,7 @@ def bucket(user_id, exp_key, treat_ratio=0.5):
 <li><strong>Google</strong>：<a href="https://developers.google.com/machine-learning/guides/rules-of-ml">Rules of Machine Learning</a>（Zinkevich）——training-serving skew 的权威论述。</li>
 <li><strong>《Designing Data-Intensive Applications》</strong>（Kleppmann）：批处理/流处理与派生数据章节，是理解双 Store 物化的基础。</li>
 </ul>
-
-<h2>深入思考（点击展开答案）</h2>
-
+<h2 data-tts="808822efc66e380f">深入思考（点击展开答案）</h2>
 <details>
 <summary>1. 一个特征在离线算出来是 3.7，在线算出来是 3.5，模型没报错但线上效果掉了 5%。你怎么系统性地定位并根治这类「无声 skew」？</summary>
 <div class="answer">
@@ -283,7 +271,6 @@ def bucket(user_id, exp_key, treat_ratio=0.5):
 <p><strong>根治</strong>：① 特征转换用<em>同一份代码/DSL</em>（Chronon 思路），杜绝双实现；② 生产落地<em>持续 skew 监控</em>——每天抽样对比在线日志 vs 离线回溯，超阈值告警；③ 新特征优先用 log-and-wait，让训练数据天生等于服务数据。Google Rules of ML 的核心建议正是「log serving features，train on them」。</p>
 </div>
 </details>
-
 <details>
 <summary>2. 为什么不能用一个统一的存储引擎同时满足训练的全表扫描和推理的毫秒点查？从存储物理层解释这个「被迫双 Store」。</summary>
 <div class="answer">
@@ -295,7 +282,6 @@ def bucket(user_id, exp_key, treat_ratio=0.5):
 <p>列存扫描友好但点查慢，KV 点查友好但扫描/历史差——没有单一引擎能同时把两条曲线都压到最优。所以工程上把同一份特征<em>物化两份</em>：历史全量进列存供训练，最新快照进 KV 供推理，代价是要维护两者的一致性（正是双 Store 架构存在的理由）。这和 Day 20 讲的「同一份数据派生多种存储视图」是同一个思想。</p>
 </div>
 </details>
-
 <details>
 <summary>3. 双边市场（外卖：用户/骑手/商家）里，把「新的骑手调度模型」按用户随机分 A/B 会得到偏乐观还是偏悲观的结论？为什么？该换什么实验设计？</summary>
 <div class="answer">
@@ -303,7 +289,6 @@ def bucket(user_id, exp_key, treat_ratio=0.5):
 <p><strong>换设计</strong>：用<em>切换实验（switchback / 区域-时间随机）</em>——按「城市 × 时间片」为单位整体切 control/treatment，让同一时空里所有人用同一策略，供需关系闭合在实验单元内，消除跨组干扰。代价是实验单元变少、方差变大、需要更长周期，且要处理时间自相关。Uber/DoorDash 的调度类实验普遍用 switchback。</p>
 </div>
 </details>
-
 <details>
 <summary>4. 在线 Store 里某顶流门店的特征被 QPS 100 万单点打爆（联想 Day 2 的热 key）。特征平台场景下，哪些缓解手段可用、哪些不可用，为什么？</summary>
 <div class="answer">
@@ -318,7 +303,6 @@ def bucket(user_id, exp_key, treat_ratio=0.5):
 <p>实战组合：本地 L1（吸收绝大部分读）+ 热特征多副本（兜底），且缓存 TTL 严格对齐该特征的新鲜度要求。</p>
 </div>
 </details>
-
 <details>
 <summary>5. 团队想「立刻」用一个全新特征训练模型，但它在线上还没积累任何日志。log-and-wait 与 backfill 两条路你怎么选？各自的隐藏风险是什么？</summary>
 <div class="answer">
@@ -331,11 +315,10 @@ def bucket(user_id, exp_key, treat_ratio=0.5):
 <p><strong>务实策略</strong>：先 backfill 快速验证特征是否有信号（离线跑通、看重要性），<em>同时立刻开启在线打日志</em>；一旦日志够了，切换到 log-and-wait 训练做「正式版」，用它对齐线上真实分布。即<em>backfill 探路、log-and-wait 定稿</em>。切忌用 backfill 版直接长期迭代——skew 会悄悄累积。</p>
 </div>
 </details>
-
 <div class="nav"><a href="index.html">← 回到 index</a></div>
 </div>
-<script src="https://hub.cissychen.com/comments.js" defer></script>
-<script src="https://hub.cissychen.com/search.js" defer></script>
-<script src="https://hub.cissychen.com/index-button.js" defer></script>
-<script src="https://hub.cissychen.com/i18n-tts.js" defer></script>
+<script defer="" src="https://hub.cissychen.com/comments.js"></script>
+<script defer="" src="https://hub.cissychen.com/search.js"></script>
+<script defer="" src="https://hub.cissychen.com/index-button.js"></script>
+<script defer="" src="https://hub.cissychen.com/i18n-tts.js"></script>
 </body></html>

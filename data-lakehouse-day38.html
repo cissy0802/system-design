@@ -1,6 +1,7 @@
 <!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Day 38 · 数据湖与湖仓 (Data Lake & Lakehouse) — System Design</title>
+
+<html lang="zh-CN"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Day 38 · 数据湖与湖仓 (Data Lake &amp; Lakehouse) — System Design</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,"SF Pro Display","Noto Sans SC",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
@@ -97,7 +98,6 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 </script>
 </head><body><div class="container">
-
 <header>
 <div class="meta">
 <span class="tag day">Day 38</span>
@@ -107,10 +107,9 @@ document.addEventListener('DOMContentLoaded',()=>{
 <span class="tag">元数据</span>
 <span class="tag">批流一体</span>
 </div>
-<h1>数据湖与湖仓 — 在对象存储上长出一个数据库<span class="en">Data Lake & Lakehouse: Open Table Formats, Metadata, Unified Batch/Stream</span></h1>
+<h1 data-tts="17bf75eded038c1b">数据湖与湖仓 — 在对象存储上长出一个数据库<span class="en">Data Lake &amp; Lakehouse: Open Table Formats, Metadata, Unified Batch/Stream</span></h1>
 </header>
-
-<h2>问题场景 + 需求约束</h2>
+<h2 data-tts="116a8d153f6e7fd2">问题场景 + 需求约束</h2>
 <p>设计一个 <strong>PB 级分析平台</strong>：每天摄入 <strong>100TB</strong> 行为日志 + 上游 OLTP 库的 CDC 变更，要同时喂三类消费者——BI 报表（要求<em>分钟级新鲜度</em>）、ML 特征/训练（要全历史、可回放任意时间点）、数据分析师 ad-hoc SQL（扫描几十 TB 也得几秒返回）。</p>
 <p>老路子是 <em>数据湖（S3 一堆 Parquet）+ 数仓（Snowflake/Redshift）</em> 并存：湖便宜能存原始数据但没事务、改一行要重写整个分区；仓查询快但贵，数据还要 ETL 搬一遍，<strong>新鲜度永远落后几小时</strong>。两套系统、两份数据、两倍成本，还对不齐。</p>
 <ul>
@@ -120,8 +119,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 <li><strong>成本</strong>：存储用对象存储（S3/GCS，$0.023/GB·月），算力按需起停，避免数仓那种『存算绑定』的常驻账单。</li>
 </ul>
 <p>本期讲四件事：<em>湖/仓/湖仓怎么选、开放表格式怎么在 S3 上做 ACID、元数据层怎么让查询又快又能时间旅行、批流怎么一套搞定</em>。</p>
-
-<h2>高层架构（湖仓分层）</h2>
+<h2 data-tts="5e901ffb01bcf961">高层架构（湖仓分层）</h2>
 <pre class="mermaid">
 graph TD
     SRC["数据源<br/><i>OLTP CDC · 日志 · 事件流</i>"]
@@ -136,11 +134,11 @@ graph TD
     ML["ML 训练/特征"]
     AD["Ad-hoc SQL"]
 
-    SRC --> ING --> META
-    META -.指向.-> DATA
-    CAT -.原子切换当前快照.-> META
-    ENG -->|读元数据→剪枝→只读相关文件| META
-    ENG --> BI & ML & AD
+    SRC --&gt; ING --&gt; META
+    META -.指向.-&gt; DATA
+    CAT -.原子切换当前快照.-&gt; META
+    ENG --&gt;|读元数据→剪枝→只读相关文件| META
+    ENG --&gt; BI &amp; ML &amp; AD
 
     classDef src fill:#1a2530,stroke:#64c8ff,color:#e8eef5
     classDef store fill:#1a1a30,stroke:#ffb450,color:#e8eef5
@@ -150,10 +148,8 @@ graph TD
     class ENG,BI,ML,AD eng
 </pre>
 <p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">核心洞察：<strong>存储仍是对象存储里的开放列存文件</strong>，但上面盖一层<strong>事务性元数据</strong>，让多引擎像操作数据库一样操作它</p>
-
-<h2>关键技术点</h2>
-
-<h3>1. 湖 vs 仓 vs 湖仓：为什么要把数据库拆成『文件 + 元数据』</h3>
+<h2 data-tts="c3df2e03437171d5">关键技术点</h2>
+<h3 data-tts="7718df99a675b3ed">1. 湖 vs 仓 vs 湖仓：为什么要把数据库拆成『文件 + 元数据』</h3>
 <p><strong>原理</strong>：传统<em>数仓</em>是 schema-on-write、存算耦合的封闭系统——先建模、私有格式，查得快但贵且锁定。<em>数据湖</em>是 schema-on-read——原始文件直接堆 S3，便宜、开放、ML 友好，但<strong>没事务、没索引、没 schema 演进保证</strong>，改一行要重写整个分区目录，并发写互相覆盖。<em>湖仓</em>的本质是：保留湖的开放列存文件（Parquet），在其上加一层<strong>事务性元数据</strong>，于是同一份数据既有湖的成本/开放性，又有仓的 ACID/性能。Databricks 在 CIDR 2021 的 Lakehouse 论文系统论证了这个架构。</p>
 <table>
 <thead><tr><th></th><th>数据仓库</th><th>数据湖</th><th>湖仓 Lakehouse</th></tr></thead>
@@ -178,8 +174,7 @@ graph TD
 <li><strong>Databricks</strong>：提出 <em>Lakehouse</em> 概念并开源 <strong>Delta Lake</strong>，CIDR 2021 论文是该架构的奠基文献。</li>
 <li><strong>Uber</strong>：为了 CDC 增量入湖自研 <strong>Apache Hudi</strong>，支撑万亿级记录的事务型数据湖。</li>
 </ul></div>
-
-<h3>2. 开放表格式：在 S3 上做 ACID 的三种流派</h3>
+<h3 data-tts="f4360ce6eb311878">2. 开放表格式：在 S3 上做 ACID 的三种流派</h3>
 <p><strong>原理</strong>：对象存储只保证<em>单个对象 PUT 的原子性</em>，没有跨文件事务、没有 rename 原子性（S3 的 rename = copy+delete）。表格式的做法是：所有数据文件<strong>只追加不修改（immutable）</strong>，每次写产生新文件，再<strong>原子地切换一个『当前快照』指针</strong>——读者要么看到旧快照全集、要么看到新快照全集，绝不看到半截。这就是<em>快照隔离（snapshot isolation）</em>。三大格式（Iceberg / Delta / Hudi）思路同源，区别在元数据组织和写优化方向。</p>
 <pre><code># 乐观并发控制（OCC）提交，三格式通用思路
 def commit(table, new_files):
@@ -207,8 +202,7 @@ def commit(table, new_files):
 <li><strong>Apple、LinkedIn、Netflix</strong>：大规模采用 Iceberg 做分析底座，看重引擎中立与分区演进。</li>
 <li><strong>Uber</strong>：用 Hudi 做 CDC 增量 ETL，只对 delta 变更跑计算再 upsert，省大量算力（见 Uber Lakehouse 博客）。</li>
 </ul></div>
-
-<h3>3. 元数据管理：分层清单让查询剪枝 + 时间旅行</h3>
+<h3 data-tts="f8643b00ab7adc5d">3. 元数据管理：分层清单让查询剪枝 + 时间旅行</h3>
 <p><strong>原理</strong>：表格式把元数据组织成<strong>多级清单树</strong>。以 Iceberg 为例：<code>metadata file</code>（表 schema、分区规范、所有快照列表）→ <code>manifest list</code>（一个快照包含哪些 manifest，带分区值范围）→ <code>manifest file</code>（每个数据文件的路径 + <strong>列级统计</strong>：min/max、null 数、行数）。查询时引擎自顶向下读元数据：用分区值范围和列 min/max 做<em>剪枝（pruning）</em>，跳过绝大多数文件，只真正打开相关 Parquet。<strong>不需要扫目录、不需要 LIST S3</strong>（Hive 表的老瓶颈）。每次提交生成新快照、旧快照保留，<em>time travel</em> 就是读历史快照指针。</p>
 <pre><code>-- Iceberg 时间旅行：审计 / 模型复现 / 误删恢复
 SELECT * FROM events
@@ -227,8 +221,7 @@ SELECT * FROM events FOR SYSTEM_VERSION AS OF 4912;  -- 按快照ID
 <li><strong>Netflix Iceberg</strong>：隐藏分区——用户查 <code>WHERE ts &gt; ...</code>，引擎自动用 <code>day(ts)</code> 分区剪枝，<em>用户不必知道物理分区列</em>，分区方案还能演进而不重写历史。</li>
 <li><strong>Apache Hudi</strong>：内置 clustering 与 compaction 服务，把增量小文件持续合并，维持读性能。</li>
 </ul></div>
-
-<h3>4. 批流一体：一张表同时接住流写与批读（COW vs MoR）</h3>
+<h3 data-tts="a052a943900bbbe0">4. 批流一体：一张表同时接住流写与批读（COW vs MoR）</h3>
 <p><strong>原理</strong>：传统 Lambda 架构要维护<em>批层 + 速度层两套代码两套结果再合并</em>，复杂且对不齐。湖仓让流和批<strong>写同一张表</strong>：Flink/Spark Streaming 持续 append 提交快照，批作业读同一张表的快照——<em>Kappa 化</em>。关键工程权衡是更新怎么落盘：<strong>Copy-on-Write（COW）</strong>写时就把改动合进新数据文件（读快、写放大大）；<strong>Merge-on-Read（MoR）</strong>写时只追加 delta 日志、读时再合并（写快、读时多一次 merge）。CDC 高频 upsert 选 MoR，分析为主选 COW。</p>
 <table>
 <thead><tr><th></th><th>Copy-on-Write</th><th>Merge-on-Read</th></tr></thead>
@@ -255,8 +248,7 @@ df = (spark.read.format("hudi")
 <li><strong>Uber</strong>：用 Hudi 做增量 ETL，上游 CDC 进来只对 delta 变更计算再 upsert，把 Lambda 双链路收敛成一套，显著省算力（Uber Lakehouse 工程博客）。</li>
 <li><strong>Netflix / Flink + Iceberg</strong>：流式 sink 持续提交 Iceberg 快照，下游批与 ad-hoc 读同一张表，统一批流口径。</li>
 </ul></div>
-
-<h2>扩展与优化（增长后怎么办）</h2>
+<h2 data-tts="d29729dca32a26c0">扩展与优化（增长后怎么办）</h2>
 <ul>
 <li><strong>Catalog 成瓶颈</strong>：所有提交都要 CAS 同一张表指针，热表写并发高会频繁冲突重试。上 REST Catalog（如 Iceberg REST、Polaris、Unity）做服务化提交，或按子分区拆表降低写冲突域。</li>
 <li><strong>查询加速</strong>：加 <em>排序/聚簇（Z-order / clustering）</em>让相关数据物理相邻，提升 min/max 剪枝效果；列存本身已做谓词下推与字典编码。</li>
@@ -264,8 +256,7 @@ df = (spark.read.format("hudi")
 <li><strong>多引擎一致</strong>：同一张表被 Spark 写、Trino 读、Flink 流写，靠 catalog 统一快照语义，避免各引擎私有缓存读到旧元数据。</li>
 <li><strong>分区演进</strong>：业务增长后分区粒度要变（按天→按小时），Iceberg 支持<em>不重写历史</em>地演进分区，老数据按旧规则、新数据按新规则。</li>
 </ul>
-
-<h2>常见陷阱 + 面试问题</h2>
+<h2 data-tts="88f19820c5499612">常见陷阱 + 面试问题</h2>
 <div class="callout">
 <strong>1. 把湖仓当 OLTP 用。</strong> 表格式是<em>分析型</em>的：快照级 ACID、面向批量/列扫描，<strong>不是行级低延迟点查/高频事务</strong>。每秒几万笔单行更新该用 Postgres，别用 Iceberg。</div>
 <div class="callout">
@@ -276,17 +267,14 @@ df = (spark.read.format("hudi")
 <strong>4. time travel 当免费午餐。</strong> 每个保留快照都钉住其引用的数据文件不被回收，<em>保留越久存储成本越高</em>；expire 又会让该时间点的回放失效。保留窗口是<em>审计需求 vs 存储成本</em>的权衡，要显式定。</div>
 <div class="callout">
 <strong>5. 面试常问：</strong>① 在只保证单对象原子的 S3 上，怎么实现多文件事务？（答：immutable 文件 + 原子切快照指针 + OCC）② COW 与 MoR 各自的写/读放大，CDC 场景选哪个？③ Hive 表慢在哪、Iceberg 怎么解（LIST 目录 vs 元数据剪枝）？④ time travel 的存储代价与回收策略？⑤ 多引擎并发写如何避免互相覆盖？</div>
-
-<h2>深入资源</h2>
+<h2 data-tts="741f9efd2cf8027e">深入资源</h2>
 <ul>
 <li><strong>《Lakehouse: A New Generation of Open Platforms》</strong>（Armbrust, Ghodsi, Xin, Zaharia，CIDR 2021）：湖仓架构的奠基论文，论证存算分离 + 开放格式 + 元数据层。</li>
 <li><strong>Apache Iceberg 官方文档 / 表规范（spec）</strong>：metadata→manifest list→manifest 三级结构、隐藏分区、分区演进的权威定义。</li>
 <li><strong>Uber Engineering：《Uber's Lakehouse Architecture》/ Hudi 博客</strong>：CDC 增量 ETL、COW/MoR、trillion-record 规模的实战。</li>
 <li><strong>《Designing Data-Intensive Applications》</strong>（Kleppmann）：列存、批处理与流处理、Lambda/Kappa 的底层原理（相关章节）。</li>
 </ul>
-
-<h2>深入思考（点击展开答案）</h2>
-
+<h2 data-tts="37423537eb1d3db8">深入思考（点击展开答案）</h2>
 <details>
 <summary>1. 对象存储只保证单对象 PUT 原子，没有跨文件事务、没有原子 rename。表格式凭什么能给出 ACID？瓶颈在哪？</summary>
 <div class="answer">
@@ -295,7 +283,6 @@ df = (spark.read.format("hudi")
 <p><strong>瓶颈</strong>：所有提交序列化在<em>同一张表指针</em>的 CAS 上。热表高并发写 → 频繁 OCC 冲突 → 重试风暴，吞吐受限于单点 catalog 的提交速率。缓解：拆表/拆分区降冲突域、批量提交、用服务化 catalog。这也是为什么湖仓适合『批量/中频写』而非『每秒几万笔单行事务』。</p>
 </div>
 </details>
-
 <details>
 <summary>2. Hive 表也是 S3 上的 Parquet，为什么 PB 级会慢到不可用？Iceberg 把哪个根因消掉了？</summary>
 <div class="answer">
@@ -303,7 +290,6 @@ df = (spark.read.format("hudi")
 <p><strong>Iceberg 的解法</strong>：把『这张表有哪些文件』从<em>文件系统 LIST</em> 变成<em>读元数据清单</em>——manifest 里显式列出每个文件路径 + 列级 min/max 统计。于是：① 不再 LIST S3，规划查询只读几个元数据对象；② 剪枝下沉到文件级（甚至行组级），跳过绝大多数文件；③ 提交是原子切快照，天然 ACID 与一致的文件集。代价是要维护这套元数据树，并定期 compaction/expire。</p>
 </div>
 </details>
-
 <details>
 <summary>3. 一张 MoR 表，流式 CDC 每秒上万 upsert。compaction 暂停一周会发生什么？怎么设计才不崩？</summary>
 <div class="answer">
@@ -311,7 +297,6 @@ df = (spark.read.format("hudi")
 <p><strong>设计要点</strong>：① compaction 当作<em>常驻服务</em>按 file group 增量合并，不是『偶尔跑的批作业』；② 阈值触发（delta 大小/数量超限就压）+ 限速避免抢占摄入；③ 监控『每 file group delta 字节数』『读放大』并告警；④ 读多场景考虑 COW，或定期把 MoR 物化成 COW 快照供 BI 读。本质：MoR 把成本从写挪到读，compaction 是把它<em>挪回去</em>的常态机制，不能停。</p>
 </div>
 </details>
-
 <details>
 <summary>4. 湖仓宣称『一份数据多引擎直读』省掉 ETL。但若 BI 团队要 Snowflake 级亚秒延迟，你会怎么权衡？</summary>
 <div class="answer">
@@ -319,7 +304,6 @@ df = (spark.read.format("hudi")
 <p><strong>权衡选项</strong>：① 靠 clustering/Z-order + 小文件治理 + 引擎本地缓存把热查询压到秒级，多数 BI 够用；② <em>分层</em>：湖仓做 single source of truth 与明细，把高频 BI 聚合物化/同步到 OLAP（ClickHouse/Druid）服务亚秒看板——但这又部分回到两套系统，要权衡同步延迟；③ 用直读湖仓格式的 MPP（Trino/StarRocks 读 Iceberg）兼顾开放与性能。<strong>没有银弹</strong>：要么牺牲一点延迟换开放/省钱，要么为亚秒 BI 接受一层额外 serving 副本——把这个取舍显式摆给业务，是架构师该做的事。</p>
 </div>
 </details>
-
 <details>
 <summary>5. 批流一体里，Flink 流式写 Iceberg 要 exactly-once 入湖。checkpoint 和表 commit 怎么对齐才不重不漏？</summary>
 <div class="answer">
@@ -328,11 +312,10 @@ df = (spark.read.format("hudi")
 <p><strong>关键点</strong>：可见性边界 = checkpoint 边界，下游新鲜度是<em>checkpoint 间隔</em>级（如 1 分钟）而非逐条实时——这是 exactly-once 与延迟的取舍。缩短 checkpoint 能降延迟，但提交太频又制造小文件，回到 compaction 问题。</p>
 </div>
 </details>
-
 <div class="nav"><a href="index.html">← 回到 index</a></div>
 </div>
-<script src="https://hub.cissychen.com/comments.js" defer></script>
-<script src="https://hub.cissychen.com/search.js" defer></script>
-<script src="https://hub.cissychen.com/index-button.js" defer></script>
-<script src="https://hub.cissychen.com/i18n-tts.js" defer></script>
+<script defer="" src="https://hub.cissychen.com/comments.js"></script>
+<script defer="" src="https://hub.cissychen.com/search.js"></script>
+<script defer="" src="https://hub.cissychen.com/index-button.js"></script>
+<script defer="" src="https://hub.cissychen.com/i18n-tts.js"></script>
 </body></html>

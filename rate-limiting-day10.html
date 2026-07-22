@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<html lang="zh-CN"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>Day 10 · Rate Limiting — System Design</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -97,7 +98,6 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 </script>
 </head><body><div class="container">
-
 <header>
 <div class="meta">
 <span class="tag day">Day 10</span>
@@ -106,10 +106,9 @@ document.addEventListener('DOMContentLoaded',()=>{
 <span class="tag">Token Bucket / GCRA</span>
 <span class="tag">Distributed Counters</span>
 </div>
-<h1>Rate Limiting — 不只是「每秒 100 次」<span class="en">Token Bucket vs Leaky Bucket vs Sliding Window · Distributed Counters · The 429 Contract</span></h1>
+<h1 data-tts="3a2aad6fa34b8de5">Rate Limiting — 不只是「每秒 100 次」<span class="en">Token Bucket vs Leaky Bucket vs Sliding Window · Distributed Counters · The 429 Contract</span></h1>
 </header>
-
-<h2>问题场景与约束</h2>
+<h2 data-tts="c7d0751a09341754">问题场景与约束</h2>
 <p>设计一个公开 API 平台的限流系统（参考 Stripe / GitHub）。全网 <strong>10 万+ 第三方集成方</strong>、<strong>峰值 1M QPS</strong>、单 key 上限 100 req/s、平台总容量 500k QPS。一次糟糕的脚本可以瞬间占满所有 worker，把付钱的请求挤掉——这就是为什么 <em>限流是保命底线</em>，不是「防爬虫」附加功能。</p>
 <ul>
 <li><strong>公平性</strong>：一个 key 失控不能拖垮其他 key；高优请求（创建支付）不能被低优请求（导出报表）饿死。</li>
@@ -120,8 +119,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 <li><strong>限流挂了不能挂业务</strong>：Redis 不可用时<em>放行</em>（fail-open）比挂全站好。</li>
 </ul>
 <p>今天讲四件事：<em>算法选型、分布式实现、精度 vs 性能、429 契约</em>。</p>
-
-<h2>高层架构</h2>
+<h2 data-tts="e44288c28aecd88e">高层架构</h2>
 <pre class="mermaid">
 graph LR
     C["Client / 第三方应用"]
@@ -131,12 +129,12 @@ graph LR
     SHED["Load Shedder<br/>(优先级丢弃)"]
     APP["业务服务"]
 
-    C -->|"req + API key"| GW
-    GW -->|"①快路径: 90% 拒绝/放行"| L1
-    L1 -->|"②慢路径: 周期同步"| L2
-    GW -.过载.-> SHED
-    GW -->|✓| APP
-    GW -.->|"✗ 429 + Retry-After"| C
+    C --&gt;|"req + API key"| GW
+    GW --&gt;|"①快路径: 90% 拒绝/放行"| L1
+    L1 --&gt;|"②慢路径: 周期同步"| L2
+    GW -.过载.-&gt; SHED
+    GW --&gt;|✓| APP
+    GW -.-&gt;|"✗ 429 + Retry-After"| C
 
     classDef edge fill:#0e2030,stroke:#64c8ff,color:#e8eef5
     classDef store fill:#1a1a30,stroke:#ffb450,color:#e8eef5
@@ -146,10 +144,8 @@ graph LR
     class APP,SHED origin
 </pre>
 <p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">网关用本地令牌桶扛快路径，Redis 做集中真值，决策永远在 1ms 内返回</p>
-
-<h2>关键技术点</h2>
-
-<h3>1. 算法选型：Token Bucket vs Leaky Bucket vs Sliding Window vs GCRA</h3>
+<h2 data-tts="c3df2e03437171d5">关键技术点</h2>
+<h3 data-tts="83d68c62bf5cade5">1. 算法选型：Token Bucket vs Leaky Bucket vs Sliding Window vs GCRA</h3>
 <p><strong>原理</strong>：四种算法各自回答一个不同的问题——<em>允许突发吗？输出能匀速吗？窗口怎么滚？</em></p>
 <table>
 <thead><tr><th>算法</th><th>核心思想</th><th>允许突发</th><th>输出速率</th><th>实现复杂度</th></tr></thead>
@@ -190,8 +186,7 @@ def allow(key, capacity, refill_rate):
 <li><strong>GitHub API</strong>：authenticated 用户 5000 req/h（hourly token bucket），Search API 单独一个更小的 bucket。</li>
 <li><strong>Redis 官方</strong>：<code>redis-cell</code> 模块直接实现 GCRA，一条 <code>CL.THROTTLE</code> 命令搞定。</li>
 </ul></div>
-
-<h3>2. 分布式限流：Redis 中心化 vs 本地分摊 vs 异步聚合</h3>
+<h3 data-tts="89d447b80b270638">2. 分布式限流：Redis 中心化 vs 本地分摊 vs 异步聚合</h3>
 <p><strong>原理</strong>：在一台机器上 token bucket 是平凡的；问题在于<em>全网共享同一个 key 的配额</em>时怎么协调。</p>
 <div class="tradeoff">
 <strong>Trade-off：</strong>
@@ -222,8 +217,7 @@ return {allowed, tokens}     -- 原子,无 race
 <li><strong>Cloudflare 边缘限流</strong>：本地短窗口决策，边缘节点间用类 gossip 的异步通道聚合大窗口计数，详见上方提到的 Cloudflare 工程博客。</li>
 <li><strong>AWS API Gateway</strong>：region 内令牌桶；rate + burst 两个参数对应 refill rate 与 bucket capacity。</li>
 </ul></div>
-
-<h3>3. 多维度限流与优先级抛弃</h3>
+<h3 data-tts="d9568feeefcd0a98">3. 多维度限流与优先级抛弃</h3>
 <p><strong>原理</strong>：单一维度限不住真实流量。一个 key 可能正常，但所有 key 加起来打爆 endpoint；某 endpoint 正常但下游 DB 挂了。要按 <em>多个维度同时检查、最严的胜出</em>。</p>
 <div class="tradeoff">
 <strong>典型维度组合（每层独立桶，全过才放行）：</strong>
@@ -255,8 +249,7 @@ def admit(req):
 <li><strong>GitHub</strong>：REST 一个桶、GraphQL 一个桶（按 query 复杂度扣不同分）、Search 一个更严格的小桶——同 token 多维。</li>
 <li><strong>Twitter/X API</strong>：每个 endpoint 一个独立 bucket（不同 endpoint 限额完全不同），<code>X-Rate-Limit-Resource</code> 头表明哪个桶在管。</li>
 </ul></div>
-
-<h3>4. 429 响应契约：让 caller 优雅退避</h3>
+<h3 data-tts="b59e595c452936c8">4. 429 响应契约：让 caller 优雅退避</h3>
 <p><strong>原理</strong>：限流不只是「拒绝」，是<em>给 caller 一个机器可读的退避说明书</em>。否则客户端只能死循环重试，把你二次打爆。</p>
 <div class="tradeoff">
 <strong>标准响应头：</strong>
@@ -278,8 +271,7 @@ def admit(req):
 <li><strong>GitHub</strong>：超限返回 403 + <code>X-RateLimit-Reset</code>（用 epoch），文档明示「等 reset 后重试，否则继续 403」。</li>
 <li><strong>AWS</strong>：除了 429，还可能 <code>ThrottlingException</code>，所有官方 SDK 自动 retry with jitter。</li>
 </ul></div>
-
-<h2>扩展与优化</h2>
+<h2 data-tts="1724845fd997c0dd">扩展与优化</h2>
 <ul>
 <li><strong>热 key 突破 Redis 单节点</strong>：把单个高流量 key 在多个 Redis shard 上分散（<code>key:0..15</code>），每 shard 一份子配额，client 哈希落 shard。代价：精度损失（局部超额）。</li>
 <li><strong>从硬限流到自适应限流</strong>：用下游 latency / 错误率作信号动态调整（Netflix concurrency-limits、Google SRE 中的 adaptive throttling）—— 「健康时多放、生病时少放」。</li>
@@ -287,8 +279,7 @@ def admit(req):
 <li><strong>计算成本权重</strong>：不是每个请求都「一个令牌」，按 endpoint CPU 成本扣不同分（GraphQL query complexity = 扣的分；CPU-heavy endpoint 扣 10 分）。</li>
 <li><strong>Fail-open vs fail-close</strong>：限流系统挂了应该<em>放行</em>（避免限流故障变业务故障），但下游会瞬间暴露。配合 circuit breaker。</li>
 </ul>
-
-<h2>常见陷阱 / 面试追问</h2>
+<h2 data-tts="230221f8a6568571">常见陷阱 / 面试追问</h2>
 <ol>
 <li><strong>「为什么不用 sliding window log？」</strong> — 内存代价。1M user × 100 req = 1 亿条 timestamp ≈ 几 GB；用 counter 近似就够，误差 &lt; 5%。</li>
 <li><strong>「Redis 挂了怎么办？」</strong> — fail-open + circuit breaker；Stripe 工程博客明确把这作为铁律。</li>
@@ -297,8 +288,7 @@ def admit(req):
 <li><strong>「Retry-After 怎么算？」</strong> — token bucket 下 = <code>(1 - tokens) / refill_rate</code>；sliding window 下 = 到下一秒还有几毫秒；并且服务端必须加 jitter。</li>
 <li><strong>「为什么 token bucket 比 leaky bucket 更主流？」</strong> — 公开 API 客户端往往天然「攒着发」（cron job 一次发 50 个），token bucket 允许这种合理 burst；leaky bucket 严格匀速反而对正常用户不友好。</li>
 </ol>
-
-<h2>深入资源</h2>
+<h2 data-tts="7454086ad177ea46">深入资源</h2>
 <ul>
 <li><strong>Stripe Engineering Blog — <em>「Scaling your API with rate limiters」</em></strong>（Paul Tarjan）：四类限流器、Redis Lua 实现、fail-open 原则，配套 GitHub gist 有可跑 Ruby 代码。</li>
 <li><strong>Cloudflare Engineering Blog — <em>「How we built rate limiting capable of scaling to millions of domains」</em></strong>：边缘节点分布式限流，本地决策 + 异步聚合。</li>
@@ -306,9 +296,7 @@ def admit(req):
 <li><strong>Google SRE Book — Ch 21 「Handling Overload」</strong>：自适应限流、优先级抛弃、客户端侧的 retry budget。</li>
 <li><strong>Marc Brooker — <em>「Caution: Decreasing TCP MSS Doesn't Help」</em> 系列分布式文章</strong>：理解 fail-open 与 backpressure 的本质思考。</li>
 </ul>
-
-<h2>深入思考（点击展开思路）</h2>
-
+<h2 data-tts="10b09e8453975d4f">深入思考（点击展开思路）</h2>
 <details>
 <summary>1. Token bucket 的 capacity 与 refill rate 设成什么关系？capacity = refill 是否合理？</summary>
 <div class="answer">
@@ -321,7 +309,6 @@ def admit(req):
 <p>Stripe 的做法是 <em>「rate 是合同，cap 是仁慈」</em> —— cap 略大于 rate 让正常用户的偶尔 burst 不报错，但不至于让下游崩溃。极端场景（金融对账）甚至 cap = rate 让其严格匀速，等价 leaky bucket。</p>
 </div>
 </details>
-
 <details>
 <summary>2. 1M QPS 全过 Redis 不可行。如果只用 1 个 Redis 节点（约 30 万 QPS），怎么把每秒 100 万限流决策塞进去？</summary>
 <div class="answer">
@@ -334,7 +321,6 @@ def admit(req):
 <p>实战：<em>本地黑名单 + 本地子配额 + Redis Cluster</em> 三件套，Redis QPS 通常能压到 5-10 万。</p>
 </div>
 </details>
-
 <details>
 <summary>3. 客户端集体收到 429 + Retry-After=30s 后同时重试，造成二次过载。服务端可以怎么做避免？</summary>
 <div class="answer">
@@ -347,7 +333,6 @@ def admit(req):
 </ul>
 </div>
 </details>
-
 <details>
 <summary>4. 限流系统自己挂了：fail-open 放行还是 fail-close 拒绝？哪种业务该走哪条？</summary>
 <div class="answer">
@@ -361,7 +346,6 @@ def admit(req):
 <p>实战分层：<em>抗 DDoS 层 fail-open（保命）；计费配额层 fail-close（保钱）</em>。两层独立部署。</p>
 </div>
 </details>
-
 <details>
 <summary>5. GraphQL 一次 query 可能消耗 100 倍的 CPU，怎么定义「一次请求」用于限流？</summary>
 <div class="answer">
@@ -376,10 +360,9 @@ def admit(req):
 <p>同理适用于：批量 API（一次传 100 个 id）、文件上传（按字节扣）、AI inference（按 token 扣）—— 凡是「单请求成本差距 &gt; 10 倍」的场景都需要权重。</p>
 </div>
 </details>
-
 <div class="nav"><a href="index.html">← 回到 index</a></div>
-<script src="https://hub.cissychen.com/comments.js" defer></script>
-<script src="https://hub.cissychen.com/search.js" defer></script>
-<script src="https://hub.cissychen.com/index-button.js" defer></script>
-<script src="https://hub.cissychen.com/i18n-tts.js" defer></script>
+<script defer="" src="https://hub.cissychen.com/comments.js"></script>
+<script defer="" src="https://hub.cissychen.com/search.js"></script>
+<script defer="" src="https://hub.cissychen.com/index-button.js"></script>
+<script defer="" src="https://hub.cissychen.com/i18n-tts.js"></script>
 </div></body></html>

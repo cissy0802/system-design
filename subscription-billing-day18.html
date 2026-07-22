@@ -1,6 +1,7 @@
 <!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Day 18 · 订阅与计费 (Subscription & Billing) — System Design</title>
+
+<html lang="zh-CN"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Day 18 · 订阅与计费 (Subscription &amp; Billing) — System Design</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,"SF Pro Display","Noto Sans SC",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
@@ -97,7 +98,6 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 </script>
 </head><body><div class="container">
-
 <header>
 <div class="meta">
 <span class="tag day">Day 18</span>
@@ -107,10 +107,9 @@ document.addEventListener('DOMContentLoaded',()=>{
 <span class="tag">Proration</span>
 <span class="tag">Metering</span>
 </div>
-<h1>订阅与计费 — 把"按时间和用量收钱"做成可对账的引擎<span class="en">Subscription & Billing: Lifecycle State Machine, Proration, Usage Metering, Multi-currency & Tax</span></h1>
+<h1 data-tts="a38425c066826092">订阅与计费 — 把"按时间和用量收钱"做成可对账的引擎<span class="en">Subscription &amp; Billing: Lifecycle State Machine, Proration, Usage Metering, Multi-currency &amp; Tax</span></h1>
 </header>
-
-<h2>问题场景与需求约束</h2>
+<h2 data-tts="8b39a7f5c26990e8">问题场景与需求约束</h2>
 <p>设计一个 SaaS 计费平台（类似 Stripe Billing / Chargebee）：<strong>10 万企业订阅</strong>，混合定价 = 月度/年度固定费（seat-based）+ 按量计费（API 调用、存储 GB）。客户随时升降级套餐、增减席位，跨 30+ 国家、多货币、需自动算税。这是 Day 17 支付的<em>上游</em>：支付解决"怎么把一笔钱安全收掉"，计费解决"<strong>这个月到底该收多少钱、向谁、为什么</strong>"。</p>
 <p>面试要先澄清的关键约束：</p>
 <ul>
@@ -120,26 +119,23 @@ document.addEventListener('DOMContentLoaded',()=>{
 <li><strong>规模</strong>：固定费扣费 ~10 万张 invoice/月，但<strong>用量事件 ~10 亿/天</strong>——计费的真正吞吐瓶颈在 metering 不在 invoicing。</li>
 <li><strong>延迟</strong>：账单生成可异步（分钟级），但 proration 预览要同步（&lt; 300ms）让客户当场看到差价。</li>
 </ul>
-
-<h2>高层架构</h2>
+<h2 data-tts="b541a35a21593496">高层架构</h2>
 <div class="mermaid">
 graph TD
-  CAT[Pricing Catalog<br/>产品/价格/计划] --> SUB[Subscription Service<br/>生命周期状态机]
-  EV[用量事件 ~10亿/天] --> ING[Metering Ingest<br/>去重+幂等]
-  ING --> AGG[聚合 Rollup<br/>Redis→Postgres]
-  SUB --> BILL[Billing Engine<br/>周期触发 / Proration]
-  AGG --> BILL
-  TAX[Tax Engine<br/>税率+税则] --> BILL
-  BILL --> INV[(Invoice Store<br/>不可变账单)]
-  INV --> PAY[Payment / 收款<br/>Day 17 幂等支付]
-  PAY -->|失败| DUN[Dunning<br/>重试+催收]
-  INV --> LED[(Ledger<br/>双重记账/收入确认)]
+  CAT[Pricing Catalog<br/>产品/价格/计划] --&gt; SUB[Subscription Service<br/>生命周期状态机]
+  EV[用量事件 ~10亿/天] --&gt; ING[Metering Ingest<br/>去重+幂等]
+  ING --&gt; AGG[聚合 Rollup<br/>Redis→Postgres]
+  SUB --&gt; BILL[Billing Engine<br/>周期触发 / Proration]
+  AGG --&gt; BILL
+  TAX[Tax Engine<br/>税率+税则] --&gt; BILL
+  BILL --&gt; INV[(Invoice Store<br/>不可变账单)]
+  INV --&gt; PAY[Payment / 收款<br/>Day 17 幂等支付]
+  PAY --&gt;|失败| DUN[Dunning<br/>重试+催收]
+  INV --&gt; LED[(Ledger<br/>双重记账/收入确认)]
 </div>
 <p><strong>组件职责</strong>：① <em>Pricing Catalog</em> 定义产品、价格、计划（版本化，改价不影响存量订阅）；② <em>Subscription Service</em> 维护每个订阅的生命周期状态机；③ <em>Metering</em> 把海量用量事件去重、聚合成可计费数量；④ <em>Billing Engine</em> 是核心——周期到点把"固定费 + 用量 + proration 调整 + 税"汇成一张 invoice；⑤ 账单交给 Day 17 的<em>幂等支付</em>收款，失败进 <em>Dunning</em> 催收；⑥ 所有金额落 <em>Ledger</em> 做收入确认与对账。</p>
-
-<h2>关键技术点</h2>
-
-<h3>① 订阅生命周期状态机 + 周期触发 — 让"到点扣费"既不漏也不重</h3>
+<h2 data-tts="c3df2e03437171d5">关键技术点</h2>
+<h3 data-tts="0cca8c1d7eff83a4">① 订阅生命周期状态机 + 周期触发 — 让"到点扣费"既不漏也不重</h3>
 <p><strong>核心 trade-off：用一个显式落库的状态机，换掉散落在各处的 if-else 与重复扣费风险。</strong></p>
 <p>【原理】订阅不是一个布尔"激活/未激活"，而是状态机：<code>trialing → active → past_due → canceled / unpaid</code>。状态转移由两类事件驱动：<em>时间</em>（周期结束 = 该出账）和<em>动作</em>（升级、取消、支付成功/失败）。到点扣费的触发有两种实现：扫表 cron（每分钟查 <code>next_billing_at &lt;= now</code>）或为每个订阅注册一个 scheduled job。关键是<strong>幂等</strong>：把"为周期 P 生成 invoice"用 <code>(subscription_id, period_start)</code> 做唯一键，cron 重跑只命中已存在的 invoice，绝不重复出账。</p>
 <div class="tradeoff"><strong>选型对比：</strong>
@@ -150,7 +146,7 @@ graph TD
 </ul></div>
 <pre><code># pseudo-code: 幂等周期出账（cron 每分钟跑）
 def bill_due_subscriptions(now):
-    for sub in db.query("status IN ('active','past_due') AND next_billing_at <= %s", now):
+    for sub in db.query("status IN ('active','past_due') AND next_billing_at &lt;= %s", now):
         period = (sub.current_period_start, sub.current_period_end)
         # 唯一键去重：同周期只出一张账
         inv = db.get_or_create_invoice(sub.id, period[0])
@@ -168,8 +164,7 @@ def bill_due_subscriptions(now):
 <li><strong>Chargebee / Recurly</strong>：同样以"subscription + 周期 invoice"为核心模型，支持 trial、暂停、续订。</li>
 <li><strong>AWS</strong>：账单按月聚合，月初出账尖峰是典型的"billing run"批处理工程。</li>
 </ul></div>
-
-<h3>② Proration（按比例计费）— 中途变更怎么"补差价"</h3>
+<h3 data-tts="afe6db944afd4e81">② Proration（按比例计费）— 中途变更怎么"补差价"</h3>
 <p><strong>核心 trade-off：proration 让定价公平且即时，但每一次变更都往账单塞入正负两条调整行，复杂度与可解释性成本陡增。</strong></p>
 <p>【原理】客户在周期中途从 $10/月 升到 $20/月，不能整月按新价收。proration 把变更点切成两段：<em>退还</em>旧套餐剩余时间的未使用部分（负数 credit），<em>补收</em>新套餐剩余时间（正数 charge）。半个月升级 → <code>-$5</code>（旧价未用）+ <code>$10</code>（新价剩余）= 净补 <code>$5</code>。这些以 <strong>invoice line item</strong> 形式累积，下次出账或立即结算。比例因子 = 剩余秒数 / 周期总秒数——按秒算，不是按天，否则边界不公。</p>
 <div class="tradeoff"><strong>选型对比：</strong>
@@ -195,8 +190,7 @@ def prorate_change(sub, new_price, now):
 <li><strong>Stripe Prorations</strong>：升降级自动生成正负 proration line items，按秒计比例；负 proration 默认不退现金而记 credit，可 <code>preview</code> 让客户先看差价（对应我们 &lt;300ms 同步预览的需求）。</li>
 <li><strong>GitHub / Slack 席位计费</strong>：年中加人按比例补差价，减人记 credit 抵续费——seat-based proration 的经典形态。</li>
 </ul></div>
-
-<h3>③ 用量计费（Metering）— 10 亿事件/天怎么聚合成几个数字</h3>
+<h3 data-tts="71b315b795477db0">③ 用量计费（Metering）— 10 亿事件/天怎么聚合成几个数字</h3>
 <p><strong>核心 trade-off：在精度（每个事件都算）与吞吐/成本（聚合后再记）之间权衡，外加迟到事件破坏已定稿账单的风险。</strong></p>
 <p>【原理】metering pipeline 四段：<em>Emit</em>（业务发用量事件）→ <em>Ingest</em>（校验+幂等去重）→ <em>Meter</em>（聚合成可计费量）→ <em>Invoice</em>（汇入账单）。10 亿/天直接一条条写 DB 会爆，工业做法是<strong>两级聚合</strong>：先在应用内存/Redis 按 <code>(customer, meter, 小时)</code> 累加，每分钟 flush 一次到 Postgres rollup 表，出账时只 SUM 几千行小时桶。聚合函数受限：通常只支持 <code>sum / count / last</code>——"峰值并发""日均存储"这类 max/avg 要业务侧自己算好上报 last 值。事件必须带 <em>幂等键</em>（event_id）去重，否则客户端重试 = 多计费。</p>
 <div class="tradeoff"><strong>选型对比：</strong>
@@ -224,8 +218,7 @@ def flush_every_minute():                        # 二级：落 Postgres
 <li><strong>Datadog / Snowflake / Cloudflare</strong>：用量型计费的典型，海量计量事件先在数据管道里 rollup，再喂给 billing。</li>
 <li><strong>AWS metering</strong>：每个服务上报计量，月底聚合成账单行，迟到/修正通过后续调整体现。</li>
 </ul></div>
-
-<h3>④ 多货币与税务 — 同一套引擎服务全球</h3>
+<h3 data-tts="5edda28d02626407">④ 多货币与税务 — 同一套引擎服务全球</h3>
 <p><strong>核心 trade-off：本币计价体验最好，但引入 FX 风险、税则复杂度与对账维度爆炸。</strong></p>
 <p>【原理】两件事必须做对。<em>货币</em>：每个 price 用 minor units + ISO 货币码存储（日元无小数、第纳尔三位小数——别假设两位）；跨币种<strong>不在出账时实时换汇</strong>，而是为每币种预设价格，避免汇率波动让账单不可复现。<em>税</em>：税额是<em>额外加</em>（exclusive，美国常见）还是<em>已含</em>（inclusive，欧盟含 VAT）由地区/货币决定；商品要打 tax code 决定税率与是否免税。税在出账瞬间按当时税率冻结进 invoice，事后税率变更不回改历史账单。</p>
 <div class="tradeoff"><strong>选型对比：</strong>
@@ -240,8 +233,7 @@ def flush_every_minute():                        # 二级：落 Postgres
 <li><strong>Stripe Tax</strong>：按货币自动选 tax behavior（USD/CAD 默认 exclusive，其余 inclusive），多币种价格可逐币种覆盖；用 product tax code 跨 100+ 国家算税。</li>
 <li><strong>Apple App Store / Google Play</strong>：全球定价用各区"价格档位"而非实时换汇，正是预设价模式。</li>
 </ul></div>
-
-<h2>扩展与优化（增长后怎么办）</h2>
+<h2 data-tts="0b47017d5769ecb7">扩展与优化（增长后怎么办）</h2>
 <ul>
 <li><strong>出账尖峰</strong>：把账单 anchor date 打散到全月（而非都在 1 号），billing run 按客户分片并行；用量 rollup 提前到周期内增量计算，出账时只做收尾。</li>
 <li><strong>Dunning（催收）</strong>：支付失败不等于流失——按 backoff 重试（如第 1/3/5/7 天），配合 smart retry（避开发卡行拒付高峰）、邮件提醒、最后降级到 <code>unpaid</code>。这是 SaaS 挽回收入的关键一环。</li>
@@ -249,27 +241,23 @@ def flush_every_minute():                        # 二级：落 Postgres
 <li><strong>定价实验</strong>：Pricing Catalog 版本化，新价格只对新订阅生效，存量订阅 grandfather（保留旧价）；改价绝不能就地改存量订阅的引用。</li>
 <li><strong>对账</strong>：billing 的 invoice 总额 ⇄ 支付实收 ⇄ ledger 收入，三方逐笔对账（接 Day 17 的对账作业），任何 break 都要可定位到 line item。</li>
 </ul>
-
-<h2>常见陷阱 + 面试追问</h2>
+<h2 data-tts="66f8731d3c850c1c">常见陷阱 + 面试追问</h2>
 <div class="callout"><strong>1. 用 float 存钱。</strong> <code>0.1 + 0.2 ≠ 0.3</code>，累积舍入误差最终在对账时炸出几分钱的 break。永远用整数 minor units，且记住不是所有币种都两位小数。</div>
 <div class="callout"><strong>2. 出账不幂等。</strong> cron 重跑、消息重投、客户狂点升级，没有 <code>(sub_id, period)</code> 唯一键就会重复出账、重复扣款。幂等是计费的底线。</div>
 <div class="callout"><strong>3. proration 按天而非按秒。</strong> 边界日的归属会让客户多付/少付，争议不断；且要明确升级立即收、降级记 credit 的策略。</div>
 <div class="callout"><strong>4. 改价就地改存量订阅。</strong> 价格必须版本化，存量订阅引用旧版本；否则一次调价把所有老客户账单全改了，等着上新闻。</div>
 <div class="callout"><strong>5. 迟到用量事件直接塞进已定稿账单。</strong> 已 finalize 的 invoice 应不可变；迟到事件入下期或走显式 credit note 调整，而不是偷偷改历史。</div>
 <p style="margin-top:14px"><strong>高频追问：</strong>① 周期出账用 cron 还是 per-subscription timer，怎么保证不漏不重？② 中途升级的 proration 一步步算给我看（按秒）。③ 10 亿用量事件/天的 metering 怎么设计，迟到事件怎么办？④ 年付怎么做收入确认，现金和收入为什么要分开记？⑤ inclusive vs exclusive 税，多币种为什么不实时换汇？</p>
-
-<h2>深入资源</h2>
+<h2 data-tts="2e95a94ebe15b50a">深入资源</h2>
 <ul>
-<li><strong>Stripe Billing — Subscriptions Overview & Prorations</strong>（<a href="https://docs.stripe.com/billing/subscriptions/overview">overview</a> / <a href="https://docs.stripe.com/billing/subscriptions/prorations">prorations</a>）：生命周期状态机与按秒 proration 的权威实现。</li>
+<li><strong>Stripe Billing — Subscriptions Overview &amp; Prorations</strong>（<a href="https://docs.stripe.com/billing/subscriptions/overview">overview</a> / <a href="https://docs.stripe.com/billing/subscriptions/prorations">prorations</a>）：生命周期状态机与按秒 proration 的权威实现。</li>
 <li><strong>Stripe — Designing robust and predictable APIs with idempotency</strong>（<a href="https://stripe.com/blog/idempotency">stripe.com/blog/idempotency</a>）：出账与变更幂等的工程基础。</li>
 <li><strong>Stripe Billing Meters / Usage-based billing</strong>（<a href="https://docs.stripe.com/billing/subscriptions/usage-based-legacy/recording-usage">recording usage</a>）：用量聚合 sum/count/last 与高频上报的官方建议。</li>
-<li><strong>Stripe Tax — Tax behavior & multi-currency</strong>（<a href="https://docs.stripe.com/tax/products-prices-tax-codes-tax-behavior">tax behavior</a>）：inclusive/exclusive 与多币种税则。</li>
+<li><strong>Stripe Tax — Tax behavior &amp; multi-currency</strong>（<a href="https://docs.stripe.com/tax/products-prices-tax-codes-tax-behavior">tax behavior</a>）：inclusive/exclusive 与多币种税则。</li>
 <li><strong>TigerBeetle — Debit/Credit schema</strong>（<a href="https://docs.tigerbeetle.com/concepts/debit-credit/">docs</a>）：把收入确认建成双重记账不变量。</li>
 <li><strong>《Designing Data-Intensive Applications》</strong>（Kleppmann）：批处理出账、幂等与对账思想的底层原理。</li>
 </ul>
-
-<h2>深入思考（点击展开答案）</h2>
-
+<h2 data-tts="572d8a5466913e82">深入思考（点击展开答案）</h2>
 <details>
 <summary>1. 10 万订阅都在每月 1 号出账，billing run 扛不住尖峰。除了"加机器"，至少给两种结构性解法，各自代价？</summary>
 <div class="answer">
@@ -280,7 +268,6 @@ def flush_every_minute():                        # 二级：落 Postgres
 <p>二阶收益：出账尖峰会传导到<em>支付</em>侧——10 万张账单同时 charge 会打爆 PSP 配额并撞上发卡行限流，所以打散账单日同时也在给下游支付削峰。</p>
 </div>
 </details>
-
 <details>
 <summary>2. 客户在一个周期内升级→降级→再升级三次，账单会变成什么样？怎么让它仍然可解释？</summary>
 <div class="answer">
@@ -293,7 +280,6 @@ def flush_every_minute():                        # 二级：落 Postgres
 <p>陷阱：频繁变更可能产生"反复试套餐套利"——某些系统对一周期内多次降级设限或只在周期末结算，正是用干净度换公平性的 trade-off。</p>
 </div>
 </details>
-
 <details>
 <summary>3. 一个用量事件在周期结束后 2 小时才到达（客户端缓冲/网络延迟）。塞进已关账单、计入下期、还是别的？各方案破在哪？</summary>
 <div class="answer">
@@ -305,7 +291,6 @@ def flush_every_minute():                        # 二级：落 Postgres
 <p>本质是 Day 20 流处理的 <strong>watermark / 迟到数据</strong>问题在计费域的投影：你要在"等多久才定稿"（完整性）与"多快出账"（时效）之间设一个 watermark，并为窗外数据准备可审计的补偿通道。</p>
 </div>
 </details>
-
 <details>
 <summary>4. 年付一次性收了 $1200，为什么不能当月就确认 $1200 收入？这对系统数据模型有什么要求？</summary>
 <div class="answer">
@@ -313,7 +298,6 @@ def flush_every_minute():                        # 二级：落 Postgres
 <p>对系统的要求：现金流与收入流<strong>必须分开记</strong>。Ledger 用双重记账：收款时 借现金 / 贷递延收入；每月 借递延收入 / 贷已确认收入。这正是 TigerBeetle 式 debit/credit 不变量的用武之地——任何时刻"已收现金 = 已确认 + 待确认"恒等，单边写入成为非法状态而非隐蔽 bug。中途取消则冲销剩余递延收入 + 退现金。</p>
 </div>
 </details>
-
 <details>
 <summary>5. 计费系统和 Day 17 支付系统的幂等键，能不能共用一个？边界在哪？</summary>
 <div class="answer">
@@ -325,10 +309,9 @@ def flush_every_minute():                        # 二级：落 Postgres
 <p>边界：一张 invoice 可能被 charge <em>多次尝试</em>（dunning：第 1/3/5 天重试）。这些重试应共享同一支付幂等键（针对该 invoice），让 PSP 识别为同一笔、不重复扣；但每次重试是计费状态机的合法转移，不应被计费层幂等当成"重复"丢弃。所以两层幂等键解耦：计费保证"账不重出"，支付保证"钱不重扣"，dunning 在两者之间编排重试——这正是分层幂等的经典设计。</p>
 </div>
 </details>
-
 </div>
-<script src="https://hub.cissychen.com/comments.js" defer></script>
-<script src="https://hub.cissychen.com/search.js" defer></script>
-<script src="https://hub.cissychen.com/index-button.js" defer></script>
-<script src="https://hub.cissychen.com/i18n-tts.js" defer></script>
+<script defer="" src="https://hub.cissychen.com/comments.js"></script>
+<script defer="" src="https://hub.cissychen.com/search.js"></script>
+<script defer="" src="https://hub.cissychen.com/index-button.js"></script>
+<script defer="" src="https://hub.cissychen.com/i18n-tts.js"></script>
 </body></html>

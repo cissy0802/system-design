@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<html lang="zh-CN"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>Day 37 · 多租户 SaaS 架构 (Multi-tenant SaaS) — System Design</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -97,7 +98,6 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 </script>
 </head><body><div class="container">
-
 <header>
 <div class="meta">
 <span class="tag day">Day 37</span>
@@ -108,10 +108,9 @@ document.addEventListener('DOMContentLoaded',()=>{
 <span class="tag">资源配额</span>
 <span class="tag">用量计费</span>
 </div>
-<h1>多租户 SaaS 架构 — 一套系统服务一万个互不信任的租户<span class="en">Multi-tenant SaaS: Tenant Isolation, Data Partitioning, Quotas & Metered Billing</span></h1>
+<h1 data-tts="0e253753e1a6adaa">多租户 SaaS 架构 — 一套系统服务一万个互不信任的租户<span class="en">Multi-tenant SaaS: Tenant Isolation, Data Partitioning, Quotas &amp; Metered Billing</span></h1>
 </header>
-
-<h2>问题场景 + 需求约束</h2>
+<h2 data-tts="af9239cef312214c">问题场景 + 需求约束</h2>
 <p>设计一个 B2B 协作 SaaS（类 Notion / 类 Figma），<strong>1 万个企业租户、共 500 万用户、单库存不下</strong>。租户从 5 人小团队到 5 万人大客户，体量差三个数量级。核心矛盾：<em>一套基础设施服务所有人换取成本效率，但任意两个租户互不信任</em>——A 租户绝不能读到 B 的数据，A 的批量导入也不能拖垮 B 的在线请求。</p>
 <ul>
 <li><strong>隔离</strong>：数据强隔离（合规：GDPR、SOC2、部分客户要求数据驻留特定区域）；性能隔离（噪声邻居不能传染）。</li>
@@ -120,37 +119,33 @@ document.addEventListener('DOMContentLoaded',()=>{
 <li><strong>计费</strong>：按席位 + 按用量（API 调用、存储）混合计费，账单误差零容忍。</li>
 </ul>
 <p>本期讲四件事：<em>隔离模型怎么选、数据怎么分区、噪声邻居怎么治、用量怎么算钱</em>。</p>
-
-<h2>高层架构</h2>
+<h2 data-tts="71feecf655a5b73f">高层架构</h2>
 <div class="mermaid">
 graph TD
-  C[租户请求] --> GW[API Gateway<br/>解析 tenant_id]
-  GW --> AUTH[AuthN/AuthZ<br/>注入 tenant context]
-  AUTH --> RL[Per-tenant 限流/配额]
-  RL --> APP[共享应用层<br/>无状态]
-  APP --> ROUTER[Tenant Router<br/>tenant_id 到 shard 映射]
-  ROUTER --> S1[(Shard 1<br/>pool 小租户)]
-  ROUTER --> S2[(Shard 2<br/>pool 小租户)]
-  ROUTER --> SILO[(Silo DB<br/>大客户独享)]
-  APP --> MET[用量事件<br/>metering pipeline]
-  MET --> BILL[计费/账单<br/>Stripe]
-  ROUTER -.查.-> CAT[(Tenant Catalog<br/>路由+配置元数据)]
+  C[租户请求] --&gt; GW[API Gateway<br/>解析 tenant_id]
+  GW --&gt; AUTH[AuthN/AuthZ<br/>注入 tenant context]
+  AUTH --&gt; RL[Per-tenant 限流/配额]
+  RL --&gt; APP[共享应用层<br/>无状态]
+  APP --&gt; ROUTER[Tenant Router<br/>tenant_id 到 shard 映射]
+  ROUTER --&gt; S1[(Shard 1<br/>pool 小租户)]
+  ROUTER --&gt; S2[(Shard 2<br/>pool 小租户)]
+  ROUTER --&gt; SILO[(Silo DB<br/>大客户独享)]
+  APP --&gt; MET[用量事件<br/>metering pipeline]
+  MET --&gt; BILL[计费/账单<br/>Stripe]
+  ROUTER -.查.-&gt; CAT[(Tenant Catalog<br/>路由+配置元数据)]
 </div>
 <p><strong>组件职责</strong>：网关从 subdomain / JWT 解出 <code>tenant_id</code>，<em>贯穿全链路</em>成为一等公民；<strong>Tenant Catalog</strong> 是控制平面，存每个租户的 shard 归属、隔离级别、配额、计费计划；数据平面按 catalog 路由——小租户混在共享 shard（pool），大客户切到独享库（silo）。用量事件旁路异步流向计费。</p>
-
-<h2>关键技术点</h2>
-
-<h3>1. 隔离模型：Silo vs Pool vs Bridge — 安全与成本的连续光谱</h3>
+<h2 data-tts="c3df2e03437171d5">关键技术点</h2>
+<h3 data-tts="535fa52bdc213f0e">1. 隔离模型：Silo vs Pool vs Bridge — 安全与成本的连续光谱</h3>
 <p><strong>核心 trade-off：每多一分隔离，多一分安全/合规，少一分成本效率与运维可扩展性。</strong></p>
 <p>【原理】多租户隔离不是布尔值而是<em>光谱</em>。AWS 的术语把它分三档：<strong>Silo</strong>（每租户独享栈/库，物理隔离）、<strong>Pool</strong>（所有租户共享资源，靠应用层逻辑隔离）、<strong>Bridge</strong>（混合：该独享的独享、该共享的共享）。关键洞察是<em>隔离边界可以逐层选择</em>——计算层 pool、存储层对大客户 silo，完全合法。</p>
 <div class="tradeoff">
-<strong>Silo</strong>：每租户独立 DB/集群。✅ 爆炸半径小、合规简单、噪声邻居天然消失、计费=直接看资源账单。❌ 成本随租户线性增长、1 万个库的 schema 迁移是噩梦、资源利用率低（小租户也占一整套）。<br>
-<strong>Pool</strong>：共享表，靠 <code>tenant_id</code> 列 + 行级隔离。✅ 成本效率极高、一次迁移全覆盖、利用率高。❌ <em>一个漏 WHERE 就是跨租户数据泄露</em>、噪声邻居、爆炸半径=全员。<br>
+<strong>Silo</strong>：每租户独立 DB/集群。✅ 爆炸半径小、合规简单、噪声邻居天然消失、计费=直接看资源账单。❌ 成本随租户线性增长、1 万个库的 schema 迁移是噩梦、资源利用率低（小租户也占一整套）。<br/>
+<strong>Pool</strong>：共享表，靠 <code>tenant_id</code> 列 + 行级隔离。✅ 成本效率极高、一次迁移全覆盖、利用率高。❌ <em>一个漏 WHERE 就是跨租户数据泄露</em>、噪声邻居、爆炸半径=全员。<br/>
 <strong>Bridge</strong>：默认 pool，大客户/高合规客户 silo。✅ 80% 成本效率 + 20% 客户的强隔离卖点。❌ 两套代码路径、路由复杂度。
 </div>
 <div class="case"><strong>现实案例</strong>：<a href="https://docs.aws.amazon.com/whitepapers/latest/saas-tenant-isolation-strategies/welcome.html">AWS《SaaS Tenant Isolation Strategies》白皮书</a>系统化了 silo/pool/bridge 三模型，是行业事实标准词汇。Salesforce 是经典 pool（共享元数据驱动的 schema 服务海量租户）；多数成熟 SaaS 最终演进成 bridge——免费/小客户 pool、企业版 silo。</div>
-
-<h3>2. 数据分区：按 tenant_id 分片 + 行级隔离 — 倾斜是头号敌人</h3>
+<h3 data-tts="ffb21027c34d7368">2. 数据分区：按 tenant_id 分片 + 行级隔离 — 倾斜是头号敌人</h3>
 <p><strong>核心 trade-off：共享 schema 省成本但隔离全靠代码纪律；schema/DB-per-tenant 隔离硬但运维不可扩展。</strong></p>
 <p>【原理】pool 模型下三种粒度：<strong>① 共享表 + tenant_id 列</strong>（最省，靠 Postgres RLS 兜底防漏查）；<strong>② schema-per-tenant</strong>（一租户一 schema）；<strong>③ database-per-tenant</strong>（=silo）。SaaS 数据天然以 <code>tenant_id</code> 为分片键——同租户数据落同一物理 shard，绝大多数查询带 tenant_id，<em>不产生跨 shard 扇出</em>，这是 SaaS 相比通用分片的巨大优势。</p>
 <p>难点是<strong>倾斜</strong>：随机 hash(tenant_id) 到 shard，但一个巨型租户可能塞爆单 shard。解法是<em>把热租户单独 isolate 到专属 shard</em>。</p>
@@ -170,8 +165,7 @@ def route(tenant_id):
     return shards[hash(tenant_id) % len(shards)]
 </code></pre>
 <div class="case"><strong>现实案例</strong>：<a href="https://www.notion.com/blog/the-great-re-shard">Notion『The Great Re-shard』</a>——按 workspace ID 分区，同 workspace 全部数据落同一 shard，扩容时从 32 库 reshard 到 96 库零停机。<a href="https://www.figma.com/blog/how-figmas-databases-team-lived-to-tell-the-scale/">Figma</a>把『逻辑分片』（应用层 + view）与『物理分片』（Postgres 层）解耦，先低风险铺逻辑分片再做物理切换，并自建 DBProxy 路由。<a href="https://aws.amazon.com/blogs/database/multi-tenant-data-isolation-with-postgresql-row-level-security/">AWS</a> 详述用 Postgres RLS 做租户隔离的范式。</div>
-
-<h3>3. 噪声邻居与资源配额 — 公平性是 pool 模型的命门</h3>
+<h3 data-tts="897298452fc1c286">3. 噪声邻居与资源配额 — 公平性是 pool 模型的命门</h3>
 <p><strong>核心 trade-off：硬隔离（独享资源）杜绝传染但浪费；软配额（共享 + 公平调度）省钱但要主动治理。</strong></p>
 <p>【原理】pool 下，A 租户一次百万行批量导入会吃光连接池/CPU，B 租户的在线请求被饿死——<em>噪声邻居</em>。三道防线：<strong>① 入口限流</strong>（per-tenant token bucket，按计费计划分级）；<strong>② 资源配额</strong>（每租户最大连接数、查询超时、存储上限）；<strong>③ 公平调度</strong>（独立队列轮询，而非 FIFO 共享队列让大租户插队）。关键是<em>配额要按租户而非全局</em>——全局限流挡不住单租户打爆。</p>
 <pre><code># Per-tenant 令牌桶 + 公平队列（避免单租户独占 worker）
@@ -186,8 +180,7 @@ def dispatch():                             # worker 轮询而非抢占
         if (job := q.poll()): run(job)
 </code></pre>
 <div class="case"><strong>现实案例</strong>：<a href="https://stripe.com/blog/rate-limiters">Stripe</a> 公开过多层 rate limiter（含按用户/load shedding 分级），核心思想就是隔离突发租户保护整体。AWS SaaS Lens 把『noisy neighbor』列为 pool 模型头号风险并推荐 per-tenant throttling + usage-based quota。</div>
-
-<h3>4. 用量计量与计费集成 — 账单错一分钱都是事故</h3>
+<h3 data-tts="ea56eb3b0e5b2bc7">4. 用量计量与计费集成 — 账单错一分钱都是事故</h3>
 <p><strong>核心 trade-off：实时精确计量成本高；批量近似省钱但对账困难。账单要求 exactly-once 语义。</strong></p>
 <p>【原理】混合计费（席位 + 用量）的难点在<em>用量</em>：每次 API 调用/存储增量是一个 usage event，要<strong>不丢不重</strong>地聚合成账单。流水线：应用埋点 → 事件队列 → 聚合（按 tenant×metric×时间窗）→ 推送给 Stripe metered billing。关键设计：<strong>每个 usage event 带幂等键</strong>（防重试重复计费）、聚合用 <em>at-least-once 投递 + 下游幂等去重</em>、用量数据是<em>财务真相源</em>要持久化可重算（出账争议时能回放）。</p>
 <pre><code># 幂等用量事件：idempotency_key 防止重试导致重复计费
@@ -205,16 +198,14 @@ FROM (SELECT DISTINCT ON (idempotency_key) * FROM raw_events) d
 GROUP BY 1,2,3;
 </code></pre>
 <div class="case"><strong>现实案例</strong>：<a href="https://docs.stripe.com/billing">Stripe usage-based / metered billing</a> 提供带幂等键的用量上报 API，正是为防重复计费设计；席位+用量混合是 SaaS 标配（Notion/Figma 按编辑席位、API 类产品按调用量）。AWS SaaS 架构强调 metering 必须与 tenant context 绑定，否则无法归因到租户出账。</div>
-
-<h2>扩展与优化</h2>
+<h2 data-tts="ede83f7e6c2d4e96">扩展与优化</h2>
 <ul>
 <li><strong>从 pool 起步，bridge 演进</strong>：早期全 pool 求速度，企业客户来了再把它 isolate 到 silo（lift-and-shift 单租户数据到专属库）。</li>
 <li><strong>倾斜治理</strong>：监控每 shard 的租户体量，热租户自动 isolate；resharding 用『双写 + 校验 + 切流』（参考 Notion/Figma）。</li>
 <li><strong>数据驻留</strong>：合规客户要 EU/US 数据不出境——catalog 增加 region 维度，租户级路由到对应区域集群（multi-region 控制平面）。</li>
 <li><strong>Per-tenant 可观测性</strong>：所有 metrics/logs/traces 打 tenant_id 标签，否则故障时无法回答『是哪个租户在搞事』。基数会爆炸，高基数 label 要谨慎。</li>
 </ul>
-
-<h2>常见陷阱 + 面试问题</h2>
+<h2 data-tts="1b2216328ed96a9a">常见陷阱 + 面试问题</h2>
 <div class="callout"><strong>1. 漏写 WHERE tenant_id = 跨租户数据泄露</strong>：pool 模型最致命的 bug，且测试很难覆盖。纵深防御：RLS 兜底 + ORM 强制注入 tenant scope + 自动化测试模拟跨租户访问。</div>
 <div class="callout"><strong>2. 连接池被单租户耗尽</strong>：共享连接池下，一个慢查询/大事务的租户会饿死全部。要 per-tenant 连接配额或语句超时。</div>
 <div class="callout"><strong>3. 全局唯一约束在分片后失效</strong>：邮箱唯一、序号自增在跨 shard 后不再全局成立。要么把唯一性限定在租户内，要么用全局 ID 服务（见 Day 11 Snowflake）。</div>
@@ -227,8 +218,7 @@ GROUP BY 1,2,3;
 <li>设计 per-tenant 限流，免费版和企业版配额不同，热点租户突发怎么不影响别人？</li>
 <li>按用量计费的流水线如何保证账单 exactly-once、出账争议时可回放？</li>
 </ol>
-
-<h2>深入资源</h2>
+<h2 data-tts="2363376e37ef6d58">深入资源</h2>
 <ul>
 <li><strong><a href="https://docs.aws.amazon.com/whitepapers/latest/saas-tenant-isolation-strategies/welcome.html">AWS《SaaS Tenant Isolation Strategies》白皮书</a></strong>：silo/pool/bridge 三模型的权威定义与实现模式。</li>
 <li><strong><a href="https://www.notion.com/blog/the-great-re-shard">Notion『The Great Re-shard』</a></strong>：按 workspace 分片 + 零停机扩容的实战复盘。</li>
@@ -236,9 +226,7 @@ GROUP BY 1,2,3;
 <li><strong><a href="https://aws.amazon.com/blogs/database/multi-tenant-data-isolation-with-postgresql-row-level-security/">AWS: Multi-tenant data isolation with Postgres RLS</a></strong>：行级安全做租户隔离的范式。</li>
 <li><strong>《Designing Data-Intensive Applications》</strong>（Kleppmann）分片与一致性章节：分区键选择、倾斜与 rebalancing 的底层原理。</li>
 </ul>
-
-<h2>深入思考（点击展开答案）</h2>
-
+<h2 data-tts="97a78a287dee7015">深入思考（点击展开答案）</h2>
 <details>
 <summary>1. pool 模型省成本，为什么大客户反而常常要求 silo？这背后是技术问题还是商业问题？</summary>
 <div class="answer">
@@ -252,7 +240,6 @@ GROUP BY 1,2,3;
 </ul>
 </div>
 </details>
-
 <details>
 <summary>2. 你用 hash(tenant_id) 均匀分片，但生产中某 shard 的 p99 持续比别人高 3 倍。可能原因？</summary>
 <div class="answer">
@@ -265,7 +252,6 @@ GROUP BY 1,2,3;
 </ul>
 </div>
 </details>
-
 <details>
 <summary>3. 全局限流（如整体 10万 QPS）已经存在，为什么还必须 per-tenant 限流？两者关系？</summary>
 <div class="answer">
@@ -277,7 +263,6 @@ GROUP BY 1,2,3;
 </ul>
 </div>
 </details>
-
 <details>
 <summary>4. 用量计费要 exactly-once，但分布式系统做不到真正的 exactly-once 投递。怎么办？</summary>
 <div class="answer">
@@ -290,7 +275,6 @@ GROUP BY 1,2,3;
 </ul>
 </div>
 </details>
-
 <details>
 <summary>5. 一个 pool shard 上有 5000 个租户共享一张表，你要给其中一个租户做 schema 迁移（加一列+回填）。这比单租户系统难在哪？</summary>
 <div class="answer">
@@ -303,9 +287,8 @@ GROUP BY 1,2,3;
 </ul>
 </div>
 </details>
-
-<script src="https://hub.cissychen.com/comments.js" defer></script>
-<script src="https://hub.cissychen.com/search.js" defer></script>
-<script src="https://hub.cissychen.com/index-button.js" defer></script>
-<script src="https://hub.cissychen.com/i18n-tts.js" defer></script>
+<script defer="" src="https://hub.cissychen.com/comments.js"></script>
+<script defer="" src="https://hub.cissychen.com/search.js"></script>
+<script defer="" src="https://hub.cissychen.com/index-button.js"></script>
+<script defer="" src="https://hub.cissychen.com/i18n-tts.js"></script>
 </div></body></html>

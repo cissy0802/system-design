@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<html lang="zh-CN"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>Day 25 · 系统设计面试 (System Design Interview) — System Design</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -97,7 +98,6 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 </script>
 </head><body><div class="container">
-
 <header>
 <div class="meta">
 <span class="tag day">Day 25</span>
@@ -107,15 +107,13 @@ document.addEventListener('DOMContentLoaded',()=>{
 <span class="tag">Scoping</span>
 <span class="tag">Trade-offs</span>
 </div>
-<h1>系统设计面试 — 45 分钟把开放题做成一场架构对话<span class="en">System Design Interview: Scoping, the 4-Step Framework, Thinking Out Loud</span></h1>
+<h1 data-tts="b384cacba9b31b39">系统设计面试 — 45 分钟把开放题做成一场架构对话<span class="en">System Design Interview: Scoping, the 4-Step Framework, Thinking Out Loud</span></h1>
 </header>
-
-<h2>问题场景 + 评分维度</h2>
+<h2 data-tts="b773612f864ab06d">问题场景 + 评分维度</h2>
 <p>面试官扔来一句「设计一个 Twitter」「设计一个发号器」，<strong>45–50 分钟</strong>，白板或共享文档，没有标准答案。新手以为考的是「我知道多少组件」，于是开始背诵『加 CDN、加 Redis、加 Kafka』——这恰恰是<em>最快的挂法</em>。</p>
 <p>面试官真正在测的是四件事（现代 rubric 基本都能拆成这四桶）：<strong>判断力</strong>（judgment，在约束下做选择）、<strong>技术深度</strong>（depth，能不能往下挖到实现）、<strong>操作成熟度</strong>（operational maturity，想没想到失败/扩容/监控）、<strong>沟通</strong>（communication，能不能主导对话、讲清推理）。同一道题，能区分 <em>L4 / L5 / L6</em> 的不是答案对错，而是这四个维度的密度。</p>
 <div class="callout"><strong>核心认知：</strong>系统设计题是一道<em>故意没有标准答案</em>的开放题。面试官不是在等你说出「正确架构」，而是在看你<strong>如何在不确定中收敛、做决策、并讲清为什么</strong>。把它当对话，不是当答题。</div>
-
-<h2>高层架构（一场面试的流程）</h2>
+<h2 data-tts="61ae6c21222c7c5c">高层架构（一场面试的流程）</h2>
 <pre class="mermaid">
 graph TD
     Q["面试官：设计一个 X<br/><i>开放 · 无标准答案</i>"]
@@ -127,10 +125,10 @@ graph TD
     S5["⑤ 收尾 ~5min<br/>瓶颈 · 扩展 · 取舍总结"]
     NARR["全程：出声推理<br/><i>narrate 每个决策</i>"]
 
-    Q --> S1 --> S2 --> S3 --> BUY
-    BUY -->|跑偏/范围不对| S1
-    BUY -->|对齐| S4 --> S5
-    NARR -.贯穿.-> S3
+    Q --&gt; S1 --&gt; S2 --&gt; S3 --&gt; BUY
+    BUY --&gt;|跑偏/范围不对| S1
+    BUY --&gt;|对齐| S4 --&gt; S5
+    NARR -.贯穿.-&gt; S3
 
     classDef start fill:#2a1530,stroke:#ff7ab6,color:#e8eef5
     classDef step fill:#1a2530,stroke:#64c8ff,color:#e8eef5
@@ -142,10 +140,8 @@ graph TD
     class NARR side
 </pre>
 <p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">时间盒是骨架；菱形的 buy-in 检查点防止你花 15 分钟把<em>错的系统</em>设计得很漂亮</p>
-
-<h2>关键技术点</h2>
-
-<h3>1. 范围界定：资深的信号是主动「砍」，不是堆功能</h3>
+<h2 data-tts="c3df2e03437171d5">关键技术点</h2>
+<h3 data-tts="f5299d6f54f64605">1. 范围界定：资深的信号是主动「砍」，不是堆功能</h3>
 <p><strong>原理</strong>：开放题的第一动作不是画图，是<em>把题收敛成可设计的题</em>。先分 <strong>功能需求</strong>（发推、看 timeline、关注）和 <strong>非功能需求</strong>（规模、延迟 SLO、一致性、可用性）。然后<strong>主动声明取舍</strong>：「我先聚焦发推 + home timeline 这两个核心路径，搜索和广告这次先不展开，可以吗？」——这一句话同时传递了 judgment 和 communication 两个信号。面试官给模糊题，就是想看你会不会问、敢不敢划线。</p>
 <div class="tradeoff"><strong>Trade-off：范围太大 vs 太小</strong>
 <ul>
@@ -164,8 +160,7 @@ clarify = [
 # 把答案写在白板角落，作为后续每个决策的「约束锚点」
 </code></pre>
 <div class="case"><strong>现实案例：</strong>Alex Xu《System Design Interview – An Insider's Guide》(<a href="https://bytebytego.com" target="_blank">ByteByteGo</a>) 的 Step 1 就叫「Understand the problem and establish design scope」；<a href="https://interviewing.io/guides/system-design-interview" target="_blank">interviewing.io 的资深工程师指南</a>反复强调：先花时间澄清和缩范围的候选人，通过率显著更高。</div>
-
-<h3>2. 四步框架 + 时间盒：候选人最常死在时间分配</h3>
+<h3 data-tts="e506ba1b4bcc38b8">2. 四步框架 + 时间盒：候选人最常死在时间分配</h3>
 <p><strong>原理</strong>：框架是 <em>clarify → estimate → high-level design → deep dive → wrap-up</em>。它的价值不是「步骤」，而是<strong>时间盒</strong>和<strong>buy-in 检查点</strong>。每画完高层架构，停下来问一句「这个方向 ok 吗？我接下来想深挖 X」——这一步让你不会埋头把面试官不关心的部分做满，也把对话的主导权握在手里。</p>
 <table>
 <thead><tr><th>阶段</th><th>时间</th><th>产出</th><th>失分点</th></tr></thead>
@@ -178,8 +173,7 @@ clarify = [
 </tbody></table>
 <div class="tradeoff"><strong>Trade-off：先广后深 vs 直接深挖。</strong>不先画高层框架就深挖 → 面试官没有全局上下文，觉得你跳跃；花 20 分钟磨高层框架图 → 没有 depth 信号。<em>正解</em>：高层 10 分钟拿到 buy-in，立刻把预算转向深挖。时间是面试里最稀缺的资源。</div>
 <div class="case"><strong>现实案例：</strong>这四步几乎是行业共识——Alex Xu 的书把它定为标准流程，<a href="https://github.com/donnemartin/system-design-primer" target="_blank">donnemartin/system-design-primer</a> 的「How to approach」一节同样建议「先划范围、再估算、再高层、再细化」。</div>
-
-<h3>3. 深挖与出声推理：让面试官看到你的决策过程</h3>
+<h3 data-tts="fe62fef186ba3ad4">3. 深挖与出声推理：让面试官看到你的决策过程</h3>
 <p><strong>原理</strong>：depth 信号几乎全部产生在深挖阶段。关键动作有二：①<strong>主动选深挖点</strong>——挑那个<em>最有 trade-off 张力的组件</em>（瓶颈、热点、一致性边界），而不是被动等面试官追问；②<strong>出声推理</strong>（think out loud）——把脑子里的候选方案、淘汰理由都说出来。即使最终结论错了，清晰的推理路径也能拿到 partial credit；沉默地写出一个正确答案，反而拿不到沟通分。</p>
 <div class="tradeoff"><strong>Trade-off：候选人主导 vs 面试官主导。</strong>主动挑深挖点 = staff 信号（你能识别系统里哪里最难），但风险是挑到自己不熟的；被动等问 = 安全但显得不够 senior。<em>折中</em>：自己提出 2–3 个候选深挖点，让面试官选一个——既展示判断力，又对齐了他想考的方向。</div>
 <pre><code># 该深挖哪里？一个排序启发式
@@ -192,8 +186,7 @@ def pick_deep_dive(components):
 # 通常命中：写路径的 fanout、热点 key、一致性窗口、消息投递保证
 </code></pre>
 <div class="case"><strong>现实案例：</strong><a href="https://blog.pragmaticengineer.com/preparing-for-the-systems-design-and-coding-interviews/" target="_blank">The Pragmatic Engineer（Gergely Orosz）</a>把「主导对话、持续 narrate」列为系统设计面试与编码面试最大的区别之一：面试官给的是一张白纸，能不能把它变成一场结构化对话，本身就是考点。</div>
-
-<h3>4. Trade-off 表达：这才是 senior 与 staff 的分水岭</h3>
+<h3 data-tts="98bac6702b9d0e58">4. Trade-off 表达：这才是 senior 与 staff 的分水岭</h3>
 <p><strong>原理</strong>：系统设计没有「正确架构」，只有「在约束 X 下，我选 A、牺牲 B、因为 C 比 D 更重要」。每个技术决策都该带上 <em>被淘汰的替代方案</em> 和 <em>淘汰理由</em>。一句「用 Kafka」是零信号；「读写比 100:1 且要支持 replay，所以选 Kafka 而非 RabbitMQ，代价是运维和 partition 管理更复杂」——这是满分表达。它证明你<strong>知道自己在放弃什么</strong>。</p>
 <div class="tradeoff"><strong>Trade-off：给结论 vs 给推理。</strong>初级答案给「选什么」；高级答案给「为什么不选另外两个」。面试官追问「为什么不用 X」时，慌的是前者，从容的是后者——因为后者在说出口前就已经比较过了。</div>
 <pre><code># Trade-off 表达模板（说出口时按这个结构）
@@ -205,15 +198,13 @@ def pick_deep_dive(components):
  如果约束变成【反约束】，我会改选【B】。"   # ← 最后这句是 staff 信号
 </code></pre>
 <div class="case"><strong>现实案例：</strong><a href="https://dataintensive.net" target="_blank">《Designing Data-Intensive Applications》(Kleppmann)</a> 整本书就是一部 trade-off 训练手册——它几乎从不给「用什么」的结论，只反复推演「在什么约束下，哪个方案的取舍更合适」。这正是面试官想听到的思维方式。</div>
-
-<h2>面试之外：进阶信号与真实设计的区别</h2>
+<h2 data-tts="da74825fa65372ab">面试之外：进阶信号与真实设计的区别</h2>
 <ul>
 <li><strong>Level 信号</strong>：<em>senior</em> 把一个系统做对（正确分层、合理选型、想到失败）；<em>staff</em> 识别<strong>跨系统的 trade-off 和组织约束</strong>（这个方案会给上下游团队带来什么负担、迁移成本、运维归属）。想往上一级表现，就多谈「二阶效应」和「演进路径」。</li>
 <li><strong>面试 vs 生产</strong>：面试里你靠 BOTE 估算 + 出声 justify 就能支撑「这里要分片」；真实生产里，同样的决策要靠<em>真实指标、压测、可观测性回归</em>来验证（详见 Day 26 容量估算、Day 27 成本与容量工程）。别把面试那套「拍脑袋数量级」当成生产决策的依据。</li>
 <li><strong>演进叙事</strong>：收尾时主动说「v1 单库够用，到 X QPS 引入读副本，再到 Y 上分片 + CDC」——展示你对增长曲线的预判，而不是一上来就堆满全部组件（over-engineering 同样扣分）。</li>
 </ul>
-
-<h2>常见陷阱 + 面试追问</h2>
+<h2 data-tts="d907abc9ac469f04">常见陷阱 + 面试追问</h2>
 <div class="callout"><strong>1. 过早抠细节。</strong>还没确认范围就开始写 DB schema、纠结字段类型。先收敛问题，细节留到深挖。</div>
 <div class="callout"><strong>2. 不问假设、闷头背诵。</strong>把背好的「设计 Twitter」整套倒出来，完全不管面试官这道题的具体约束——面试官一改条件就崩。</div>
 <div class="callout"><strong>3. 列组件不讲 trade-off。</strong>「加 CDN、加缓存、加队列」像报菜名，没有一句「为什么」。组件是名词，信号在动词（为什么选、放弃了什么）。</div>
@@ -227,8 +218,7 @@ def pick_deep_dive(components):
 <li>某个组件挂了会怎样？怎么降级 / 重试 / 熔断？</li>
 <li>怎么知道线上出问题了？你会监控哪几个指标、SLO 怎么定？</li>
 </ol>
-
-<h2>深入资源</h2>
+<h2 data-tts="d0b1525c142d95a2">深入资源</h2>
 <ul>
 <li><strong>《System Design Interview – An Insider's Guide》Alex Xu</strong>（ByteByteGo）：4 步框架的标准出处，每章一道经典题的完整演练。</li>
 <li><strong><a href="https://github.com/donnemartin/system-design-primer" target="_blank">donnemartin/system-design-primer</a></strong>（GitHub）：开源的系统设计学习库，含「如何应对面试」流程与大量样例题。</li>
@@ -236,9 +226,7 @@ def pick_deep_dive(components):
 <li><strong><a href="https://blog.pragmaticengineer.com/preparing-for-the-systems-design-and-coding-interviews/" target="_blank">The Pragmatic Engineer — Preparing for the Systems Design and Coding Interviews</a></strong>（Gergely Orosz）：实战准备方法与沟通要点。</li>
 <li><strong>《Designing Data-Intensive Applications》(Kleppmann)</strong>：把每个技术点的 trade-off 真正讲透，面试深挖的底层弹药库。</li>
 </ul>
-
-<h2>深入思考（点击展开答案）</h2>
-
+<h2 data-tts="692ce9fd2a3acb12">深入思考（点击展开答案）</h2>
 <details>
 <summary>1. 「设计 Twitter」只有 45 分钟。你会主动砍掉哪些功能、怎么向面试官「申请」缩范围而不显得偷懒？</summary>
 <div class="answer">
@@ -246,7 +234,6 @@ def pick_deep_dive(components):
 <p><strong>怎么申请才不像偷懒</strong>：关键是给出<em>理由</em>而非只说「不做」。「Twitter 的核心难点在 timeline 的 fanout 与名人热点，我想把时间集中在这条路径上深挖到存储和扩展层；搜索和广告是独立子系统，如果还有时间我们再回来——这样安排可以吗？」——这同时展示了 judgment（你知道哪里最难）、communication（主动对齐）、和时间意识。偷懒是「不做且不解释」；缩范围是「有意识地分配深度预算」。面试官几乎总会接受，因为这正是资深工程师做项目的方式。</p>
 </div>
 </details>
-
 <details>
 <summary>2. 你正深挖某组件，面试官说「这块我不关心，跳过」。这传递了什么信号？你该怎么调整？</summary>
 <div class="answer">
@@ -254,7 +241,6 @@ def pick_deep_dive(components):
 <p><strong>怎么调整</strong>：别恋战、别解释「但这里也很重要」。立刻顺着他的方向：「明白，那我转到 X——这里我看到的关键 trade-off 是……」。同时更新你对「这场面试在考什么」的判断：他刚刚暴露了他的评分重心，后面主动往那个方向多走。能快速读懂并响应这种引导，本身就是高 communication 分。</p>
 </div>
 </details>
-
 <details>
 <summary>3. 同一道「设计一个限流器」，senior 和 staff 的回答差在哪？给个具体例子。</summary>
 <div class="answer">
@@ -262,7 +248,6 @@ def pick_deep_dive(components):
 <p><strong>staff</strong>：在 senior 的基础上，跳出单个系统看<em>二阶效应与组织约束</em>。例如：①「分布式计数每次都打 Redis 会让限流器自己成为瓶颈和单点，我会在每个节点本地预借一批配额（local token + 周期对账），用一点点精度换可用性」；②「限流规则谁来配、怎么热更新、误杀了怎么快速回滚——这关系到 oncall 和其他团队」；③「限流应该是平台能力还是每个服务自己实现？如果 50 个团队各写一遍，维护成本和不一致就是组织级问题」。<strong>差别不在技术深度，而在视野半径</strong>：senior 优化组件，staff 优化组件之间、团队之间的 trade-off。</p>
 </div>
 </details>
-
 <details>
 <summary>4. 「出声推理」有没有反作用？什么时候应该先安静想 30 秒再开口？</summary>
 <div class="answer">
@@ -270,7 +255,6 @@ def pick_deep_dive(components):
 <p><strong>该先静想的时刻</strong>：①面试官刚给完题或刚加了新约束——花 20–30 秒在白板列要点、组织框架再开口，比立刻喷强得多；②被追问到一个需要权衡的硬问题——明确说「让我想 30 秒」，从容比抢答更显资深；③要做容量估算——先安静算，再把结论和关键假设讲出来。<strong>原则</strong>：先在脑子里（或白板角落）形成一个<em>有结构的小结论</em>，再 narrate 这个结论的推理路径。沉默是用来组织、出声是用来呈现，两者交替，不是二选一。</p>
 </div>
 </details>
-
 <details>
 <summary>5. 面试里靠 BOTE 估算就能 justify「这里要分片」；真实生产里同样的决策要靠什么？为什么不能照搬面试那套？</summary>
 <div class="answer">
@@ -278,10 +262,9 @@ def pick_deep_dive(components):
 <p><strong>生产里</strong>：同样的决策要靠①<em>真实指标</em>（当前 QPS、存储增长斜率、p99 延迟趋势）；②<em>压测</em>（在接近真实数据分布下测出单分片的实际拐点，而非理论值）；③<em>可观测性回归</em>（上线后持续验证假设是否成立）。<strong>为什么不能照搬</strong>：BOTE 假设均匀分布，而生产的杀手是<em>热点和长尾</em>——平均值告诉你「该分片」，但真正决定分片键和分片数的是 p99 和最热那个 key 的行为。面试里你可以说「假设均匀」，生产里这个假设往往就是事故的根源。面试训练的是<em>决策框架</em>，生产要的是<em>用数据校验过的框架</em>——框架同源，依据不同。（延伸见 Day 26 / Day 27）</p>
 </div>
 </details>
-
 </div>
-<script src="https://hub.cissychen.com/comments.js" defer></script>
-<script src="https://hub.cissychen.com/search.js" defer></script>
-<script src="https://hub.cissychen.com/index-button.js" defer></script>
-<script src="https://hub.cissychen.com/i18n-tts.js" defer></script>
+<script defer="" src="https://hub.cissychen.com/comments.js"></script>
+<script defer="" src="https://hub.cissychen.com/search.js"></script>
+<script defer="" src="https://hub.cissychen.com/index-button.js"></script>
+<script defer="" src="https://hub.cissychen.com/i18n-tts.js"></script>
 </body></html>

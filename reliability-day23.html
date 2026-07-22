@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<html lang="zh-CN"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>Day 23 · 可靠性 (Reliability) — System Design</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -97,7 +98,6 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 </script>
 </head><body><div class="container">
-
 <header>
 <div class="meta">
 <span class="tag day">Day 23</span>
@@ -107,10 +107,9 @@ document.addEventListener('DOMContentLoaded',()=>{
 <span class="tag">Backoff</span>
 <span class="tag">Bulkhead</span>
 </div>
-<h1>可靠性 — 一个下游抖动，不让它拖垮整条链路<span class="en">Reliability: Circuit Breaker, Retry/Backoff, Bulkhead & Graceful Degradation</span></h1>
+<h1 data-tts="4265cb6cffc9be2c">可靠性 — 一个下游抖动，不让它拖垮整条链路<span class="en">Reliability: Circuit Breaker, Retry/Backoff, Bulkhead &amp; Graceful Degradation</span></h1>
 </header>
-
-<h2>问题场景 + 需求约束</h2>
+<h2 data-tts="1d4ace071a84ea7e">问题场景 + 需求约束</h2>
 <p>设计一条电商<strong>下单链路</strong>：下单 QPS 5 万，p99 SLO 300ms，整体可用性目标 99.95%（年停机 ~4.4 小时）。下单要同步调用约 <strong>30 个下游依赖</strong>——库存、优惠券、风控、地址、支付预授权……其中只有库存和支付是<em>核心</em>，其余非核心。</p>
 <p>真正要防的不是「某个服务挂了」，而是 <strong>级联故障（cascading failure）</strong>：优惠券服务一次 GC 停顿，响应从 20ms 涨到 5s。调用方同步等待，每个下单请求占着一个线程死等——几秒内线程池被占满，<strong>连根本不查优惠券的请求也排不进来</strong>。一个非核心依赖拖垮了整个下单。可靠性工程的核心命题就是：<em>让局部故障止于局部</em>。本期讲四件互补的武器：断路器、退避重试、舱壁、优雅降级。</p>
 <ul>
@@ -119,8 +118,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 <li><strong>串联可用性</strong>：30 个依赖串联，每个 99.9%，整体 ≈ 99.9%³⁰ ≈ <strong>97%</strong>。不做隔离，依赖越多越脆。</li>
 <li><strong>幂等性</strong>：决定了能不能安全重试（见 Day 7、Day 17）。</li>
 </ul>
-
-<h2>高层架构</h2>
+<h2 data-tts="b9653eb8c967c1bc">高层架构</h2>
 <p>每个下游调用都穿过一层 <strong>resilience 中间层</strong>：超时 → 舱壁（独立资源池）→ 断路器（统计错误率）→ 重试（带退避）。任何一环判定失败，立刻走 <strong>fallback</strong>（缓存值 / 默认值 / 跳过）而不是死等。入口处还有一道 <strong>负载保护（load shedding）</strong>，过载时优先保住核心请求。</p>
 <pre class="mermaid">
 graph LR
@@ -132,11 +130,11 @@ graph LR
     DEP["下游依赖<br/><i>优惠券/风控...</i>"]
     FB["Fallback<br/><i>缓存/默认/跳过</i>"]
 
-    IN --> LS -->|放行| ORD --> BH --> CB
-    LS -.->|拒绝 429| IN
-    CB -->|closed| DEP
-    CB -.->|open→fail fast| FB
-    DEP -.->|超时/错误| FB
+    IN --&gt; LS --&gt;|放行| ORD --&gt; BH --&gt; CB
+    LS -.-&gt;|拒绝 429| IN
+    CB --&gt;|closed| DEP
+    CB -.-&gt;|open→fail fast| FB
+    DEP -.-&gt;|超时/错误| FB
 
     classDef in fill:#1a2530,stroke:#64c8ff,color:#e8eef5
     classDef gate fill:#2a1530,stroke:#ff7ab6,color:#e8eef5
@@ -148,10 +146,8 @@ graph LR
     class DEP,FB dep
 </pre>
 <p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">每个依赖被独立隔离；失败快速短路到 fallback，不让一个慢依赖耗尽全局资源</p>
-
-<h2>关键技术点</h2>
-
-<h3>1. 断路器 Circuit Breaker — 给故障依赖「拉闸」</h3>
+<h2 data-tts="c3df2e03437171d5">关键技术点</h2>
+<h3 data-tts="d40a2253df1e75b9">1. 断路器 Circuit Breaker — 给故障依赖「拉闸」</h3>
 <p>一句话 trade-off：<em>用「对故障依赖的临时不可用」换「调用方快速失败、下游获得喘息」</em>。</p>
 <p><strong>原理</strong>：电闸的隐喻。断路器是个三态机：<strong>Closed</strong>（正常放行，统计失败率）→ 失败率超阈值 → <strong>Open</strong>（直接拒绝，不再发请求，立刻走 fallback）→ 冷却一段时间 → <strong>Half-Open</strong>（放少量探测请求试水）→ 成功则回 Closed，失败则退回 Open。它把「等满超时再失败」（每次浪费几秒、还在给濒死的下游加压）变成「<em>fail fast</em>」，同时切断了持续打击，让下游有机会恢复。</p>
 <div class="tradeoff">
@@ -164,7 +160,7 @@ graph LR
 <pre><code># 断路器状态机 (pseudo-code)
 def call(dep, req):
     if state == OPEN:
-        if now() - opened_at > cooldown:   # 冷却到点
+        if now() - opened_at &gt; cooldown:   # 冷却到点
             state = HALF_OPEN               # 放一个探测
         else:
             return fallback(req)            # fail fast，不打下游
@@ -183,8 +179,7 @@ def call(dep, req):
 <li><strong>resilience4j</strong>：Hystrix 停止维护后的 JVM 主流替代，用滑动窗口（按数量或时间）统计失败率。</li>
 <li><strong>Martin Fowler</strong>：<a href="https://martinfowler.com/bliki/CircuitBreaker.html" style="color:#5eead4">CircuitBreaker</a> 一文是该模式的标准定义来源。</li>
 </ul></div>
-
-<h3>2. 退避重试 Retry with Backoff + Jitter — 重试是把双刃剑</h3>
+<h3 data-tts="c5d95a0d60947ee9">2. 退避重试 Retry with Backoff + Jitter — 重试是把双刃剑</h3>
 <p>一句话 trade-off：<em>用「重试带来的额外负载」换「吸收瞬时抖动」——但用错就是火上浇油</em>。</p>
 <p><strong>原理</strong>：瞬时故障（网络抖动、leader 选举、偶发超时）重试一次往往就好。但 <strong>naive 立即重试是放大器</strong>：下游过载 → 大量请求失败 → 所有客户端同时重试 → 下游被双倍流量彻底打死，这就是 <strong>retry storm（重试风暴）</strong>。两个解药：① <strong>指数退避（exponential backoff）</strong>，每次失败等待翻倍（100ms→200ms→400ms），给下游恢复时间；② <strong>jitter（抖动）</strong>，加随机让重试时刻错开，否则所有客户端会「对齐」成同步脉冲，周期性地一起砸过去。</p>
 <div class="tradeoff">
@@ -214,8 +209,7 @@ def retry(req, max_attempts=3):
 <li><strong>Google SRE</strong>：用 <em>retry budget</em>（按比例限制重试）而非固定次数，防止重试放大压垮后端（《SRE Book》Handling Overload 章）。</li>
 <li><strong>gRPC</strong>：内置 retry policy，支持退避参数与可重试状态码白名单。</li>
 </ul></div>
-
-<h3>3. 舱壁 Bulkhead — 把资源切成隔舱</h3>
+<h3 data-tts="73c41e95948f3310">3. 舱壁 Bulkhead — 把资源切成隔舱</h3>
 <p>一句话 trade-off：<em>用「整体资源利用率下降」换「单依赖故障不耗尽全局资源」</em>。</p>
 <p><strong>原理</strong>：源自造船——船体分成多个<strong>水密隔舱</strong>，一处进水不会沉船。映射到系统：不要让所有下游调用共用同一个线程池/连接池。给每个依赖分配<em>独立配额</em>（如优惠券最多占 20 个线程）。这样优惠券变慢，最多占满它自己那 20 个，<strong>核心的库存、支付调用仍有线程可用</strong>——故障被关在隔舱里。这正是开头那个雪崩场景的根治方案。</p>
 <div class="tradeoff">
@@ -242,8 +236,7 @@ def call(dep, req):
 <li><strong>Michael Nygard《Release It!》</strong>：用船舱隔舱比喻正式提出 Bulkhead 稳定性模式（与 Circuit Breaker 同源）。</li>
 <li><strong>Kubernetes / 服务网格</strong>：用资源 quota、连接池上限（Envoy 的 max connections / pending requests）实现进程级与连接级舱壁。</li>
 </ul></div>
-
-<h3>4. 优雅降级 + 负载保护 — 宁可残缺，不可全死</h3>
+<h3 data-tts="8bb034028ffa6a38">4. 优雅降级 + 负载保护 — 宁可残缺，不可全死</h3>
 <p>一句话 trade-off：<em>用「功能完整性 / 结果精度」换「核心链路存活」</em>。</p>
 <p><strong>原理</strong>：当依赖失败或系统过载，与其返回 500、与其全盘崩溃，不如返回一个<strong>降级响应</strong>：优惠券服务挂了就按原价下单（fallback 到默认值）；个性化推荐挂了就返回热门榜（fallback 到缓存/静态结果）。配套的是入口侧 <strong>load shedding（负载保护）</strong>：当系统接近过载，主动<em>拒绝</em>一部分请求（返回 429），保住剩余请求能正常完成——<strong>部分成功远好于全体超时</strong>。拒绝时按 <em>criticality（请求优先级）</em>取舍：先拒非核心、保核心下单。</p>
 <div class="tradeoff">
@@ -259,8 +252,7 @@ def call(dep, req):
 <li><strong>Google SRE</strong>：服务端 load shedding + 客户端节流（client-side throttling）+ 请求 criticality 分级，是处理过载的标准实践（<a href="https://sre.google/sre-book/handling-overload/" style="color:#5eead4">Handling Overload</a>、<a href="https://sre.google/sre-book/addressing-cascading-failures/" style="color:#5eead4">Addressing Cascading Failures</a>）。</li>
 <li><strong>Netflix</strong>：每个 Hystrix 依赖都配 fallback——个性化数据拉不到就返回非个性化的兜底内容，宁可不精准也不空白。</li>
 </ul></div>
-
-<h2>扩展与优化</h2>
+<h2 data-tts="915b15e12ef2041f">扩展与优化</h2>
 <ul>
 <li><strong>自适应并发限流</strong>：与其手调每个舱壁的固定大小，不如用类 TCP 拥塞控制的自适应算法（Netflix concurrency-limits），按延迟变化动态调并发上限。</li>
 <li><strong>对冲请求（hedged requests）</strong>：对幂等读，p95 没返回就并发发第二个请求、取先到的，显著压低长尾延迟（但要配重试预算防放大）。</li>
@@ -268,8 +260,7 @@ def call(dep, req):
 <li><strong>混沌工程验证</strong>：这些防护写了不等于有效，要靠故障注入（注延迟、断依赖）主动验证断路器真能跳、fallback 真能兜（详见后续混沌工程篇）。</li>
 <li><strong>区域级 failover</strong>：单可用区/区域故障时，把流量切到健康区域，是比单机隔离更高层级的可靠性。</li>
 </ul>
-
-<h2>常见陷阱 + 面试追问</h2>
+<h2 data-tts="607c7ff556a8bd8d">常见陷阱 + 面试追问</h2>
 <div class="callout">
 <strong>1. 重试在每层叠加 → 指数放大</strong>：A→B→C 三层，每层各重试 3 次，底层 C 实际承受 3×3×3 = <strong>27 倍</strong>流量。规则：<em>只在最外层重试</em>，或全链路共享 retry budget。
 </div>
@@ -285,8 +276,7 @@ def call(dep, req):
 <div class="callout">
 <strong>5. 断路器阈值拍脑袋</strong>：太敏感→正常抖动就跳闸误伤；太迟钝→形同虚设。要基于最小请求数 + 滑动窗口错误率，并想清楚 half-open 探测的并发控制（别让探测又变成惊群）。
 </div>
-
-<h2>深入资源</h2>
+<h2 data-tts="d0579656aaf3bbe9">深入资源</h2>
 <ul>
 <li><strong>Amazon Builders' Library</strong>：Marc Brooker, <a href="https://aws.amazon.com/builders-library/timeouts-retries-and-backoff-with-jitter/" style="color:#64c8ff">Timeouts, retries, and backoff with jitter</a> —— 超时/重试/退避的权威实践。</li>
 <li><strong>Google《SRE Book》</strong>：<a href="https://sre.google/sre-book/handling-overload/" style="color:#64c8ff">Handling Overload</a> 与 <a href="https://sre.google/sre-book/addressing-cascading-failures/" style="color:#64c8ff">Addressing Cascading Failures</a> —— load shedding、节流、级联故障的系统论述。</li>
@@ -294,9 +284,7 @@ def call(dep, req):
 <li><strong>Netflix</strong>：<a href="https://github.com/Netflix/Hystrix/wiki/How-it-Works" style="color:#64c8ff">Hystrix Wiki</a>，断路器 + 舱壁 + fallback 的工程实现细节。</li>
 <li><strong>Michael Nygard《Release It!》</strong>（Pragmatic Bookshelf）：稳定性模式（Circuit Breaker / Bulkhead / Fail Fast / Shed Load）的原始出处。</li>
 </ul>
-
-<h2>深入思考（点击展开答案）</h2>
-
+<h2 data-tts="a727405da3a29d16">深入思考（点击展开答案）</h2>
 <details>
 <summary>1. A→B→C 三层调用，每层各配「最多重试 3 次」。C 短暂过载时，它实际承受的放大倍数是多少？为什么 retry budget 比 max-retries 更安全？</summary>
 <div class="answer">
@@ -304,7 +292,6 @@ def call(dep, req):
 <p><strong>retry budget 为何更好</strong>：max-retries 是<em>每请求</em>的局部限制，无法约束整体放大；大面积故障时每个请求都顶满 3 次，叠加后仍是 27 倍。retry budget 用 token bucket 限制「重试量 ≤ 正常请求的 X%」，是<em>全局</em>封顶——故障再大，重试流量也超不过这个比例。实践上两者结合：单请求设小上限，全局再套 budget。</p>
 </div>
 </details>
-
 <details>
 <summary>2. 断路器进入 Open 后冷却到点转 Half-Open，此时放探测请求。若不限制探测并发会怎样？怎么设计 Half-Open？</summary>
 <div class="answer">
@@ -312,7 +299,6 @@ def call(dep, req):
 <p><strong>设计要点</strong>：① Half-Open 只放<em>极少量</em>探测（如 1 个或固定小并发），其余请求继续 fail-fast 走 fallback；② 探测连续成功 N 次才回 Closed，单次成功不够（避免被偶发成功骗回）；③ 探测失败立即退回 Open 并<em>重置甚至延长</em>冷却（可加退避，避免高频探测）；④ 冷却时间本身可指数增长，故障持续越久探测越稀疏。本质：Half-Open 是「小流量试探恢复」，绝不能变成「全量复活」。</p>
 </div>
 </details>
-
 <details>
 <summary>3. 为什么上游超时必须大于下游超时之和？把上游设得比下游短会发生什么连锁反应？</summary>
 <div class="answer">
@@ -320,7 +306,6 @@ def call(dep, req):
 <p><strong>正确做法</strong>：超时预算<em>自上而下递减</em>。入口 300ms，留出网络与自身开销后，给下游 250ms，下游再给它的下游 200ms……每层都比父级紧。更进一步用 <em>deadline propagation</em>：把「绝对截止时间」透传下去，下游一看 deadline 已过就直接放弃，连算都不算。这样整条链路对「还剩多少时间」有一致认知，杜绝白做功。</p>
 </div>
 </details>
-
 <details>
 <summary>4. 过载时 load shedding（主动拒绝一部分）反直觉地比「全部都收」更好。用 goodput 解释为什么，以及重试如何让不做 shedding 的系统陷入死亡螺旋。</summary>
 <div class="answer">
@@ -328,7 +313,6 @@ def call(dep, req):
 <p><strong>死亡螺旋</strong>：不 shed + 客户端重试 = 正反馈。过载→变慢→超时→重试→负载更高→更慢……每轮都把系统推得更深，无法自愈。打破螺旋需要：服务端 load shedding + 客户端节流（adaptive throttling，按近期拒绝率主动减少发送）+ retry budget。三者缺一，系统就会在过载点「锁死」而非自动回弹。</p>
 </div>
 </details>
-
 <details>
 <summary>5. 断路器、舱壁、重试、降级——四者能互相替代吗？用一次「优惠券服务慢到 5s」的故障说明它们各自拦在哪一环、缺一会怎样。</summary>
 <div class="answer">
@@ -342,10 +326,9 @@ def call(dep, req):
 <p>串起来：舱壁<em>关住</em>故障、断路器<em>停止</em>无效调用、重试<em>吸收</em>瞬时抖动、降级<em>兜住</em>用户体验。任何一环缺失，这次优惠券慢调用都会在某个层面造成可感知的损害。</p>
 </div>
 </details>
-
 </div>
-<script src="https://hub.cissychen.com/comments.js" defer></script>
-<script src="https://hub.cissychen.com/search.js" defer></script>
-<script src="https://hub.cissychen.com/index-button.js" defer></script>
-<script src="https://hub.cissychen.com/i18n-tts.js" defer></script>
+<script defer="" src="https://hub.cissychen.com/comments.js"></script>
+<script defer="" src="https://hub.cissychen.com/search.js"></script>
+<script defer="" src="https://hub.cissychen.com/index-button.js"></script>
+<script defer="" src="https://hub.cissychen.com/i18n-tts.js"></script>
 </body></html>

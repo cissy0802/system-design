@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<html lang="zh-CN"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>Day 2 · 缓存 (Caching) — System Design</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -97,7 +98,6 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 </script>
 </head><body><div class="container">
-
 <header>
 <div class="meta">
 <span class="tag day">Day 2</span>
@@ -106,14 +106,12 @@ document.addEventListener('DOMContentLoaded',()=>{
 <span class="tag">LRU/LFU/ARC</span>
 <span class="tag">Invalidation</span>
 </div>
-<h1>缓存 — 从浏览器到 DB 的多层穿透艺术<span class="en">Caching: Layers, Eviction Policies, Write Strategies, Invalidation</span></h1>
+<h1 data-tts="21dbede4ef165389">缓存 — 从浏览器到 DB 的多层穿透艺术<span class="en">Caching: Layers, Eviction Policies, Write Strategies, Invalidation</span></h1>
 </header>
-
-<h2>问题场景</h2>
+<h2 data-tts="6ca7956f3546efd8">问题场景</h2>
 <p>用户访问首页 200ms 内必须返回，DB 查询一次需要 80ms，单查首页要 7 个查询——不缓存就是死。<strong>但缓存不是『加个 Redis』那么简单</strong>：Facebook 2010 年因为一次 Memcached 失效风暴丢了 2.5 小时全站可用性；Discord 2017 年发现消息列表的 LRU 在热点频道下表现糟糕，换 LFU 后命中率从 78% 提到 96%；GitHub 2020 年 PR 页面用 Russian Doll caching，命中率 99.3%。</p>
 <p>本期讲三件事：<em>缓存放在哪一层、怎么淘汰、怎么写</em>。最关键的是『缓存失效』，被 Phil Karlton 称为计算机科学两大难题之一（另一个是命名）。</p>
-
-<h2>需求与约束（面试必问）</h2>
+<h2 data-tts="e642c404e7017463">需求与约束（面试必问）</h2>
 <ul>
 <li><strong>读写比</strong>：100:1 适合 cache，1:1 写多读少基本没收益（缓存命中率太低）。</li>
 <li><strong>数据热度分布</strong>：是否 80/20 Pareto？长尾分布缓存效果差，热点严重则单 key 风暴。</li>
@@ -122,8 +120,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 <li><strong>命中率目标</strong>：&lt; 80% 通常意味着缓存层没价值；&gt; 95% 才能真正卸载后端。</li>
 <li><strong>失效策略</strong>：TTL、显式 invalidate、还是 write-through？</li>
 </ul>
-
-<h2>高层架构（多层缓存）</h2>
+<h2 data-tts="cb2a0e7650797397">高层架构（多层缓存）</h2>
 <pre class="mermaid">
 graph LR
     B["Browser cache<br/><i>localStorage / SW</i>"]
@@ -133,9 +130,9 @@ graph LR
     L2["Redis / Memcached<br/><i>跨进程共享 L2</i>"]
     DB[("DB + buffer pool")]
 
-    B -->|①| CDN -->|②| RP -->|③| APP -->|④| DB
-    APP <-.->|miss → 回填| L2
-    L2 -.miss.-> DB
+    B --&gt;|①| CDN --&gt;|②| RP --&gt;|③| APP --&gt;|④| DB
+    APP &lt;-.-&gt;|miss → 回填| L2
+    L2 -.miss.-&gt; DB
 
     classDef client fill:#1a2530,stroke:#64c8ff,color:#e8eef5
     classDef edge fill:#0e2030,stroke:#5eead4,color:#e8eef5
@@ -147,10 +144,8 @@ graph LR
     class DB origin
 </pre>
 <p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">命中率从左到右递增；返回时反向回填每一层，下一次请求短路</p>
-
-<h2>关键技术点</h2>
-
-<h3>1. 缓存层次：Browser / CDN / App / DB Buffer Pool</h3>
+<h2 data-tts="c3df2e03437171d5">关键技术点</h2>
+<h3 data-tts="f4c8056a45000870">1. 缓存层次：Browser / CDN / App / DB Buffer Pool</h3>
 <p><strong>原理</strong>：每一层缓存解决不同的延迟问题。<em>Browser cache</em> 省网络（0ms vs 50ms）；<em>CDN</em> 把静态资产放到用户 50 公里以内的 PoP，p50 延迟 10ms；<em>app 进程内 cache</em>（Guava / Caffeine / Python <code>functools.lru_cache</code>）省 Redis 一次 RTT（0.1ms vs 1ms）；<em>Redis</em> 跨进程共享，命中后省 DB 查询（1ms vs 50ms）；<em>DB buffer pool</em>（Postgres shared_buffers, InnoDB buffer pool）省磁盘 IO。</p>
 <div class="tradeoff">
 <strong>Trade-off：</strong>
@@ -167,8 +162,7 @@ graph LR
 <li><strong>GitHub Rails</strong>：用 Russian Doll caching（嵌套片段缓存），PR 详情页命中率 99.3%。</li>
 <li><strong>Stack Overflow</strong>：单数据中心 9 台服务器扛全球访问，靠 5 层缓存（HTTP / Redis / SQL Server buffer / .NET CLR / 客户端）。</li>
 </ul></div>
-
-<h3>2. 淘汰策略：LRU vs LFU vs ARC vs TinyLFU</h3>
+<h3 data-tts="0c72d4a6aa3fc126">2. 淘汰策略：LRU vs LFU vs ARC vs TinyLFU</h3>
 <p><strong>原理</strong>：缓存容量有限，必须选一个『谁先死』规则。</p>
 <table>
 <thead><tr><th>策略</th><th>淘汰对象</th><th>适合场景</th><th>命中率</th></tr></thead>
@@ -198,7 +192,7 @@ class LRU:
     def put(self, k, v):
         if k in self.d: self.d.move_to_end(k)
         self.d[k] = v
-        if len(self.d) > self.cap:
+        if len(self.d) &gt; self.cap:
             self.d.popitem(last=False)  # 淘汰头部（最久未访问）
 
 # Redis 实际用『近似 LRU』：每次淘汰从 5 个随机 key 中挑最久的
@@ -212,8 +206,7 @@ class LRU:
 <li><strong>Linux Page Cache</strong>：用 2Q（active/inactive 双链表），近似 LRU 但抗扫描污染。</li>
 <li><strong>Discord</strong>：消息缓存早期用 LRU，热门频道下『最近未访问』误判严重，切到 LFU 后命中率 78% → 96%。</li>
 </ul></div>
-
-<h3>3. 写策略：Cache-aside vs Write-through vs Write-back</h3>
+<h3 data-tts="bcac6f9b9a79ff3b">3. 写策略：Cache-aside vs Write-through vs Write-back</h3>
 <p><strong>原理</strong>：写数据时缓存和 DB 谁先谁后、谁负责，决定了一致性和复杂度。</p>
 <table>
 <thead><tr><th></th><th>Cache-aside (lazy)</th><th>Write-through</th><th>Write-back</th></tr></thead>
@@ -252,8 +245,7 @@ def update_user(uid, data):
 <li><strong>MySQL InnoDB</strong>：buffer pool 是 write-back，靠 redo log + checkpoint 保证持久化。</li>
 <li><strong>Apple iCloud Photos</strong>：缩略图用 write-through 到 S3，保证 CDN 拉取永远有效。</li>
 </ul></div>
-
-<h3>4. 失效难题：TTL、惊群、雪崩、穿透</h3>
+<h3 data-tts="9a17e0c779225e09">4. 失效难题：TTL、惊群、雪崩、穿透</h3>
 <p><strong>原理</strong>：四个经典坑，每个都在生产环境炸过。</p>
 <ul>
 <li><strong>Thundering herd（缓存击穿）</strong>：一个热 key 过期瞬间，1 万个请求同时穿到 DB。<em>解法</em>：互斥锁（single-flight）、逻辑过期（永不真过期，后台异步刷）、提前续约。</li>
@@ -281,8 +273,7 @@ func GetHot(key string) (any, error) {
 <li><strong>Pinterest</strong>：曾因 Memcached 全集群同 TTL 雪崩挂掉 30 分钟，事后加 jitter 修复。</li>
 <li><strong>Vercel ISR</strong>：Next.js Incremental Static Regeneration 就是 stale-while-revalidate 的产品化。</li>
 </ul></div>
-
-<h2>扩展与优化（增长后怎么办）</h2>
+<h2 data-tts="1dddec685ef95ab2">扩展与优化（增长后怎么办）</h2>
 <ul>
 <li><strong>命中率上不去</strong>：分析访问分布。如果是长尾，考虑预热（pre-warming）或更大容量；如果是热点，分片到多 key（<code>user:123:part:{0..15}</code>）。</li>
 <li><strong>Redis 单实例顶不住</strong>：上 Redis Cluster（16384 slot）或 Twemproxy / Codis 中间层；写热点要 consistent hashing。</li>
@@ -290,8 +281,7 @@ func GetHot(key string) (any, error) {
 <li><strong>对象太大</strong>：换 Redis（支持 512MB / value）或切片；考虑只缓存 ID 列表，详情仍走 DB（节省内存）。</li>
 <li><strong>瓶颈识别</strong>：监控『命中率』『p99 延迟』『回源 QPS』，命中率下跌往往是新功能没缓存或 invalidation bug。</li>
 </ul>
-
-<h2>常见陷阱（资深工程师也常翻车）</h2>
+<h2 data-tts="289d64583c5092af">常见陷阱（资深工程师也常翻车）</h2>
 <div class="callout">
 <strong>1. 更新缓存还是删除缓存？</strong> 答案永远是<em>删除</em>。更新会让两个并发写产生乱序（A 写值 v1 → B 写值 v2 → B 更新 cache → A 更新 cache，cache 永远停在 v1）。
 </div>
@@ -307,8 +297,7 @@ func GetHot(key string) (any, error) {
 <div class="callout">
 <strong>5. 忽略冷启动</strong>：服务重启或 cache cluster 替换瞬间，命中率 0%，DB 直接被打爆。要预热或慢启动放量。
 </div>
-
-<h2>面试问题示例</h2>
+<h2 data-tts="1fc9cb9f020560da">面试问题示例</h2>
 <ol>
 <li>设计 Instagram 首页 feed 缓存，用户量 10 亿，p99 &lt; 200ms。</li>
 <li>Redis 一个 hot key（如顶流明星的粉丝列表）QPS 100w，怎么扛？</li>
@@ -316,19 +305,15 @@ func GetHot(key string) (any, error) {
 <li>LRU 和 LFU 的实现细节，时间复杂度，分别什么场景下选哪个？</li>
 <li>Cache penetration（恶意查不存在的 key）怎么防？Bloom Filter 的误判率怎么算？</li>
 </ol>
-
-<h2>关键资源</h2>
+<h2 data-tts="e65beec73c0e0fb9">关键资源</h2>
 <ul>
 <li><strong>《Designing Data-Intensive Applications》Ch 1 + Ch 5</strong>（Kleppmann）：缓存与一致性的本质讨论。</li>
 <li><strong>《Scaling Memcache at Facebook》</strong>（NSDI 2013）：分布式缓存的圣经，lease、gutter pool、跨区复制都在里面。</li>
 <li><strong>Caffeine wiki</strong>：W-TinyLFU 设计细节，作者 Ben Manes 的 Benchmark 数据非常硬核。</li>
 </ul>
-
-<h2>English Summary</h2>
+<h2 data-tts="ea363ff7e940764c">English Summary</h2>
 <p>Caching is a multi-layer art spanning browser, CDN, reverse proxy, in-process, distributed (Redis/Memcached), and DB buffer pools. Choose eviction policy by access pattern: LRU for recency, LFU for frequency, W-TinyLFU (Caffeine) when in doubt. Write strategies trade consistency for performance: cache-aside is the default, write-through ensures correctness, write-back maximizes throughput at the cost of durability. The hardest part is invalidation — beware thundering herd, avalanche (use TTL jitter), penetration (bloom filter), and the eternal question of <em>delete</em> vs <em>update</em> cache (always delete).</p>
-
-<h2>深入思考（点击展开答案）</h2>
-
+<h2 data-tts="c79c7f059a4d268e">深入思考（点击展开答案）</h2>
 <details>
 <summary>1. 命中率从 95% 降到 90%，DB 负载会变成几倍？为什么不是简单的 2 倍？</summary>
 <div class="answer">
@@ -342,7 +327,6 @@ func GetHot(key string) (any, error) {
 <p><em>真实数字</em>：90% 命中率下 DB 实际负载通常是 3-5 倍。所以监控里看到命中率掉 5 个百分点就要警觉。</p>
 </div>
 </details>
-
 <details>
 <summary>2. cache-aside『先写 DB → 再删 cache』，生产仍偶尔读到旧值。至少列 3 种可能原因及对应修法。</summary>
 <div class="answer">
@@ -355,7 +339,6 @@ func GetHot(key string) (any, error) {
 </ul>
 </div>
 </details>
-
 <details>
 <summary>3. Redis Cluster 不支持跨 slot 的 MULTI / 事务。这个限制怎么影响 key 设计？hash tag（{user:123}）解决了什么、引入了什么新问题？</summary>
 <div class="answer">
@@ -371,7 +354,6 @@ func GetHot(key string) (any, error) {
 <p><em>实战建议</em>：hash tag 只用在<em>真正必须原子</em>的场景（购物车 + 库存）；展示型多 key 拼装，让 app 端做并发 GET 而不是依赖事务。</p>
 </div>
 </details>
-
 <details>
 <summary>4. Hot key 单点 QPS 100w，单 Redis 实例顶不住。至少列 3 种解法（不同方向），各自代价？</summary>
 <div class="answer">
@@ -385,7 +367,6 @@ func GetHot(key string) (any, error) {
 <p><em>实战组合</em>：通常 ① + ③ 一起上——分片承担写、本地 L1 承担读。</p>
 </div>
 </details>
-
 <details>
 <summary>5. 服务重启时命中率瞬间 0%，DB 直接被打爆。预热怎么做？预热过程本身如何不把 DB 打挂？</summary>
 <div class="answer">
@@ -411,10 +392,9 @@ func GetHot(key string) (any, error) {
 <p><em>真实故事</em>：Pinterest 2014 年因 Memcached 整集群替换没预热，DB 被打挂 30 分钟，事后改成『新旧集群并行运行 1 小时』。</p>
 </div>
 </details>
-
 <div class="nav"><a href="index.html">← 回到 index</a></div>
-</div><script src="https://hub.cissychen.com/comments.js" defer></script>
-<script src="https://hub.cissychen.com/search.js" defer></script>
-<script src="https://hub.cissychen.com/index-button.js" defer></script>
-<script src="https://hub.cissychen.com/i18n-tts.js" defer></script>
+</div><script defer="" src="https://hub.cissychen.com/comments.js"></script>
+<script defer="" src="https://hub.cissychen.com/search.js"></script>
+<script defer="" src="https://hub.cissychen.com/index-button.js"></script>
+<script defer="" src="https://hub.cissychen.com/i18n-tts.js"></script>
 </body></html>

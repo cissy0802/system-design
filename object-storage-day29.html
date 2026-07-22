@@ -1,6 +1,7 @@
 <!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Day 29 · 文件存储 (File & Object Storage) — System Design</title>
+
+<html lang="zh-CN"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Day 29 · 文件存储 (File &amp; Object Storage) — System Design</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,"SF Pro Display","Noto Sans SC",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
@@ -98,7 +99,6 @@ document.addEventListener('DOMContentLoaded',()=>{
 </script>
 </head>
 <body><div class="container">
-
 <header>
 <div class="meta">
 <span class="tag day">Day 29</span>
@@ -108,10 +108,9 @@ document.addEventListener('DOMContentLoaded',()=>{
 <span class="tag">Multipart Upload</span>
 <span class="tag">Durability</span>
 </div>
-<h1>文件存储 — 用 1.5x 空间换 11 个 9 的持久性<span class="en">File & Object Storage: S3 Architecture, Erasure Coding, Multipart Upload, Durability</span></h1>
+<h1 data-tts="308b890da0a59438">文件存储 — 用 1.5x 空间换 11 个 9 的持久性<span class="en">File &amp; Object Storage: S3 Architecture, Erasure Coding, Multipart Upload, Durability</span></h1>
 </header>
-
-<h2>问题场景 + 需求约束</h2>
+<h2 data-tts="590ff14f33bb1537">问题场景 + 需求约束</h2>
 <p>设计一个类 S3 的对象存储：服务 <strong>千亿级对象、100 PB 容量</strong>，单对象 1 字节到 5 TB，<strong>11 个 9 持久性</strong>（99.999999999%，即每年 1000 万个对象里坏不到 1 个）。这是网盘、备份、数据湖、图片/视频源站的地基——Dropbox、Netflix 的母带、你 App 的用户头像都躺在这种系统里。</p>
 <ul>
 <li><strong>读写比与对象分布</strong>：写一次读多次（WORM-ish），但对象大小是<em>极端长尾</em>——99% 是小文件（&lt;1MB），99% 的字节在大文件里。两端要分别优化。</li>
@@ -120,8 +119,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 <li><strong>吞吐</strong>：单对象 5 TB，10 Gbps 也要 1 小时——必须<strong>并行分片 + 断点续传</strong>，不能一个 TCP 流扛到底。</li>
 <li><strong>成本</strong>：100 PB 用 3 副本是 300 PB 裸盘，纠删码能压到 ~130 PB。每 PB 每月的电费机架费决定生死。</li>
 </ul>
-
-<h2>高层架构</h2>
+<h2 data-tts="1cc9f40c479706d4">高层架构</h2>
 <pre class="mermaid">
 graph TD
     C["客户端<br/><i>SDK / presigned URL 直传</i>"]
@@ -136,18 +134,16 @@ graph TD
       S3["Storage Node N<br/><i>裸盘 + CRC</i>"]
     end
     BG["后台任务<br/><i>scrub 校验 · 重建 · GC · 分层</i>"]
-    C --> LB
-    LB --> META
-    LB --> PL
-    PL --> S1 & S2 & S3
-    META -.索引.-> DP
-    BG -.巡检/修复.-> DP
+    C --&gt; LB
+    LB --&gt; META
+    LB --&gt; PL
+    PL --&gt; S1 &amp; S2 &amp; S3
+    META -.索引.-&gt; DP
+    BG -.巡检/修复.-&gt; DP
 </pre>
 <p><strong>核心是控制面/数据面分离</strong>：元数据服务存「对象 key → 数据分片落在哪些盘」的索引（小、强一致、需要扩展到千亿条），数据面只管存不可变的字节块（大、追求吞吐和成本）。两者独立扩展是对象存储区别于文件系统的根本设计——没有目录树、没有 inode 链，<strong>扁平 keyspace</strong> 让水平扩展几乎无上限。后台任务（巡检、重建、GC）是持久性的真正来源，跟请求路径解耦。</p>
-
-<h2>关键技术点</h2>
-
-<h3>1. 三种存储模型 — 为什么对象存储能无限扩</h3>
+<h2 data-tts="c3df2e03437171d5">关键技术点</h2>
+<h3 data-tts="47fc1d9d208a0752">1. 三种存储模型 — 为什么对象存储能无限扩</h3>
 <p>一句话 trade-off：<em>对象存储牺牲了「原地修改」和「目录语义」，换来扁平 keyspace 的无限水平扩展和极低单位成本</em>。</p>
 <p><strong>原理</strong>：Block（块，如 EBS/裸盘）给你定长扇区，最灵活但要自己管文件系统；File（文件，如 NFS/EFS）给你 POSIX 目录树和原地改写，但<strong>目录树是棵需要一致维护的树</strong>，元数据成为扩展瓶颈。Object（对象，如 S3）把整个文件当成不可变 blob，key 是一个扁平字符串（`a/b/c.jpg` 里的 `/` 只是字符不是目录），<strong>没有 rename、没有 append、没有 inode 链</strong>。这让元数据退化成一张巨大的 KV 表，可以按 key hash 任意分片。</p>
 <table>
@@ -159,8 +155,7 @@ graph TD
 <tr><td>典型</td><td>EBS, 本地盘</td><td>EFS, NFS, HDFS</td><td>S3, GCS, R2</td></tr>
 </table>
 <div class="case"><strong>真实案例</strong>：AWS S3 已存超过 <strong>100 万亿对象</strong>（2021 Pi Day 数据），靠的就是扁平 keyspace + 元数据分片；而需要 POSIX 语义的场景（如训练时直接 mmap）才上 FSx/Lustre。Dropbox 的 Magic Pocket 同样把文件切成不可变 block，用 KV（key→位置）做索引而非目录树。</div>
-
-<h3>2. 持久性引擎 — 复制 vs 纠删码</h3>
+<h3 data-tts="1db0fcff333f54fb">2. 持久性引擎 — 复制 vs 纠删码</h3>
 <p>一句话 trade-off：<em>3 副本简单、重建快、但 200% 空间放大；纠删码省到 ~30-50% 放大，代价是 CPU 编码、修复时的读放大、不适合小文件</em>。</p>
 <p><strong>原理</strong>：要 11 个 9，单盘年故障率约 2-4% 远远不够。三副本（3-replication）跨 3 个 AZ 各放一份，任意 2 份挂了仍可读，简单粗暴。<strong>纠删码（Erasure Coding / Reed-Solomon）</strong>把对象切成 k 个数据块，算出 m 个校验块，共 k+m 份分散到不同故障域，<strong>任意 k 份就能重建</strong>。Backblaze Vault 用 17+3：17 数据 + 3 校验 = 20 份，丢任意 3 份不丢数据，存储放大只有 20/17≈1.18x，却也算到 11 个 9。</p>
 <div class="tradeoff"><strong>为什么不全用 EC？</strong>① 小文件不划算：切 17 份后每份太小，元数据和 IOPS 开销吃掉收益，所以热/小对象常用副本、冷/大对象用 EC。② 修复读放大：重建一个块要读 k 个其他块（17 次读 vs 副本的 1 次拷贝），故障高峰会放大网络。③ CPU：编解码耗算力，写延迟更高。</div>
@@ -175,8 +170,7 @@ def repair(surviving_shards):          # 只需任意 17 份
     return rs_decode(surviving_shards) # 矩阵求逆 × 幸存块
 </code></pre>
 <div class="case"><strong>真实案例</strong>：<strong>Backblaze</strong> 开源了自研 Reed-Solomon 库，Vault 用 17+3 跨 20 个 pod。<strong>AWS S3</strong> 承诺 11 个 9，跨 ≥3 个 AZ 冗余并对所有对象持续做 CRC 巡检。<strong>Facebook f4</strong> 用 EC 存温数据（warm BLOBs），把老照片的存储放大从 3.6x（含跨机房副本）压到 ~2.1x。<strong>Dropbox</strong> Magic Pocket 内部也用 EC 把跨区冗余成本压下来。</div>
-
-<h3>3. 大对象上传 — Multipart + 客户端直传</h3>
+<h3 data-tts="e1a66074a9a60061">3. 大对象上传 — Multipart + 客户端直传</h3>
 <p>一句话 trade-off：<em>分片并行上传 + presigned URL 客户端直传，换来高吞吐与断点续传，代价是客户端复杂度和「孤儿分片」要 GC</em>。</p>
 <p><strong>原理</strong>：5 TB 走单条 TCP 流，任何抖动都从头再来，且单流吞吐受 RTT × 窗口限制。Multipart upload 把对象切成 part（S3 规定 5MB–5GB/part，上限 1 万 part），<strong>每个 part 独立上传、可并行、可重传、带各自 ETag</strong>，最后一个 CompleteMultipartUpload 把 part 列表拼成对象。配合 <strong>presigned URL</strong>：服务端用密钥签一个有时效的 URL，客户端拿着它<strong>直接 PUT 到存储层</strong>，字节不经过你的应用服务器——省带宽、省一跳延迟。</p>
 <pre><code># 服务端只发签名，不碰字节流
@@ -191,48 +185,42 @@ def init_upload(key, size):
 </code></pre>
 <div class="callout"><strong>陷阱</strong>：客户端上传一半跑路，part 会变成<strong>孤儿数据</strong>占着盘还在计费。S3 的解法是 <code>lifecycle rule: abort incomplete multipart upload after N days</code> 自动清理——一定要配，否则成本悄悄漏。</div>
 <div class="case"><strong>真实案例</strong>：AWS S3 的 multipart upload 与 presigned URL 是 SDK 默认大文件路径（&gt;100MB 自动分片并发）。Netflix 上传母带、Dropbox 同步大文件、几乎所有「浏览器直传 S3」的 SaaS 都靠 presigned URL 把流量从自己服务器上卸掉。</div>
-
-<h3>4. 元数据强一致与热分区</h3>
+<h3 data-tts="4c8b9db7ce94aa60">4. 元数据强一致与热分区</h3>
 <p>一句话 trade-off：<em>强一致让 read-after-write 变简单，但元数据要分片才能扛千亿 key，而分片又会在顺序 key 上制造热点</em>。</p>
 <p><strong>原理</strong>：元数据是「key → 分片位置 + 版本 + ACL」的巨表，必须分片（按 key 的 hash）。2020 年前 S3 是最终一致（新对象 list 可能读不到），<strong>2020 年底 S3 上线强 read-after-write 一致性</strong>——PUT 返回成功后任何 GET/LIST 立即可见，且不加价不降性能。代价是元数据层要做到分片内强一致（通常是 Paxos/Raft 复制的 KV）。但<strong>按 key 前缀顺序分片会撞热点</strong>：若所有 key 是 `2026-06-20/...` 这种时间前缀，写入永远砸在同一分片。</p>
 <div class="callout"><strong>面试高频</strong>：老 S3 性能指南建议给 key 加<strong>随机前缀（hash 散列）</strong>打散热点；2018 年后 S3 自动按前缀做自适应分区，每个前缀可达 3500 PUT / 5500 GET 每秒，但<em>设计 key schema 时仍要避免单调递增前缀</em>。这是「数据库分片热点」（Day 4）在存储元数据上的同一个坑。</div>
 <div class="case"><strong>真实案例</strong>：Google Colossus（GFS 继任者）把元数据从单 master 改成 BigTable 支撑的可分片元数据层，解决了 GFS single-master 的扩展天花板。S3 的强一致改造也是把元数据子系统重做成强一致 KV。</div>
-
-<h2>扩展与优化</h2>
+<h2 data-tts="7d47527106d43cc0">扩展与优化</h2>
 <ul>
 <li><strong>分层存储（tiering）</strong>：热数据 SSD/副本，温数据 HDD/EC，冷数据 SMR/磁带（S3 Glacier）。按访问频率自动下沉，成本可降一个数量级。Dropbox 专门为冷存储优化 Magic Pocket、上 SMR 盘。</li>
 <li><strong>版本控制 + 软删除</strong>：对象不可变天然适合多版本；删除只标记 tombstone，配合 GC 真正回收。这也是<strong>备份与防勒索</strong>的基础（versioning + MFA delete + 跨区复制）。</li>
 <li><strong>持续巡检（scrubbing）</strong>：后台不断重算 CRC 比对，提前发现 bit rot 和坏盘，在丢到「不可重建」之前修复。这是 11 个 9 的真正保障，比请求路径还重要。</li>
 <li><strong>跨区复制（CRR）</strong>：异步把对象复制到另一 region，用于 DR 和数据驻留合规。注意它是<em>最终一致</em>，RPO 不为 0。</li>
 </ul>
-
-<h2>常见陷阱 + 面试问题</h2>
+<h2 data-tts="43efadbbd7570049">常见陷阱 + 面试问题</h2>
 <ul>
 <li><strong>把对象存储当文件系统用</strong>：以为 `ls` 一个「目录」很便宜——其实是 LIST 前缀扫描，百万 key 下很慢且贵。没有真正的 rename（是 copy+delete）。</li>
 <li><strong>用副本扛冷数据</strong>：冷数据 3 副本是烧钱，该上 EC；反过来给小文件上 EC 是自找麻烦。</li>
 <li><strong>忘了孤儿 multipart</strong>：不配 lifecycle abort，成本月月漏。</li>
 <li><strong>面试追问</strong>：① 11 个 9 到底怎么算出来的？（故障域独立性 + 修复速度 vs 故障率的概率模型）② 一个 5TB 对象怎么传？怎么断点续传？③ 强一致和最终一致在对象存储里各放弃了什么？④ 热点 key 怎么办？和数据库分片的热点是不是同一个问题？⑤ 删除一个对象后空间什么时候真的释放？（GC + tombstone）</li>
 </ul>
-
-<h2>深入资源</h2>
+<h2 data-tts="5c05603c12ad7a3a">深入资源</h2>
 <ul>
 <li><strong>《Designing Data-Intensive Applications》</strong>（Kleppmann）— 复制、分区、一致性的底层原理，对象存储的元数据层正是这些概念的应用。</li>
 <li><strong>Werner Vogels — "Building and operating a pretty big storage system called S3"</strong>（allthingsdistributed.com, 2023）— S3 持久性、巡检、规模的第一手视角。</li>
 <li><strong>Dropbox 工程博客 — "Inside the Magic Pocket"</strong>（dropbox.tech）— EB 级自建对象存储的 EC、放置、迁移实战。</li>
 <li><strong>Backblaze — "Reed-Solomon Erasure Coding" / "Vault Architecture"</strong>（backblaze.com/blog）— 17+3 纠删码与开源实现，把持久性数学讲透。</li>
 </ul>
-
-<h2>深入思考</h2>
+<h2 data-tts="4d12253f235b61c6">深入思考</h2>
 <details><summary>11 个 9 的持久性到底是怎么"算"出来的？它最依赖哪个假设？</summary><div class="answer">持久性 ≈ 把「在修复完成前，同一对象的冗余份额全部丢失」的概率压到极低。给定单盘年故障率（AFR）和<strong>修复时间</strong>（MTTR），可建马尔可夫/二项模型：k+m 编码下，必须在 MTTR 窗口内同时坏掉 ≥ m+1 个独立故障域才丢数据。所以两个杠杆是<strong>故障域独立性</strong>和<strong>修复速度</strong>——修得越快、故障域越独立，丢数据窗口越小。最脆弱的假设是「<em>故障相互独立</em>」：同批次坏盘、同机架断电、同 region 灾难是<strong>相关故障</strong>，会让漂亮的概率模型瞬间失效。这正是要跨 AZ / 跨故障域放置、并做持续巡检（缩短 MTTR）的原因。</div></details>
 <details><summary>为什么对象存储几乎都"不可变"（覆盖而非原地改）？这个限制反而带来了什么好处？</summary><div class="answer">不可变让一切变简单且可并发：① 缓存/CDN 可以无脑长缓存，因为同一 key 内容不变（变就换 version id）；② 复制和 EC 不用处理「改一半」的中间态，写要么全成要么不存在；③ 没有原地写就没有读写锁竞争，多副本天然一致；④ 天生支持版本控制和快照。代价是「改一个字节也要重写整个对象」，所以对象存储不适合频繁小改的 workload（那是 block/file 或数据库的活）。这是用<strong>功能受限换取扩展性、一致性和成本</strong>的经典 trade-off。</div></details>
 <details><summary>S3 在 2020 年从最终一致升级到强 read-after-write 一致，且"不加价不降性能"——这在工程上意味着重做了什么？</summary><div class="answer">最终一致往往源于「元数据走缓存/异步索引」。要做到强一致，PUT 成功的那一刻，元数据的权威记录就必须已落到可被后续读命中的位置——意味着元数据子系统本身要是<strong>强一致复制的分片 KV</strong>（Paxos/Raft 类），并且读路径直接命中权威分片而非可能滞后的缓存。"不降性能"说明他们没有用「读时加锁/读多数派」的笨办法，而是把一致性下沉到分区内的复制协议，让常规读仍是单跳。本质上是把一致性成本从「每次请求」转移到「元数据架构」一次性付清。</div></details>
 <details><summary>给 100 PB 冷数据选 3 副本还是 17+3 EC？算一下成本差，再说什么时候反而该用副本。</summary><div class="answer">3 副本：100 PB 逻辑 → 300 PB 裸盘。17+3 EC：放大 20/17≈1.18，→ 约 118 PB 裸盘。差 ~180 PB，按冷存储每 PB 每月数千美元算，一年省的是<strong>千万美元量级</strong>，冷数据用 EC 几乎没有悬念。什么时候仍选副本？① <strong>小文件多</strong>：切 17 份后每份只有几 KB，元数据条目暴涨、随机读 IOPS 被打爆，EC 的空间收益被运维成本吃掉。② <strong>读延迟敏感且常读</strong>：副本可就近读单份，EC 正常读虽只读数据片不需解码、但任一片缺失就要拉 k 片重建，尾延迟更差。所以现实是分层：热/小 → 副本，冷/大 → EC。</div></details>
 <details><summary>客户端用 presigned URL 直传到存储层，绕过了你的应用服务器——你因此失去了什么控制能力？怎么补？</summary><div class="answer">失去的是<strong>请求路径上的拦截点</strong>：没法在写入瞬间做病毒扫描、内容审核、配额强校验、改写/转码、精细计费。补法分两类：① <strong>签名时前置约束</strong>：presigned URL 里嵌入条件（content-length-range 限大小、content-type 限类型、key 前缀限路径），签名本身就是一次授权决策。② <strong>事件驱动后置处理</strong>：上传完成触发事件（S3 Event → Lambda/队列），异步做扫描、转码、建索引、对账，发现违规再隔离/删除。本质是把「同步守门」改成「授权 + 异步治理」，这也是 serverless 媒体处理管线的标准形态。</div></details>
-
 <div class="nav"><a href="index.html">← 回到 index</a></div>
 </div>
-<script src="https://hub.cissychen.com/comments.js" defer></script>
-<script src="https://hub.cissychen.com/search.js" defer></script>
-<script src="https://hub.cissychen.com/index-button.js" defer></script>
-<script src="https://hub.cissychen.com/i18n-tts.js" defer></script>
+<script defer="" src="https://hub.cissychen.com/comments.js"></script>
+<script defer="" src="https://hub.cissychen.com/search.js"></script>
+<script defer="" src="https://hub.cissychen.com/index-button.js"></script>
+<script defer="" src="https://hub.cissychen.com/i18n-tts.js"></script>
 </body></html>

@@ -1,6 +1,7 @@
 <!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Day 49 · 容器与编排 (Containers & Orchestration) — System Design</title>
+
+<html lang="zh-CN"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Day 49 · 容器与编排 (Containers &amp; Orchestration) — System Design</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,"SF Pro Display","Noto Sans SC",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
@@ -97,7 +98,6 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 </script>
 </head><body><div class="container">
-
 <header>
 <div class="meta">
 <span class="tag day">Day 49</span>
@@ -107,10 +107,9 @@ document.addEventListener('DOMContentLoaded',()=>{
 <span class="tag">Scheduling</span>
 <span class="tag">Service Mesh</span>
 </div>
-<h1>容器与编排 — 声明式控制平面如何让机器自愈<span class="en">Containers & Orchestration: namespaces/cgroups, Kubernetes objects, Scheduling, Service Mesh</span></h1>
+<h1 data-tts="078c2b704e95eae7">容器与编排 — 声明式控制平面如何让机器自愈<span class="en">Containers &amp; Orchestration: namespaces/cgroups, Kubernetes objects, Scheduling, Service Mesh</span></h1>
 </header>
-
-<h2>问题场景 + 需求约束</h2>
+<h2 data-tts="760c7d8727378fdc">问题场景 + 需求约束</h2>
 <p>你的平台团队接手了 <strong>500 台裸机、2000+ 微服务实例</strong>：机器 CPU 利用率常年 &lt;15%（每个服务独占机器怕互相干扰）、发布靠 Ansible 脚本逐台推、机器挂了靠 on-call 半夜爬起来手动迁移。目标：把 2000 个实例塞进这批机器、利用率提到 40%+、发布自动化、<em>节点故障 30 秒内自愈</em>。这就是 Google 内部 Borg、以及开源 Kubernetes 要解决的问题。</p>
 <ul>
 <li><strong>隔离要求</strong>：一个服务 OOM 或跑满 CPU，不能拖垮同机器的邻居（noisy neighbor）。</li>
@@ -119,8 +118,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 <li><strong>自愈 SLO</strong>：节点宕机 → 探测 → 重新调度 pod 上线，端到端 &lt;60s；单 pod 崩溃 &lt;10s 重启。</li>
 <li><strong>发布安全</strong>：滚动更新，任意时刻至少 N-1 个副本存活，坏版本能自动停止 rollout。</li>
 </ul>
-
-<h2>高层架构（Kubernetes 控制平面）</h2>
+<h2 data-tts="e0028b1d08bbafc0">高层架构（Kubernetes 控制平面）</h2>
 <pre class="mermaid">
 graph TD
     U["用户 / CI<br/><i>kubectl apply YAML</i>"]
@@ -136,13 +134,13 @@ graph TD
       POD["Pods<br/><i>namespace+cgroup 隔离</i>"]
     end
 
-    U --> API
-    API <--> ETCD
-    SCHED -.watch/bind.-> API
-    CM -.watch/reconcile.-> API
-    KUBELET -.watch 本节点 pod.-> API
-    KUBELET --> CRI --> POD
-    PROXY --> POD
+    U --&gt; API
+    API &lt;--&gt; ETCD
+    SCHED -.watch/bind.-&gt; API
+    CM -.watch/reconcile.-&gt; API
+    KUBELET -.watch 本节点 pod.-&gt; API
+    KUBELET --&gt; CRI --&gt; POD
+    PROXY --&gt; POD
 
     classDef ctrl fill:#1a2530,stroke:#64c8ff,color:#e8eef5
     classDef store fill:#2a1530,stroke:#ff7ab6,color:#e8eef5
@@ -153,10 +151,8 @@ graph TD
 </pre>
 <p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">核心是 <strong>watch + reconcile</strong>：所有组件不直接互相调用，而是 watch API Server 的期望状态，各自把现实拉向期望</p>
 <p><strong>组件职责</strong>：<em>API Server</em> 是唯一写 etcd 的入口，负责鉴权、校验、乐观并发（resourceVersion）。<em>etcd</em> 用 Raft 存整个集群的期望+实际状态，是唯一真相源。<em>Scheduler</em> 只做一件事：把未绑定的 pod 挑一个 node 写回去。<em>Controller Manager</em> 跑几十个控制器（Deployment/ReplicaSet/Node…），每个都是「观察实际 vs 期望，有差就动作」的死循环。<em>kubelet</em> 是节点代理，watch 分配到本节点的 pod，调 containerd 拉起容器。</p>
-
-<h2>关键技术点</h2>
-
-<h3>1. 容器原理：namespace 切视图 + cgroup 切资源</h3>
+<h2 data-tts="c3df2e03437171d5">关键技术点</h2>
+<h3 data-tts="3fc09cc2fccadd7d">1. 容器原理：namespace 切视图 + cgroup 切资源</h3>
 <p><strong>核心 trade-off：</strong>用内核隔离换启动速度和密度，代价是共享内核 = 隔离弱于虚拟机。</p>
 <p><strong>原理</strong>：容器不是「轻量虚拟机」，它就是<em>一个普通 Linux 进程</em>，只是被两组内核特性框住。<strong>namespace</strong> 管「你能看见什么」——<code>pid</code>(独立进程树，容器里 PID 1)、<code>net</code>(独立网卡/IP/端口)、<code>mnt</code>(独立文件系统视图)、<code>uts</code>(主机名)、<code>ipc</code>、<code>user</code>(UID 映射)。<strong>cgroup</strong>(control group)管「你能用多少」——CPU 配额、内存上限、IO 带宽、PID 数量。镜像则靠 <em>overlayfs</em> 分层：只读层共享，写时复制。三者合起来：进程以为自己独占一台机器，实际和几十个邻居共享同一个内核。</p>
 <div class="tradeoff">
@@ -171,9 +167,9 @@ graph TD
 </div>
 <pre><code># cgroup v2 给一个容器限 1.5 核 + 512MB（伪 shell）
 mkdir /sys/fs/cgroup/mysvc
-echo "150000 100000" > /sys/fs/cgroup/mysvc/cpu.max   # 每 100ms 给 150ms CPU 时间 = 1.5 核
-echo 536870912       > /sys/fs/cgroup/mysvc/memory.max # 超了触发 OOM kill
-echo $CONTAINER_PID  > /sys/fs/cgroup/mysvc/cgroup.procs
+echo "150000 100000" &gt; /sys/fs/cgroup/mysvc/cpu.max   # 每 100ms 给 150ms CPU 时间 = 1.5 核
+echo 536870912       &gt; /sys/fs/cgroup/mysvc/memory.max # 超了触发 OOM kill
+echo $CONTAINER_PID  &gt; /sys/fs/cgroup/mysvc/cgroup.procs
 # 内存超限 → 内核 OOM killer 杀进程 → kubelet 记 OOMKilled → 按 restartPolicy 重启</code></pre>
 <div class="case">
 <strong>现实案例：</strong>
@@ -182,8 +178,7 @@ echo $CONTAINER_PID  > /sys/fs/cgroup/mysvc/cgroup.procs
 <li><strong>AWS Fargate / Lambda</strong>：底层用 <em>Firecracker</em> microVM 而非纯容器——多租户跑不可信客户代码，容器隔离不够，需要 VM 级边界。</li>
 <li><strong>CPU throttling 生产坑</strong>：cgroup CPU 配额基于 CFS quota，很多团队因 limit 设太低导致 P99 延迟毛刺（进程被强制暂停），是 Kubernetes 社区反复讨论的经典问题。</li>
 </ul></div>
-
-<h3>2. 声明式对象模型：期望状态 + 调和循环</h3>
+<h3 data-tts="badc9012701044fc">2. 声明式对象模型：期望状态 + 调和循环</h3>
 <p><strong>核心 trade-off：</strong>声明式（说「我要 3 个副本」）比命令式（说「启动一个容器」）更能自愈，代价是所有逻辑变成最终一致的异步循环，难调试。</p>
 <p><strong>原理</strong>：K8s 里你不「启动容器」，你<em>声明期望</em>：一个 <code>Deployment</code> 说「nginx:1.25，3 副本」。之后 Deployment 控制器创建 <code>ReplicaSet</code>，ReplicaSet 控制器保证「实际 pod 数 == 3」。每个控制器都是同一个模式的 <strong>reconcile loop</strong>：读期望、读实际、算 diff、执行、写回状态，永不停。删掉一个 pod → 实际=2≠期望=3 → 控制器立刻补一个。这就是自愈的本质：没有「故障处理特例代码」，故障只是一次让实际偏离期望的事件，循环自然把它拉回来。<code>Service</code> 提供稳定 VIP + DNS，把一组随时生灭的 pod IP 抽象成一个不变的入口。</p>
 <pre><code># 每个控制器的骨架（伪代码）——K8s 全靠这个循环
@@ -207,8 +202,7 @@ def reconcile(desired, actual):
 <li><strong>Argo CD / Flux（GitOps）</strong>：把「期望状态」放进 Git，控制器持续 reconcile 集群向 Git 靠拢——声明式模型的自然延伸，回滚=git revert。</li>
 <li><strong>CRD + Operator</strong>：把「运维一个数据库」也写成 reconcile loop（如 etcd/Redis Operator），用户声明「我要一个 3 节点 Redis」，Operator 自动处理故障转移。</li>
 </ul></div>
-
-<h3>3. 调度与自愈：过滤 → 打分 → 探针</h3>
+<h3 data-tts="2be3f53c1ebdbe99">3. 调度与自愈：过滤 → 打分 → 探针</h3>
 <p><strong>核心 trade-off：</strong>bin-packing 塞得越满利用率越高，但留给突发和故障转移的余量越少。</p>
 <p><strong>原理</strong>：调度器对每个待调度 pod 分两阶段。<em>Filter（预选）</em>：排除不满足硬约束的 node——资源不够、node selector 不匹配、污点(taint)未被容忍、反亲和冲突。<em>Score（优选）</em>：给活下来的 node 打分——资源最空闲的(LeastAllocated 铺开) 还是最满的(MostAllocated 打包省机器)、亲和性偏好、镜像本地已有。选最高分绑定。<strong>自愈靠三种探针</strong>：<code>liveness</code>(挂了就重启)、<code>readiness</code>(没准备好就摘出 Service 端点，但不重启)、<code>startup</code>(慢启动服务的宽限期)。节点级：node 心跳超时 → 标记 NotReady → 驱逐上面的 pod → 别处重建。</p>
 <div class="tradeoff">
@@ -231,8 +225,7 @@ readinessProbe:  { httpGet: {path: /ready},   periodSeconds: 5 }
 <li><strong>Kubernetes descheduler</strong>：调度是一次性的，集群跑久了会失衡（有的 node 满有的空），descheduler 周期性驱逐再平衡。</li>
 <li><strong>Cluster Autoscaler / Karpenter</strong>：pod 因资源不足 Pending → 自动加机器；node 长期空闲 → 缩容。把「自愈」从 pod 级延伸到 node 级。</li>
 </ul></div>
-
-<h3>4. Service Mesh：把网络能力下沉到 sidecar</h3>
+<h3 data-tts="f336ae8816382845">4. Service Mesh：把网络能力下沉到 sidecar</h3>
 <p><strong>核心 trade-off：</strong>用每 pod 一个 Envoy sidecar 换来「零改代码」的重试/熔断/mTLS/可观测，代价是每跳多一次代理、资源翻倍。</p>
 <p><strong>原理</strong>：微服务多了，重试、超时、熔断、mTLS、流量切分、链路追踪这些「网络关切」如果写进每个服务的业务代码，就得为每种语言维护一套库、且升级要改所有服务重新发版。Service Mesh 把这些能力抽到一个 <em>sidecar 代理</em>（Envoy）里，和业务容器同 pod，劫持所有进出流量。业务代码只管发普通 HTTP，重试/加密/指标全由 sidecar 透明完成。<strong>数据平面</strong>（一堆 Envoy）+ <strong>控制平面</strong>（Istio 的 istiod）分离：控制平面把路由规则、证书下发给所有 Envoy，Envoy 负责真正转发。</p>
 <div class="tradeoff">
@@ -249,8 +242,7 @@ readinessProbe:  { httpGet: {path: /ready},   periodSeconds: 5 }
 <li><strong>Istio</strong>：控制平面 istiod 下发 xDS 配置给 Envoy，提供 mTLS、金丝雀流量切分、故障注入，是 Google/IBM/Lyft 联合发起的 mesh 标准实现。</li>
 <li><strong>sidecar 成本争议</strong>：因 per-pod sidecar 的 CPU/内存/延迟开销，业界转向 eBPF（Cilium）和 Istio ambient 模式，把部分 L4 能力下沉内核、L7 用共享代理。</li>
 </ul></div>
-
-<h2>扩展与优化（增长后怎么办）</h2>
+<h2 data-tts="5349dd6d460aa9e3">扩展与优化（增长后怎么办）</h2>
 <ul>
 <li><strong>etcd 是瓶颈</strong>：所有 watch/写都压 etcd，集群 5000 node 以上时 etcd 的 Raft 提交延迟和 watch 扇出成瓶颈。手段：拆事件到独立 etcd、API Server 加缓存、限制 watch 数、大集群拆多集群 + 联邦。</li>
 <li><strong>调度器扩展</strong>：默认调度器串行调度，超大规模用调度框架插件、或多调度器分片（Borg 就是分 cell 各自调度）。</li>
@@ -258,15 +250,13 @@ readinessProbe:  { httpGet: {path: /ready},   periodSeconds: 5 }
 <li><strong>成本</strong>：Cluster Autoscaler/Karpenter 按需增删 node + Spot 实例跑无状态负载 + VPA 自动调 request，是 K8s 降本的三板斧（呼应 Day 27 成本工程）。</li>
 <li><strong>有状态服务</strong>：StatefulSet + PV/PVC + CSI 存储，但数据库上 K8s 仍需谨慎评估（存储性能、故障转移复杂度）。</li>
 </ul>
-
-<h2>常见陷阱 + 面试问题</h2>
+<h2 data-tts="9e48c2ac428bad65">常见陷阱 + 面试问题</h2>
 <div class="callout"><strong>1. liveness 探针探依赖 = 自造雪崩。</strong> liveness 只应探进程自身健康。若探了下游 DB，DB 抖动会让全部 pod 被判死重启，把局部故障放大成全局。依赖健康交给 readiness。</div>
 <div class="callout"><strong>2. 不设 request/limit 或设错。</strong> 不设 request → 调度器当它 0，超卖到 OOM；memory limit 设太低 → OOMKilled 反复重启；CPU limit 太低 → CFS throttle 导致 P99 毛刺。</div>
 <div class="callout"><strong>3. 把 Pod 当宠物。</strong> Pod 是牛不是宠物（cattle not pets），随时会被驱逐/重建，IP 会变。任何依赖固定 pod IP 或 pod 本地磁盘的设计都是错的——用 Service + PV。</div>
 <div class="callout"><strong>4. 以为容器=安全隔离。</strong> 容器共享内核，一个内核提权漏洞可穿透所有容器。跑不可信代码要上 gVisor/Kata/microVM，别指望 namespace。</div>
 <div class="callout"><strong>5. 面试高频：</strong> ① 一个 <code>kubectl apply</code> 到 pod 跑起来，中间经过哪些组件？② node 宕机后 pod 多久、如何被重建？③ 为什么声明式比命令式更能自愈？④ Service Mesh 解决什么、代价是什么、什么时候<em>不</em>该上？⑤ liveness 和 readiness 区别，配错各会怎样？</div>
-
-<h2>深入资源</h2>
+<h2 data-tts="4c488f155527ff06">深入资源</h2>
 <ul>
 <li><strong>《Large-scale cluster management at Google with Borg》</strong>（Verma et al., EuroSys 2015）：容器编排的思想源头，task-packing / over-commit / 隔离全在里面。</li>
 <li><strong>《Borg, Omega, and Kubernetes》</strong>（ACM Queue, 2016）：三代系统的经验复盘，讲清 K8s 为何长成这样。</li>
@@ -274,9 +264,7 @@ readinessProbe:  { httpGet: {path: /ready},   periodSeconds: 5 }
 <li><strong>Kubernetes 官方文档 concepts</strong>：controller / reconcile / scheduling / probes 的权威定义。</li>
 <li><strong>《Designing Data-Intensive Applications》</strong>（Kleppmann）第 8-9 章：分布式系统故障模型与共识，理解 etcd/Raft 为何是控制平面地基。</li>
 </ul>
-
-<h2>深入思考（点击展开答案）</h2>
-
+<h2 data-tts="64589918319e7a88">深入思考（点击展开答案）</h2>
 <details>
 <summary>1. 为什么 K8s 坚持 level-triggered（看当前状态）而不是 edge-triggered（响应事件）？如果控制器漏掉一个 watch 事件会怎样？</summary>
 <div class="answer">
@@ -285,7 +273,6 @@ readinessProbe:  { httpGet: {path: /ready},   periodSeconds: 5 }
 <p>代价是：必须<em>幂等</em>（同一 diff 执行多次结果一致），且有轮询/resync 开销。K8s 用 informer 缓存 + 周期性 resync 兼顾：平时靠 watch 增量省流量，定期全量兜底防漏。这正是「自愈」能力的根：故障不是特例，只是又一次让 level 偏离的状态。</p>
 </div>
 </details>
-
 <details>
 <summary>2. etcd 用 Raft 保证强一致，但整个集群所有 watch 和写都压在它上面。这会成为什么规模的瓶颈？有哪些缓解手段？</summary>
 <div class="answer">
@@ -293,7 +280,6 @@ readinessProbe:  { httpGet: {path: /ready},   periodSeconds: 5 }
 <p><strong>缓解</strong>：① 把高频变动的 <code>events</code> 对象拆到独立 etcd 实例，别和核心对象抢 IO；② API Server 侧 watch cache，让众多 client 复用一份 watch，不直接压 etcd；③ 分页 list + resourceVersion 避免全量；④ 控制 CRD/对象数量与更新频率（滥用 status 高频写是常见杀手）；⑤ 终极手段——<strong>拆集群</strong>。单集群总有规模天花板，Google Borg 早就用「cell」分片，K8s 生产也普遍多集群 + 联邦，用爆炸半径换可扩展性。</p>
 </div>
 </details>
-
 <details>
 <summary>3. bin-packing 把机器塞到 90%，一台 node 挂了会发生什么连锁反应？为什么「高利用率」和「高可用」在这里天然对立？</summary>
 <div class="answer">
@@ -301,7 +287,6 @@ readinessProbe:  { httpGet: {path: /ready},   periodSeconds: 5 }
 <p><strong>对立本质</strong>：故障转移需要「别处有空位」接住难民 pod，而空位就是被浪费的利用率。高利用率=没空位=转移失败。工程解法不是二选一，而是<em>显式预留</em>：保留 N+1 或按可用区留 headroom（如每 AZ 留够扛住整个 AZ 挂的余量）、用 PodDisruptionBudget 限制同时不可用数、反亲和把副本摊开。本质和容量规划的 P99/排队论 headroom 是同一件事（Day 27）。</p>
 </div>
 </details>
-
 <details>
 <summary>4. Service Mesh 给每个 pod 加一个 Envoy sidecar。在一个 1000 pod 的集群，这笔开销具体贵在哪？业界为什么开始搞 ambient/eBPF「去 sidecar」？</summary>
 <div class="answer">
@@ -309,7 +294,6 @@ readinessProbe:  { httpGet: {path: /ready},   periodSeconds: 5 }
 <p><strong>去 sidecar 动机</strong>：这些开销对「只想要 mTLS + 基础指标」的团队性价比太低。Ambient mode 把 L4（mTLS、TCP 路由）下沉到 node 级共享代理（ztunnel），只在需要 L7（HTTP 路由、重试）时才走一层共享 waypoint 代理；Cilium 用 eBPF 直接在内核态做 L4 策略和负载均衡，连代理进程都省了。代价是 L7 能力和每-pod 隔离粒度要重新权衡——这是「能力全 vs 开销低」谱系上的重新选点，不是免费午餐。</p>
 </div>
 </details>
-
 <details>
 <summary>5. 容器共享宿主内核。这个「特性」在多租户公有云（跑客户任意代码）场景下为什么是致命的？AWS 是怎么绕过的？</summary>
 <div class="answer">
@@ -317,11 +301,10 @@ readinessProbe:  { httpGet: {path: /ready},   periodSeconds: 5 }
 <p><strong>AWS 的解法</strong>：Lambda 和 Fargate 底层不用裸容器，而用 <em>Firecracker</em> microVM——每个函数/任务跑在一个极简 KVM 虚拟机里，有<em>独立 guest 内核</em>，用 hypervisor 这条比内核 syscall 窄得多、更易审计的边界隔离租户。它砍掉传统 VM 的设备模拟，启动压到 ~百毫秒、内存开销极小，拿回接近容器的密度同时保住 VM 级隔离。同类思路还有 Google gVisor（用户态重实现内核 syscall 拦截）、Kata Containers（轻量 VM）。结论：<em>隔离强度和密度可以部分兼得，但从来不是免费的，多租户跑不可信代码必须付这笔隔离税</em>。</p>
 </div>
 </details>
-
 <div class="nav"><a href="index.html">← 回到 index</a></div>
 </div>
-<script src="https://hub.cissychen.com/comments.js" defer></script>
-<script src="https://hub.cissychen.com/search.js" defer></script>
-<script src="https://hub.cissychen.com/index-button.js" defer></script>
-<script src="https://hub.cissychen.com/i18n-tts.js" defer></script>
+<script defer="" src="https://hub.cissychen.com/comments.js"></script>
+<script defer="" src="https://hub.cissychen.com/search.js"></script>
+<script defer="" src="https://hub.cissychen.com/index-button.js"></script>
+<script defer="" src="https://hub.cissychen.com/i18n-tts.js"></script>
 </body></html>

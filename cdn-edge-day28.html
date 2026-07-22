@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<html lang="zh-CN"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>Day 28 · CDN 与 Edge — System Design</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -97,7 +98,6 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 </script>
 </head><body><div class="container">
-
 <header>
 <div class="meta">
 <span class="tag day">Day 28</span>
@@ -107,10 +107,9 @@ document.addEventListener('DOMContentLoaded',()=>{
 <span class="tag">Tiered Cache</span>
 <span class="tag">Edge Compute</span>
 </div>
-<h1>CDN 与 Edge — 把计算和缓存推到离用户 50 公里处<span class="en">CDN & Edge: Anycast, Tiered Cache, Edge Invalidation, Edge Compute</span></h1>
+<h1 data-tts="8a5995e00cda387c">CDN 与 Edge — 把计算和缓存推到离用户 50 公里处<span class="en">CDN &amp; Edge: Anycast, Tiered Cache, Edge Invalidation, Edge Compute</span></h1>
 </header>
-
-<h2>问题场景 + 需求约束</h2>
+<h2 data-tts="a14c85276f7bd7b9">问题场景 + 需求约束</h2>
 <p>你要为一个全球性的电商 / 媒体站设计 <strong>CDN + Edge 层</strong>：<em>5000 万 DAU</em>、分布在五大洲，内容是<strong>静态资产（图片/JS/视频分片，可强缓存）+ 半动态页面（商品页，秒级可 stale）+ 动态 API（购物车，不可缓存）</strong>混合。</p>
 <ul>
 <li><strong>延迟 SLO</strong>：静态资产 p95 &lt; 50ms（必须命中边缘）；动态 API 边缘只做 TLS 终止 + 路由，回源走优化骨干网。</li>
@@ -119,8 +118,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 <li><strong>失效时效</strong>：商品调价后，全球边缘缓存要在 <em>数秒内</em> 反映新价格（错误价格 = 真金白银损失）。</li>
 </ul>
 <p>核心矛盾：<strong>把内容推到离用户越近、命中率越高、延迟越低，但失效越难、一致性越弱</strong>。CDN 的设计就是在这条轴上找平衡。</p>
-
-<h2>高层架构</h2>
+<h2 data-tts="4a037c1950b797c7">高层架构</h2>
 <pre class="mermaid">
 graph LR
     U["全球用户<br/><i>同一个 Anycast IP</i>"]
@@ -132,10 +130,10 @@ graph LR
     SHIELD["Origin Shield<br/><i>单点回源收敛</i>"]
     ORG[("Origin<br/>app + 对象存储")]
 
-    U -->|BGP 选最近| EDGE --> L1
-    L1 -.miss.-> UPPER
-    UPPER -.miss.-> SHIELD
-    SHIELD -.miss.-> ORG
+    U --&gt;|BGP 选最近| EDGE --&gt; L1
+    L1 -.miss.-&gt; UPPER
+    UPPER -.miss.-&gt; SHIELD
+    SHIELD -.miss.-&gt; ORG
 
     classDef client fill:#1a2530,stroke:#64c8ff,color:#e8eef5
     classDef edge fill:#0e2030,stroke:#5eead4,color:#e8eef5
@@ -148,10 +146,8 @@ graph LR
 </pre>
 <p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">Anycast 把用户引到最近 PoP；缓存分层收敛回源，越往右节点越少、命中越贵</p>
 <p><strong>组件职责</strong>：<em>边缘节点</em>用 Anycast 接住流量，做 TLS 握手、WAF 过滤、运行 Edge Worker；<em>边缘缓存</em>命中则直接返回（占绝大多数请求）；未命中向<em>区域上层缓存</em>请求，再不行才到 <em>Origin Shield</em>（一个指定 PoP 专门回源，把成千上万边缘的 miss 收敛成对 origin 的少量请求），最后才打 origin。这条「下层 → 上层 → shield → origin」的漏斗是命中率与 origin 保护的关键。</p>
-
-<h2>关键技术点</h2>
-
-<h3>1. Anycast + BGP：一个 IP，全球就近接入</h3>
+<h2 data-tts="c3df2e03437171d5">关键技术点</h2>
+<h3 data-tts="b17a2dd2f4cb7856">1. Anycast + BGP：一个 IP，全球就近接入</h3>
 <p>核心 trade-off：<em>用路由层做负载均衡，换来零配置故障转移，但牺牲了对「用户落哪个节点」的精确控制。</em></p>
 <p><strong>原理</strong>：同一段 IP 前缀从全球几百个 PoP 用 <strong>BGP 同时宣告</strong>。用户的数据包由互联网路由器按 BGP 度量（AS 跳数等）送到「网络上最近」的 PoP——通常也是延迟最低的。这带来三个白送的好处：<strong>就近接入</strong>（无需 GeoDNS 猜测）、<strong>DDoS 稀释</strong>（攻击流量被分摊到所有 PoP，单点容量 = 全网容量）、<strong>自动 failover</strong>（PoP 宕机时撤回路由宣告，BGP 在秒级把流量收敛到次近 PoP，无需改 DNS、不等 TTL 过期）。</p>
 <div class="tradeoff">
@@ -168,8 +164,7 @@ graph LR
 <li><strong>Google Public DNS / 主流权威 DNS</strong>：8.8.8.8 即 Anycast，全球就近响应。</li>
 <li><strong>主流 CDN（Cloudflare/Fastly）</strong>：用 Anycast 让任意 PoP 都能吸收 DDoS，把「单点抗攻击」变成「全网抗攻击」。</li>
 </ul></div>
-
-<h3>2. 边缘缓存键 + 分层缓存（Tiered Cache）</h3>
+<h3 data-tts="40498a313aa94f62">2. 边缘缓存键 + 分层缓存（Tiered Cache）</h3>
 <p>核心 trade-off：<em>边缘节点越多命中率越分散，分层把 miss 收敛回源、保护 origin，代价是多一跳延迟。</em></p>
 <p><strong>原理</strong>：CDN 用 <strong>cache key</strong>（默认 host + path + 部分 query）索引对象。但全球几百个 PoP 各自独立缓存时，每个 PoP 第一次都要回源——<strong>命中率被「摊薄」</strong>，origin 仍会被几百倍放大的 miss 打到。<strong>Tiered Cache</strong> 把 PoP 分成下层（近用户）和上层（少数大节点）：下层 miss 先问上层，只有上层 miss 才允许回源。这样 origin 看到的是<em>少数上层节点</em>的请求，而非全部边缘。配合 <strong>request coalescing</strong>（同一 key 的并发 miss 在节点内合并成一次回源，其余请求挂起等结果），可彻底压住 thundering herd。</p>
 <div class="tradeoff">
@@ -200,8 +195,7 @@ def handle(req):
 <li><strong>Netflix Open Connect</strong>：把缓存设备（OCA）直接<em>嵌入 ISP 机房</em>，热门内容在非高峰预填充，播放时几乎全在 ISP 内网命中。</li>
 <li><strong>Fastly</strong>：以「即时全网 purge + 高命中」著称，适合频繁变化的半动态内容。</li>
 </ul></div>
-
-<h3>3. 边缘缓存失效：purge 的传播与 stale 兜底</h3>
+<h3 data-tts="3e3a45abf796e0c1">3. 边缘缓存失效：purge 的传播与 stale 兜底</h3>
 <p>核心 trade-off：<em>主动 purge 一致性强但传播有延迟、有放大；TTL 简单但要么太旧要么打爆 origin。</em></p>
 <p><strong>原理</strong>：边缘缓存有几百个副本，「让全球同时失效」本质是一个<strong>分布式广播</strong>问题。三种手段：<strong>① TTL 过期</strong>（被动，最简单，但 TTL 短=回源多、TTL 长=数据旧）；<strong>② 显式 purge</strong>（按 URL / 按 tag / purge everything，主动推送失效消息到所有 PoP，秒级但有传播延迟，purge everything 会瞬间清空缓存→origin 被打爆）；<strong>③ stale-while-revalidate / soft purge</strong>（标记为陈旧但仍先返回旧值，后台异步回源刷新）——用「短暂 stale」换「永不让用户等回源、永不雪崩 origin」。生产里通常是 <em>长 TTL + tag-based purge + SWR</em> 的组合：正常靠 tag 精确失效，兜底靠 TTL，体验靠 SWR。</p>
 <div class="tradeoff">
@@ -217,8 +211,7 @@ def handle(req):
 <li><strong>Fastly</strong>：以毫秒级 <em>instant purge</em> 和 surrogate-key（tag）失效著称，电商常用其按 key 批量失效。</li>
 <li><strong>Cloudflare</strong>：支持 purge by URL / tag / everything；并把 <code>stale-while-revalidate</code> 作为标准缓存指令降低回源毛刺。</li>
 </ul></div>
-
-<h3>4. Edge Compute：在 PoP 上跑代码</h3>
+<h3 data-tts="fd267159057a44ec">4. Edge Compute：在 PoP 上跑代码</h3>
 <p>核心 trade-off：<em>isolate 启动近零、密度高但每请求受限；container/VM 能力强但冷启动慢、密度低。</em></p>
 <p><strong>原理</strong>：把鉴权、A/B 分流、个性化、API 聚合等逻辑从 origin 下沉到边缘，省一整趟回源 RTT。但「在几百个 PoP 跑用户代码」要求<strong>极高的密度和极低的冷启动</strong>。两条路线：<strong>V8 isolate</strong>（Cloudflare Workers）——单进程内跑成千上万个轻量沙箱，<em>冷启动近乎为零</em>、内存开销极小，但单请求 CPU/内存有硬上限、不能跑任意原生二进制；<strong>容器 / 微 VM</strong>（Lambda@Edge 等）——能力接近完整运行时，但冷启动以百毫秒计、单节点密度低。Edge 的另一难点是<strong>状态</strong>：边缘天然无共享状态，强一致数据要么回源、要么用专门的边缘存储（KV 最终一致、Durable Object 单点串行化）。</p>
 <div class="tradeoff">
@@ -238,16 +231,14 @@ def handle(req):
 <li><strong>AWS Lambda@Edge / CloudFront Functions</strong>：前者跑完整 Lambda（重逻辑），后者跑轻量 JS（header 改写等高频低延迟场景）。</li>
 <li><strong>Fastly Compute</strong>：用 WebAssembly 沙箱，主打安全隔离与快速实例化。</li>
 </ul></div>
-
-<h2>扩展与优化</h2>
+<h2 data-tts="4e767de578e25790">扩展与优化</h2>
 <ul>
 <li><strong>动态内容加速</strong>：不可缓存的 API 也能受益于 CDN——边缘做 TLS 终止后，走 CDN 优化骨干网（持久连接 + 私有路由）回源，比公网直连更稳更快（如 Argo Smart Routing 思路）。</li>
 <li><strong>Origin Shield</strong>：流量增长后为每个 origin 指定一个收敛 PoP，把回源 RPS 再压一个数量级，并平滑 origin 扩容压力。</li>
 <li><strong>多 CDN（Multi-CDN）</strong>：用 GSLB/RUM 数据在多家 CDN 间按性能与可用性切流，避免单一 CDN 故障（见下方 Fastly 事故）拖垮全站。</li>
 <li><strong>边缘可观测性</strong>：命中率、回源 RPS、各 PoP p95、purge 传播时延都要打点；命中率掉 = origin 即将雪崩的先行指标。</li>
 </ul>
-
-<h2>常见陷阱 + 面试追问</h2>
+<h2 data-tts="c584681595a74938">常见陷阱 + 面试追问</h2>
 <ul>
 <li><strong>「CDN = 只缓存静态资源」</strong>：错。现代 CDN 还做 TLS 终止、DDoS 清洗、边缘计算、动态加速；面试要能区分「缓存」与「边缘平台」。</li>
 <li><strong>cache key 把 cookie/追踪参数算进去</strong>：命中率瞬间归零，origin 被打爆——经典生产事故。要显式归一化与 <code>Vary</code> 控制。</li>
@@ -255,8 +246,7 @@ def handle(req):
 <li><strong>忽视边缘是「全局爆炸半径」</strong>：CDN 的一行配置/一条规则会同时推到全球。<em>Cloudflare 2019-07-02</em> 一条 WAF 正则触发<strong>灾难性回溯</strong>，CPU 打满，全网约 27 分钟、流量掉约 82%（<a href="https://blog.cloudflare.com/cloudflare-outage/">官方复盘</a>）；<em>Fastly 2021-06-08</em> 一个潜伏的软件缺陷被某客户配置触发，约 85% 网络中断近 1 小时（<a href="https://www.fastly.com/blog/summary-of-june-8-outage">官方总结</a>）。面试要答出：配置也要灰度发布、要有 kill switch。</li>
 <li><strong>Anycast 与长连接</strong>：追问「为什么有些场景不能纯 Anycast」——BGP 重路由会让 TCP/WebSocket 中途换 PoP 断连，需会话亲和或边缘转发。</li>
 </ul>
-
-<h2>深入资源</h2>
+<h2 data-tts="9d673bc3f54f0ab5">深入资源</h2>
 <ul>
 <li><strong>Cloudflare 2019-07-02 outage 复盘</strong> — 正则回溯如何打垮全网，配置灰度的反面教材：<a href="https://blog.cloudflare.com/cloudflare-outage/">blog.cloudflare.com/cloudflare-outage</a></li>
 <li><strong>Fastly 2021-06-08 outage 总结</strong> — 潜伏缺陷被客户配置触发的全球中断：<a href="https://www.fastly.com/blog/summary-of-june-8-outage">fastly.com/blog/summary-of-june-8-outage</a></li>
@@ -264,9 +254,7 @@ def handle(req):
 <li><strong>Cloudflare Tiered Cache Smart Topology</strong> — 分层缓存如何选上层、收敛回源：<a href="https://blog.cloudflare.com/tiered-cache-smart-topology/">blog.cloudflare.com/tiered-cache-smart-topology</a></li>
 <li><strong>Cloudflare：无容器的云计算（Workers/isolate）</strong> — V8 isolate 为何能近零冷启动：<a href="https://blog.cloudflare.com/cloud-computing-without-containers/">blog.cloudflare.com</a></li>
 </ul>
-
-<h2>深入思考</h2>
-
+<h2 data-tts="a90ee35392bcdb76">深入思考</h2>
 <details>
 <summary>1. 全网命中率 90%，origin 扛 20 万 RPS。如果命中率掉到 80%，origin 压力涨多少？为什么这是「先行告警」指标？</summary>
 <div class="answer">
@@ -274,7 +262,6 @@ def handle(req):
 <p>所以命中率是 origin 雪崩的<strong>先行指标</strong>：等到 origin CPU 报警时，缓存层往往已经失守一阵。常见诱因：cache key 误带参数、大规模 purge、新版本改了 Cache-Control、热点内容 TTL 集体过期（要加 TTL jitter）。监控应对命中率本身设阈值告警，而非只看 origin。</p>
 </div>
 </details>
-
 <details>
 <summary>2. 商品调价后要求「全球数秒内一致」，但 CDN purge 有传播延迟。怎么设计让用户绝不看到错误价格？</summary>
 <div class="answer">
@@ -287,7 +274,6 @@ def handle(req):
 <p>本质：用「<em>缓存可缓存的、实时取易变的</em>」替代「缓存一切再想办法快速失效」。purge 永远有窗口，架构上消除依赖才是稳的。</p>
 </div>
 </details>
-
 <details>
 <summary>3. 为什么 Anycast 能「天然抗 DDoS」，而传统单数据中心不能？容量模型差在哪？</summary>
 <div class="answer">
@@ -296,7 +282,6 @@ def handle(req):
 <p>代价：你失去对流量落点的精确控制，且需要全球 BGP 与海量 PoP 的运营能力——这正是 CDN 作为「专门生意」存在的原因。</p>
 </div>
 </details>
-
 <details>
 <summary>4. Edge Worker 用 V8 isolate 而非容器。把「冷启动」和「多租户安全」放一起看，这个选择牺牲了什么？</summary>
 <div class="answer">
@@ -309,7 +294,6 @@ def handle(req):
 <p>所以选型是「<em>海量轻量短请求</em> 选 isolate；<em>重逻辑/需完整运行时</em> 选容器/微 VM」。Cloudflare 赌的是边缘场景绝大多数属于前者。</p>
 </div>
 </details>
-
 <details>
 <summary>5. CDN 的一条配置能同时推全球——这既是优势也是「全局爆炸半径」。如何让边缘发布像后端一样安全？</summary>
 <div class="answer">
@@ -324,11 +308,10 @@ def handle(req):
 <p>一句话：边缘的便利来自「全局即时生效」，而安全来自<strong>给这个全局生效加上灰度、限额和开关</strong>。</p>
 </div>
 </details>
-
 <div class="nav"><a href="index.html">← 回到 index</a></div>
 </div>
-<script src="https://hub.cissychen.com/comments.js" defer></script>
-<script src="https://hub.cissychen.com/search.js" defer></script>
-<script src="https://hub.cissychen.com/index-button.js" defer></script>
-<script src="https://hub.cissychen.com/i18n-tts.js" defer></script>
+<script defer="" src="https://hub.cissychen.com/comments.js"></script>
+<script defer="" src="https://hub.cissychen.com/search.js"></script>
+<script defer="" src="https://hub.cissychen.com/index-button.js"></script>
+<script defer="" src="https://hub.cissychen.com/i18n-tts.js"></script>
 </body></html>

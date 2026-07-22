@@ -1,6 +1,7 @@
 <!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Day 36 · 区块链与分布式账本 (Blockchain & Distributed Ledger) — System Design</title>
+
+<html lang="zh-CN"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Day 36 · 区块链与分布式账本 (Blockchain &amp; Distributed Ledger) — System Design</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,"SF Pro Display","Noto Sans SC",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
@@ -97,7 +98,6 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 </script>
 </head><body><div class="container">
-
 <header>
 <div class="meta">
 <span class="tag day">Day 36</span>
@@ -107,10 +107,9 @@ document.addEventListener('DOMContentLoaded',()=>{
 <span class="tag">Smart Contract</span>
 <span class="tag">Decentralized Storage</span>
 </div>
-<h1>区块链与分布式账本 — 在无信任节点间复制一份谁也改不了的状态机<span class="en">Blockchain & Distributed Ledger: Consensus, Smart Contracts, Decentralized Storage, Trilemma</span></h1>
+<h1 data-tts="393909bccc92b175">区块链与分布式账本 — 在无信任节点间复制一份谁也改不了的状态机<span class="en">Blockchain &amp; Distributed Ledger: Consensus, Smart Contracts, Decentralized Storage, Trilemma</span></h1>
 </header>
-
-<h2>问题场景 + 需求约束</h2>
+<h2 data-tts="23d9a1b9e14bc164">问题场景 + 需求约束</h2>
 <p>设计一个<strong>跨机构清结算账本</strong>（多家银行、多国监管、没谁愿当中心方）：要在<em>互不信任</em>的几百个节点间，复制一份<em>所有人都认账、谁也单方面改不了</em>的交易历史。这和传统分布式系统是两种威胁模型——Day 5 的 replication 假设节点只会宕机（crash fault），这里却假设节点会<strong>主动作恶、伪造、合谋</strong>（Byzantine fault），且没有可信协调者。共识的本质从「让活着的副本达成一致」升级为「让一群可能撒谎的人达成一致」。</p>
 <ul>
 <li><strong>信任模型</strong>：无 trusted third party，节点可拜占庭作恶，最多容忍 1/3（BFT）或 &lt;50% 算力/质押（中本聪共识）的恶意方。</li>
@@ -118,10 +117,8 @@ document.addEventListener('DOMContentLoaded',()=>{
 <li><strong>最终性（finality）</strong>：交易多久「不可逆」？PoW 是概率最终性（等 6 个块 ≈ 1 小时），BFT 是确定性最终性（一个块即定）。</li>
 <li><strong>数据规模</strong>：全节点要存全部历史（Bitcoin 已 &gt; 600GB，Ethereum archive node &gt; 15TB），on-chain 存储极贵（每 KB 上链成本可达数美元）。</li>
 <li><strong>不可篡改 + 可审计</strong>：任意第三方能独立验证整条链，无需信任发布者。</li>
-
 </ul>
-
-<h2>高层架构</h2>
+<h2 data-tts="18c6f7b6972c65d8">高层架构</h2>
 <pre class="mermaid">
 graph TD
     C["客户端 / 钱包<br/><i>私钥签名交易</i>"]
@@ -135,11 +132,11 @@ graph TD
     LDG[("区块链账本<br/>哈希链 + Merkle 树")]
     OFF[("链下存储<br/>IPFS / Arweave")]
 
-    C -->|①签名 tx| MP --> P2P
-    P2P -->|②共识选 leader 出块| EVM
-    EVM -->|③状态转移| LDG
-    EVM -.大对象只存 hash.-> OFF
-    V1 <-.gossip.-> V2 <-.gossip.-> V3
+    C --&gt;|①签名 tx| MP --&gt; P2P
+    P2P --&gt;|②共识选 leader 出块| EVM
+    EVM --&gt;|③状态转移| LDG
+    EVM -.大对象只存 hash.-&gt; OFF
+    V1 &lt;-.gossip.-&gt; V2 &lt;-.gossip.-&gt; V3
 
     classDef client fill:#1a2530,stroke:#64c8ff,color:#e8eef5
     classDef net fill:#0e2030,stroke:#5eead4,color:#e8eef5
@@ -151,10 +148,8 @@ graph TD
     class LDG,OFF store
 </pre>
 <p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">交易经 mempool 进入 P2P 网络 → 共识选出块者 → 虚拟机确定性执行得到新状态 → 哈希链追加。每个全节点重放所有交易独立验证，不信任出块者。</p>
-
-<h2>关键技术点</h2>
-
-<h3>1. 共识算法：PoW vs PoS vs BFT — 拿安全和去中心化换吞吐</h3>
+<h2 data-tts="c3df2e03437171d5">关键技术点</h2>
+<h3 data-tts="d1ca6e3dd6c3b7f1">1. 共识算法：PoW vs PoS vs BFT — 拿安全和去中心化换吞吐</h3>
 <p><strong>原理</strong>：拜占庭环境下达成一致需要「投票权稀缺」，否则攻击者能用海量假身份（<em>Sybil 攻击</em>）操纵投票。<strong>PoW</strong> 用算力当稀缺资源（解哈希难题，谁先解出谁出块）；<strong>PoS</strong> 用质押的资本当稀缺资源（按质押量加权随机选出块者，作恶则没收质押 = slashing）；<strong>BFT 类</strong>（PBFT / Tendermint）则在<em>已知验证者集合</em>内做两轮投票（pre-vote / pre-commit），凑齐 2/3+ 即确定性提交。</p>
 <table>
 <thead><tr><th></th><th>PoW (Bitcoin)</th><th>PoS (Ethereum)</th><th>BFT (Tendermint)</th></tr></thead>
@@ -178,7 +173,7 @@ def mine(block, difficulty):
     nonce = 0
     while True:
         h = sha256(sha256(block.header + nonce))  # Bitcoin 双 SHA-256
-        if int(h, 16) < target:                   # 前导零足够多
+        if int(h, 16) &lt; target:                   # 前导零足够多
             return nonce                            # 找到 → 广播出块
         nonce += 1
 # 验证只需一次哈希（O(1)），但生成需 ~期望 2^difficulty 次尝试
@@ -192,8 +187,7 @@ def mine(block, difficulty):
 <li><strong>Cosmos / Tendermint</strong>：BFT 即时最终性，跨链 IBC 生态的共识底座，验证者集合有限但出块 ~1s。</li>
 <li><strong>Solana</strong>：Proof of History（密码学时钟给交易预排序）+ PoS 追求高 TPS，但 2022 年多次因拥塞/bug 全网停摆（见下文性能权衡）。</li>
 </ul></div>
-
-<h3>2. 智能合约架构：确定性状态机 + gas 计量 — 图灵完备的代价是要给停机问题收费</h3>
+<h3 data-tts="e62319159eb24a0f">2. 智能合约架构：确定性状态机 + gas 计量 — 图灵完备的代价是要给停机问题收费</h3>
 <p><strong>原理</strong>：智能合约是<em>部署在链上、由所有节点重复执行</em>的代码。每个全节点必须算出<em>完全相同</em>的结果，否则状态分叉——这要求执行<strong>严格确定性</strong>：禁止真随机、禁止读系统时间/网络、浮点也要规避。EVM 是个 256 位的栈式虚拟机。因为代码可能死循环（停机问题不可判定），用 <strong>gas</strong> 给每个操作码定价，调用者预付 gas，执行耗尽即回滚——既防 DoS 又给计算定价。</p>
 <div class="tradeoff">
 <strong>Trade-off：合约可变性的两难</strong>
@@ -224,8 +218,7 @@ function withdraw() public {
 <li><strong>Solana</strong>：用 BPF/SBF（非 EVM），账户模型而非 EVM 的合约存储模型，为并行执行优化。</li>
 <li><strong>Hyperledger Fabric</strong>：许可链，chaincode 跑在 Docker 容器里，execute-order-validate 架构允许非确定性后再筛。</li>
 </ul></div>
-
-<h3>3. 数据完整性：哈希链 + Merkle 树 + 链下存储 — 把「信任」压缩成一个 32 字节的根</h3>
+<h3 data-tts="f6f752404c57e21d">3. 数据完整性：哈希链 + Merkle 树 + 链下存储 — 把「信任」压缩成一个 32 字节的根</h3>
 <p><strong>原理</strong>：不可篡改靠两层哈希。<em>哈希链</em>：每个区块头含前一块的哈希，改任意历史块会让其后所有块哈希失效，篡改成本 = 重做其后全部 PoW/共识。<em>Merkle 树</em>：把块内成千上万交易两两哈希成一棵树，根哈希进块头——轻节点（SPV）只需 O(log n) 的 Merkle proof 就能验证「某笔交易在某块里」，无需下载全块。这让手机钱包不必存 600GB 全链。</p>
 <div class="tradeoff">
 <strong>Trade-off：数据存哪？</strong>
@@ -250,8 +243,7 @@ def verify(leaf, proof, root):
 <li><strong>Arweave</strong>：「永久存储」定位，一次性付费、blockweave 结构，被不少 NFT 项目用作图片持久层。</li>
 <li><strong>Certificate Transparency</strong>：Google 的 CT 日志用 Merkle 树做可审计的证书账本——区块链思想的非加密货币应用。</li>
 </ul></div>
-
-<h3>4. 可扩展性三难：Layer 2 Rollup — 不在主链上算，只把证明丢回主链</h3>
+<h3 data-tts="2fcb9ec7f3b64f85">4. 可扩展性三难：Layer 2 Rollup — 不在主链上算，只把证明丢回主链</h3>
 <p><strong>原理</strong>：「区块链三难」（Vitalik 提出）指<em>去中心化、安全、可扩展</em>三者难以兼得——提高吞吐往往要么减少节点（牺牲去中心化）、要么放松验证（牺牲安全）。主流扩容路线是 <strong>Layer 2 Rollup</strong>：把成百上千笔交易在链下批量执行，只把<em>压缩后的数据 + 一个有效性保证</em>提交回 L1，L1 当结算与数据可用层。两种流派：<em>Optimistic Rollup</em> 默认相信、留挑战期（~7 天）让人提交欺诈证明；<em>ZK Rollup</em> 用零知识证明（SNARK/STARK）数学上证明执行正确，主链一验即终。</p>
 <div class="tradeoff">
 <strong>Trade-off：Optimistic vs ZK Rollup</strong>
@@ -268,32 +260,27 @@ def verify(leaf, proof, root):
 <li><strong>Ethereum</strong>：官方 roadmap 明确「rollup-centric」——L1 退守结算+数据可用，扩容交给 L2。</li>
 <li><strong>Bitcoin Lightning Network</strong>：另一思路（支付通道，非 rollup），把高频小额支付移到链下双向通道，只在开关通道时上链。</li>
 </ul></div>
-
-<h2>扩展与优化（增长后怎么办）</h2>
+<h2 data-tts="39a8cbd73b1200b5">扩展与优化（增长后怎么办）</h2>
 <ul>
 <li><strong>吞吐撞墙</strong>：主链不要硬扩块（扩块 = 全节点硬件门槛升高 = 去中心化退化，比特币「区块大小之争」的核心），把 TPS 推给 L2 rollup。</li>
 <li><strong>状态膨胀</strong>：全节点状态无限增长（Ethereum state &gt; 数百 GB），引入 state expiry / statelessness（无状态客户端靠见证数据验证），降低新节点门槛。</li>
 <li><strong>数据可用性</strong>：rollup 的瓶颈从执行转移到「把数据发回 L1」，danksharding / blob（EIP-4844）专门给 L2 留便宜的数据带宽。</li>
 <li><strong>跨链互操作</strong>：多链生态需要桥（bridge），但桥是<em>头号被黑重灾区</em>（锁仓巨大、信任假设脆弱），优先用轻客户端验证而非多签托管。</li>
 </ul>
-
-<h2>常见陷阱 + 面试问题</h2>
+<h2 data-tts="d5f66fd9413b1e68">常见陷阱 + 面试问题</h2>
 <div class="callout"><strong>1. 「区块链不可篡改」≠「数据一定正确」。</strong> 链只保证写入后改不了（防篡改），不保证写入的是真话（garbage in, garbage forever）。预言机（oracle）把链下真值喂上链，是整个信任链最薄弱、最常被操纵的一环（DeFi 预言机价格操纵攻击频发）。</div>
 <div class="callout"><strong>2. 51% 攻击攻击的是什么？</strong> 不是「偷走别人的币」（改不了签名），而是<em>双花</em>：攻击者控制多数算力后可重组链、撤销自己已确认的交易。小市值 PoW 币因算力便宜屡遭此劫。</div>
 <div class="callout"><strong>3. 私钥即一切。</strong> 没有「找回密码」：私钥丢 = 资产永久锁死，私钥泄 = 瞬间归零。这是 UX 与安全的根本矛盾，账户抽象（AA）/ 社交恢复在补这个坑。</div>
 <div class="callout"><strong>4. 最终性不是「确认了就安全」。</strong> PoW 是概率最终性，等的块越多被重组概率越低但永不为零；BFT 才是确定性最终性。交易所对大额充值要求多确认正是为此。</div>
 <div class="callout"><strong>5. 面试高频追问：</strong>（1）为什么 PoS 比 PoW 安全成本更高？（2）Optimistic 和 ZK rollup 的提现延迟差异来自哪？（3）为什么不把用户头像存上链？（4）BFT 为什么节点数受限、O(n²) 出在哪？（5）软分叉 vs 硬分叉的兼容性区别？</div>
-
-<h2>深入资源</h2>
+<h2 data-tts="fd88ec357b57b536">深入资源</h2>
 <ul>
 <li><strong>Bitcoin Whitepaper</strong>（Nakamoto, 2008）：PoW、Merkle、SPV 的原点，9 页讲清中本聪共识。</li>
 <li><strong>《Designing Data-Intensive Applications》</strong>（Kleppmann）第 8-9 章：拜占庭故障、共识与一致性的系统视角，把区块链放回分布式系统脉络。</li>
 <li><strong><a href="https://ethereum.org/roadmap/merge/">ethereum.org — The Merge</a></strong>：PoS 切换、能耗、slashing 官方说明。</li>
 <li><strong>Vitalik Buterin 博客</strong>（vitalik.eth.limo）：区块链三难、rollup-centric roadmap、PoS 设计的一手论述。</li>
 </ul>
-
-<h2>深入思考（点击展开答案）</h2>
-
+<h2 data-tts="cfdb24d9df0fbc62">深入思考（点击展开答案）</h2>
 <details>
 <summary>1. PoS 的「nothing-at-stake」问题到底指什么？为什么 PoW 天然没有，PoS 要靠 slashing 才能补？</summary>
 <div class="answer">
@@ -301,7 +288,6 @@ def verify(leaf, proof, root):
 <p><strong>修法 slashing</strong>：协议规定「在冲突的两个块上都签名」是可被密码学证明的罪证，一旦被举报就<em>没收质押并踢出</em>，把「全押无成本」变成「全押会被罚到破产」，恢复了机会成本。<em>二阶效应</em>：验证者由此有了「手滑双签被罚」的风险，催生分布式验证者技术（DVT）降低单点误罚。</p>
 </div>
 </details>
-
 <details>
 <summary>2. 为什么 Bitcoin 选 ~10 分钟出块、Solana 追求 400ms？出块越快越好吗？快了在分布式系统上付什么代价？</summary>
 <div class="answer">
@@ -309,7 +295,6 @@ def verify(leaf, proof, root):
 <p><strong>Solana 的 400ms</strong>：靠 Proof of History 预先给交易排好时序（密码学时钟），减少「现在轮到谁」的协调开销，并要求验证者跑高配硬件。<em>代价</em>：硬件门槛高 → 节点少 → 去中心化退化；容错余量小，2022 年多次因流量洪峰/bug <strong>全网停摆数小时</strong>。这正是三难写照：拿去中心化和稳定性换了吞吐——出块快是把安全余量花掉了。</p>
 </div>
 </details>
-
 <details>
 <summary>3. 智能合约要求「所有节点算出完全相同结果」。这个确定性约束具体禁掉了哪些日常编程习惯？违反会怎样？</summary>
 <div class="answer">
@@ -323,7 +308,6 @@ def verify(leaf, proof, root):
 <p>违反确定性的后果不是报错，而是<em>不同节点得到不同状态根</em>，共识无法对齐 → 链分裂。所以 EVM 从指令集层面就阉割掉了这些来源。</p>
 </div>
 </details>
-
 <details>
 <summary>4. 把数据存 IPFS、链上只放 hash，号称「去中心化+不可篡改」。这个方案的可用性陷阱在哪？和「存 S3 只记 URL」本质区别是什么？</summary>
 <div class="answer">
@@ -331,7 +315,6 @@ def verify(leaf, proof, root):
 <p><strong>与 S3+URL 的本质区别</strong>：S3 的 URL 是<em>位置寻址</em>，内容可被悄悄替换而 URL 不变——不防篡改。IPFS 的 CID 是<em>内容寻址</em>，内容一改 CID 就变，所以防篡改但同样不保证可用性。两者都需要「有人持续存储」的激励，区别只在「篡改能否被发现」。<em>真正持久</em>要靠 Filecoin（存储证明+激励）或 Arweave（一次付费永久存）这类把存储可用性纳入激励的方案。</p>
 </div>
 </details>
-
 <details>
 <summary>5. 一家银行联盟要做跨行清算账本，工程师建议「上以太坊主网」。作为架构师你会反对吗？什么场景才真正需要无许可公链？</summary>
 <div class="answer">
@@ -340,11 +323,10 @@ def verify(leaf, proof, root):
 <p><strong>什么时候才真要公链</strong>：当参与方<em>无法事先确定、互不信任、且需要抗审查/抗单点关停</em>——如面向全球任意用户的公开资产发行、去信任的跨境价值转移。一个判据：如果你能列出一份「谁有权写入」的白名单，你大概率不需要无许可公链。</p>
 </div>
 </details>
-
 <div class="nav"><a href="index.html">← 回到 index</a></div>
 </div>
-<script src="https://hub.cissychen.com/comments.js" defer></script>
-<script src="https://hub.cissychen.com/search.js" defer></script>
-<script src="https://hub.cissychen.com/index-button.js" defer></script>
-<script src="https://hub.cissychen.com/i18n-tts.js" defer></script>
+<script defer="" src="https://hub.cissychen.com/comments.js"></script>
+<script defer="" src="https://hub.cissychen.com/search.js"></script>
+<script defer="" src="https://hub.cissychen.com/index-button.js"></script>
+<script defer="" src="https://hub.cissychen.com/i18n-tts.js"></script>
 </body></html>

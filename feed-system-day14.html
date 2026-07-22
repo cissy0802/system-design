@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<html lang="zh-CN"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>Day 14 · Feed 系统 (Feed System) — System Design</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -97,7 +98,6 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 </script>
 </head><body><div class="container">
-
 <header>
 <div class="meta">
 <span class="tag day">Day 14</span>
@@ -107,10 +107,9 @@ document.addEventListener('DOMContentLoaded',()=>{
 <span class="tag">Fanout</span>
 <span class="tag">Ranking</span>
 </div>
-<h1>Feed 系统 — 1 亿 DAU 关注流的 fanout 艺术<span class="en">Feed System: Push vs Pull vs Hybrid, Fanout-on-write Limits, Timeline Storage, Ranking Pipeline</span></h1>
+<h1 data-tts="6c890460950cf8e9">Feed 系统 — 1 亿 DAU 关注流的 fanout 艺术<span class="en">Feed System: Push vs Pull vs Hybrid, Fanout-on-write Limits, Timeline Storage, Ranking Pipeline</span></h1>
 </header>
-
-<h2>问题场景 + 需求约束</h2>
+<h2 data-tts="68e85f2f0cde478f">问题场景 + 需求约束</h2>
 <p>给一个 <strong>1 亿 DAU 的关注式 timeline</strong>（Twitter/X 的 Home、微博关注流、Instagram Feed）设计后端：你关注了几百个账号，下拉刷新要在 <strong>p99 &lt; 200ms</strong> 内拿到这些账号最新的、排好序的帖子。难点不是「存帖子」，而是<em>读写放大的不对称</em>——一次发帖要让几百万关注者「看到」，一次刷新要从几百个关注对象里聚合排序。先想清楚：<strong>这份合并工作放在写时做，还是读时做？</strong></p>
 <ul>
 <li><strong>规模</strong>：1 亿 DAU，平均关注数几百，发帖峰值几千~万 QPS，timeline 读峰值数十万 QPS（Twitter 公开过约 <strong>300K QPS</strong> 的 timeline 读）。</li>
@@ -119,22 +118,21 @@ document.addEventListener('DOMContentLoaded',()=>{
 <li><strong>不均匀的扇出</strong>：普通人几百关注者，名人几千万——<em>同一套 fanout 不可能同时服务这两端</em>。</li>
 <li><strong>排序</strong>：纯时间序还是 ML 排序？后者要在聚合后对几百候选打分，预算紧张。</li>
 </ul>
-
-<h2>高层架构（混合 fanout）</h2>
+<h2 data-tts="56d2d53b9f80c7f7">高层架构（混合 fanout）</h2>
 <pre class="mermaid">
 graph TD
-    POST["发帖 Write API"] --> TW[("Tweet Store<br/>权威帖子库")]
-    POST --> FO["Fanout 服务<br/><i>查社交图</i>"]
-    FO -->|普通用户:推| TLC[("Home Timeline Cache<br/>Redis · 每人一条有界 list")]
-    FO -.名人:跳过 fanout.-> CEL[("名人帖子<br/>读时拉取")]
+    POST["发帖 Write API"] --&gt; TW[("Tweet Store<br/>权威帖子库")]
+    POST --&gt; FO["Fanout 服务<br/><i>查社交图</i>"]
+    FO --&gt;|普通用户:推| TLC[("Home Timeline Cache<br/>Redis · 每人一条有界 list")]
+    FO -.名人:跳过 fanout.-&gt; CEL[("名人帖子<br/>读时拉取")]
 
-    READ["刷新 Read API"] --> MIX["Timeline 混合服务"]
-    MIX -->|① 读预物化| TLC
-    MIX -->|② 拉名人最新| CEL
-    MIX --> RANK["排序 + 多样性"]
-    RANK --> HYDRATE["Hydrate<br/><i>用 id 取帖子正文</i>"]
-    HYDRATE --> TW
-    HYDRATE --> OUT["返回 20 条 feed"]
+    READ["刷新 Read API"] --&gt; MIX["Timeline 混合服务"]
+    MIX --&gt;|① 读预物化| TLC
+    MIX --&gt;|② 拉名人最新| CEL
+    MIX --&gt; RANK["排序 + 多样性"]
+    RANK --&gt; HYDRATE["Hydrate<br/><i>用 id 取帖子正文</i>"]
+    HYDRATE --&gt; TW
+    HYDRATE --&gt; OUT["返回 20 条 feed"]
 
     classDef w fill:#1a2530,stroke:#64c8ff,color:#e8eef5
     classDef cache fill:#1a1a30,stroke:#ffb450,color:#e8eef5
@@ -145,10 +143,8 @@ graph TD
 </pre>
 <p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">写路径预物化普通用户 timeline；读路径合并「预物化」+「名人实时拉取」再排序</p>
 <p><strong>组件职责</strong>：<em>Tweet Store</em> 是帖子的 source of truth（按 tweet_id 分片的 KV）。<em>Fanout 服务</em>在发帖时查社交图，把 tweet_id <strong>推</strong>进每个关注者的 Home Timeline Cache——这是「写时多干活」。名人例外：扇出代价太大，其帖子不预物化，留待读时<strong>拉</strong>。<em>混合服务</em>是关键：读时把预物化的 timeline 与名人最新帖 merge，排序后只对 top-N <em>hydrate</em>（timeline 里只存 id，正文回 Tweet Store 取，省内存）。</p>
-
-<h2>关键技术点</h2>
-
-<h3>1. Push vs Pull vs Hybrid：合并工作放写时还是读时</h3>
+<h2 data-tts="c3df2e03437171d5">关键技术点</h2>
+<h3 data-tts="c509c85fabaf9db9">1. Push vs Pull vs Hybrid：合并工作放写时还是读时</h3>
 <p><strong>一句话 trade-off</strong>：用「发帖时的写放大」换「刷新时的读放大」——两者只能选一头省，名人逼你两头都得管。</p>
 <p><strong>原理</strong>：<em>Push（fanout-on-write）</em>发帖时把帖子 id 写进每个关注者的 timeline，读时一次性取出——读 O(1)、写 O(关注者数)。<em>Pull（fanout-on-read）</em>什么都不预算，刷新时现查你关注的所有人最近帖子再归并排序——写 O(1)、读 O(关注数×每人查询)。<strong>选择取决于读写比和扇出分布</strong>：读多写少（100:1）且大多数人关注者不多 → push 把成本摊到稀疏的写上，划算；但遇到千万粉丝的名人，一条帖子触发千万次写，push 直接崩。所以工业界几乎全是 <em>Hybrid</em>：普通用户 push、名人 pull，读时合并。</p>
 <table>
@@ -174,8 +170,7 @@ graph TD
 <li><strong>Facebook News Feed（Multifeed）</strong>：走 <em>pull</em>——aggregator 在读时 fan-out 到一组 leaf 节点取好友近期动态，排序过滤后返回（Meta 工程博客 2015）。</li>
 <li><strong>LinkedIn FollowFeed</strong>：也是 pull 思路——broker（followfeed-query）读时并行查多个 storage 节点的活动 timeline 再归并（LinkedIn 工程博客）。</li>
 </ul></div>
-
-<h3>2. Fanout-on-write 的写放大与名人问题</h3>
+<h3 data-tts="4edc4eb534aec377">2. Fanout-on-write 的写放大与名人问题</h3>
 <p><strong>一句话 trade-off</strong>：push 把读成本转嫁成写成本，而写成本随<em>关注者数线性爆炸</em>，到名人量级就不可持续。</p>
 <p><strong>原理</strong>：一条帖子的 fanout 写次数 = 作者的关注者数。普通人几百次缓存写，缓存层轻松吸收；但 5000 万粉丝的账号发一条，就是 5000 万次 Redis 写——即便每次 100µs，串行也要小时级，还会瞬间打满缓存集群带宽。更糟的是<em>惊群叠加</em>：名人同时在线粉丝多，扇出风暴和读风暴撞一起。解法是给账号设<strong>扇出阈值</strong>：关注者超过阈值的进「名人名单」，其帖子<em>跳过 fanout</em>，改在读时拉取并入每个读者的 timeline。代价是读路径多一次「拉名人最新帖 + 合并」，但避免了写侧的雪崩。</p>
 <pre><code># Hybrid fanout：发帖时按阈值分流（pseudo-code）
@@ -184,7 +179,7 @@ FANOUT_THRESHOLD = 100_000  # 关注者超此数 → 走读时 pull
 def on_post(author_id, tweet_id, ts):
     tweet_store.put(tweet_id, ...)          # 永远先落权威库
     n = social_graph.follower_count(author_id)
-    if n > FANOUT_THRESHOLD:
+    if n &gt; FANOUT_THRESHOLD:
         celeb_recent.zadd(author_id, ts, tweet_id)  # 名人最新帖，读时拉
         return                                # ⚠️ 不 fanout
     # 普通用户：异步扇出，分批 pipeline，避免阻塞发帖
@@ -208,8 +203,7 @@ def on_post(author_id, tweet_id, ts):
 <li><strong>Twitter</strong>：明确把高粉账号列入「celebrity」绕过 fanout，读时合并；home timeline 在 Redis 中是<em>有界</em>的（公开材料提到约 800 条上限），老条目截断。</li>
 <li><strong>Instagram</strong>：用 Cassandra 为非名人异步预物化 feed；名人（百万粉级）<em>不预物化</em>，因为对全部关注者扇出 I/O 代价过高（Instagram 工程材料）。</li>
 </ul></div>
-
-<h3>3. Timeline 存储：有界 list、存 id 不存正文</h3>
+<h3 data-tts="dd46297887aab9e0">3. Timeline 存储：有界 list、存 id 不存正文</h3>
 <p><strong>一句话 trade-off</strong>：用「读时多一次 hydrate 取正文」换「timeline 缓存内存缩小一两个数量级」。</p>
 <p><strong>原理</strong>：Home timeline 用 Redis 的有序结构（按时间打分的 sorted set / list）实现，每人一条，<strong>只存 tweet_id 不存正文</strong>。理由：① 正文几 KB，1 亿用户 × 800 条全存正文是 TB 级内存灾难；存 8 字节 id 则缩小百倍；② 帖子可能被编辑/删除，正文若冗余进每个 timeline，更新要再扇出一遍。读时拿到 top-N 个 id，再批量回 Tweet Store <em>hydrate</em> 正文（一次 MGET），并过滤掉已删除/已拉黑的。timeline 还必须<strong>有界</strong>——只保留最新几百条，老的截断，否则活跃大账号的关注者 timeline 无限增长。冷数据（翻很旧的帖）回落到 pull。</p>
 <pre><code># 读路径：合并 + hydrate（pseudo-code）
@@ -235,8 +229,7 @@ def get_home_timeline(uid, limit=20):
 <li><strong>Twitter</strong>：home timeline 存于 Redis 集群、有界（~800 条）、每条仅 id 级数据，靠异步 pipeline 写入优化吞吐（Krikorian 材料）。</li>
 <li><strong>Instagram</strong>：feed/活动数据从 Redis 迁到 Cassandra（再到自研 Rocksandra 存储引擎），把 GC 卡顿和 p99 压下来——说明 timeline 存储选型随规模演进（Instagram 工程博客）。</li>
 </ul></div>
-
-<h3>4. Ranking Pipeline：从时间序到 ML 排序</h3>
+<h3 data-tts="88b93160375528e0">4. Ranking Pipeline：从时间序到 ML 排序</h3>
 <p><strong>一句话 trade-off</strong>：用「用户参与度提升」换「实时性、可解释性与算力预算」——排序模型只能跑在聚合后的小候选集上。</p>
 <p><strong>原理</strong>：早期 feed 是<em>纯时间倒序</em>（reverse-chron），简单、实时、可预测。但信息过载后转向 <strong>ML 排序</strong>：聚合出候选（push 物化 + pull 名人，几百条）后，对每条用模型预测多个参与信号（点赞/评论/转发/停留概率），加权成分排序。这呼应 Day 13 的多阶段漏斗——区别是 feed 候选来自<em>关注图</em>而非全库召回，候选量小得多（几百 vs 十亿），所以可以直接上较重的排序模型。排序后还要<strong>重排</strong>注入多样性（同作者打散、避免连刷一个话题）和业务规则（广告插入、时效性提权）。</p>
 <div class="tradeoff">
@@ -252,8 +245,7 @@ def get_home_timeline(uid, limit=20):
 <li><strong>Facebook News Feed</strong>：Multifeed 的 aggregator 在读时对 leaf 取回的候选做 ranking 与 filtering 再返回——排序是读路径的一部分（Meta 工程博客）。</li>
 <li><strong>LinkedIn</strong>：FollowFeed 当初的目标之一就是支撑「计算更复杂的打分与排序」而不牺牲实时性，broker 读时归并后排序（LinkedIn 工程博客）。</li>
 </ul></div>
-
-<h2>扩展与优化（增长后怎么办）</h2>
+<h2 data-tts="65a92a34965b826b">扩展与优化（增长后怎么办）</h2>
 <ul>
 <li><strong>活跃度感知 fanout</strong>：只给近期活跃的关注者预物化，僵尸粉读时按需生成，砍掉大量无效写。</li>
 <li><strong>分层 timeline</strong>：热（近几百条）放 Redis，温/冷回落到 Cassandra/磁盘按需 pull，控制内存成本。</li>
@@ -261,25 +253,21 @@ def get_home_timeline(uid, limit=20):
 <li><strong>排序与召回解耦</strong>：把「装候选」与「排序」拆成独立服务，排序模型可独立迭代、灰度（Day 13 漏斗思想）。</li>
 <li><strong>瓶颈识别</strong>：监控扇出延迟 p99、单 key timeline 大小、hydrate 回源 QPS、名人合并耗时——名人合并往往是读路径长尾的根因。</li>
 </ul>
-
-<h2>常见陷阱 + 面试问题</h2>
+<h2 data-tts="53dfcc31dec279cf">常见陷阱 + 面试问题</h2>
 <div class="callout"><strong>1. 一上来就纠结 push 还是 pull。</strong> 正确答案几乎永远是 <em>hybrid</em>。面试官想听的是「按关注者数/活跃度分流」的阈值思维，以及读时如何合并两条来源——而不是二选一。</div>
 <div class="callout"><strong>2. 把正文塞进每个 timeline。</strong> 内存爆炸 + 删除/编辑要全量重扇出。timeline 只存 id，读时 hydrate。</div>
 <div class="callout"><strong>3. 忘了 timeline 要有界。</strong> 不截断老条目，大账号关注者的单 key 无限膨胀，Redis 大 key 拖垮整个分片。</div>
 <div class="callout"><strong>4. 排序排在写时。</strong> push 时就定死顺序，新帖与模型更新无法实时反映；重排序应放读路径。</div>
 <div class="callout"><strong>5. 忽略可见性过滤。</strong> 拉黑/删除/隐私的帖子若不在读时过滤，会把已删内容推给用户——hydrate 后必须 filter。</div>
 <p><strong>高频追问</strong>：① 千万粉名人发帖，怎么不打爆系统？② push/pull 阈值怎么定，依据什么指标？③ 新关注一个人，ta 的历史帖怎么进我的 timeline（backfill）？④ 发帖到关注者可见的端到端延迟预算怎么拆？⑤ 时间序 vs 排序流，各自牺牲什么、什么产品该选哪个？</p>
-
-<h2>深入资源</h2>
+<h2 data-tts="5ec15ef2d8ddb32c">深入资源</h2>
 <ul>
 <li><strong>Raffi Krikorian《Timelines at Scale》</strong>（QCon/InfoQ）+ High Scalability 对 Twitter timeline 架构的拆解：fanout、Redis 物化、名人 hybrid 的一手材料。</li>
 <li><strong>Meta 工程博客《Serving Facebook Multifeed》</strong>（2015）：pull 式 aggregator-leaf 架构与读时排序的实战。</li>
 <li><strong>LinkedIn 工程博客《FollowFeed: LinkedIn's Feed Made Faster and Smarter》</strong>：pull/读时归并 + 复杂排序的取舍。</li>
 <li><strong>《Designing Data-Intensive Applications》第 1 章</strong>（Kleppmann）：正是用 Twitter timeline 的写扇出 vs 读扇出作为「负载描述」的开篇案例。</li>
 </ul>
-
-<h2>深入思考（点击展开答案）</h2>
-
+<h2 data-tts="06db2ba5d84fe6aa">深入思考（点击展开答案）</h2>
 <details>
 <summary>1. push 的写放大随关注者数线性增长，pull 的读放大随关注数线性增长。能不能用一个不等式估算「该 push 还是 pull」的临界点？</summary>
 <div class="answer">
@@ -287,7 +275,6 @@ def get_home_timeline(uid, limit=20):
 <p><strong>直觉化</strong>：普通人发帖少、被反复刷 → 读远多于写 → push（写一次省无数次读）。名人粉丝数既抬高写成本，其帖又因被排序埋掉而人均曝光低、降低写收益——两头夹击使其落到 pull 区。这正是 hybrid 阈值的理论依据。</p>
 </div>
 </details>
-
 <details>
 <summary>2. 用户 A 刚关注了大 V B（500 万粉）。A 的 timeline 里应不应该立刻出现 B 的历史帖？backfill 怎么做才不踩坑？</summary>
 <div class="answer">
@@ -295,7 +282,6 @@ def get_home_timeline(uid, limit=20):
 <p><strong>若 B 是普通账号（走 push）</strong>：B 历史帖不在 A 的预物化 timeline 里。做法：读时按需拉 B 近期帖合并（简单常用），或后台异步 zadd 进 A 的 timeline。<strong>坑</strong>：别在「关注」这个同步请求里回填——若 A 一次性关注一批人（导入通讯录），同步回填会放大成一场小型 fanout 风暴，必须异步且限速，并尊重有界截断。</p>
 </div>
 </details>
-
 <details>
 <summary>3. timeline 用 Redis sorted set 存 id。如果 Redis 某分片宕机，那批用户的 timeline 全没了，怎么办？这是数据丢失吗？</summary>
 <div class="answer">
@@ -303,7 +289,6 @@ def get_home_timeline(uid, limit=20):
 <p><strong>恢复策略</strong>：① 短期<em>降级到 pull</em>——该分片用户刷新时实时归并关注对象最新帖，慢但能用，给重建争取时间；② 后台<em>重新 fanout 重建</em>，代价是读路径退化 + 一波写风暴（要限速）。这也解释了 timeline 为何要<em>有界</em>——重建只需回填最近几百条而非全历史。<strong>反面教训</strong>：若把 timeline 当唯一存储（不存 Tweet Store），这就是真·数据丢失——派生层永远不能当权威。</p>
 </div>
 </details>
-
 <details>
 <summary>4. 从时间序切到 ML 排序流，DAU 参与度涨了，但客服收到「为什么我没看到好友 X 的帖」的投诉激增。这个二阶效应怎么来的？怎么缓解？</summary>
 <div class="answer">
@@ -311,7 +296,6 @@ def get_home_timeline(uid, limit=20):
 <p><strong>缓解</strong>：① 给强关系/明确订阅保底曝光位；② 提供<em>「最新」时间序入口</em>作为可切换视图（Twitter/Instagram 都做了）；③ 排序加<em>多样性与覆盖率</em>约束，别让头部账号霸屏；④ 产品上明示「为你推荐 vs 最新」。本质是承认离线参与度指标 ≠ 用户信任，需生态侧指标兜底（呼应 Day 13 的茧房讨论）。</p>
 </div>
 </details>
-
 <details>
 <summary>5. 估算：1 亿用户、人均 800 条有界 timeline、每条存 8 字节 tweet_id。光 timeline cache 要多少内存？这个数字告诉你什么架构含义？</summary>
 <div class="answer">
@@ -319,11 +303,10 @@ def get_home_timeline(uid, limit=20):
 <p><strong>架构含义</strong>：① 单机放不下 → timeline cache 必须<em>分片</em>（按 uid 哈希，呼应 Day 4）；② 这还只是 id——<strong>幸好没存正文</strong>，否则 800 × 几 KB × 1e8 = PB 级，这就是「只存 id + hydrate」的硬约束来源；③ 内存太贵 → <em>活跃度感知</em>和<em>分层</em>（热放内存、冷回落 Cassandra）不是优化是必需；④ 也解释了有界 800 为何重要——它直接决定缓存层总内存预算，翻倍上限就翻倍成本。</p>
 </div>
 </details>
-
 <div class="nav"><a href="index.html">← 回到 index</a></div>
 </div>
-<script src="https://hub.cissychen.com/comments.js" defer></script>
-<script src="https://hub.cissychen.com/search.js" defer></script>
-<script src="https://hub.cissychen.com/index-button.js" defer></script>
-<script src="https://hub.cissychen.com/i18n-tts.js" defer></script>
+<script defer="" src="https://hub.cissychen.com/comments.js"></script>
+<script defer="" src="https://hub.cissychen.com/search.js"></script>
+<script defer="" src="https://hub.cissychen.com/index-button.js"></script>
+<script defer="" src="https://hub.cissychen.com/i18n-tts.js"></script>
 </body></html>

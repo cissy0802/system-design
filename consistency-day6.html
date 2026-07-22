@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<html lang="zh-CN"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>Day 6 · 一致性 (Consistency) — System Design</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -94,7 +95,6 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 </script>
 </head><body><div class="container">
-
 <header>
 <div class="meta">
 <span class="tag day">Day 6</span>
@@ -104,10 +104,9 @@ document.addEventListener('DOMContentLoaded',()=>{
 <span class="tag">CAP / PACELC</span>
 <span class="tag">Causal</span>
 </div>
-<h1>一致性 (Consistency) — 它不是一个开关，是一整条光谱<span class="en">Linearizable / Sequential / Causal / RYW / Monotonic / Eventual · CAP & PACELC · HLC & Version Vectors</span></h1>
+<h1 data-tts="3b91d3301fe4ee2f">一致性 (Consistency) — 它不是一个开关，是一整条光谱<span class="en">Linearizable / Sequential / Causal / RYW / Monotonic / Eventual · CAP &amp; PACELC · HLC &amp; Version Vectors</span></h1>
 </header>
-
-<h2>问题场景与约束</h2>
+<h2 data-tts="84833304d779633d">问题场景与约束</h2>
 <p>设计一个全球电商「<strong>限量发售 + 商品详情 + 评论</strong>」混合系统：欧美亚三大洲，<strong>50 万 DAU</strong>，发售时段瞬时 <strong>20k 下单 QPS / 200k 商品查看 QPS / 50k 评论读写 QPS</strong>。同一个系统里有三类截然不同的一致性要求：</p>
 <ul>
 <li><strong>库存与下单（强一致 / linearizable）</strong>：100 件限量必须不超卖、不少卖；任何客户端读到的库存数字之后只能更少。RPO=0。</li>
@@ -115,8 +114,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 <li><strong>商品评论（causal + eventual）</strong>：必须保证『回复』出现在『被回复评论』之后（因果序）；但允许欧洲用户晚 1-2 秒看到亚洲用户的新评论。</li>
 </ul>
 <p>这三套需求强迫你 <em>在同一系统内混用多种一致性模型</em>——这才是真实系统的样子。Day 5 已经讲了复制怎么做；今天讲：<strong>哪些一致性保证值得为之付出延迟与可用性，哪些不值，工程上怎么落地</strong>。</p>
-
-<h2>高层架构</h2>
+<h2 data-tts="b74570f34d29411b">高层架构</h2>
 <pre class="mermaid">
 graph TD
     subgraph Edge["Edge / CDN"]
@@ -135,19 +133,19 @@ graph TD
 
     Client["客户端<br/><i>携带 session LSN / HLC</i>"]
 
-    Client -- "view product" --> CDN
-    CDN -. miss .-> INV
-    Client -- "order / decrement stock" --> INV
-    Client -- "list my orders" --> ORD
-    Client -- "post / read comments" --> CMT_US
-    Client -- "post / read comments" --> CMT_EU
-    Client -- "post / read comments" --> CMT_AP
+    Client -- "view product" --&gt; CDN
+    CDN -. miss .-&gt; INV
+    Client -- "order / decrement stock" --&gt; INV
+    Client -- "list my orders" --&gt; ORD
+    Client -- "post / read comments" --&gt; CMT_US
+    Client -- "post / read comments" --&gt; CMT_EU
+    Client -- "post / read comments" --&gt; CMT_AP
 
-    INV -. CDC .-> CDN
-    ORD -. CDC .-> CDN
-    CMT_US <-. async + HLC .-> CMT_EU
-    CMT_EU <-. async + HLC .-> CMT_AP
-    CMT_AP <-. async + HLC .-> CMT_US
+    INV -. CDC .-&gt; CDN
+    ORD -. CDC .-&gt; CDN
+    CMT_US &lt;-. async + HLC .-&gt; CMT_EU
+    CMT_EU &lt;-. async + HLC .-&gt; CMT_AP
+    CMT_AP &lt;-. async + HLC .-&gt; CMT_US
 
     classDef strong fill:#2a1530,stroke:#ff7ab6,color:#e8eef5
     classDef ryw fill:#1a2530,stroke:#64c8ff,color:#e8eef5
@@ -157,10 +155,8 @@ graph TD
     class CMT_US,CMT_EU,CMT_AP,HLC causal
 </pre>
 <p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">三种一致性域：库存走全球 linearizable（Spanner 类多数派），订单走单 region 主从 + 客户端 LSN，评论走 multi-region async + HLC 保因果序。Edge CDN 兜住 95% 的纯展示流量。</p>
-
-<h2>关键技术点</h2>
-
-<h3>1. 一致性光谱：6 种模型，从『绝对正确』到『最终对齐』</h3>
+<h2 data-tts="c3df2e03437171d5">关键技术点</h2>
+<h3 data-tts="5be681210cfb8baa">1. 一致性光谱：6 种模型，从『绝对正确』到『最终对齐』</h3>
 <p><strong>原理</strong>：一致性模型定义了『多个客户端看到的操作顺序，与某个理想顺序的偏差程度』。从强到弱（每弱一档，性能/可用性升一档）：</p>
 <table>
 <thead><tr><th>模型</th><th>承诺</th><th>实现代价</th><th>典型</th></tr></thead>
@@ -200,8 +196,7 @@ graph TD
 <li><strong>Facebook TAO</strong>：social graph 缓存层，写穿主区域、读最终一致；只有少数关键操作（隐私设置变更）走强一致路径。</li>
 <li><strong>Discord 消息</strong>：Cassandra QUORUM 读写（W+R&gt;N），获得 sequential per-channel，但跨 channel 无序——业务上够用。</li>
 </ul></div>
-
-<h3>2. CAP 与 PACELC：『二选一』是误导，『四选二』才接近真相</h3>
+<h3 data-tts="fd77365b7361e6b7">2. CAP 与 PACELC：『二选一』是误导，『四选二』才接近真相</h3>
 <p><strong>原理</strong>：CAP 定理（Brewer 2000，Gilbert &amp; Lynch 2002 证明）说：网络分区（P）发生时，必须在一致性（C）和可用性（A）之间选一个。但这只刻画了『分区时』的行为，<em>没说分区不发生时怎么办</em>——而分区是罕见事件，绝大多数时间系统都不在分区中。</p>
 <p>PACELC（Abadi 2012）补全了另一半：<strong>P</strong>artition 时 <strong>A</strong> 还是 <strong>C</strong>；<strong>E</strong>lse（正常时）<strong>L</strong>atency 还是 <strong>C</strong>onsistency。完整决策有 4 种组合：</p>
 <table>
@@ -213,7 +208,7 @@ graph TD
 <tr><td><strong>PC / EC</strong></td><td>保一致</td><td>强一致</td><td>Spanner, CockroachDB, etcd, HBase</td></tr>
 </tbody></table>
 <div class="tradeoff">
-<strong>面试金句</strong>：『CAP 是分区时的二选一，PACELC 才告诉你 99% 的时间该如何取舍』。<br><br>
+<strong>面试金句</strong>：『CAP 是分区时的二选一，PACELC 才告诉你 99% 的时间该如何取舍』。<br/><br/>
 <strong>真实生产决策只有两类</strong>：
 <ul>
 <li><strong>PA/EL</strong>（最常见）：『分区时继续接受写、收敛后合并；不分区时低延迟为先』。社交、电商展示、IoT 数据收集。代价：写冲突要靠 LWW/CRDT 收敛，业务必须设计为可合并。</li>
@@ -239,8 +234,7 @@ graph TD
 <li><strong>Stripe</strong>：账户与计费 PC/EC（Postgres 主从 + 多 AZ semi-sync）；事件日志与审计 PA/EL（Kafka + ClickHouse）。同公司不同子系统不同象限。</li>
 <li><strong>Cloudflare KV vs Durable Objects</strong>：KV 是 PA/EL（eventual，全球 60 秒收敛）；Durable Objects 是 PC/EC（单点强一致 + 跨区域路由）。文档明确告诉你『选错象限你会吃苦头』。</li>
 </ul></div>
-
-<h3>3. Causal Consistency：用 HLC 和 Version Vector 实现『因果序』</h3>
+<h3 data-tts="9e513044da45c865">3. Causal Consistency：用 HLC 和 Version Vector 实现『因果序』</h3>
 <p><strong>原理</strong>：因果一致性保证『有因果关系的操作』被所有副本以相同顺序看到。形式定义来自 Lamport 1978 的 happens-before 关系（<code>a → b</code> 当且仅当 a 与 b 在同进程且 a 先发生，或 a 是 b 收到的消息）。</p>
 <p>工程实现两个主力：</p>
 <ul>
@@ -256,14 +250,14 @@ sequenceDiagram
     participant V as Bob (eu-west)
 
     Note over U,V: 因果场景: Bob 回复 Alice 的评论
-    U->>US: post "好看吗?" HLC=(t1, 0)
-    US->>EU: replicate (t1, 0)
-    EU->>V: read shows "好看吗?"
-    V->>EU: reply "好看" with deps=[(t1,0)] HLC=(t2, 0)
-    Note over EU: t2 > t1 保证因果
-    EU->>US: replicate reply with deps
+    U-&gt;&gt;US: post "好看吗?" HLC=(t1, 0)
+    US-&gt;&gt;EU: replicate (t1, 0)
+    EU-&gt;&gt;V: read shows "好看吗?"
+    V-&gt;&gt;EU: reply "好看" with deps=[(t1,0)] HLC=(t2, 0)
+    Note over EU: t2 &gt; t1 保证因果
+    EU-&gt;&gt;US: replicate reply with deps
     Note over US: 收到 reply, 检查 deps<br/>若 (t1,0) 未到 → 暂存
-    US-->>U: 现在看 — 先看到"好看吗?", 再看到"好看" ✓
+    US--&gt;&gt;U: 现在看 — 先看到"好看吗?", 再看到"好看" ✓
 
     Note over U,V: 错误对比 (无 HLC, 异步复制):
     Note over US: reply 可能先于 question 到达<br/>导致用户先看到回复, 后看到提问 ✗
@@ -276,7 +270,7 @@ class HLC:
 
     def now(self):     # local event (e.g. write)
         pt = physical_time_ms()
-        if pt > self.l:
+        if pt &gt; self.l:
             self.l, self.c = pt, 0
         else:
             self.c += 1
@@ -298,7 +292,7 @@ class HLC:
 
 # 性质:
 #  - 单调递增 (本地或外部触发都不会回退)
-#  - happens-before 关系保留: a→b ⇒ HLC(a) < HLC(b)
+#  - happens-before 关系保留: a→b ⇒ HLC(a) &lt; HLC(b)
 #  - 接近 wall clock (差异 bounded by max clock skew)
 #  - 常数 size (8 bytes), 不像 vector clock 随节点数膨胀
 </code></pre>
@@ -311,8 +305,7 @@ class HLC:
 <li><strong>COPS (Cluster of Order-Preserving Servers)</strong>：Lloyd 等 2011 提出的 causal+ 模型，社交网络场景的学术基线；Facebook TAO 借鉴。</li>
 <li><strong>Git</strong>：commit DAG 本质就是 version vector；merge 时自动检测并发分支并要求人工解决。</li>
 </ul></div>
-
-<h3>4. 工程落地：在同一系统里『按数据类型』切一致性</h3>
+<h3 data-tts="f08289d92bd09b8b">4. 工程落地：在同一系统里『按数据类型』切一致性</h3>
 <p><strong>原理</strong>：真实系统不会全用一种一致性。<em>按数据的『违反代价』分层</em>是核心方法论。</p>
 <div class="tradeoff">
 <strong>分层决策表（用 SLO/业务损失驱动）</strong>：
@@ -336,7 +329,7 @@ def place_order(user, sku, qty):
     order = orders_db.insert(user, sku, qty)             # primary write
     session.set_lsn(order.lsn)                            # 客户端带回
 
-    # Step 3: Eventual — 推荐 & 热度计数
+    # Step 3: Eventual — 推荐 &amp; 热度计数
     fan_out_async("user.purchased", {user, sku})         # Kafka → 推荐/搜索
     increment_counter_eventual(sku + ":popular", 1)      # Redis, 弱一致 OK
 
@@ -356,8 +349,7 @@ def place_order(user, sku, qty):
 <li><strong>Twitter Timeline</strong>：用户自己刚发推 → 强制读 leader 5 秒（RYW）；他人推 → 走 fan-out async（eventual）；点赞计数 → eventual + 周期重算。</li>
 <li><strong>Notion / Linear</strong>：文档内容 CRDT 协作（causal+eventual）；权限/付费 strong（Postgres）；评论按文档分区，文档内 causal、文档间 eventual。</li>
 </ul></div>
-
-<h2>扩展与优化</h2>
+<h2 data-tts="2f317527871253be">扩展与优化</h2>
 <ul>
 <li><strong>Bounded Staleness（有界陈旧）</strong>：『读至多 X 秒前的数据』。比纯 eventual 严格，比 strong 廉价。Cosmos DB / Aurora Global Database / CockroachDB 都支持。适合 dashboard、analytics、地理就近读。</li>
 <li><strong>客户端 SDK 内置 token 路由</strong>：MongoDB、Vitess、Aurora 都让 SDK 自动管理 session LSN；业务无感即可获得 RYW。这是『把一致性从基础设施挪到 SDK 层』的趋势。</li>
@@ -365,8 +357,7 @@ def place_order(user, sku, qty):
 <li><strong>Read-only follower 的 follower read</strong>：CockroachDB / TiDB 支持『落后 5 秒的副本响应只读』，避开多数派 RTT；适合 BI 查询、地理就近读。</li>
 <li><strong>Linearizable 的 fallback</strong>：当 quorum 不可达，是 fail-stop（推荐）还是 fail-open（危险）？etcd、ZooKeeper 都选 fail-stop——这就是 PC/EC 的『C』。如果业务接受不了，就别选 PC，去选 PA。</li>
 </ul>
-
-<h2>常见陷阱与面试问题</h2>
+<h2 data-tts="73fd8b46debf3709">常见陷阱与面试问题</h2>
 <div class="callout">
 <strong>1. 把 strong consistency 当默认</strong>：上来就 Spanner / Raft，结果跨区域写 200ms。先问『违反一致性的代价是什么』，再选模型。</div>
 <div class="callout">
@@ -385,8 +376,7 @@ def place_order(user, sku, qty):
 <li>解释 Hybrid Logical Clock 比 Lamport timestamp 和 Vector Clock 各强在哪？size、可读性、因果判断？</li>
 <li>Spanner 为什么能号称『全球 linearizable』？TrueTime 的 ε 是怎么影响 commit 等待时间的？没有 GPS 钟怎么做（CockroachDB）？</li>
 </ol>
-
-<h2>深入资源</h2>
+<h2 data-tts="5a6e3232e9238f61">深入资源</h2>
 <ul>
 <li><strong>《Designing Data-Intensive Applications》Ch 5 §一致性 + Ch 9 §Consistency and Consensus</strong>（Kleppmann）：本主题最完整的工业级讨论。</li>
 <li><strong>Daniel Abadi — "Consistency Tradeoffs in Modern Distributed Database Design"</strong>（2012, IEEE Computer）：PACELC 原始论文，6 页读完。</li>
@@ -397,9 +387,7 @@ def place_order(user, sku, qty):
 <li><strong>Marc Brooker 博客 — brooker.co.za</strong>：AWS 资深工程师的一致性/可用性短文，工程视角极佳。</li>
 <li><strong>Werner Vogels — "Eventually Consistent" (ACM Queue 2008)</strong>：Amazon CTO 解释为什么 eventual 不可怕。</li>
 </ul>
-
-<h2>深入思考</h2>
-
+<h2 data-tts="31aef29b792b6045">深入思考</h2>
 <details>
 <summary>1. 同一笔『购物结账』，库存走 Linearizable、订单走 RYW、推荐走 Eventual。如果某天产品经理说『订单也走 Linearizable 吧，安全点』，你怎么劝？给数字。</summary>
 <div class="answer">
@@ -429,7 +417,6 @@ def place_order(user, sku, qty):
 <p><em>劝说金句</em>：『订单系统的安全不是来自更强的一致性模型，而是来自<strong>正确的故障模型 + 对账机制</strong>。Linearizable 解决不了你真正担心的"丢订单"——那是 durability 问题不是 consistency 问题』。这一句把术语层级捋清，PM 通常就听懂了。</p>
 </div>
 </details>
-
 <details>
 <summary>2. Spanner 的 TrueTime ε（不确定性）大约 7ms。如果某天 GPS 信号被干扰，ε 涨到 200ms，会发生什么？为什么这是『安全降级』而不是『错误』？</summary>
 <div class="answer">
@@ -446,7 +433,6 @@ def place_order(user, sku, qty):
 <p>所以这道题的『正确答案』不是『Spanner 完了』，而是『Spanner 用更慢换正确，这恰恰证明它的设计哲学』。</p>
 </div>
 </details>
-
 <details>
 <summary>3. 跨章节：Day 4 (Sharding) + Day 5 (Replication) + Day 6 (Consistency) 一起部署。一个『分片 + 多副本』的 OLTP，怎么在 shard 之间做强一致？为什么 2PC 在这里效率很差，而 deterministic transaction 是 trend？</summary>
 <div class="answer">
@@ -476,7 +462,6 @@ def place_order(user, sku, qty):
 <p><strong>面试金句</strong>：『2PC 不是错，是不够好。分布式事务的未来要么走 deterministic（强语义、高吞吐），要么承认 Saga（弱语义、业务补偿），混着用 2PC 是技术债』。</p>
 </div>
 </details>
-
 <details>
 <summary>4. 『读自己写』听起来朴素，但在『用户 A 用手机写，立刻用电脑读』场景下，session 粘性失效。给 3 种工程解法 + 各自代价。</summary>
 <div class="answer">
@@ -506,7 +491,6 @@ def place_order(user, sku, qty):
 <p><strong>更深的洞察</strong>：跨设备『读自己写』本质是『用户身份在多个会话中表达』，不是分布式系统问题，是『用户身份建模』问题。最优解通常是<em>把『用户的当前状态』作为 first-class entity</em> 持久化（user.last_write_lsn），而不是让每个 session 自己管。这思路推广到 multi-tenant、跨设备同步、协作场景都适用。</p>
 </div>
 </details>
-
 <details>
 <summary>5. 反直觉：在『可用性 5 个 9』和『强一致』之间，业务为什么常常应该选可用性？给一个『选强一致结果灾难』的真实推演。</summary>
 <div class="answer">
@@ -541,9 +525,8 @@ def place_order(user, sku, qty):
 <p>这也是 CLAUDE.md 强调的『追求超级个体』在系统设计层的体现：<em>把『默认安全』替换为『精确选择』</em>——技术决策的成熟标志。</p>
 </div>
 </details>
-
-<script src="https://hub.cissychen.com/comments.js" defer></script>
-<script src="https://hub.cissychen.com/search.js" defer></script>
-<script src="https://hub.cissychen.com/index-button.js" defer></script>
-<script src="https://hub.cissychen.com/i18n-tts.js" defer></script>
+<script defer="" src="https://hub.cissychen.com/comments.js"></script>
+<script defer="" src="https://hub.cissychen.com/search.js"></script>
+<script defer="" src="https://hub.cissychen.com/index-button.js"></script>
+<script defer="" src="https://hub.cissychen.com/i18n-tts.js"></script>
 </div></body></html>

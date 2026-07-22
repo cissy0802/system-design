@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<html lang="zh-CN"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>Day 39 · 工作流引擎 (Workflow Engine) — System Design</title>
 <style>
 <style>
@@ -98,7 +99,6 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 </script>
 </head><body><div class="container">
-
 <header>
 <div class="meta">
 <span class="tag day">Day 39</span>
@@ -108,10 +108,9 @@ document.addEventListener('DOMContentLoaded',()=>{
 <span class="tag">Saga</span>
 <span class="tag">补偿事务</span>
 </div>
-<h1>工作流引擎 — 让崩溃后还能接着跑的长流程<span class="en">Workflow Engine: Durable Execution, Saga Orchestration, Compensation</span></h1>
+<h1 data-tts="c6089c7d3e2066c1">工作流引擎 — 让崩溃后还能接着跑的长流程<span class="en">Workflow Engine: Durable Execution, Saga Orchestration, Compensation</span></h1>
 </header>
-
-<h2>问题场景 + 需求约束</h2>
+<h2 data-tts="7a3b69e930e0be4a">问题场景 + 需求约束</h2>
 <p>设计一个<strong>订单履约编排引擎</strong>：每天 <strong>100 万</strong>笔订单，每笔要走「扣款 → 锁库存 → 生成运单 → 等物流揽收（可能几小时到几天）→ 发通知」。这是一条<em>长时间运行、跨多个服务、必须全成或全补偿</em>的流程。难点不在单步，而在<strong>中间任何一步崩溃后如何精确接着跑</strong>：worker 进程被 OOM kill、支付回调延迟 2 天、库存服务超时——你既不能重复扣款，也不能把订单卡死。</p>
 <p>裸写这套逻辑的下场：用 DB 状态字段 + cron 轮询驱动状态机，很快演变成几百个 <code>if state==...</code> 分支、重试和补偿代码散落各处，没人敢改。工作流引擎把「<strong>状态持久化、重试、超时、补偿</strong>」下沉成基础设施。</p>
 <ul>
@@ -120,8 +119,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 <li><strong>正确性</strong>：要么整单履约成功，要么已执行的步骤被<em>语义补偿</em>回滚（退款、释放库存）——没有分布式 2PC 可用。</li>
 <li><strong>可观测</strong>：任一订单能查到「现在卡在哪一步、为什么、重试几次」。</li>
 </ul>
-
-<h2>高层架构</h2>
+<h2 data-tts="d5b5617740b4d321">高层架构</h2>
 <pre class="mermaid">
 graph TD
     C["客户端 / API<br/><i>StartWorkflow(order)</i>"]
@@ -131,13 +129,13 @@ graph TD
     W["Worker 集群<br/><i>你的 Workflow + Activity 代码</i>"]
     EXT["外部系统<br/><i>支付 / 库存 / 物流</i>"]
 
-    C --> FE
-    FE -->|① append 事件| HIST
-    FE -->|② 派发 task| MQ
-    MQ -->|③ long-poll 拉取| W
-    W -->|④ replay 历史恢复状态| HIST
-    W -->|⑤ 调用副作用| EXT
-    W -->|⑥ 结果 → 新事件| FE
+    C --&gt; FE
+    FE --&gt;|① append 事件| HIST
+    FE --&gt;|② 派发 task| MQ
+    MQ --&gt;|③ long-poll 拉取| W
+    W --&gt;|④ replay 历史恢复状态| HIST
+    W --&gt;|⑤ 调用副作用| EXT
+    W --&gt;|⑥ 结果 → 新事件| FE
 
     classDef client fill:#1a2530,stroke:#64c8ff,color:#e8eef5
     classDef core fill:#1a1a30,stroke:#ffb450,color:#e8eef5
@@ -147,10 +145,8 @@ graph TD
     class HIST,EXT store
 </pre>
 <p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px">引擎（Frontend + History + Matching）只管持久化与调度，<strong>不跑业务代码</strong>；业务跑在你自己的 Worker 里，崩了就重放 History 恢复</p>
-
-<h2>关键技术点</h2>
-
-<h3>1. 持久化执行（Durable Execution）—— 把「状态机」藏进普通代码</h3>
+<h2 data-tts="c3df2e03437171d5">关键技术点</h2>
+<h3 data-tts="691f20caa13f2222">1. 持久化执行（Durable Execution）—— 把「状态机」藏进普通代码</h3>
 <p><strong>原理</strong>：核心思想是 <em>event sourcing + 确定性重放</em>。workflow 的每一次进展（Activity 被调度、完成、Timer 触发、收到信号）都作为<strong>事件顺序追加</strong>到 History。当 worker 崩溃重启，引擎把这段 History 从头<em>重放</em>给你的 workflow 代码：走到已经记录过结果的那一步，直接返回缓存值（<strong>不重新执行副作用</strong>）；只有 History 里还没有的那一步才真正落地。于是「运行数天、跨崩溃」的流程，在代码里看起来就是一段平铺直叙的同步函数。</p>
 <div class="tradeoff">
 <strong>Trade-off：</strong>
@@ -180,8 +176,7 @@ def fulfill_order(order):
 <li><strong>Netflix Conductor</strong>：Netflix 开源的编排引擎，用 JSON DSL 定义流程 + Web UI 可视化，编排媒体处理 pipeline。</li>
 <li><strong>AWS Step Functions</strong>：托管状态机，Amazon 内部大量用于订单/供应链的长流程编排。</li>
 </ul></div>
-
-<h3>2. 编排 vs 编舞（Orchestration vs Choreography）</h3>
+<h3 data-tts="7d8d8c8d8d3973a9">2. 编排 vs 编舞（Orchestration vs Choreography）</h3>
 <p><strong>原理</strong>：跨服务的多步事务有两种协调风格。<em>编排（Orchestration）</em>：一个中央协调器（workflow）主动依次调用各参与者——「你扣款、你锁库存、你发货」，逻辑集中、可视、易补偿。<em>编舞（Choreography）</em>：没有中央大脑，每个服务处理完发一个事件，下一个服务订阅事件自行接力（订单已支付 → 库存服务监听 → 发库存已锁事件 → 物流监听）。</p>
 <div class="tradeoff">
 <strong>Trade-off：</strong>
@@ -197,8 +192,7 @@ def fulfill_order(order):
 <li><strong>Chris Richardson / microservices.io</strong>：Saga 的两种实现（orchestration / choreography）权威对照，配 Eventuate Tram 参考实现。</li>
 <li><strong>Netflix Conductor</strong>：明确选编排——中央引擎持有流程定义，避免编舞的「流程逻辑散落」。</li>
 </ul></div>
-
-<h3>3. 补偿事务（Compensation）—— 没有回滚，只有「语义反做」</h3>
+<h3 data-tts="16ff7f0753cbb365">3. 补偿事务（Compensation）—— 没有回滚，只有「语义反做」</h3>
 <p><strong>原理</strong>：分布式下没有跨服务 ACID 回滚。Saga 把长事务拆成一串本地事务 T1…Tn，每个 Ti 配一个<strong>补偿事务</strong> Ci：一旦某步失败，就<em>逆序</em>执行已完成步骤的补偿（Cn-1…C1）。补偿不是回到原样的物理 rollback，而是<em>业务语义上的抵消</em>——扣了款就退款、锁了库存就释放、发了邮件就再发一封更正。这正是 1987 年 Garcia-Molina &amp; Salem 的 Sagas 论文奠定的模型。</p>
 <div class="tradeoff">
 <strong>Trade-off（前向 vs 后向恢复）：</strong>
@@ -224,8 +218,7 @@ def fulfill_order(order):
 <li><strong>Sagas 论文（SIGMOD 1987）</strong>：补偿事务 Ci 语义抵消 Ti 的原始定义，现代微服务 Saga 的理论源头。</li>
 <li><strong>支付/电商系统</strong>：下单失败退款、超卖时释放库存，都是典型后向补偿；对第三方已划款则转前向重试 + 对账兜底。</li>
 </ul></div>
-
-<h3>4. Activity 执行保证 —— at-least-once + 幂等 + 超时/心跳</h3>
+<h3 data-tts="ea21719b0826ee24">4. Activity 执行保证 —— at-least-once + 幂等 + 超时/心跳</h3>
 <p><strong>原理</strong>：workflow 本身靠重放做到「逻辑上 exactly-once」，但真正碰外部系统的 <em>Activity</em> 只能保证 <strong>at-least-once</strong>：引擎派发任务给 worker，若 worker 执行完但上报结果前崩了，引擎没收到 ACK,超时后会<em>重派</em>——于是同一次扣款可能被执行两次。唯一正解是<strong>让 Activity 幂等</strong>：用业务唯一键（订单号）做幂等键，下游据此去重。长任务还要定期 <em>heartbeat</em>，让引擎区分「慢」和「死」，避免误判超时。</p>
 <div class="tradeoff">
 <strong>Trade-off：</strong>投递语义与限流—— at-most-once（不重试，可能丢，不可接受）vs at-least-once（会重试，配幂等，业界默认）。所谓 exactly-once 不是不重复执行，而是<em>重复执行但只生效一次</em>（幂等键去重）。</div>
@@ -244,23 +237,20 @@ func ChargePayment(ctx, order) error {
 <li><strong>Temporal / Cadence Task Queue</strong>：worker long-poll 拉任务；Activity 超时未完成或未心跳则重试，官方要求 Activity 幂等。</li>
 <li><strong>Stripe</strong>：支付 API 用 <code>Idempotency-Key</code> 头，客户端重试同一 key 只扣一次——正是给上游 workflow 重试兜底的经典实现。</li>
 </ul></div>
-
-<h2>扩展与优化</h2>
+<h2 data-tts="56dec93af865e3c5">扩展与优化</h2>
 <ul>
 <li><strong>History 存储分片</strong>：workflow 数暴涨后，按 workflow_id 一致性哈希分片到多个 Cassandra/分库；单 workflow 的 History 别写太长（几万事件会拖慢重放），用 <em>Continue-As-New</em> 截断历史另起新 execution。</li>
 <li><strong>版本化难题</strong>：workflow 代码改了，在途的老 workflow 重放时新旧代码路径不一致会「非确定性」报错。用 <code>getVersion()</code> / patch 分支兼容老历史——这是长流程引擎最难的运维点。</li>
 <li><strong>Worker 扩缩</strong>：workflow task 与 activity task 分不同 queue、独立扩容；CPU 密集的 activity 单独隔离，别和轻量 workflow task 抢线程。</li>
 <li><strong>多区域</strong>：History 跨区复制做灾备（Cadence/Temporal 的 global namespace / XDC），故障切区后 workflow 从复制的历史继续。</li>
 </ul>
-
-<h2>常见陷阱 + 面试问题</h2>
+<h2 data-tts="ffcf87b960feaa16">常见陷阱 + 面试问题</h2>
 <div class="callout"><strong>1. 在 workflow 里直接 <code>time.now()</code> / <code>rand()</code> / 调 HTTP。</strong> 破坏确定性重放：重放时值变了，历史对不上直接报错。所有不确定操作都必须放进 Activity，或用引擎提供的确定性 API。</div>
 <div class="callout"><strong>2. 以为引擎给 exactly-once 就不用管幂等。</strong> Activity 是 at-least-once，副作用必须自己幂等去重，否则重试就是重复扣款。</div>
 <div class="callout"><strong>3. 把不可补偿的步骤放太靠前。</strong> 一旦执行了不可撤销的操作（钱打给第三方），后面失败就无法整单回滚，只能前向重试——排序上尽量把它放到最后。</div>
 <div class="callout"><strong>4. 面试常问：</strong>为什么微服务要避免分布式 2PC？（阻塞、协调者单点、锁资源久、参与者故障放大）Saga 用什么换什么？（放弃隔离性 I，换可用性——中间态对外可见，需业务容忍）。</div>
 <div class="callout"><strong>5. 面试常问：</strong>workflow 引擎怎么保证进程崩溃后不丢状态、不重复副作用？（答：event sourcing 持久化 + 确定性重放 + Activity 幂等键）。</div>
-
-<h2>深入资源</h2>
+<h2 data-tts="c0900c8d4db8a6ee">深入资源</h2>
 <ul>
 <li><strong>《Designing Data-Intensive Applications》第 9 章 + 第 12 章</strong>（Kleppmann）：分布式事务、共识与「派生数据/端到端幂等」的本质讨论。</li>
 <li><strong>Sagas（Garcia-Molina &amp; Salem, ACM SIGMOD 1987）</strong>：长事务与补偿事务的理论原点，微服务 Saga 的鼻祖。</li>
@@ -268,9 +258,7 @@ func ChargePayment(ctx, order) error {
 <li><strong>Netflix TechBlog —《Netflix Conductor: A microservices orchestrator》</strong>：编排引擎的工业级设计与取舍。</li>
 <li><strong>microservices.io — Saga 模式（Chris Richardson）</strong>：orchestration vs choreography 权威对照与实现指南。</li>
 </ul>
-
-<h2>深入思考（点击展开答案）</h2>
-
+<h2 data-tts="2fb9fc5caf3906ef">深入思考（点击展开答案）</h2>
 <details>
 <summary>1. workflow 引擎号称崩溃后精确恢复，凭什么？如果 Activity「执行完了但上报结果前 worker 崩了」，会怎样？</summary>
 <div class="answer">
@@ -278,7 +266,6 @@ func ChargePayment(ctx, order) error {
 <p><strong>但那个尴尬窗口是真实存在的</strong>：Activity 已经把款扣了，结果还没写进 History，worker 就崩了。引擎收不到完成事件，超时后<em>重派</em>这个 Activity → 第二次扣款。引擎层面无法消除，只能靠 <strong>Activity 幂等</strong>：用订单号做幂等键，下游支付网关认这个 key，第二次直接返回首次结果。这就是为什么「引擎给你 durable，但幂等得你自己保证」。</p>
 </div>
 </details>
-
 <details>
 <summary>2. 为什么 workflow 代码必须「确定性」？一个 <code>if random() &gt; 0.5</code> 会引发什么具体故障？</summary>
 <div class="answer">
@@ -286,7 +273,6 @@ func ChargePayment(ctx, order) error {
 <p><code>if random()&gt;0.5</code> 第一次跑走了 A 分支（调度 Activity A，写进历史）；崩溃重放时 <code>random()</code> 又摇了一次，这次走 B 分支要调度 Activity B。引擎发现「代码想调度 B，但历史第 N 条是 A」——命令与历史<em>不匹配</em>，直接抛非确定性错误，workflow 卡死。所以随机、当前时间、读外部状态、并发 map 遍历顺序……全是雷区,必须挪进 Activity（其结果被持久化，重放时不再重算）。</p>
 </div>
 </details>
-
 <details>
 <summary>3. 都用工作流引擎了，为什么还需要 Saga / 补偿？两者是替代还是互补？</summary>
 <div class="answer">
@@ -294,7 +280,6 @@ func ChargePayment(ctx, order) error {
 <p>没有引擎你也能写 Saga（编舞式，靠事件），但补偿的状态、重试、超时又得自己持久化，绕回手写状态机的泥潭。所以「Temporal 里跑一个 Saga workflow」是当下最常见的组合：引擎负责 durable + retry，Saga 负责 business rollback 语义。</p>
 </div>
 </details>
-
 <details>
 <summary>4. 在途 workflow 有 500 万个还没结束，此时你要改 workflow 代码逻辑。会出什么事？怎么安全发布？</summary>
 <div class="answer">
@@ -302,7 +287,6 @@ func ChargePayment(ctx, order) error {
 <p><strong>安全做法</strong>：不能直接改分支，要<em>版本化兼容</em>。用引擎的 <code>getVersion()</code>/patch API：<code>v=getVersion("addStep", 1, 2); if v==1: 老逻辑 else: 新逻辑</code>。老 workflow 重放时拿到记录过的旧版本号走老路径，新启动的走新路径，两者在同一份代码里共存。等所有老 workflow 跑完，再摘掉旧分支。或者干脆<em>另起新 task queue / 新 workflow 类型</em>，让老流程在旧 worker 上自然消化完。</p>
 </div>
 </details>
-
 <details>
 <summary>5. 补偿事务失败了怎么办？「扣款成功、库存锁定、发货失败、要退款但退款接口也挂了」——设计这条兜底路径。</summary>
 <div class="answer">
@@ -310,11 +294,10 @@ func ChargePayment(ctx, order) error {
 <p>但要防两件事：① 补偿必须<strong>幂等</strong>（退款接口带幂等键），否则重试可能退好几次；② 设<strong>重试上限 / deadline</strong>，超过后不再自动重试，而是把这单打进「人工介入」队列并告警，转人工对账退款。绝不能让一条补偿无限重试悄悄耗资源、也不能假装成功放过去——<em>宁可卡住等人，不可静默丢钱</em>。生产上还会配一条独立对账 job 兜底：每天扫「已扣款但最终未履约且未退款」的订单强制补退。</p>
 </div>
 </details>
-
 <div class="nav"><a href="index.html">← 回到 index</a></div>
 </div>
-<script src="https://hub.cissychen.com/comments.js" defer></script>
-<script src="https://hub.cissychen.com/search.js" defer></script>
-<script src="https://hub.cissychen.com/index-button.js" defer></script>
-<script src="https://hub.cissychen.com/i18n-tts.js" defer></script>
+<script defer="" src="https://hub.cissychen.com/comments.js"></script>
+<script defer="" src="https://hub.cissychen.com/search.js"></script>
+<script defer="" src="https://hub.cissychen.com/index-button.js"></script>
+<script defer="" src="https://hub.cissychen.com/i18n-tts.js"></script>
 </body></html>

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<html lang="zh-CN"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>Day 8 · 消息队列 (Message Queues) — System Design</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -94,7 +95,6 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 </script>
 </head><body><div class="container">
-
 <header>
 <div class="meta">
 <span class="tag day">Day 8</span>
@@ -104,10 +104,9 @@ document.addEventListener('DOMContentLoaded',()=>{
 <span class="tag">Kafka / SQS</span>
 <span class="tag">Delivery / Backpressure / DLQ</span>
 </div>
-<h1>消息队列 — 异步是解耦的代价，也是它的全部价值<span class="en">Kafka vs RabbitMQ vs SQS · Delivery Semantics · Backpressure · Dead Letter Queue</span></h1>
+<h1 data-tts="9e3fe5f787fa17b3">消息队列 — 异步是解耦的代价，也是它的全部价值<span class="en">Kafka vs RabbitMQ vs SQS · Delivery Semantics · Backpressure · Dead Letter Queue</span></h1>
 </header>
-
-<h2>问题场景与约束</h2>
+<h2 data-tts="b091e1a9c0eae3f2">问题场景与约束</h2>
 <p>设计一个电商「<strong>订单事件总线</strong>」：用户下单后，订单服务产生一条 <code>order.created</code> 事件，要被 <strong>5 类下游</strong> 各自独立消费——库存扣减、积分发放、推荐更新、数据仓库入仓、风控审计。这些下游<em>处理速度天差地别</em>：库存扣减 2ms，数仓批量入仓一条要 200ms。</p>
 <p>硬约束：</p>
 <ul>
@@ -118,8 +117,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 <li><strong>毒消息隔离</strong>：某条事件让某个消费者反复崩溃，不能阻塞整条流。</li>
 </ul>
 <p>今天讲：为什么这个场景必须用消息队列而非同步 RPC、Kafka / RabbitMQ / SQS 怎么选、<strong>投递语义</strong>的本质、backpressure 与消费积压、以及 <strong>DLQ</strong> 怎么兜底毒消息。</p>
-
-<h2>高层架构</h2>
+<h2 data-tts="8c14b108e74a505e">高层架构</h2>
 <div class="mermaid">
 graph LR
     Prod["订单服务<br/><i>Producer</i>"]
@@ -133,14 +131,14 @@ graph LR
     end
     DLQ["DLQ<br/>order.events.dlq"]
 
-    Prod -->|"ack=all<br/>幂等 producer"| K
-    K --> C1
-    K --> C2
-    K --> C3
-    K --> C4
-    K --> C5
-    C1 -.->|"重试耗尽"| DLQ
-    C4 -.->|"毒消息"| DLQ
+    Prod --&gt;|"ack=all<br/>幂等 producer"| K
+    K --&gt; C1
+    K --&gt; C2
+    K --&gt; C3
+    K --&gt; C4
+    K --&gt; C5
+    C1 -.-&gt;|"重试耗尽"| DLQ
+    C4 -.-&gt;|"毒消息"| DLQ
 
     classDef bus fill:#2a1530,stroke:#ff7ab6,color:#e8eef5
     classDef dlq fill:#3a2010,stroke:#ffb450,color:#e8eef5
@@ -148,10 +146,8 @@ graph LR
     class DLQ dlq
 </div>
 <p style="font-size:0.88rem;color:#7a8590;text-align:center;margin-top:-6px"><strong>核心思路</strong>：一份事件、多个<em>独立 Consumer Group</em>，各自维护 offset，互不影响——这是 <strong>pub/sub fan-out</strong>。Producer 用 <code>ack=all</code> + 幂等保证不丢；按 <code>order_id</code> 分区保证<em>单订单有序</em>；慢消费者积压只影响自己；重试耗尽的消息进 DLQ 不阻塞主流。</p>
-
-<h2>关键技术点</h2>
-
-<h3>1. 选型：Log (Kafka) vs Broker (RabbitMQ) vs Managed (SQS)</h3>
+<h2 data-tts="c3df2e03437171d5">关键技术点</h2>
+<h3 data-tts="bb187da7d4c10c4f">1. 选型：Log (Kafka) vs Broker (RabbitMQ) vs Managed (SQS)</h3>
 <p style="color:#5eead4">核心 trade-off：<strong>留存可重放的日志</strong> vs <strong>灵活路由的智能 broker</strong> vs <strong>零运维的托管队列</strong>。</p>
 <p><strong>原理</strong>：三者是<em>三种不同的抽象</em>。<strong>Kafka</strong> 是<em>分布式 append-only log</em>：消息写入 partition 后<strong>不因被消费而删除</strong>，consumer 只是移动自己的 offset，因此天然支持多订阅者 fan-out、回放历史、高吞吐顺序 IO。<strong>RabbitMQ</strong> 是<em>智能 broker</em>：消息经 exchange 按 routing key 投到 queue，<strong>消费 ack 后即删除</strong>，强在灵活路由（topic/fanout/header exchange）和单条消息粒度控制。<strong>SQS</strong> 是 AWS <em>全托管队列</em>：无需运维，弹性近无限，但功能最简（标准队列无序、FIFO 队列有序但限流）。</p>
 <table>
@@ -180,8 +176,7 @@ graph LR
 <li><strong>RabbitMQ</strong>：广泛用于任务分发（Celery / Sidekiq 后端）、需要灵活 routing 的微服务命令总线。</li>
 </ul>
 </div>
-
-<h3>2. 投递语义：at-most-once / at-least-once / exactly-once</h3>
+<h3 data-tts="de802f938ea27a0f">2. 投递语义：at-most-once / at-least-once / exactly-once</h3>
 <p style="color:#5eead4">核心 trade-off：<strong>不丢 vs 不重</strong> 不可兼得（无幂等时）；工程上的「恰好一次」= 至少一次 + 幂等。</p>
 <p><strong>原理</strong>：投递语义取决于 <em>ack 与处理的先后</em>。<strong>At-most-once</strong>：先 ack（提交 offset）再处理——崩溃则消息丢失，绝不重复，适合可丢的指标采样。<strong>At-least-once</strong>：先处理再 ack——崩溃在 ack 前则重投，绝不丢失但可能重复，是<em>绝大多数业务的默认选择</em>。<strong>Exactly-once</strong>：网络层面不可达（两将军问题），但可以通过<em>至少一次投递 + 消费端幂等/去重</em>在「效果上」实现每条恰好生效一次。</p>
 <div class="tradeoff">
@@ -208,8 +203,7 @@ graph LR
 <li><strong>支付/订单系统</strong>：普遍走 at-least-once + idempotency key（见 Day 7），把「恰好一次」下沉到业务层去重。</li>
 </ul>
 </div>
-
-<h3>3. Backpressure 与消费积压：慢消费者不能拖垮上游</h3>
+<h3 data-tts="e9d0d4dfeb4bf281">3. Backpressure 与消费积压：慢消费者不能拖垮上游</h3>
 <p style="color:#5eead4">核心 trade-off：<strong>buffer（吸收突发）</strong> vs <strong>drop / 限流（保护系统）</strong>——队列把同步背压变成了可观测的 lag。</p>
 <p><strong>原理</strong>：生产速率 &gt; 消费速率时，消息堆积。同步 RPC 里这表现为调用方阻塞、线程耗尽、级联雪崩；消息队列把它<em>转化为 consumer lag</em>（offset 落后量），是一个可监控、可缓冲的指标。应对手段分两类：<strong>扩容消费</strong>（加 consumer，但受 partition 数上限——一个 partition 同组内只能被一个 consumer 消费）；<strong>限制生产</strong>（producer 限流 / 拒绝，把压力推回源头）。Kafka 的 log 模型让积压「躺在磁盘上」相对安全；RabbitMQ 队列积压在内存/磁盘则可能触发 flow control 阻塞 producer。</p>
 <div class="tradeoff">
@@ -236,8 +230,7 @@ graph LR
 <li><strong>Kafka 通用实践</strong>：用 <code>consumer lag</code>（如 Burrow / Cruise Control 监控）作为扩缩容信号，是流处理运维的核心 SLI。</li>
 </ul>
 </div>
-
-<h3>4. Dead Letter Queue：毒消息的隔离区</h3>
+<h3 data-tts="02b9abf3dc99f870">4. Dead Letter Queue：毒消息的隔离区</h3>
 <p style="color:#5eead4">核心 trade-off：<strong>无限重试（阻塞队列）</strong> vs <strong>丢弃（丢数据）</strong> vs <strong>DLQ（隔离 + 留证据）</strong>。</p>
 <p><strong>原理</strong>：某条消息因数据畸形、下游 bug、依赖永久不可用而<em>反复处理失败</em>，称为<strong>毒消息（poison message）</strong>。若无限重试，它会卡住整个 partition / queue（尤其有序队列，后面的消息全被堵）；若直接丢，则丢数据无追溯。<strong>DLQ</strong> 的做法：重试 N 次仍失败，把消息<em>连同失败上下文</em>移到一个专门的死信队列，主流继续前进；之后人工或自动分析 DLQ，修复后 <em>redrive</em> 回主队列重放。</p>
 <div class="tradeoff">
@@ -268,8 +261,7 @@ graph LR
 <li><strong>RabbitMQ</strong>：用 dead-letter exchange（DLX）+ TTL 实现延迟重试与死信路由，是业界标准做法。</li>
 </ul>
 </div>
-
-<h2>扩展与优化</h2>
+<h2 data-tts="dfb3a31c83203a31">扩展与优化</h2>
 <ul>
 <li><strong>分区数要预留</strong>：partition 数决定消费并行度上限，且<em>减少 partition 很麻烦</em>（会破坏 key→partition 映射）。建 topic 时按未来峰值估容量，宁多勿少（但太多会增加 broker 元数据与 rebalance 开销）。</li>
 <li><strong>有序性的代价</strong>：全局有序 = 单 partition = 无法并行。本场景只需<em>单订单有序</em>，所以按 <code>order_id</code> 分区——既有序又能横向扩展。这是「分区键即并行单元」的核心权衡。</li>
@@ -277,8 +269,7 @@ graph LR
 <li><strong>Schema Registry</strong>：用 Avro/Protobuf + schema registry 做兼容性演进，避免上游改字段打挂所有下游（事件总线的隐形杀手）。</li>
 <li><strong>多区域 / 灾备</strong>：MirrorMaker 2 / uReplicator 跨区复制；要想清楚 active-active 下的 offset 与去重问题。</li>
 </ul>
-
-<h2>常见陷阱与面试问题</h2>
+<h2 data-tts="fb7801d8dea78bb1">常见陷阱与面试问题</h2>
 <div class="callout">
 <strong>1. 以为「用了 Kafka 就 exactly-once 了」。</strong> EOS 只在 Kafka 内闭环。一旦消费后写外部 DB 或调第三方，仍是 at-least-once + 必须自己幂等。面试问 EOS 时，期待你点出这个边界。</div>
 <div class="callout">
@@ -298,8 +289,7 @@ graph LR
 <li>有序队列里出现一条毒消息，整条队列卡死，怎么办？DLQ 怎么设计？</li>
 <li>Producer <code>ack=0/1/all</code> 分别什么语义？什么时候会丢消息？</li>
 </ol>
-
-<h2>深入资源</h2>
+<h2 data-tts="5b50e538dff6c4b6">深入资源</h2>
 <ul>
 <li><strong>《Designing Data-Intensive Applications》Ch 11 §Stream Processing</strong>（Kleppmann）：消息系统、log、投递语义最完整的工业级讨论。</li>
 <li><strong>Confluent — <a href="https://www.confluent.io/blog/exactly-once-semantics-are-possible-heres-how-apache-kafka-does-it/">Exactly-Once Semantics Are Possible: Here's How Kafka Does It</a></strong>：幂等 producer + 事务的权威讲解。</li>
@@ -308,9 +298,7 @@ graph LR
 <li><strong>Uber — <a href="https://www.uber.com/us/en/blog/kafka/">Disaster Recovery for Multi-Region Kafka at Uber</a></strong>：超大规模 Kafka 的多区域容灾实践。</li>
 <li><strong>AWS — <a href="https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-dead-letter-queues.html">Using dead-letter queues in Amazon SQS</a></strong>：DLQ、redrive、FIFO 阻塞行为的官方文档。</li>
 </ul>
-
-<h2>深入思考</h2>
-
+<h2 data-tts="1adceb6366ba8d2c">深入思考</h2>
 <details>
 <summary>1. 一个 topic 有 100 个 partition，consumer group 里放了 150 个 consumer，会发生什么？为什么？</summary>
 <div class="answer">
@@ -319,7 +307,6 @@ graph LR
 <p>所以建 topic 时就要按未来峰值规划 partition 数，这是少数「事前决策远比事后补救便宜」的参数。这也解释了为什么 Uber 要做 uForwarder——用 push proxy 解耦「消费并行度」与「partition 数」。</p>
 </div>
 </details>
-
 <details>
 <summary>2. 数仓消费者积压了 1 亿条消息，老板要你 1 小时内追上。给至少 3 种手段并分析代价。</summary>
 <div class="answer">
@@ -333,7 +320,6 @@ graph LR
 <p><strong>更深一层</strong>：能 1 小时追上的前提是 <em>partition 数和下游写入能力早就预留了余量</em>。如果 partition 只有 10 个,任你怎么加 consumer 也只有 10 并行——<strong>积压恢复能力是设计期决定的，不是故障期能临时变出来的</strong>。这正是「log 模型让积压安全躺在磁盘上」的价值：它给了你恢复的时间窗口，但恢复速度仍受架构上限约束。</p>
 </div>
 </details>
-
 <details>
 <summary>3. 「至少一次 + 幂等 = 恰好一次」——那为什么还要 Kafka 的 exactly-once 事务？它解决了幂等解决不了的什么问题？</summary>
 <div class="answer">
@@ -342,7 +328,6 @@ graph LR
 <p><strong>但关键边界</strong>：这只在「Kafka → Kafka」闭环成立。一旦你写的是外部 Postgres 或调 Stripe，Kafka 事务管不到那边——又回到 at-least-once + 业务幂等。所以 EOS 不是银弹，它精确地解决「Kafka 内流处理」这一类问题，理解它的<em>适用边界</em>比记住它存在更重要。</p>
 </div>
 </details>
-
 <details>
 <summary>4. 同步 RPC 也能解耦服务，为什么订单这种关键链路反而要引入消息队列这个「额外的会丢消息的中间件」？</summary>
 <div class="answer">
@@ -352,9 +337,8 @@ graph LR
 <p>代价是：(1) <em>最终一致</em>——下游状态有延迟，UI 要兜底（「处理中」）；(2) <em>at-least-once 的重复</em>——要幂等;(3) 多了个要运维的中间件。<strong>本质是用「最终一致 + 幂等复杂度」换「时间解耦 + 抗级联 + 易扩展」</strong>。对订单这种「下单必须快且稳、下游可异步」的场景，这笔交易划算；对「必须同步拿到结果」的场景（如实时风控拒绝），则该留同步调用。</p>
 </div>
 </details>
-
-<script src="https://hub.cissychen.com/comments.js" defer></script>
-<script src="https://hub.cissychen.com/search.js" defer></script>
-<script src="https://hub.cissychen.com/index-button.js" defer></script>
-<script src="https://hub.cissychen.com/i18n-tts.js" defer></script>
+<script defer="" src="https://hub.cissychen.com/comments.js"></script>
+<script defer="" src="https://hub.cissychen.com/search.js"></script>
+<script defer="" src="https://hub.cissychen.com/index-button.js"></script>
+<script defer="" src="https://hub.cissychen.com/i18n-tts.js"></script>
 </div></body></html>

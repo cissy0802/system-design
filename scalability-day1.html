@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<html lang="zh-CN"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>Day 1 · Scalability 基础 — System Design</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -97,7 +98,6 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 </script>
 </head><body><div class="container">
-
 <header>
 <div class="meta">
 <span class="tag day">Day 1</span>
@@ -106,14 +106,12 @@ document.addEventListener('DOMContentLoaded',()=>{
 <span class="tag">Load Balancing</span>
 <span class="tag">Foundations</span>
 </div>
-<h1>Scalability 基础 — 从单机到千万 QPS<span class="en">Scalability Fundamentals: Vertical vs Horizontal, Load Balancing, Statelessness</span></h1>
+<h1 data-tts="cc8be882c609d713">Scalability 基础 — 从单机到千万 QPS<span class="en">Scalability Fundamentals: Vertical vs Horizontal, Load Balancing, Statelessness</span></h1>
 </header>
-
-<h2>问题场景</h2>
+<h2 data-tts="097540e31a6504d6">问题场景</h2>
 <p>你的产品上线第一天 1k DAU，单台 EC2 跑 Postgres + Node 服务一切都好。半年后涨到 100w DAU、3k QPS，p99 延迟从 80ms 飙到 2.4s，DB 偶尔挂掉。<strong>这是几乎每个产品的必经之路</strong>——Instagram 2010 年只有 3 个工程师扛 1400w 用户，Notion 2019 年从单 Postgres 走到分片，都是同一个故事。</p>
 <p>本期不教"加机器"这种废话，而是搞清楚：<em>什么样的负载该垂直扩，什么时候必须横向扩，横向扩的隐藏成本是什么</em>，以及为什么"无状态服务"是横扩的入场券。</p>
-
-<h2>需求与约束（面试必问）</h2>
+<h2 data-tts="e98d604ae2a94bdf">需求与约束（面试必问）</h2>
 <ul>
 <li><strong>读写比</strong>：是 100:1（社交 feed）还是 1:1（IM）？决定了你优先扩读副本还是分片写。</li>
 <li><strong>QPS 量级</strong>：100 / 10k / 1M？10k QPS 以下基本不需要分布式；1M QPS 强制走 sharding + CDN。</li>
@@ -122,8 +120,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 <li><strong>一致性要求</strong>：转账级（强一致）还是点赞级（最终一致）？</li>
 <li><strong>预算</strong>：m5.large 月费几十刀，c7gn.16xlarge 几千刀。一个被忽视的约束。</li>
 </ul>
-
-<h2>高层架构（从 1 台到 N 层）</h2>
+<h2 data-tts="ff2cc77e87c3d448">高层架构（从 1 台到 N 层）</h2>
 <pre class="mermaid">
 graph TD
     C[Client]
@@ -138,12 +135,12 @@ graph TD
     R1[("Replica-1<br/>读副本")]
     R2[("Replica-2<br/>读副本")]
 
-    C --> DNS --> L4 --> L7
-    L7 --> A1 & A2 & AN
-    A1 & A2 & AN --> R
-    A1 & A2 & AN --> PG
-    PG -.复制.-> R1
-    PG -.复制.-> R2
+    C --&gt; DNS --&gt; L4 --&gt; L7
+    L7 --&gt; A1 &amp; A2 &amp; AN
+    A1 &amp; A2 &amp; AN --&gt; R
+    A1 &amp; A2 &amp; AN --&gt; PG
+    PG -.复制.-&gt; R1
+    PG -.复制.-&gt; R2
 
     classDef edge fill:#1a2530,stroke:#64c8ff,color:#e8eef5
     classDef app fill:#0e2030,stroke:#5eead4,color:#e8eef5
@@ -152,10 +149,8 @@ graph TD
     class A1,A2,AN app
     class R,PG,R1,R2 data
 </pre>
-
-<h2>关键技术点</h2>
-
-<h3>1. Vertical vs Horizontal Scaling</h3>
+<h2 data-tts="c3df2e03437171d5">关键技术点</h2>
+<h3 data-tts="1cf928931cb0acb0">1. Vertical vs Horizontal Scaling</h3>
 <p><strong>原理</strong>：垂直扩=换更大的机器（更多 CPU/RAM/NVMe），横向扩=加更多机器。垂直扩在 <em>x86 内存带宽 / NUMA</em> 触顶前线性收益，单机现在能干到 192 vCPU / 2TB RAM（c7g.metal、x2idn.32xlarge），所以别太早走分布式。</p>
 <div class="tradeoff">
 <strong>Trade-off：</strong>
@@ -165,8 +160,7 @@ graph TD
 </ul>
 </div>
 <div class="case"><strong>现实案例：</strong>Stack Overflow 2016 年公布架构——9 台 web server + 4 台 SQL Server（96 核 1.5TB RAM 一台），扛 6000 req/s。他们的哲学："Hardware is cheap, programmers are expensive"，垂直扩到 2024 年才开始认真分库。反例：Pinterest 2012 年坚持 MySQL 垂直扩到 Master 撑不住，被迫紧急做 sharding，迁移花了 6 个月。</div>
-
-<h3>2. Load Balancer：L4 vs L7</h3>
+<h3 data-tts="d47adda262f31401">2. Load Balancer：L4 vs L7</h3>
 <p><strong>原理</strong>：L4（TCP/UDP）只看四元组，转发不解包，单机能 200w+ QPS（LVS/IPVS、AWS NLB）。L7（HTTP）能基于 path / header / cookie 路由，能做 TLS 卸载、压缩、限流，代价是 CPU 重得多（Envoy 单核 ~5w QPS）。生产里常 <em>L4 在前 + L7 在后</em>分层。</p>
 <div class="tradeoff">
 <strong>负载算法选型：</strong>
@@ -183,8 +177,7 @@ def pick_backend(backends):
     return a if a.active_requests &lt;= b.active_requests else b
 # 数学上：N 个后端，最大负载从 O(log N) 降到 O(log log N)</code></pre>
 <div class="case"><strong>现实案例：</strong>Cloudflare 用 LVS + Unimog（自研 L4 LB）扛全球流量，单机房百 Gbps。AWS ALB 是托管的 L7，背后是 Envoy 改的；NLB 是 L4，走 hyperplane，延迟 100μs 内。</div>
-
-<h3>3. Stateless Services（横扩的入场券）</h3>
+<h3 data-tts="681dd01c5cbbcbc5">3. Stateless Services（横扩的入场券）</h3>
 <p><strong>原理</strong>：服务实例不持有任何"下次请求需要的状态"——所有 session / cache / 计数器外置到 Redis/DB。这样 LB 可以把任何请求打到任何实例，crash 一台也无人受伤。</p>
 <div class="tradeoff">
 <strong>Trade-off：</strong>无状态 ≠ 无缓存。本地缓存（Caffeine / in-process LRU）依然能用，但要接受"实例间缓存不一致"。完全外置到 Redis 则增加 1 跳 ~0.5ms 延迟和单点风险。<em>折中：本地 cache + TTL 30s + 通过 pub/sub 失效</em>。</div>
@@ -196,8 +189,7 @@ def auth(req):
     token = req.headers["Authorization"]
     return jwt.verify(token, PUBLIC_KEY)  # 无任何服务端状态</code></pre>
 <div class="case"><strong>现实案例：</strong>Netflix 所有 microservice 强制无状态，发布走 Spinnaker 红黑部署——直接起一组新实例、流量切过去、老的全删。Discord 反例：语音服务必须有状态（一个 voice channel 锚在一台 server），他们用 <em>consistent hashing + 状态迁移协议</em>解决，2020 年公开演讲承认这是最难的部分。</div>
-
-<h3>4. 容量规划与"够用就好"</h3>
+<h3 data-tts="1921202a01e38afb">4. 容量规划与"够用就好"</h3>
 <p><strong>原理</strong>：别上来就 K8s + 微服务。Shopify 黑五扛 7600w QPS 用的是<em>单体 Rails + 大量 Pod</em>。能上单体绝不上微服务，能加机器绝不分库。<strong>Back-of-envelope 算法</strong>是面试核心：</p>
 <pre><code># 例：设计 Twitter timeline
 # 3 亿 DAU × 平均 100 次刷新/天 = 3e10 reads/day
@@ -205,16 +197,14 @@ def auth(req):
 # 一台 4 核机能扛 ~5k QPS 静态 read
 # → 至少需要 200 台 read 实例（含 2x headroom）</code></pre>
 <div class="callout"><strong>面试经验：</strong>面试官几乎一定会让你估算 QPS、存储、带宽。背三个数：1 天 ≈ 1e5 秒、1 QPS × 1 年 ≈ 30M 条、1Gbps ≈ 125MB/s。</div>
-
-<h2>扩展与优化（增长后的瓶颈）</h2>
+<h2 data-tts="23c8d941e730d6d9">扩展与优化（增长后的瓶颈）</h2>
 <ol>
 <li><strong>第一瓶颈通常是 DB 写</strong>：读可以加 replica 缓解，写要么 vertical scale，要么 sharding。看到 <em>p99 写延迟 &gt; 100ms</em> 时该考虑了。</li>
 <li><strong>第二瓶颈是缓存击穿</strong>：热 key 把 Redis 单分片打满，需要本地 cache + 多副本。</li>
 <li><strong>第三瓶颈是网络</strong>：跨 AZ 流量按 GB 收费（AWS $0.01/GB），微服务粒度太细会被传输费 + RTT 反复教育。</li>
 <li><strong>多区域</strong>：当用户分布在 &gt; 2 大洲，引入 GeoDNS + 区域内闭环 + 异步全局复制。</li>
 </ol>
-
-<h2>常见坑</h2>
+<h2 data-tts="d2c050fabcbd0303">常见坑</h2>
 <ul>
 <li><strong>过早分布式</strong>：1k QPS 上 K8s + 8 个微服务，结果调试时间是单体的 10 倍。</li>
 <li><strong>Sticky session 的陷阱</strong>：用 cookie hash 绑定实例，扩容/重启时大批用户掉线，且热实例无法解热。</li>
@@ -222,8 +212,7 @@ def auth(req):
 <li><strong>不做容量演练</strong>：黑五前不压测，等真流量来了才发现连接池上限。Netflix 的 Chaos Monkey 文化就是为此。</li>
 <li><strong>忽视 thundering herd</strong>：缓存失效瞬间，1000 个实例同时打 DB。解决：单飞（singleflight）、互斥锁、概率性提前刷新。</li>
 </ul>
-
-<h2>面试问题示例</h2>
+<h2 data-tts="e3706887188be183">面试问题示例</h2>
 <ol>
 <li>"现在系统 5k QPS p99 200ms，要扩到 50k QPS p99 100ms，你的 5 步计划是什么？"（期望先问读写比、瓶颈在哪，再谈方案）</li>
 <li>"为什么不直接用一台 192 核机器？"（考察对 vertical scale 上限、blast radius、SPOF 的理解）</li>
@@ -231,19 +220,15 @@ def auth(req):
 <li>"如果让 session 改成 stateless，JWT 和 Redis session 你怎么选？"（考察 revocation、size、安全性权衡）</li>
 <li>"Round robin 在长连接场景下会怎么坏？怎么修？"（引出 least conn / P2C）</li>
 </ol>
-
-<h2>关键资源</h2>
+<h2 data-tts="c42f32dd2a0dd9fc">关键资源</h2>
 <ul>
 <li>📕 <em>Designing Data-Intensive Applications</em>（Kleppmann）Ch.1：Reliable, Scalable, and Maintainable Applications。</li>
 <li>📝 Stack Overflow Architecture（2016, Nick Craver）：垂直扩到极致的范本，<code>nickcraver.com/blog/2016/02/17/stack-overflow-the-architecture-2016-edition/</code></li>
 <li>📝 High Scalability blog："Power of Two Random Choices" 经典文章。</li>
 </ul>
-
-<h2>English Summary</h2>
+<h2 data-tts="81c7650fb1ff9d7b">English Summary</h2>
 <p>Scaling means surviving load growth without rewriting from scratch. <strong>Vertical scaling</strong> (bigger box) is underrated — Stack Overflow runs SO at billions of pageviews on a handful of fat SQL servers. <strong>Horizontal scaling</strong> demands <em>stateless services</em>, smart <em>load balancing</em> (L4 for throughput, L7 for routing; P2C beats round-robin under skewed load), and capacity planning via <em>back-of-envelope math</em>. The cardinal sin is premature distribution: complexity grows superlinearly, debuggability collapses. Scale when you must, not when you can.</p>
-
-<h2>深入思考（点击展开答案）</h2>
-
+<h2 data-tts="f45de38128492854">深入思考（点击展开答案）</h2>
 <details>
 <summary>1. 服务从 1k QPS 扩到 100k QPS，每加一台机器 p99 反而变高。瓶颈可能在哪？至少列出 3 个不同层的可能原因。</summary>
 <div class="answer">
@@ -257,7 +242,6 @@ def auth(req):
 <p><em>诊断顺序</em>：先看哪些指标随机器数<em>线性增长</em>（CPU 应该降，但延迟上升 = 共享资源饱和）。</p>
 </div>
 </details>
-
 <details>
 <summary>2. 为什么 stateless 是横扩的入场券？业务必须保持会话（游戏房间、长事务），有哪些办法既保留状态又能扩缩容？</summary>
 <div class="answer">
@@ -272,7 +256,6 @@ def auth(req):
 <p><em>实战经验</em>：90% 业务用『外置 Redis』就够；游戏/IM 用 sticky；金融账本才上 Raft。</p>
 </div>
 </details>
-
 <details>
 <summary>3. L4 LB 和 L7 LB 一定要二选一吗？大厂典型『L4 在外、L7 在内』为什么不反过来？</summary>
 <div class="answer">
@@ -291,7 +274,6 @@ def auth(req):
 <p><strong>反过来会怎样</strong>：L7 直接对外，第一次 SYN flood 就把它的连接表打爆，TLS 握手 CPU 飙到 100%。</p>
 </div>
 </details>
-
 <details>
 <summary>4. 一台 c7g.metal（192 vCPU）vs 16 台 c7g.4xlarge（16 vCPU）——总价相同。各自适合什么 workload？故障爆炸半径怎么对比？</summary>
 <div class="answer">
@@ -310,7 +292,6 @@ def auth(req):
 <p><em>结论</em>：CPU bound 且无状态 → 多台小的；内存/IO 密集且需 locality → 大机器（但至少 2 台做 HA）。</p>
 </div>
 </details>
-
 <details>
 <summary>5. 黑五大促预期流量平日 5 倍。容量规划怎么做？headroom 留多少？为什么不能直接『加 5 倍机器』完事？</summary>
 <div class="answer">
@@ -326,11 +307,9 @@ def auth(req):
 <p><strong>实操</strong>：提前 1 周做 5 倍流量压测（线下 + 影子流量）、降级开关就位（关掉非核心功能腾资源）、上 CDN/缓存预热、扩容预案脚本化（一键扩 N 倍）、监控告警门槛临时调严。</p>
 </div>
 </details>
-
 <div class="nav"><a href="index.html">← 回到目录</a></div>
-
-</div><script src="https://hub.cissychen.com/comments.js" defer></script>
-<script src="https://hub.cissychen.com/search.js" defer></script>
-<script src="https://hub.cissychen.com/index-button.js" defer></script>
-<script src="https://hub.cissychen.com/i18n-tts.js" defer></script>
+</div><script defer="" src="https://hub.cissychen.com/comments.js"></script>
+<script defer="" src="https://hub.cissychen.com/search.js"></script>
+<script defer="" src="https://hub.cissychen.com/index-button.js"></script>
+<script defer="" src="https://hub.cissychen.com/i18n-tts.js"></script>
 </body></html>
