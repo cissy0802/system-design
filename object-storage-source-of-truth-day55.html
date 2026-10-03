@@ -107,10 +107,9 @@ document.addEventListener('DOMContentLoaded',()=>{
 <span class="tag">WAL</span>
 <span class="tag">Consensus</span>
 </div>
-<h1>对象存储当真相源 — 把共识外包给 S3 的「零盘」架构<span class="en">Object Storage as the Source of Truth: The Zero-Disk Architecture</span></h1>
+<h1 data-tts="1d56160b56e7ad96">对象存储当真相源 — 把共识外包给 S3 的「零盘」架构<span class="en">Object Storage as the Source of Truth: The Zero-Disk Architecture</span></h1>
 </header>
-
-<h2>问题场景 + 需求约束</h2>
+<h2 data-tts="3f6283692b9af2ae">问题场景 + 需求约束</h2>
 <p>给一个 <strong>agent 时代的 Git 托管服务</strong>做存储层。流量形状变了：几十万个 coding agent 在同一批仓库上并发 <code>fetch</code>、小步 <code>push</code>，读写比约 100:1，但写<em>频率</em>远高于人类。</p>
 <ul>
 <li><strong>规模</strong>：10 万仓库，单仓最大 50 GB；峰值 300 push/s，读 QPS 三万级。</li>
@@ -120,25 +119,23 @@ document.addEventListener('DOMContentLoaded',()=>{
 </ul>
 <p>传统答案是「有状态副本组 + 共识」：每仓三副本、Raft 选主、push 走 leader 多数派确认。能用，但<strong>副本组是有状态的</strong>：扩容要搬数据、节点死了要重建副本、读扩展受副本数限制、写吞吐被 leader 往返锁死，而仓库大小不均让 rebalance 成为常态。</p>
 <div class="callout"><strong>本期的反转：</strong>如果对象存储已经给了你<em>跨 AZ 的 11 个 9 持久性</em>和<em>单 key 原子 compare-and-swap</em>，你为什么还要自己跑共识？把 WAL 直接写进对象存储、用条件写做串行化点，<strong>副本就全变成可丢的缓存，节点无状态、不选主、不搬数据</strong>。这不是理论：2026 年它已改写了 Git 托管和 Kafka 的默认答案。</div>
-
-<h2>高层架构</h2>
+<h2 data-tts="0022472394b584ca">高层架构</h2>
 <pre class="mermaid">
 graph LR
-    C["Git 客户端<br/>push / fetch"] --> LB["L7 路由<br/><i>rendezvous hashing</i>"]
-    LB --> N1["节点 A<br/><i>NVMe 热缓存</i>"]
-    LB --> N2["节点 B<br/><i>NVMe 热缓存</i>"]
-    LB --> N3["新扩容节点 C<br/><i>缓存为空</i>"]
-    N1 -- "①数据 PUT ②index CAS" --> S3[("对象存储<br/><b>WAL = 真相源</b><br/>不可变数据 + 可变 index")]
-    N2 -- "条件 GET<br/>ETag 命中则 304" --> S3
-    N3 -- "从 WAL 重建整个仓库" --> S3
-    N1 -. "UDP gossip: WAL 已推进到 seq=N" .-> N2
-    N1 -. gossip .-> N3
+    C["Git 客户端<br/>push / fetch"] --&gt; LB["L7 路由<br/><i>rendezvous hashing</i>"]
+    LB --&gt; N1["节点 A<br/><i>NVMe 热缓存</i>"]
+    LB --&gt; N2["节点 B<br/><i>NVMe 热缓存</i>"]
+    LB --&gt; N3["新扩容节点 C<br/><i>缓存为空</i>"]
+    N1 -- "①数据 PUT ②index CAS" --&gt; S3[("对象存储<br/><b>WAL = 真相源</b><br/>不可变数据 + 可变 index")]
+    N2 -- "条件 GET<br/>ETag 命中则 304" --&gt; S3
+    N3 -- "从 WAL 重建整个仓库" --&gt; S3
+    N1 -. "UDP gossip: WAL 已推进到 seq=N" .-&gt; N2
+    N1 -. gossip .-&gt; N3
 </pre>
 <p>三件事值得指出。<strong>真相源只有一份</strong>：对象存储里的 WAL——数据对象不可变、内容寻址，加一个可变 <code>index</code> 记录顺序。<strong>节点同质无状态</strong>：任何节点都能接任何仓库的 push，本地 NVMe 上那份真实 git 仓库只是<em>热缓存</em>。<strong>gossip 不承担正确性</strong>——它只让副本<em>早一点</em>知道该拉新数据；正确性全压在 index 的条件写上，落后的副本在服务读之前必然先做一次条件 GET 对账。</p>
-
-<h2>关键点 1：把串行化点从副本组搬到对象存储的条件写</h2>
+<h2 data-tts="5724d98ac739f9d8">关键点 1：把串行化点从副本组搬到对象存储的条件写</h2>
 <p><strong>一句话 trade-off</strong>：用一次 PUT 的延迟，换掉整套 leader 选举、成员变更和多数派协调。</p>
-<h3>原理</h3>
+<h3 data-tts="a718e12fd2254b95">原理</h3>
 <p>共识的本质是<em>给并发写定一个全序</em>。Raft 用「多数派承认的 leader + 单调 term」产生它，代价是维护一个有状态副本组。而 2024 年起 S3 支持条件写：<code>PutObject</code> 带 <code>If-Match: &lt;etag&gt;</code>，ETag 不匹配即返回 <strong>412</strong>——一个跨 AZ 持久化的<strong>单 key 原子 compare-and-swap</strong>。</p>
 <p>架构于是反转：<strong>数据对象无条件并发写（不可变、重传安全），顺序由一次 index 的 CAS 决定</strong>。CAS 成功的那一刻既是「push 进入历史」的时刻，也是能 ack 客户端的最早时刻。谁赢 CAS 谁排前面，输的人重读、重算、重试——<em>没有 leader，也不需要有</em>。</p>
 <pre class="mermaid">
@@ -146,26 +143,26 @@ sequenceDiagram
     participant A as 节点 A
     participant B as 节点 B
     participant S as 对象存储
-    A->>S: PUT wal/0042.pack 不可变数据
-    B->>S: PUT wal/0043.pack 不可变数据
-    A->>S: PUT index If-Match etag_v7
-    S-->>A: 200 OK 新 etag_v8
-    A->>A: ack 客户端：push 成功
-    B->>S: PUT index If-Match etag_v7
-    S-->>B: 412 Precondition Failed
-    B->>S: GET index 读到 v8 含 A 的记录
-    B->>S: PUT index If-Match etag_v8
-    S-->>B: 200 OK 新 etag_v9
+    A-&gt;&gt;S: PUT wal/0042.pack 不可变数据
+    B-&gt;&gt;S: PUT wal/0043.pack 不可变数据
+    A-&gt;&gt;S: PUT index If-Match etag_v7
+    S--&gt;&gt;A: 200 OK 新 etag_v8
+    A-&gt;&gt;A: ack 客户端：push 成功
+    B-&gt;&gt;S: PUT index If-Match etag_v7
+    S--&gt;&gt;B: 412 Precondition Failed
+    B-&gt;&gt;S: GET index 读到 v8 含 A 的记录
+    B-&gt;&gt;S: PUT index If-Match etag_v8
+    S--&gt;&gt;B: 200 OK 新 etag_v9
     Note over A,B: 只有 index 的 CAS 是串行点<br/>数据对象的 PUT 全程并发
 </pre>
-<h3>选型 Trade-off</h3>
+<h3 data-tts="fd5db069e5336b5f">选型 Trade-off</h3>
 <table>
 <tr><th>方案</th><th>换来什么</th><th>牺牲什么</th></tr>
 <tr><td><strong>Raft/Paxos 副本组</strong></td><td>写延迟可做到个位数毫秒</td><td>有状态：选主、成员变更、rebalance；读扩展受副本数限制</td></tr>
 <tr><td><strong>外部仲裁</strong>（指针存 DynamoDB / etcd）</td><td>数据在对象存储，元数据事务强、还能跨 key</td><td>多一个有状态组件要运维付费；两套存储故障域叠加</td></tr>
 <tr><td><strong>对象存储原生 CAS</strong></td><td>零额外有状态组件；节点完全同质可随时扩缩</td><td>写延迟下限 = 对象存储 PUT 的 p99；CAS 只覆盖单 key；语义绑定厂商</td></tr>
 </table>
-<h3>伪代码</h3>
+<h3 data-tts="ad8af8fb7bf98351">伪代码</h3>
 <pre><code># 追加 WAL 记录；index 的 CAS 是唯一串行化点（pseudo-code）
 def append(repo, record):
     for _ in range(MAX_RETRY):
@@ -183,15 +180,14 @@ def append(repo, record):
     raise Contention(repo)
 # CAS 失败留下的 ① 是孤儿对象：无人引用，交给 GC，不影响正确性</code></pre>
 <div class="case"><strong>现实案例：</strong>Cursor 的 Git 存储 <strong>Continuity</strong>（2026-08 公开）正是这套：S3 上的 WAL 是唯一真相源，index 的原子 CAS 就是 push 的串行化点，<em>任何</em>服务器都能接 push——定序从「一组副本的协调」变成「对象存储上的一次更新」（<a href="https://cursor.com/blog/git-at-any-scale">Git at any scale · Cursor</a>）。同构模式在数据湖里已是标准：Apache Iceberg 的提交就是把表指针从旧 metadata 文件 CAS 到新的，失败就基于新状态重试（<a href="https://iceberg.apache.org/spec/">Iceberg spec</a>）。</div>
-
-<h2>关键点 2：本地盘降级为可丢的热缓存</h2>
+<h2 data-tts="30480cc1f5ee6def">关键点 2：本地盘降级为可丢的热缓存</h2>
 <p><strong>一句话 trade-off</strong>：放弃「本地盘就是数据」的假设，换来节点无状态、读副本线性扩展、spot 回收无痛。</p>
-<h3>原理</h3>
+<h3 data-tts="718445258c7f683c">原理</h3>
 <p>真相一旦在对象存储，本地 NVMe 上那份 git 仓库的身份就变了：它<strong>不是副本，是缓存</strong>。收益有三：扩容不再搬数据（空载上线、按需 materialize）；节点故障不必重建副本；读扩展不受副本数限制——Cursor 报告合成测试中读吞吐可随副本数线性扩展到 100 节点。</p>
 <p>读路径的代价是缓存可能落后，所以<strong>服务读之前先对账</strong>——拿本地 ETag 发条件 GET，<code>If-None-Match</code> 命中就返回 304、下载 0 字节（常态热路径）；真落后了才按 seq 差值补拉。gossip 只是把「该对账了」提前通知到。</p>
-<h3>选型 Trade-off</h3>
+<h3 data-tts="ebd7075e72e05ad3">选型 Trade-off</h3>
 <p>代价是<strong>冷读放大</strong>：新节点的第一个 fetch 要从 WAL 重建仓库，延迟可能是热路径几十倍。三条缓解各有代价：<em>rendezvous hashing</em> 把同仓流量粘到少数偏好节点（命中率↑，牺牲负载均匀度、引入热点仓库）；<em>周期 snapshot</em> 让重建从 replay 全史变成「snapshot + 尾部增量」（省冷读，花存储与后台 CPU）。</p>
-<h3>伪代码</h3>
+<h3 data-tts="d957d7448d695b34">伪代码</h3>
 <pre><code>def serve_fetch(repo, want):
     local = cache.get(repo)                                  # NVMe 上的真实 git 仓库
     head = s3.get_json(f"{repo}/index.json",
@@ -209,13 +205,12 @@ def materialize(repo):                                       # 缓存丢失时
         repo_dir.apply(s3.get(e.key))
     return repo_dir</code></pre>
 <div class="case"><strong>现实案例：</strong>Cursor 把本地 NVMe 仓库明确定位成 warm cache，仓库可从 WAL 完整重建；副本间用 <strong>UDP gossip</strong> 传播 WAL 推进，再用带 ETag 的条件 GET 核对，未变则 S3 直接 304、packfile 下载 0 字节。<strong>WarpStream</strong>（Kafka 协议兼容，已被 Confluent 收购）更极端：Agent <em>完全没有本地盘</em>、数据直写对象存储，因此是纯无状态进程、可随意扩缩重启（<a href="https://www.warpstream.com/blog/kafka-is-dead-long-live-kafka">Kafka Is Dead, Long Live Kafka</a>）。</div>
-
-<h2>关键点 3：延迟与成本曲线从「磁盘」换成「请求数」</h2>
+<h2 data-tts="7fc3da4d6d832f1d">关键点 3：延迟与成本曲线从「磁盘」换成「请求数」</h2>
 <p><strong>一句话 trade-off</strong>：攒批窗口是一个旋钮——往右拧省钱提吞吐，往左拧降延迟涨成本。</p>
-<h3>原理</h3>
+<h3 data-tts="1a32b226ac13c43d">原理</h3>
 <p>零盘架构的写延迟有硬下限：<strong>对象存储 PUT 的 p99</strong>，因为「未落对象存储不确认」是持久性承诺的全部依据。WarpStream 的公开数字很有代表性：默认 S3 Standard 下 Produce 的 p99 约 <strong>400 ms</strong>（4 MiB 对象写入 S3 的 p99 量级），换 <strong>S3 Express One Zone</strong>（低延迟、单 AZ）可降到 169 ms。Cursor 的对应数字是 S3 Standard 约 <strong>120 push/s</strong>、Express One Zone <strong>300+ push/s</strong>，而后者瓶颈已不在 S3 而在 git 压缩本地数据的速度。</p>
 <p>成本也换了维度：不再为 IOPS 和容量付费，而是<strong>为请求数付费</strong>。小对象风暴因此是头号成本杀手，解药只有<strong>攒批</strong>：把多个写（甚至多分区、多仓库的）合并进一个对象，N 次 PUT 变 1 次。</p>
-<h3>选型 Trade-off</h3>
+<h3 data-tts="304a87cf5742f636">选型 Trade-off</h3>
 <table>
 <tr><th>配置</th><th>写延迟 p99</th><th>代价</th></tr>
 <tr><td>本地盘 + Raft 多数派</td><td>个位数毫秒</td><td>有状态副本组的全部运维负担</td></tr>
@@ -223,7 +218,7 @@ def materialize(repo):                                       # 缓存丢失时
 <tr><td>对象存储 Express One Zone</td><td>百毫秒级</td><td>单 AZ 持久性、单价更高；跨 AZ 耐久性要自己补</td></tr>
 </table>
 <p>攒批窗口同理：窗口越长，摊薄的请求成本越低、吞吐越高，但 p99 直接加上窗口长度。<strong>旋钮必须由 workload 决定</strong>：日志摄取拧到 250 ms 以上毫无痛感；agent 等 push 返回才能走下一步时，每 100 ms 都在吃等待时间。</p>
-<h3>伪代码</h3>
+<h3 data-tts="6bfe9aa9910cf6d1">伪代码</h3>
 <pre><code>// 多分区攒批成一个共享对象：按请求数计费，非 IOPS（pseudo-code）
 for {
     batch := buf.Drain(maxWait: 250*time.Millisecond, maxBytes: 8&lt;&lt;20)
@@ -233,16 +228,15 @@ for {
     batch.AckAll(offsets)                          // 对象 + 元数据都提交后才 ack
 }</code></pre>
 <div class="case"><strong>现实案例：</strong>Kafka 的 <strong>KIP-1150 Diskless Topics</strong> 2026-03 被社区投票接受，正是这个形状：写是 leaderless（任何 broker 接任何分区），broker 把多分区批次合并上传成一个<em>共享日志段对象</em>，再由新增的 <strong>Batch Coordinator</strong> 在数据持久化之后统一分配 offset——注意它<em>没有</em>把定序交给对象存储 CAS。它同时是「范式已定、落地很难」的样本：KIP-1150 接受了，但定义核心实现的 KIP-1163 / 1164 仍在讨论，原生 Diskless 未 GA（<a href="https://aiven.io/blog/kip-1150-accepted-and-the-road-ahead">KIP-1150 Accepted, and the Road Ahead</a>）。</div>
-
-<h2>关键点 4：正确性押在厂商的条件写语义上</h2>
+<h2 data-tts="ba7a62e917de5b02">关键点 4：正确性押在厂商的条件写语义上</h2>
 <p><strong>一句话 trade-off</strong>：省掉一整套共识实现，代价是把线性一致的根基交给一个外部 API 的语义细节。</p>
-<h3>原理</h3>
+<h3 data-tts="34ceeb8c9ef5e524">原理</h3>
 <p><strong>①「强一致」不等于「有 CAS」。</strong>S3 在 2020 年就给了读写强一致，但那只保证读到最新版本，<em>不</em>提供原子性原语；CAS 是 2024 年条件写上线后的事（<a href="https://docs.aws.amazon.com/AmazonS3/latest/userguide/conditional-writes.html">AWS 文档</a>）。这解释了为什么早期 Iceberg / Delta 在 S3 上要靠外部锁表补洞。</p>
 <p><strong>② CAS 只覆盖单 key。</strong>两个对象的两次条件写不构成一个事务，所以<strong>所有可变状态必须收口到一个 key</strong>，其余对象全部不可变、内容寻址。</p>
 <p><strong>③ 实现差异是真实风险。</strong>条件写语义在 S3、MinIO、R2、Ozone 之间并不天然一致（Apache Ozone 到 2026 年才专门实现 S3 条件请求以支持这类乐观并发）。声称多云，押的是<em>最弱</em>那家的语义。</p>
-<h3>选型 Trade-off</h3>
+<h3 data-tts="346a70d754ddbe83">选型 Trade-off</h3>
 <p><em>直押对象存储 CAS</em>：组件最少，但正确性绑定单一厂商。<em>外部共识兜底</em>（指针放 etcd/DynamoDB）：换回跨 key 事务与可移植性，代价是请回一个有状态组件。<em>专用协调器</em>（KIP-1150 路线）：定序逻辑自己掌握、可做复杂 offset 语义，但协调器自己又是个需要高可用的有状态服务——<strong>共识被推走了，没有消失</strong>。</p>
-<h3>伪代码</h3>
+<h3 data-tts="aa3a3394f81d61e5">伪代码</h3>
 <pre><code># 反例：两个 key 的条件写不是一个事务
 s3.put_json(f"{repo}/refs.json",  refs, if_match=e1)    # 成功
 s3.put_json(f"{repo}/index.json", idx,  if_match=e2)    # 此处崩 → 两 key 永久不一致
@@ -254,11 +248,9 @@ s3.put_json(f"{repo}/HEAD", {"manifest": mid},
             if_match=head_etag)                         # 唯一可变指针 = 唯一 CAS 点
 # 旧节点醒来重试？手里的 head_etag 必然过期 → 412 → CAS 本身就是 fencing token</code></pre>
 <div class="case"><strong>现实案例：</strong>Iceberg 的「写不可变 metadata 文件 + CAS 表指针」与 Continuity 的「写不可变 packfile + CAS index」是同一骨架的两次独立发现。Jack Vanlightly 对 Iceberg 一致性模型的拆解把这套乐观并发的失败模式讲得比规范更清楚（<a href="https://jack-vanlightly.com/analyses/2024/7/30/understanding-apache-icebergs-consistency-model-part1">Understanding Apache Iceberg's Consistency Model</a>）。</div>
-
-<h2>扩展与优化</h2>
+<h2 data-tts="846a97789bc21813">扩展与优化</h2>
 <p><strong>Compaction 是第一等公民</strong>：WAL 无限增长会让冷读变成 replay 全史，必须周期把尾部压成 snapshot；它还与写路径争同一个 CAS 点——Cursor 的 120 push/s 正是「边压缩边复制」下的数字。<strong>CAS 热点要按仓库分片</strong>：全局一个 index 等于把全站写吞吐锁在一个 key 的争用上；按仓库（或表、分区组）各一个可变 key，争用才与业务粒度对齐。<strong>多区域是下一道坎</strong>：条件写是区域内语义，跨区域复制异步且非原子，要么回到单写区域 + 只读副本，要么重新引入跨区域共识。<strong>尾延迟靠 hedged request</strong>：p99 既由外部 PUT 决定，能做的就是对慢请求发第二份——而请求数就是账单。</p>
-
-<h2>常见陷阱 + 面试问题</h2>
+<h2 data-tts="dc8f31bbcaa7f4c5">常见陷阱 + 面试问题</h2>
 <ul>
 <li><strong>「本地盘先 ack、后台异步传 S3」</strong>——延迟确实好看，但 RPO 不再是 0，持久性承诺已破。面试高频送命题：<em>ack 的时机就是持久性契约本身</em>。</li>
 <li><strong>把 gossip 当正确性机制</strong>。它是 UDP、会丢，只能加速发现，不能替代条件 GET 对账。被问「gossip 丢了会怎样」，答案是「副本多落后一会儿，但读前必然对账，不影响正确性」。</li>
@@ -266,8 +258,7 @@ s3.put_json(f"{repo}/HEAD", {"manifest": mid},
 <li><strong>CAS 争用没有退避</strong>。裸重试在高并发下放大成活锁；必须配指数退避 + 抖动，并把「争用导致的 412 率」做成一等指标——它是分片粒度不对的早期信号。</li>
 <li><strong>追问清单</strong>：① 对象存储<em>没有</em>条件写时你怎么补洞、代价几何？② 两个节点同时 CAS 成功是否可能，为什么？③ 300 push/s 的瓶颈在哪一层，怎么证明？④ 换成要求 p99 写延迟 &lt; 10 ms 的金融账本，你还选这套吗？⑤ 孤儿对象怎么 GC，会不会误删仍被引用的对象？</li>
 </ul>
-
-<h2>深入资源</h2>
+<h2 data-tts="9713ff3e48fff100">深入资源</h2>
 <ul>
 <li><a href="https://cursor.com/blog/git-at-any-scale">Git at any scale · Cursor</a> — Continuity 架构原文：S3 WAL 作真相源、CAS 定序、rendezvous hashing、gossip、吞吐数字。</li>
 <li><a href="https://aiven.io/blog/kip-1150-accepted-and-the-road-ahead">KIP-1150 Accepted, and the Road Ahead · Aiven</a> — Kafka Diskless Topics 被接受后的落地路线与未决问题。</li>
@@ -276,8 +267,7 @@ s3.put_json(f"{repo}/HEAD", {"manifest": mid},
 <li><a href="https://jack-vanlightly.com/analyses/2024/7/30/understanding-apache-icebergs-consistency-model-part1">Understanding Apache Iceberg's Consistency Model · Jack Vanlightly</a> — 同一骨架在数据湖侧的一致性分析。</li>
 <li><em>Designing Data-Intensive Applications</em>（Martin Kleppmann）— 复制与共识两章，判断「这套省掉了什么」的底座。</li>
 </ul>
-
-<h2>深入思考</h2>
+<h2 data-tts="c154f6deccfbb0f5">深入思考</h2>
 <details><summary>Continuity 直押 S3 CAS，KIP-1150 却另建 Batch Coordinator。同样是零盘，为什么分叉？</summary>
 <div class="answer">
 <p>差别在<strong>定序有多复杂</strong>。Git push 接近「把一条记录追加到某仓库的历史」——单仓库、单 key，一次 CAS 就表达完了。Kafka 要给成千上万个分区各自分配<em>连续、无洞、单调</em>的 offset，而一个上传对象混装多分区数据：要么每分区一个可变 key（一次写得 CAS 几百个 key，而 CAS 不跨 key），要么全局一个 key（全站写吞吐锁死在一个 CAS 上）——两条都不通。推论值得记住：<strong>对象存储 CAS 能否直接当共识用，取决于可变状态能否自然收口成一个 key</strong>。能，架构塌缩成极简；不能，共识只是被推到另一个组件里——它变便宜了（不在数据路径、不管持久性），但没消失。</p>
@@ -298,7 +288,6 @@ s3.put_json(f"{repo}/HEAD", {"manifest": mid},
 <p><strong>搬了位置，这次搬得划算，但账要算全</strong>。消失的是你<em>自己运维</em>的那部分：选主、成员变更、副本重建、rebalance。新增四项：compaction/GC 成了关键路径上的后台系统（压不过来冷读爆炸）、攒批逻辑成了正确性相关代码（出 bug 丢批次）、CAS 争用成了新的扩展瓶颈、一条新的供应商语义依赖。划算在于：搬走的是<em>分布式系统里最难写对的代码</em>（共识 + 成员变更），换来的是普通工程问题（批处理、GC、分片）。这是个很一般的判断原则——<strong>优先把「难以证明正确」的复杂度换成「容易测试」的复杂度，即使总行数没少。</strong></p>
 </div>
 </details>
-
 <div class="nav"><a href="index.html">← 回到 index</a></div>
 </div>
 <script src="https://hub.cissychen.com/comments.js" defer></script>
