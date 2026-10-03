@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+
+<html lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Day 55 · Object Storage as the Source of Truth — System Design</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"SF Pro Display",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
+.container{max-width:820px;margin:0 auto;padding:24px 20px 60px}
+header{padding:40px 0 28px;border-bottom:1px solid rgba(100,200,255,0.15);margin-bottom:32px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem}
+.tag{padding:3px 10px;border-radius:4px;background:rgba(100,200,255,0.12);color:#64c8ff;border:1px solid rgba(100,200,255,0.25)}
+.tag.diff{background:rgba(94,234,212,0.1);color:#5eead4;border-color:rgba(94,234,212,0.3)}
+.tag.day{background:rgba(255,180,80,0.1);color:#ffb450;border-color:rgba(255,180,80,0.25)}
+h1{font-size:1.75rem;font-weight:800;background:linear-gradient(135deg,#64c8ff 0%,#5eead4 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:0.5px;line-height:1.3}
+h1 .en{display:block;font-size:1rem;color:#7a8590;-webkit-text-fill-color:#7a8590;margin-top:6px;font-weight:500}
+h2{font-size:1.2rem;color:#5eead4;margin:36px 0 14px;padding-left:12px;border-left:3px solid #5eead4}
+h3{font-size:1rem;color:#64c8ff;margin:20px 0 10px;font-weight:600}
+p{margin:10px 0;color:#c8cfd6}
+ul,ol{margin:10px 0 10px 22px;color:#c8cfd6}
+li{margin:6px 0}
+strong{color:#e8eef5;font-weight:600}
+em{color:#5eead4;font-style:normal;font-weight:500}
+code{font-family:"SF Mono",Menlo,Consolas,monospace;background:rgba(100,200,255,0.1);color:#5eead4;padding:1px 6px;border-radius:3px;font-size:0.88em}
+pre{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:14px 16px;overflow-x:auto;margin:12px 0;font-family:"SF Mono",Menlo,Consolas,monospace;font-size:0.84rem;line-height:1.55;color:#c8cfd6}
+pre code{background:none;color:inherit;padding:0;font-size:1em}
+.mermaid{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:18px;margin:14px 0;text-align:center;overflow-x:auto;cursor:zoom-in;transition:border-color 0.15s}
+.mermaid:hover{border-color:rgba(100,200,255,0.4)}
+.mermaid svg{width:100%;max-width:100%;height:auto;min-height:280px}
+.lightbox{position:fixed;inset:0;background:rgba(8,12,18,0.96);z-index:9999;display:none;align-items:center;justify-content:center;padding:24px;cursor:grab;backdrop-filter:blur(4px);overflow:hidden}
+.lightbox.open{display:flex}
+.lightbox.dragging{cursor:grabbing}
+.lightbox svg{width:auto;height:auto;max-width:96vw;max-height:92vh;transform-origin:center center;will-change:transform}
+.lightbox .hint{position:fixed;top:16px;right:20px;font-size:0.78rem;color:#7a8590;font-family:"SF Mono",Menlo,monospace;pointer-events:none}
+.callout{background:rgba(255,180,80,0.06);border-left:3px solid #ffb450;padding:12px 14px;margin:14px 0;border-radius:4px;font-size:0.94rem}
+.callout strong{color:#ffb450}
+.tradeoff{background:rgba(100,200,255,0.05);border:1px solid rgba(100,200,255,0.2);border-radius:6px;padding:12px 14px;margin:12px 0;font-size:0.94rem}
+.case{background:rgba(94,234,212,0.05);border-left:3px solid #5eead4;padding:12px 14px;margin:12px 0;border-radius:4px;font-size:0.94rem}
+.case strong{color:#5eead4}
+.nav{margin-top:50px;padding-top:24px;border-top:1px solid rgba(100,200,255,0.15);text-align:center}
+.nav a{color:#64c8ff;text-decoration:none;font-size:0.92rem;padding:8px 16px;border:1px solid rgba(100,200,255,0.3);border-radius:4px;transition:all 0.15s}
+.nav a:hover{background:rgba(100,200,255,0.1)}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:0.9rem}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid rgba(100,200,255,0.15)}
+th{color:#64c8ff;font-weight:600;background:rgba(100,200,255,0.05)}
+details{background:rgba(100,200,255,0.04);border:1px solid rgba(100,200,255,0.18);border-radius:6px;padding:12px 16px;margin:10px 0;transition:all 0.15s}
+details:hover{border-color:rgba(100,200,255,0.35)}
+details[open]{background:rgba(94,234,212,0.05);border-color:rgba(94,234,212,0.3)}
+details summary{font-weight:600;color:#e8eef5;list-style:none;outline:none;cursor:pointer;display:flex;align-items:flex-start;gap:10px;font-size:0.96rem}
+details summary::-webkit-details-marker{display:none}
+details summary::before{content:'▶';color:#64c8ff;font-size:0.75em;transition:transform 0.2s;flex-shrink:0;margin-top:5px}
+details[open] summary::before{transform:rotate(90deg);color:#5eead4}
+details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
+details .answer ul,details .answer ol{margin:6px 0 6px 22px}
+@media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+</style>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({startOnLoad:true,theme:'base',flowchart:{useMaxWidth:true,htmlLabels:true,nodeSpacing:50,rankSpacing:60},themeVariables:{primaryColor:'#1a2530',primaryTextColor:'#e8eef5',primaryBorderColor:'#64c8ff',lineColor:'#5eead4',secondaryColor:'#0e1419',tertiaryColor:'#0a0f14',background:'#0a0f14',mainBkg:'#1a2530',secondBkg:'#0e1419',textColor:'#d4dae0',fontFamily:'-apple-system,"SF Pro Display",sans-serif',fontSize:'16px'}});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const lb=document.createElement('div');lb.className='lightbox';
+  lb.innerHTML='<span class="hint">scroll = zoom · drag = pan · Esc / click bg = close</span>';
+  document.body.appendChild(lb);
+  let scale=1,panX=0,panY=0,dragging=false,moved=false,lx=0,ly=0;
+  const apply=()=>{const s=lb.querySelector('svg');if(s)s.style.transform=`translate(${panX}px,${panY}px) scale(${scale})`};
+  const reset=()=>{scale=1;panX=0;panY=0};
+  const close=()=>{lb.classList.remove('open');const s=lb.querySelector('svg');if(s)s.remove();reset()};
+  document.addEventListener('click',e=>{
+    if(e.target.closest('.lightbox')){if(moved){moved=false;return}close();return}
+    const w=e.target.closest('.mermaid');if(!w)return;
+    const svg=w.querySelector('svg');if(!svg)return;
+    const c=svg.cloneNode(true);c.removeAttribute('style');
+    c.style.maxWidth='96vw';c.style.maxHeight='92vh';
+    lb.appendChild(c);lb.classList.add('open');reset();apply();
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+  lb.addEventListener('wheel',e=>{
+    if(!lb.classList.contains('open'))return;
+    e.preventDefault();
+    const svg=lb.querySelector('svg');if(!svg)return;
+    const ns=Math.max(0.3,Math.min(10,scale*(1-e.deltaY*0.002)));
+    const r=svg.getBoundingClientRect();
+    const cx=e.clientX-(r.left+r.width/2),cy=e.clientY-(r.top+r.height/2);
+    const k=ns/scale-1;panX-=cx*k;panY-=cy*k;scale=ns;apply();
+  },{passive:false});
+  lb.addEventListener('mousedown',e=>{
+    if(!lb.classList.contains('open'))return;
+    dragging=true;moved=false;lx=e.clientX;ly=e.clientY;lb.classList.add('dragging');e.preventDefault();
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    const dx=e.clientX-lx,dy=e.clientY-ly;
+    if(Math.abs(dx)+Math.abs(dy)>3)moved=true;
+    panX+=dx;panY+=dy;lx=e.clientX;ly=e.clientY;apply();
+  });
+  document.addEventListener('mouseup',()=>{dragging=false;lb.classList.remove('dragging')});
+});
+</script>
+</head><body><div class="container">
+<header>
+<div class="meta">
+<span class="tag day">Day 55</span>
+<span class="tag diff">Hard</span>
+<span class="tag">Storage</span>
+<span class="tag">Object Storage</span>
+<span class="tag">WAL</span>
+<span class="tag">Consensus</span>
+</div>
+<h1>Object Storage as the Source of Truth<span class="en">The Zero-Disk Architecture: Outsourcing Consensus to S3</span></h1>
+</header>
+
+<h2>Scenario + Constraints</h2>
+<p>You are designing the storage layer for a <strong>Git hosting service in the agent era</strong>. The traffic shape has changed: hundreds of thousands of coding agents <code>fetch</code> concurrently and <code>push</code> in small increments across the same repositories. The read/write ratio is roughly 100:1, but write <em>frequency</em> is far above anything human developers produce.</p>
+<ul>
+<li><strong>Scale</strong>: 100k repositories, up to 50 GB each; peak 300 pushes/s, read QPS in the tens of thousands.</li>
+<li><strong>Durability</strong>: once a push returns success it cannot be lost (RPO = 0).</li>
+<li><strong>Consistency</strong>: after a successful push, any node's subsequent fetch must see it (per-repo linearizability).</li>
+<li><strong>Elasticity</strong>: nodes run on spot instances and can be reclaimed at any time; a new node must take traffic immediately.</li>
+</ul>
+<p>The traditional answer is "stateful replica group + consensus": three replicas per repo, Raft leader election, pushes through the leader with majority acknowledgement. It works, but <strong>a replica group is stateful</strong>: scaling out means moving data, a dead node means rebuilding a replica, read scaling is capped by replica count, write throughput is pinned by leader round-trips — and uneven repo sizes make rebalancing a permanent chore.</p>
+<div class="callout"><strong>The reversal:</strong> if object storage already gives you <em>eleven nines of cross-AZ durability</em> and <em>atomic single-key compare-and-swap</em>, why run your own consensus at all? Write the WAL straight into object storage and use a conditional write as the serialization point, and <strong>every replica becomes a disposable cache — nodes are stateless, elect no leader, and move no data</strong>. This is not theory: in 2026 it has already rewritten the default answer for both Git hosting and Kafka.</div>
+
+<h2>High-Level Architecture</h2>
+<pre class="mermaid">
+graph LR
+    C["Git client<br/>push / fetch"] --> LB["L7 routing<br/><i>rendezvous hashing</i>"]
+    LB --> N1["Node A<br/><i>NVMe warm cache</i>"]
+    LB --> N2["Node B<br/><i>NVMe warm cache</i>"]
+    LB --> N3["New node C<br/><i>cold / empty cache</i>"]
+    N1 -- "1. PUT data 2. CAS index" --> S3[("Object store<br/><b>WAL = source of truth</b><br/>immutable data + mutable index")]
+    N2 -- "conditional GET<br/>ETag hit then 304" --> S3
+    N3 -- "materialize whole repo from WAL" --> S3
+    N1 -. "UDP gossip: WAL advanced to seq=N" .-> N2
+    N1 -. gossip .-> N3
+</pre>
+<p>Three things deserve calling out. <strong>There is exactly one source of truth</strong>: the WAL in object storage — immutable, content-addressed data objects plus one mutable <code>index</code> object that records order. <strong>Nodes are homogeneous and stateless</strong>: any node can accept a push for any repo, and the real git repository on local NVMe is only a <em>warm cache</em>. <strong>Gossip carries no correctness</strong> — it merely tells replicas <em>earlier</em> that there is new data to pull; correctness rests entirely on the index's conditional write, and a lagging replica always does a conditional GET to reconcile before serving a read.</p>
+
+<h2>Key Point 1: Move the Serialization Point from the Replica Group to a Conditional Write</h2>
+<p><strong>Trade-off in one line</strong>: spend one PUT's latency, delete leader election, membership changes, and quorum coordination.</p>
+<h3>Principle</h3>
+<p>Consensus is fundamentally about <em>imposing a total order on concurrent writes</em>. Raft produces it with "a majority-acknowledged leader + monotonic terms", at the cost of maintaining a stateful replica group. Since 2024, S3 supports conditional writes: <code>PutObject</code> with <code>If-Match: &lt;etag&gt;</code> returns <strong>412 Precondition Failed</strong> when the ETag does not match — a genuine <strong>atomic single-key compare-and-swap</strong> that is durable across AZs.</p>
+<p>So the architecture inverts: <strong>data objects are written concurrently and unconditionally (immutable, safe to retry), and order is decided by one CAS on the index</strong>. The instant the CAS succeeds is both the moment "this push enters history" and the earliest moment you may ack the client. Whoever wins the CAS goes first; the loser re-reads, recomputes, retries — <em>there is no leader, and none is needed</em>.</p>
+<pre class="mermaid">
+sequenceDiagram
+    participant A as Node A
+    participant B as Node B
+    participant S as Object store
+    A->>S: PUT wal/0042.pack immutable data
+    B->>S: PUT wal/0043.pack immutable data
+    A->>S: PUT index If-Match etag_v7
+    S-->>A: 200 OK new etag_v8
+    A->>A: ack client: push succeeded
+    B->>S: PUT index If-Match etag_v7
+    S-->>B: 412 Precondition Failed
+    B->>S: GET index sees v8 including A's record
+    B->>S: PUT index If-Match etag_v8
+    S-->>B: 200 OK new etag_v9
+    Note over A,B: only the index CAS is serialized<br/>data object PUTs stay fully concurrent
+</pre>
+<h3>Trade-off</h3>
+<table>
+<tr><th>Option</th><th>What you get</th><th>What you give up</th></tr>
+<tr><td><strong>Raft/Paxos replica group</strong></td><td>single-digit millisecond write latency</td><td>stateful: elections, membership changes, rebalancing; read scaling capped by replica count</td></tr>
+<tr><td><strong>External arbiter</strong> (pointer in DynamoDB / etcd)</td><td>data in object storage, strong metadata transactions, even across keys</td><td>one more stateful component to run and pay for; two failure domains compound</td></tr>
+<tr><td><strong>Native object-store CAS</strong></td><td>zero extra stateful components; fully homogeneous nodes, scale any time</td><td>write latency floor = object store PUT p99; CAS covers one key only; semantics bound to a vendor</td></tr>
+</table>
+<h3>Pseudo-code</h3>
+<pre><code># Append a WAL record; the index CAS is the only serialization point (pseudo-code)
+def append(repo, record):
+    for _ in range(MAX_RETRY):
+        idx, etag = s3.get_json(f"{repo}/index.json")     # read current WAL head
+        key = f"{repo}/wal/{idx.next_seq:08d}.pack"
+        s3.put(key, record)                              # 1) immutable: concurrent, retry-safe
+        idx.entries.append({"seq": idx.next_seq, "key": key,
+                            "sha": sha256(record)})
+        idx.next_seq += 1
+        try:
+            s3.put_json(f"{repo}/index.json", idx, if_match=etag)   # 2) CAS
+            return idx.next_seq - 1                      # only now may we ack the client
+        except PreconditionFailed:                       # 412: someone advanced it first
+            continue                                     # re-read, recompute, retry
+    raise Contention(repo)
+# A failed CAS leaves step 1 as an orphan object: unreferenced, left to GC, correctness intact</code></pre>
+<div class="case"><strong>In the wild:</strong> Cursor's Git storage, <strong>Continuity</strong> (published 2026-08), is exactly this: the WAL on S3 is the sole source of truth, an atomic CAS on the index is the serialization point for pushes, and <em>any</em> server can accept a push — ordering moves from "coordination among a group of replicas" to "one update on object storage" (<a href="https://cursor.com/blog/git-at-any-scale">Git at any scale · Cursor</a>). The same pattern is already standard in data lakes: an Apache Iceberg commit CAS-swaps the table pointer from the old metadata file to a new one, retrying against the new state on failure (<a href="https://iceberg.apache.org/spec/">Iceberg spec</a>).</div>
+
+<h2>Key Point 2: Demote Local Disk to a Disposable Warm Cache</h2>
+<p><strong>Trade-off in one line</strong>: drop the assumption that "local disk is the data" and get stateless nodes, linear read scaling, and painless spot reclamation.</p>
+<h3>Principle</h3>
+<p>Once truth lives in object storage, the identity of the git repository on local NVMe changes: it is <strong>not a replica, it is a cache</strong>. Three consequences follow: scaling out no longer moves data (bring a node up empty, materialize on demand); node failure no longer requires rebuilding a replica; and read scaling is no longer capped by replica count — Cursor reports read throughput scaling linearly to 100 replicas in synthetic tests.</p>
+<p>The cost lands on the read path: a cache can lag, so you <strong>reconcile before serving</strong> — send a conditional GET carrying the local ETag, and an <code>If-None-Match</code> hit returns 304 with zero bytes downloaded (the steady-state hot path); only a genuinely stale cache pulls the seq delta. Gossip just announces "time to reconcile" a little earlier.</p>
+<h3>Trade-off</h3>
+<p>Treating the cache as a cache means accepting <strong>cold-read amplification</strong>: a new node's first fetch must materialize the repo from the WAL, potentially tens of times slower than the hot path. Two mitigations, each with a price: <em>rendezvous hashing</em> pins a repo's traffic to a few preferred nodes (higher hit rate, but you sacrifice load evenness and invite hot-repo problems); <em>periodic snapshots</em> turn materialization from "replay all history" into "snapshot + tail delta" (cheaper cold reads, paid for in storage and background CPU).</p>
+<h3>Pseudo-code</h3>
+<pre><code>def serve_fetch(repo, want):
+    local = cache.get(repo)                                  # a real git repo on NVMe
+    head = s3.get_json(f"{repo}/index.json",
+                       if_none_match=local.etag)             # conditional GET
+    if head is NOT_MODIFIED:
+        return git_upload_pack(local, want)                  # hot path: zero S3 data transfer
+    for e in head.entries[local.seq + 1:]:                   # pull exactly the delta
+        local.apply(s3.get(e.key))
+    local.etag, local.seq = head.etag, head.last_seq
+    return git_upload_pack(local, want)
+
+def materialize(repo):                                       # when the cache is gone
+    repo_dir = restore(s3.get(f"{repo}/snapshot/latest"))
+    for e in wal_entries_after(snap.seq):                    # then the tail delta
+        repo_dir.apply(s3.get(e.key))
+    return repo_dir</code></pre>
+<div class="case"><strong>In the wild:</strong> Cursor explicitly frames the local NVMe repository as a warm cache that can be rebuilt from the WAL; replicas propagate WAL progress over <strong>UDP gossip</strong>, then verify with an ETag-bearing conditional GET — unchanged means S3 answers 304 and zero packfile bytes move. <strong>WarpStream</strong> (Kafka protocol compatible, acquired by Confluent) goes further: its Agents have <em>no local disk at all</em> and write straight to object storage, which is what makes them purely stateless processes, free to scale and restart (<a href="https://www.warpstream.com/blog/kafka-is-dead-long-live-kafka">Kafka Is Dead, Long Live Kafka</a>).</div>
+
+<h2>Key Point 3: The Latency and Cost Curves Shift from Disk to Request Count</h2>
+<p><strong>Trade-off in one line</strong>: the batching window is a dial — turn it right for throughput and cost, left for latency.</p>
+<h3>Principle</h3>
+<p>Write latency in a zero-disk architecture has a hard floor: <strong>the object store's PUT p99</strong>, because "nothing is acknowledged until it is in object storage" is the entire basis of the durability promise. WarpStream's published numbers are representative: with default S3 Standard, Produce p99 is around <strong>400 ms</strong> (the p99 for writing a 4 MiB object to S3), dropping to 169 ms on <strong>S3 Express One Zone</strong> (low latency, single AZ). Cursor's counterpart figures are roughly <strong>120 pushes/s</strong> on S3 Standard and <strong>300+ pushes/s</strong> on Express One Zone — where the bottleneck is no longer S3 but git compacting on-disk data.</p>
+<p>The cost model changes dimension too: you no longer pay for IOPS and capacity, you <strong>pay per request</strong>. Small-object storms are therefore the number one cost killer, and the only cure is <strong>batching</strong>: merge many writes (even across partitions or repos) into a single object, turning N PUTs into one.</p>
+<h3>Trade-off</h3>
+<table>
+<tr><th>Configuration</th><th>Write p99</th><th>Price</th></tr>
+<tr><td>Local disk + Raft quorum</td><td>single-digit ms</td><td>the full operational burden of a stateful replica group</td></tr>
+<tr><td>Object storage, Standard</td><td>hundreds of ms</td><td>an order of magnitude more latency; interactive writes (agent micro-pushes) feel slow</td></tr>
+<tr><td>Object storage, Express One Zone</td><td>~100 ms</td><td>single-AZ durability, higher unit price; cross-AZ durability is on you</td></tr>
+</table>
+<p>The batching window behaves the same way: a longer window amortizes request cost and raises throughput, but adds the window length straight onto p99. <strong>Only the workload can set this dial</strong>: log ingestion will not notice 250 ms or more, but when an agent cannot take its next step until the push returns, every 100 ms is spent waiting.</p>
+<h3>Pseudo-code</h3>
+<pre><code>// Batch many partitions into one shared object: billed per request, not per IOPS (pseudo-code)
+for {
+    batch := buf.Drain(maxWait: 250*time.Millisecond, maxBytes: 8&lt;&lt;20)
+    key, err := objectStore.Put(encode(batch))     // one object, many partitions
+    if err != nil { batch.NackAll(); continue }    // never ack what is not persisted
+    offsets := coordinator.Commit(key, batch.Index())  // sequence and assign offsets
+    batch.AckAll(offsets)                          // ack only after object + metadata commit
+}</code></pre>
+<div class="case"><strong>In the wild:</strong> Kafka's <strong>KIP-1150 Diskless Topics</strong> was accepted by community vote in 2026-03 and has exactly this shape: writes are leaderless (any broker accepts any partition), a broker merges batches from many partitions into one <em>shared log segment object</em>, and a new <strong>Batch Coordinator</strong> assigns offsets after the data is durably persisted — note that it does <em>not</em> hand ordering to object-store CAS. It is also a specimen of "paradigm settled, delivery hard": KIP-1150 is accepted, but KIP-1163 / 1164, which define the core implementation, are still under discussion and native Diskless is not yet GA (<a href="https://aiven.io/blog/kip-1150-accepted-and-the-road-ahead">KIP-1150 Accepted, and the Road Ahead</a>).</div>
+
+<h2>Key Point 4: You Are Betting Correctness on a Vendor's Conditional-Write Semantics</h2>
+<p><strong>Trade-off in one line</strong>: skip an entire consensus implementation, and in exchange put the foundation of linearizability inside the semantics of an external API.</p>
+<h3>Principle</h3>
+<p><strong>1. "Strongly consistent" does not mean "has CAS".</strong> S3 gave read-after-write strong consistency back in 2020, but that only guarantees you read the latest version; it offers <em>no</em> atomicity primitive. CAS arrived only with conditional writes in 2024 (<a href="https://docs.aws.amazon.com/AmazonS3/latest/userguide/conditional-writes.html">AWS docs</a>). That is why early Iceberg / Delta on S3 had to patch the hole with an external lock table.</p>
+<p><strong>2. CAS covers one key.</strong> Two conditional writes on two objects do not form a transaction, so <strong>all mutable state must funnel into a single key</strong>, with every other object immutable and content-addressed.</p>
+<p><strong>3. Implementation divergence is a real risk.</strong> Conditional-write semantics are not automatically identical across S3, MinIO, R2, and Ozone (Apache Ozone only implemented S3 conditional requests in 2026 to support this kind of optimistic concurrency). Claim multi-cloud, and you are actually betting on the <em>weakest</em> implementation.</p>
+<h3>Trade-off</h3>
+<p><em>Bet directly on object-store CAS</em>: fewest components, but correctness is tied to one vendor. <em>External consensus as a backstop</em> (pointer in etcd/DynamoDB): buys back cross-key transactions and portability, at the price of inviting a stateful component back in. <em>A dedicated coordinator</em> (the KIP-1150 route): you own the ordering logic and can express complex offset semantics, but the coordinator is itself a stateful service that must be highly available — <strong>consensus was pushed away, not removed</strong>.</p>
+<h3>Pseudo-code</h3>
+<pre><code># Anti-pattern: two conditional writes are not one transaction
+s3.put_json(f"{repo}/refs.json",  refs, if_match=e1)    # succeeds
+s3.put_json(f"{repo}/index.json", idx,  if_match=e2)    # crash here, two keys diverge forever
+
+# Correct shape: funnel into one key (Iceberg and Continuity share this skeleton)
+mid = content_hash(full_state)
+s3.put(f"{repo}/manifest/{mid}", full_state)            # immutable, retry-safe, unconditional
+s3.put_json(f"{repo}/HEAD", {"manifest": mid},
+            if_match=head_etag)                         # the only mutable pointer = the only CAS
+# A stale node wakes up and retries? Its head_etag is necessarily stale, so 412 —
+# the CAS is itself the fencing token.</code></pre>
+<div class="case"><strong>In the wild:</strong> Iceberg's "write immutable metadata, CAS the table pointer" and Continuity's "write immutable packfiles, CAS the index" are two independent discoveries of one skeleton. Jack Vanlightly's analysis of Iceberg's consistency model explains the failure modes of this optimistic concurrency more clearly than the spec does (<a href="https://jack-vanlightly.com/analyses/2024/7/30/understanding-apache-icebergs-consistency-model-part1">Understanding Apache Iceberg's Consistency Model</a>).</div>
+
+<h2>Scaling and Optimization</h2>
+<p><strong>Compaction is a first-class citizen</strong>: an unbounded WAL turns every cold read into a full-history replay, so the tail must be compacted into snapshots periodically — and that work contends for the same CAS point as the write path, which is exactly why Cursor's 120 pushes/s figure is measured "while compacting and replicating". <strong>Shard the CAS hot spot per repository</strong>: one global index object pins site-wide write throughput to contention on a single key; one mutable key per repo (or per table, per partition group) aligns contention with business granularity. <strong>Multi-region is the next wall</strong>: conditional writes are a within-region semantic and cross-region replication is asynchronous and non-atomic, so you either fall back to a single write region plus read-only replicas, or reintroduce cross-region consensus. <strong>Tail latency wants hedged requests</strong>: when p99 is set by an external PUT, about all you can do is issue a second copy for slow requests — and request count is the bill.</p>
+
+<h2>Pitfalls + Interview Questions</h2>
+<ul>
+<li><strong>"Ack from local disk, upload to S3 asynchronously."</strong> The latency chart looks great, but RPO is no longer 0 and the durability promise is broken. A classic interview trap: <em>when you ack is the durability contract.</em></li>
+<li><strong>Treating gossip as a correctness mechanism.</strong> It is UDP and it drops; it accelerates discovery but cannot replace the conditional-GET reconcile. Asked "what if gossip is lost?", the answer is "a replica lags a bit longer, but it always reconciles before serving a read, so correctness is unaffected".</li>
+<li><strong>Getting the cost dimension wrong.</strong> After migrating from $/GB-month to $/request, thousands of small PUTs per second can cost more than the disks did. <em>Batching is not an optimization here; it is a precondition.</em></li>
+<li><strong>CAS contention without backoff.</strong> Naive retries amplify into livelock under load; you need exponential backoff with jitter, and the "412 rate from contention" belongs in your first-class metrics — it is the early signal that your sharding granularity is wrong.</li>
+<li><strong>Follow-up list</strong>: 1) With no conditional write available, how do you patch the hole and at what cost? 2) Can two nodes both win a CAS — why not? 3) Which layer bottlenecks at 300 pushes/s, and how would you prove it? 4) Would you still choose this for a financial ledger that demands write p99 &lt; 10 ms? 5) How do you GC orphan objects without deleting one that is still referenced?</li>
+</ul>
+
+<h2>Going Deeper</h2>
+<ul>
+<li><a href="https://cursor.com/blog/git-at-any-scale">Git at any scale · Cursor</a> — the Continuity architecture first-hand: S3 WAL as source of truth, CAS ordering, rendezvous hashing, gossip, throughput numbers.</li>
+<li><a href="https://aiven.io/blog/kip-1150-accepted-and-the-road-ahead">KIP-1150 Accepted, and the Road Ahead · Aiven</a> — what acceptance of Kafka Diskless Topics means and what remains unresolved.</li>
+<li><a href="https://www.warpstream.com/blog/kafka-is-dead-long-live-kafka">Kafka Is Dead, Long Live Kafka · WarpStream</a> — the full argument for diskless agents writing straight to object storage, with the latency and cost arithmetic.</li>
+<li><a href="https://docs.aws.amazon.com/AmazonS3/latest/userguide/conditional-writes.html">AWS: S3 conditional writes</a> — the precise semantics of <code>If-Match</code> / <code>If-None-Match</code>. Required reading before you design on them.</li>
+<li><a href="https://jack-vanlightly.com/analyses/2024/7/30/understanding-apache-icebergs-consistency-model-part1">Understanding Apache Iceberg's Consistency Model · Jack Vanlightly</a> — the same skeleton analyzed on the data-lake side.</li>
+<li><em>Designing Data-Intensive Applications</em> (Martin Kleppmann) — the replication and consensus chapters are the baseline for judging what this architecture actually removes.</li>
+</ul>
+
+<h2>Reflections</h2>
+<details><summary>Continuity bets directly on S3 CAS, while KIP-1150 builds a Batch Coordinator. Both are zero-disk — why the fork?</summary>
+<div class="answer">
+<p>The difference is <strong>how complex the ordering is</strong>. A Git push is close to "append one record to this repository's history" — single repo, single key, one CAS expresses it. Kafka must assign <em>contiguous, gapless, monotonic</em> offsets to thousands of partitions while one uploaded object carries data from many of them: either one mutable key per partition (hundreds of CAS operations per write, and CAS does not span keys) or one global key (site-wide write throughput pinned to a single CAS). Neither works. The inference is worth keeping: <strong>whether object-store CAS can serve as your consensus depends on whether your mutable state naturally funnels into one key.</strong> If it does, the architecture collapses to something minimal; if not, consensus has merely moved into another component — cheaper (off the data path, not responsible for durability) but not gone.</p>
+</div>
+</details>
+<details><summary>Write p99 goes from single-digit milliseconds to hundreds. Which workloads absorb that, and which collapse?</summary>
+<div class="answer">
+<p>What matters is not the absolute latency but <strong>whether it sits inside a synchronous dependency chain</strong>. Absorbed easily: log ingestion, CI artifact uploads, data-lake commits — consumers that tolerate second-scale freshness. Collapsing: any loop where you cannot read the next step until the write lands. Agent workflows are the dangerous middle case: 400 ms per push sounds harmless, but an agent loop alternating push and fetch for dozens of rounds turns accumulated latency into the felt bottleneck — precisely why Cursor reached for Express One Zone. The sturdier move is to <strong>decouple the latency-sensitive loop from durability</strong>: the ack must wait for object storage (or RPO breaks), but subsequent reads can hit the local cache on the node that just wrote.</p>
+</div>
+</details>
+<details><summary>Suppose a failure violates If-Match semantics and two writes both return 200. How bad is it, and how would you make it detectable?</summary>
+<div class="answer">
+<p>Catastrophic and silent: both writers believe they won the CAS, the index forks, both nodes acked their clients, and the later write overwrites the earlier one — <strong>an acknowledged write is lost</strong>. This is the inverse of Day 54's "fail obviously": the error does not crash, it just quietly is. Three layers of defense: <em>self-checking structure</em> — each WAL record carries <code>prev_seq</code> and <code>prev_hash</code> to form a hash chain, so a fork shows up as a broken chain rather than a silent overwrite; <em>an independent oracle</em> — a background scanner verifying chain continuity and gapless seq (note Day 51: with a base rate this low, precision must be extremely high or the check gets ignored); <em>auditability</em> — because data objects are immutable and content-addressed, even a forked index means the underlying data <em>is not lost</em> and the correct order can be reconstructed by hand. That is the real disaster-time value of the discipline "only one key is mutable".</p>
+</div>
+</details>
+<details><summary>Does this architecture actually reduce total system complexity, or only relocate it?</summary>
+<div class="answer">
+<p><strong>It relocates it — profitably this time — but count the whole bill.</strong> What disappears is the part <em>you</em> operate: elections, membership changes, replica rebuilds, rebalancing. Four things appear: compaction/GC becomes a background system on the critical path (fall behind and cold reads explode), batching logic becomes correctness-relevant code (a bug drops batches), CAS contention becomes the new scaling bottleneck, and you take on a new dependency on vendor semantics. The profit is in the exchange rate: what you shipped out is <em>the hardest code in distributed systems to get right</em> (consensus plus membership change), and what you took on is ordinary engineering (batching, GC, sharding). That generalizes into a judgment rule — <strong>prefer trading complexity that is hard to prove correct for complexity that is easy to test, even when the line count does not drop.</strong></p>
+</div>
+</details>
+
+<div class="nav"><a href="index.en.html">← Back to index</a></div>
+</div>
+</body></html>
