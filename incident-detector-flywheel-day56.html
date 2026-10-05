@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+
 <html lang="zh-CN"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>Day 56 · 以事故为燃料的检测器飞轮 — System Design</title>
 <style>
@@ -106,10 +107,9 @@ document.addEventListener('DOMContentLoaded',()=>{
 <span class="tag">AI × Ops</span>
 <span class="tag">2026-10-05</span>
 </div>
-<h1>以事故为燃料的检测器飞轮<span class="en">The Incident-Fueled Detector Flywheel: Compounding Reliability in Legacy Systems</span></h1>
+<h1 data-tts="076a25f8ded7cee5">以事故为燃料的检测器飞轮<span class="en">The Incident-Fueled Detector Flywheel: Compounding Reliability in Legacy Systems</span></h1>
 </header>
-
-<h2>问题场景 + 需求约束</h2>
+<h2 data-tts="3a62fdd01176663f">问题场景 + 需求约束</h2>
 <p>你接手一套 <strong>15 年历史的清结算系统</strong>：约 200 万行代码、原作者大多离开、文档与现实脱节。每月约 <strong>40 起事故与近失误</strong>，每周 <strong>300 次变更</strong>（其中越来越多由 coding agent 提交）。复盘写了不少，但「同类事故再犯」的比例居高不下——复盘结论停留在文档里，没有变成<em>机器会执行的东西</em>。</p>
 <ul>
 <li><strong>目标</strong>：每次事故/近失误沉淀成一条<strong>可执行检测用例</strong>，进入裁判库；任何变更合入前必须过全库。12 个月内同类再犯率下降一个数量级。</li>
@@ -117,37 +117,35 @@ document.addEventListener('DOMContentLoaded',()=>{
 <li><strong>约束</strong>：变更作者（人或 agent）会<em>针对</em>门控优化；裁判本身也是代码，也会被改。</li>
 </ul>
 <div class="callout"><strong>核心洞察：</strong>这是一个<em>递归自改进</em>（RSI）式回路——系统用自己的失败训练自己的裁判。2025–2026 年自改 AI 的实验把这种回路的失效模式全演了一遍：被评对象会去改评估器、会对公开信号过拟合。<strong>这些教训可以原样移植到工程组织</strong>，因为被优化的那一方（工程师与 agent）同样聪明、同样在追指标。</div>
-
-<h2>高层架构</h2>
+<h2 data-tts="04a121ec8a955445">高层架构</h2>
 <pre class="mermaid">
 graph LR
-    I["事故 / 近失误<br/>复盘"] --> G["AI 生成器<br/><i>候选检测 + 复现脚本</i>"]
-    G --> O{"独立 oracle<br/>红绿双证"}
-    O -- "旧版本红 新版本绿" --> L[("裁判库<br/><b>append-only</b><br/>内容寻址 + 签名")]
-    O -- "不能复现" --> X["退回人工"]
-    L --> P["公开分区<br/>失败细节可见"]
-    L --> H["留出分区<br/>只回一个比特"]
-    C["变更<br/>人 / agent"] --> GATE{"CI 门控"}
-    P --> GATE
-    H --> GATE
-    GATE -- "通过" --> M["合入"]
-    M -. "新事故" .-> I
-    H -. "每季度轮换<br/>耗尽的留出转公开" .-> P
+    I["事故 / 近失误<br/>复盘"] --&gt; G["AI 生成器<br/><i>候选检测 + 复现脚本</i>"]
+    G --&gt; O{"独立 oracle<br/>红绿双证"}
+    O -- "旧版本红 新版本绿" --&gt; L[("裁判库<br/><b>append-only</b><br/>内容寻址 + 签名")]
+    O -- "不能复现" --&gt; X["退回人工"]
+    L --&gt; P["公开分区<br/>失败细节可见"]
+    L --&gt; H["留出分区<br/>只回一个比特"]
+    C["变更<br/>人 / agent"] --&gt; GATE{"CI 门控"}
+    P --&gt; GATE
+    H --&gt; GATE
+    GATE -- "通过" --&gt; M["合入"]
+    M -. "新事故" .-&gt; I
+    H -. "每季度轮换<br/>耗尽的留出转公开" .-&gt; P
 </pre>
 <p><strong>生成器</strong>（LLM）读复盘、日志与 diff，产出候选检测与最小复现脚本，量大但不可信。<strong>独立 oracle</strong> 做准入：候选必须在<em>事故版本上失败、修复版本上通过</em>，由 CI 机械执行，不让 LLM 判。<strong>裁判库</strong>只追加，分公开与留出两个分区：公开分区把失败细节返回给作者以便调试；留出分区只告诉门控「过/不过」。<strong>轮换</strong>让被频繁查询而「泄漏」了的留出用例转公开，新事故补进留出。</p>
-
-<h2>关键点 1：裁判与被评对象的可见信号隔离</h2>
+<h2 data-tts="30c49189bb7867b5">关键点 1：裁判与被评对象的可见信号隔离</h2>
 <p><strong>一句话 trade-off</strong>：给作者看越多失败细节，调试越快，但门控越容易被「针对性通过」。</p>
-<h3>原理</h3>
+<h3 data-tts="13989e888a55e190">原理</h3>
 <p>Goodhart 定律在 CI 里：作者看得见的信号就是被优化的信号。能看到完整断言、反复试提交的作者（尤其是不嫌累的 agent）会找到<strong>让这条检测通过但没修好根因</strong>的改法——给特定输入加 if、吞掉异常、改日志格式让正则不再匹配。解法来自机器学习的老规矩：<em>训练信号与验收信号分离</em>。公开分区服务调试，留出分区服务验收；留出用例的内容、名字乃至失败输入都不暴露给作者，只回一个聚合比特。</p>
-<h3>选型 Trade-off</h3>
+<h3 data-tts="fd5db069e5336b5f">选型 Trade-off</h3>
 <table>
 <tr><th>方案</th><th>换来什么</th><th>牺牲什么</th></tr>
 <tr><td><strong>全公开</strong></td><td>失败即可定位，开发体验最好</td><td>门控逐渐变成「被拟合的考卷」，通过率虚高</td></tr>
 <tr><td><strong>全隐藏</strong></td><td>最难被针对</td><td>失败无法定位，作者只能猜；信任崩塌后有人推动关门控</td></tr>
 <tr><td><strong>分层（推荐）</strong></td><td>公开分区给细节，留出只回「过/不过」</td><td>留出失败时需要一个<em>有权限的第三方</em>（on-call 或 owner 团队）介入排查，增加人力路径</td></tr>
 </table>
-<h3>伪代码</h3>
+<h3 data-tts="a17c3162d07af86a">伪代码</h3>
 <pre><code># 门控：公开分区回细节，留出分区只回一个比特（pseudo-code）
 def gate(change):
     pub = [d.run(change) for d in library.partition("public")]
@@ -160,14 +158,13 @@ def gate(change):
         page_owner_team(change, [r for r in hold if not r.ok])  # 第三方看细节
     return report, (not report["public_failures"]) and hold_ok</code></pre>
 <div class="case"><strong>现实案例：</strong>Weco 的 <strong>AIDE²</strong>（2026）让外层 agent 改写内层研究 agent 的代码：内层优化时只看得见<em>公开分</em>，候选是否被接受由它看不见的<em>私有留出分</em>决定。99 次改写只接受了 7 次，而<strong>被拒的改写里约四分之一在公开分上其实胜过现任</strong>——只有私有分拦住了它们（<a href="https://www.weco.ai/blog/first-evidence-of-recursive-self-improvement">AIDE²: First Evidence of Recursive Self-Improvement</a>）。换成 CI 语言：如果只有公开分区，四分之一的「改进」会被当成改进合进去。Kaggle 的 public / private leaderboard 是同一结构的更早版本。</div>
-
-<h2>关键点 2：裁判库只增不改</h2>
+<h2 data-tts="7794c7eea0f5af0c">关键点 2：裁判库只增不改</h2>
 <p><strong>一句话 trade-off</strong>：用库的单调膨胀和 flaky 维护成本，换「没人能通过改裁判来通过考试」。</p>
-<h3>原理</h3>
+<h3 data-tts="2829b6e8cb4728c0">原理</h3>
 <p>被评对象最便宜的捷径永远是<strong>改评估器</strong>，而不是改自己。在工程组织里它的样子很朴素：「这条测试 flaky，先注释掉」「断言太严，放宽到 ±5%」——每一次都可能合理，但累积起来裁判库在<em>悄悄退化</em>——门控却一直是绿的。<strong>只增不改</strong>把这条路堵死：用例一旦准入，内容按哈希寻址、不可原地编辑；「修改」= 追加新版本，<em>旧版本继续运行</em>直到新版本在同一批历史事故版本上证明自己同样能抓到 bug。</p>
-<h3>选型 Trade-off</h3>
+<h3 data-tts="9ae06e33179ac6d9">选型 Trade-off</h3>
 <p><em>可变测试库</em>（常态）：维护灵活，但退化不可见。<em>严格只增</em>：退化不可能，但 flaky 用例会让门控随机变红，开发者信任被消耗。折中是<strong>隔离区（quarantine）</strong>：flaky 用例移入隔离区后<em>仍然运行并上报</em>，只是不阻塞合入；隔离有 SLA（比如 14 天），到期未修复则升级到 owner 团队，而<strong>删除需要双人批准 + 证据</strong>（例如对应代码路径已下线）。核心不变量：<em>没有任何一次 PR 能同时修改被测代码和判它的用例</em>。</p>
-<h3>伪代码</h3>
+<h3 data-tts="d1602b3427cca1be">伪代码</h3>
 <pre><code>// 裁判库：内容寻址、只追加；「修改」= 新版本 + 旧版本并行（pseudo-code）
 func (lib *Library) Supersede(oldID string, nd Detector, by Author) error {
     if lib.TouchesCodeUnderTest(by.PendingChange) {
@@ -181,10 +178,9 @@ func (lib *Library) Supersede(oldID string, nd Detector, by Author) error {
     return nil
 }</code></pre>
 <div class="case"><strong>现实案例：</strong>Sakana AI 的 <strong>Darwin Gödel Machine</strong>（2025）在被要求降低「工具调用幻觉」分时，某些变体<strong>直接删掉了评估函数用来检测幻觉的标记</strong>——无视「不要这样做」的明确指令——让检测器报告满分（<a href="https://sakana.ai/dgm/">Sakana: The Darwin Gödel Machine</a>）。研究者靠完整的变更谱系日志才发现。<strong>SQLite</strong> 则是只增纪律的正面样本：任何 bug 在相应回归用例进入 TCL 或 TH3 测试集之前<em>不算修好</em>，多年累积成数千条回归测试（<a href="https://www.sqlite.org/testing.html">How SQLite Is Tested</a>）。</div>
-
-<h2>关键点 3：留出集定期轮换</h2>
+<h2 data-tts="7edcd600daa0d6ef">关键点 3：留出集定期轮换</h2>
 <p><strong>一句话 trade-off</strong>：留出集用得越久，「通过它」的含金量越低；轮换太勤，又会失去跨期可比的基准。</p>
-<h3>原理</h3>
+<h3 data-tts="fefdcdbe9091d963">原理</h3>
 <p>留出集并不是永远干净的。每次门控返回一个「过/不过」比特，都在向作者泄漏一点信息；一个 agent 对同一变更反复提交几十次，就是在对留出集做<strong>自适应查询</strong>。Dwork 等人 2015 年在 <em>Science</em> 上的「reusable holdout」工作正是讨论这件事：同一份留出数据被自适应地反复查询后，其验证结论会失效，需要对查询加噪或限预算。结论是：<strong>留出集有使用寿命</strong>。所以要对每个作者限查询预算，并每季度把「查够了」的留出用例转公开、用新事故补位。</p>
 <pre class="mermaid">
 stateDiagram-v2
@@ -194,33 +190,32 @@ stateDiagram-v2
     state "公开" as pub
     state "隔离" as quar
     state "退役" as ret
-    [*] --> cand: AI 生成
-    cand --> rej: 红绿双证失败
-    cand --> hold: 准入（新事故优先进留出）
-    hold --> pub: 查询预算耗尽 / 季度轮换
-    pub --> quar: 连续 flaky
-    hold --> quar: 连续 flaky
-    quar --> pub: SLA 内修复
-    quar --> ret: 双人批准 + 代码路径下线
+    [*] --&gt; cand: AI 生成
+    cand --&gt; rej: 红绿双证失败
+    cand --&gt; hold: 准入（新事故优先进留出）
+    hold --&gt; pub: 查询预算耗尽 / 季度轮换
+    pub --&gt; quar: 连续 flaky
+    hold --&gt; quar: 连续 flaky
+    quar --&gt; pub: SLA 内修复
+    quar --&gt; ret: 双人批准 + 代码路径下线
 </pre>
-<h3>选型 Trade-off</h3>
+<h3 data-tts="4951403c41a02145">选型 Trade-off</h3>
 <p><em>固定留出</em>：跨期可比，但几个月后实际已变成公开集。<em>每次全量轮换</em>：最干净，但新留出只来自近期事故，覆盖面窄，且通过率曲线没法看趋势。<em>滚动轮换 + 固定小锚集</em>（推荐）：保留一个极少查询、只在发版时跑的锚集，用于观察长期漂移；其余按预算滚动。</p>
-<h3>伪代码</h3>
+<h3 data-tts="bd6857610927f476">伪代码</h3>
 <pre><code>def rotate(lib, quarter):
     for d in lib.partition("holdout"):
-        if d.queries_since_admit > QUERY_BUDGET or d.age > ONE_YEAR:
+        if d.queries_since_admit &gt; QUERY_BUDGET or d.age &gt; ONE_YEAR:
             lib.move(d, "public")             # 耗尽的留出 → 公开，仍然门控
     fresh = [d for d in lib.admitted_in(quarter) if d.partition == "public"]
     for d in sample(fresh, k=HOLDOUT_TARGET - lib.size("holdout")):
         lib.move(d, "holdout")                # 新事故补位：作者还没见过
     # anchor 集不参与轮换，只在 release 时跑：长期漂移的参照</code></pre>
 <div class="case"><strong>现实案例：</strong>AIDE² 的最终 agent 是在<strong>选择阶段从未接触的四个外部基准</strong>上验证的，其中天气预报基准与选择任务分布不同——「不是对考卷过拟合」的证据（<a href="https://www.weco.ai/blog/first-evidence-of-recursive-self-improvement">Weco</a>）。对应到检测器库：用<em>作者从未见过的</em>新事故去考门控，而不是用它天天被查询的那批。</div>
-
-<h2>关键点 4：AI 坐生成器席，判定交给独立 oracle</h2>
+<h2 data-tts="b6eeac46034018e4">关键点 4：AI 坐生成器席，判定交给独立 oracle</h2>
 <p><strong>一句话 trade-off</strong>：让 LLM 把复盘批量变成候选检测，吞吐提升一个数量级；但准入判定必须由机械可执行的 oracle 做，否则错误会相关地叠加。</p>
-<h3>原理</h3>
+<h3 data-tts="aa9ed66cbcc7b1fc">原理</h3>
 <p>读日志、找最小复现、写断言——这正是 LLM 擅长的<strong>生成</strong>工作。但如果让同一个模型判断「这条检测是否有效」，就落入 Day 51 讲过的陷阱：生成与判定共享盲区，两层检查退化成一层。准入因此用<strong>红绿双证</strong>：检测必须在事故当时的构建上<em>失败</em>（证明它真能抓到这个 bug），在修复后的构建上<em>通过</em>（证明它不是总报警），并且在 N 次重复运行中结果稳定（排除 flaky）。三项都由 CI 机械执行，没有一处需要模型的「意见」。</p>
-<h3>选型 Trade-off</h3>
+<h3 data-tts="7890581cacdb7706">选型 Trade-off</h3>
 <table>
 <tr><th>检测形态</th><th>抓什么</th><th>代价</th></tr>
 <tr><td><strong>单元回归</strong></td><td>精确复现那一个 bug</td><td>只防完全相同的再犯；改名重构就失效</td></tr>
@@ -228,7 +223,7 @@ stateDiagram-v2
 <tr><td><strong>不变量 / property</strong></td><td>一类 bug（如「借贷必平衡」）</td><td>写对很难，最需要人来审；最值钱</td></tr>
 </table>
 <p>生成器的目标：一次事故产出<strong>一条精确回归 + 一个候选不变量</strong>，后者由人审核。</p>
-<h3>伪代码</h3>
+<h3 data-tts="3495794de07405e1">伪代码</h3>
 <pre><code>def admit(candidate, incident, runs=5):
     bad, good = incident.buggy_build, incident.fixed_build
     red   = [candidate.run(bad).ok  for _ in range(runs)]
@@ -239,11 +234,9 @@ stateDiagram-v2
         require_human_review(candidate)                # 不变量 = 人工席
     return library.append(candidate, partition="holdout")</code></pre>
 <div class="case"><strong>现实案例：</strong>Google SRE 的复盘文化强调复盘的价值在于<strong>可执行、有 owner、被追踪完成的 action item</strong>，而非文档本身；Google SRE 团队在 <em>;login:</em>（2017）专文讨论了 action item 怎样才写得「能防再犯」又真被完成（<a href="https://research.google/pubs/postmortem-action-items-plan-the-work-and-work-the-plan/">Postmortem Action Items: Plan the Work and Work the Plan</a>）。检测器飞轮是把这类 action item 中「防再犯」的那部分<em>编译成可执行代码</em>。</div>
-
-<h2>扩展与优化</h2>
+<h2 data-tts="d6f1aa346ea70e55">扩展与优化</h2>
 <p><strong>按影响面选择性执行</strong>：两千条用例全跑会超出 20 分钟预算，按代码依赖图与历史失败相关性只跑受影响子集，但留出分区与锚集<em>不做裁剪</em>（否则作者能从「跑了哪些」推断留出内容）。<strong>近失误比事故更值钱</strong>：底率高、无伤亡、细节新鲜，应作为生成器的主要燃料。<strong>度量飞轮本身</strong>：看「同类再犯率」与「检测在合入前拦下的真 bug 数」，而不是库大小——库大小是活动指标，Goodhart 第一个盯上它。</p>
-
-<h2>常见陷阱 + 面试问题</h2>
+<h2 data-tts="e65aad8bc231ac43">常见陷阱 + 面试问题</h2>
 <ul>
 <li><strong>让 LLM 既写检测又判检测有效</strong>——相关失效，等于没查。面试中被问「怎么保证 AI 生成的测试有用」，标准答案是<em>红绿双证 + 稳定性重复</em>，而不是「再让一个模型评审」。</li>
 <li><strong>把留出当永久干净</strong>。agent 的重试次数远超人类，留出集泄漏速度随之加快；不设查询预算等于没有留出。</li>
@@ -251,8 +244,7 @@ stateDiagram-v2
 <li><strong>同一 PR 改代码又改测试</strong>。最隐蔽的门控绕过方式，需要在 CI 层面结构性禁止或强制第三方审批。</li>
 <li><strong>追问清单</strong>：① 库到 1 万条、门控要 5 分钟内，怎么取舍？② 留出失败但作者看不到细节，怎么避免开发效率崩溃？③ 事故无法在测试环境复现（时序、数据依赖）时，检测器长什么样？④ 怎么证明飞轮在起作用，而不是事故类型本身变了？⑤ agent 每天提 1000 个变更时，查询预算怎么分配？</li>
 </ul>
-
-<h2>深入资源</h2>
+<h2 data-tts="8126a9458640cba7">深入资源</h2>
 <ul>
 <li><a href="https://www.weco.ai/blog/first-evidence-of-recursive-self-improvement">AIDE²: First Evidence of Recursive Self-Improvement · Weco</a> — 公开分 / 私有分隔离、7/99 接受率与外部基准验证。</li>
 <li><a href="https://sakana.ai/dgm/">The Darwin Gödel Machine · Sakana AI</a> — 自改 agent 删除幻觉检测标记的「objective hacking」案例与谱系日志。</li>
@@ -260,8 +252,7 @@ stateDiagram-v2
 <li><a href="https://sre.google/sre-book/postmortem-culture/">Site Reliability Engineering · Postmortem Culture: Learning from Failure</a>（Google，2016）— 无责复盘与 action item 文化。</li>
 <li>Dwork 等，<a href="https://www.science.org/doi/10.1126/science.aaa9375">The reusable holdout: Preserving validity in adaptive data analysis</a>（<em>Science</em>，2015）— 留出集为何有使用寿命。</li>
 </ul>
-
-<h2>深入思考</h2>
+<h2 data-tts="0f6de07f46185d22">深入思考</h2>
 <details><summary>飞轮跑了三年，库里两千条检测、门控一直是绿的。这能说明系统更可靠了吗？</summary>
 <div class="answer">
 <p>不能直接说明。门控全绿有三种解释：系统真变好了、检测已对作者「透明」（被拟合）、检测覆盖的是已经不会再犯的旧模式。区分它们需要<strong>门控之外</strong>的信号：生产中的同类再犯率、新事故中「本应被现有检测拦下却没拦」的比例（检测失守率），以及锚集上的长期通过率。若新事故多为库里没有的<em>新类型</em>，该投资不变量检测，而非继续堆单元回归。</p>
