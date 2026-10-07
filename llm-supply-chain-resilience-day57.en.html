@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+
+<html lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Day 57 · LLM Supply-Chain Resilience — System Design</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"SF Pro Display","Noto Sans SC",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
+.container{max-width:820px;margin:0 auto;padding:24px 20px 60px}
+header{padding:40px 0 28px;border-bottom:1px solid rgba(100,200,255,0.15);margin-bottom:32px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem}
+.tag{padding:3px 10px;border-radius:4px;background:rgba(100,200,255,0.12);color:#64c8ff;border:1px solid rgba(100,200,255,0.25)}
+.tag.diff{background:rgba(94,234,212,0.1);color:#5eead4;border-color:rgba(94,234,212,0.3)}
+.tag.day{background:rgba(255,180,80,0.1);color:#ffb450;border-color:rgba(255,180,80,0.25)}
+h1{font-size:1.75rem;font-weight:800;background:linear-gradient(135deg,#64c8ff 0%,#5eead4 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:0.5px;line-height:1.3}
+h1 .en{display:block;font-size:1rem;color:#7a8590;-webkit-text-fill-color:#7a8590;margin-top:6px;font-weight:500}
+h2{font-size:1.2rem;color:#5eead4;margin:36px 0 14px;padding-left:12px;border-left:3px solid #5eead4}
+h3{font-size:1rem;color:#64c8ff;margin:20px 0 10px;font-weight:600}
+p{margin:10px 0;color:#c8cfd6}
+ul,ol{margin:10px 0 10px 22px;color:#c8cfd6}
+li{margin:6px 0}
+strong{color:#e8eef5;font-weight:600}
+em{color:#5eead4;font-style:normal;font-weight:500}
+code{font-family:"SF Mono",Menlo,Consolas,monospace;background:rgba(100,200,255,0.1);color:#5eead4;padding:1px 6px;border-radius:3px;font-size:0.88em}
+pre{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:14px 16px;overflow-x:auto;margin:12px 0;font-family:"SF Mono",Menlo,Consolas,monospace;font-size:0.84rem;line-height:1.55;color:#c8cfd6}
+pre code{background:none;color:inherit;padding:0;font-size:1em}
+.mermaid{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:18px;margin:14px 0;text-align:center;overflow-x:auto;cursor:zoom-in;transition:border-color 0.15s}
+.mermaid:hover{border-color:rgba(100,200,255,0.4)}
+.mermaid svg{width:100%;max-width:100%;height:auto;min-height:280px}
+.lightbox{position:fixed;inset:0;background:rgba(8,12,18,0.96);z-index:9999;display:none;align-items:center;justify-content:center;padding:24px;cursor:grab;backdrop-filter:blur(4px);overflow:hidden}
+.lightbox.open{display:flex}
+.lightbox.dragging{cursor:grabbing}
+.lightbox svg{width:auto;height:auto;max-width:96vw;max-height:92vh;transform-origin:center center;will-change:transform}
+.lightbox .hint{position:fixed;top:16px;right:20px;font-size:0.78rem;color:#7a8590;font-family:"SF Mono",Menlo,monospace;pointer-events:none}
+.callout{background:rgba(255,180,80,0.06);border-left:3px solid #ffb450;padding:12px 14px;margin:14px 0;border-radius:4px;font-size:0.94rem}
+.callout strong{color:#ffb450}
+.tradeoff{background:rgba(100,200,255,0.05);border:1px solid rgba(100,200,255,0.2);border-radius:6px;padding:12px 14px;margin:12px 0;font-size:0.94rem}
+.case{background:rgba(94,234,212,0.05);border-left:3px solid #5eead4;padding:12px 14px;margin:12px 0;border-radius:4px;font-size:0.94rem}
+.case strong{color:#5eead4}
+.nav{margin-top:50px;padding-top:24px;border-top:1px solid rgba(100,200,255,0.15);text-align:center}
+.nav a{color:#64c8ff;text-decoration:none;font-size:0.92rem;padding:8px 16px;border:1px solid rgba(100,200,255,0.3);border-radius:4px;transition:all 0.15s}
+.nav a:hover{background:rgba(100,200,255,0.1)}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:0.9rem}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid rgba(100,200,255,0.15)}
+th{color:#64c8ff;font-weight:600;background:rgba(100,200,255,0.05)}
+details{background:rgba(100,200,255,0.04);border:1px solid rgba(100,200,255,0.18);border-radius:6px;padding:12px 16px;margin:10px 0;transition:all 0.15s}
+details:hover{border-color:rgba(100,200,255,0.35)}
+details[open]{background:rgba(94,234,212,0.05);border-color:rgba(94,234,212,0.3)}
+details summary{font-weight:600;color:#e8eef5;list-style:none;outline:none;cursor:pointer;display:flex;align-items:flex-start;gap:10px;font-size:0.96rem}
+details summary::-webkit-details-marker{display:none}
+details summary::before{content:'▶';color:#64c8ff;font-size:0.75em;transition:transform 0.2s;flex-shrink:0;margin-top:5px}
+details[open] summary::before{transform:rotate(90deg);color:#5eead4}
+details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
+details .answer ul,details .answer ol{margin:6px 0 6px 22px}
+@media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+</style>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({startOnLoad:true,theme:'base',flowchart:{useMaxWidth:true,htmlLabels:true,nodeSpacing:50,rankSpacing:60},themeVariables:{primaryColor:'#1a2530',primaryTextColor:'#e8eef5',primaryBorderColor:'#64c8ff',lineColor:'#5eead4',secondaryColor:'#0e1419',tertiaryColor:'#0a0f14',background:'#0a0f14',mainBkg:'#1a2530',secondBkg:'#0e1419',textColor:'#d4dae0',fontFamily:'-apple-system,"SF Pro Display",sans-serif',fontSize:'16px'}});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const lb=document.createElement('div');lb.className='lightbox';
+  lb.innerHTML='<span class="hint">scroll = zoom · drag = pan · Esc / click bg = close</span>';
+  document.body.appendChild(lb);
+  let scale=1,panX=0,panY=0,dragging=false,moved=false,lx=0,ly=0;
+  const apply=()=>{const s=lb.querySelector('svg');if(s)s.style.transform=`translate(${panX}px,${panY}px) scale(${scale})`};
+  const reset=()=>{scale=1;panX=0;panY=0};
+  const close=()=>{lb.classList.remove('open');const s=lb.querySelector('svg');if(s)s.remove();reset()};
+  document.addEventListener('click',e=>{
+    if(e.target.closest('.lightbox')){if(moved){moved=false;return}close();return}
+    const w=e.target.closest('.mermaid');if(!w)return;
+    const svg=w.querySelector('svg');if(!svg)return;
+    const c=svg.cloneNode(true);c.removeAttribute('style');
+    c.style.maxWidth='96vw';c.style.maxHeight='92vh';
+    lb.appendChild(c);lb.classList.add('open');reset();apply();
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+  lb.addEventListener('wheel',e=>{
+    if(!lb.classList.contains('open'))return;
+    e.preventDefault();
+    const svg=lb.querySelector('svg');if(!svg)return;
+    const ns=Math.max(0.3,Math.min(10,scale*(1-e.deltaY*0.002)));
+    const r=svg.getBoundingClientRect();
+    const cx=e.clientX-(r.left+r.width/2),cy=e.clientY-(r.top+r.height/2);
+    const k=ns/scale-1;panX-=cx*k;panY-=cy*k;scale=ns;apply();
+  },{passive:false});
+  lb.addEventListener('mousedown',e=>{
+    if(!lb.classList.contains('open'))return;
+    dragging=true;moved=false;lx=e.clientX;ly=e.clientY;lb.classList.add('dragging');e.preventDefault();
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    const dx=e.clientX-lx,dy=e.clientY-ly;
+    if(Math.abs(dx)+Math.abs(dy)>3)moved=true;
+    panX+=dx;panY+=dy;lx=e.clientX;ly=e.clientY;apply();
+  });
+  document.addEventListener('mouseup',()=>{dragging=false;lb.classList.remove('dragging')});
+});
+</script>
+</head><body><div class="container">
+<header>
+<div class="meta">
+<span class="tag day">Day 57</span>
+<span class="tag diff">Hard</span>
+<span class="tag">LLM Infra</span>
+<span class="tag">Reliability</span>
+<span class="tag">Vendor Risk</span>
+<span class="tag">2026-10-07</span>
+</div>
+<h1>LLM Supply-Chain Resilience<span class="en">When Your Core Dependency Can Cut You Off, Reprice, or Compete</span></h1>
+</header>
+
+<h2>Scenario + Requirements</h2>
+<p>You own an AI coding assistant: <strong>2M DAU</strong>, about <strong>40M model calls per day</strong>, peaking around <strong>2,000 RPS</strong>, with <strong>75% of traffic on a single closed frontier-model vendor</strong>. Traditional dependencies (databases, clouds) fail by going down. This one has three extra failure modes: <em>cutoff</em>, <em>repricing</em>, and <em>competing with you</em>. All three have already happened:</p>
+<ul>
+<li><strong>Cutoff</strong>: in June 2025 Windsurf disclosed that Anthropic was revoking almost all of its first-party Claude 3.x capacity with <strong>less than five days' notice</strong>, against the backdrop of reports that OpenAI was acquiring Windsurf. In August 2026, after SpaceX acquired Cursor, OpenAI announced it would stop supplying models to Cursor (Cursor said OpenAI models served about 5% of its traffic).</li>
+<li><strong>Repricing / rule changes</strong>: GitHub said Copilot's premium request model was "no longer sustainable" and moved all plans to token-based usage billing from June 1, 2026. From April 2026 Anthropic stopped letting subscription limits cover third-party harnesses such as OpenClaw, then paused a broader billing change — <strong>the rules themselves changed repeatedly within one quarter</strong>.</li>
+<li><strong>Competing</strong>: vendors ship their own applications (Claude Code, Codex, and so on). You are both a large customer and a competitor.</li>
+</ul>
+<p><strong>Requirements</strong>: if any single vendor cuts you off completely within <strong>72 hours</strong>, core features stay up and quality regression is measurable and bounded; each task has a hard cost budget and gross margin stays non-negative; p95 time-to-first-token (TTFT) stays under 1.5s through a switchover.</p>
+<div class="callout"><strong>Core insight:</strong> this is not an availability problem you fix by "adding a fallback". It is <em>supply-chain management</em>. Vendors have their own strategic intent, and the failure modes are <strong>correlated, announced with short notice, and commercially motivated</strong> — nothing like random hardware faults.</div>
+
+<h2>High-Level Architecture</h2>
+<pre class="mermaid">
+graph LR
+    C["Client / Agent"] --&gt; GW["LLM Gateway<br/><i>canonical request schema</i>"]
+    GW --&gt; R{"Router<br/>capability tier · budget · health"}
+    R --&gt; A1["Adapter: Vendor A<br/><i>primary closed model</i>"]
+    R --&gt; A2["Adapter: Vendor B<br/><i>warm-standby closed model</i>"]
+    R --&gt; A3["Adapter: open weights<br/><i>hosted / self-run vLLM</i>"]
+    R -.-&gt; L[("Cost ledger<br/>per-task budget")]
+    R -.-&gt; H[("Health / breaker state")]
+    S["Shadow-traffic sampler"] --&gt; EV["Eval harness<br/><i>golden set + regression</i>"]
+    A1 -.-&gt; S
+    EV --&gt;|"capability matrix"| R
+    CT["Contract &amp; capacity registry<br/><i>notice · quota · price</i>"] --&gt; R
+</pre>
+<p>The <strong>Gateway</strong> translates product requests into one internal schema (messages, tool definitions, cache hints); product code never imports a vendor SDK directly. The <strong>Router</strong> picks a model by asking: what capability tier does this task need, how much budget is left, and who is healthy right now. <strong>Adapters</strong> absorb vendor differences (tool-call formats, prompt-caching semantics, streaming events). The <strong>eval harness</strong> keeps scoring every candidate on shadow traffic and produces a capability matrix for the Router — without it, every switch is a blind switch. The <strong>contract registry</strong> turns commercial terms into data the router can read.</p>
+
+<h2>Key Point 1: Model Abstraction Layer and Capability Contracts</h2>
+<p><strong>One-line trade-off</strong>: the thicker the abstraction, the faster you can switch — but it flattens each vendor's unique features (caching, long context, specific tool formats). You pay a performance tax for portability.</p>
+<h3>Principle</h3>
+<p>The goal is not "all models are the same" but <strong>making differences explicit</strong>. Each model declares a capability contract: context length, parallel tool calls, strict structured output, prompt-cache granularity and TTL, price. Each request declares what it <em>needs</em>. Routing is constraint matching, not swapping a model-name string. The most dangerous anti-pattern is the <strong>half abstraction</strong>: the interface is unified, but the prompts were tuned against one vendor — on switchover nothing errors, and quality quietly drops. So prompts are versioned per model family and stored alongside the adapters.</p>
+<h3>Trade-offs</h3>
+<table>
+<tr><th>Option</th><th>You gain</th><th>You give up</th></tr>
+<tr><td><strong>Direct vendor SDK</strong></td><td>New features on day one, lowest latency</td><td>Switching cost measured in lines of code; a cutoff means editing product code</td></tr>
+<tr><td><strong>Lowest-common-denominator API</strong></td><td>Switching is a config change</td><td>Differentiators like prompt caching and extended thinking go unused; you lose on both cost and quality</td></tr>
+<tr><td><strong>Capability contract + opt-in extensions (recommended)</strong></td><td>Portable by default; unique features used explicitly with the dependency registered</td><td>You maintain a capability matrix and per-vendor prompt variants; eval cost grows linearly with model count</td></tr>
+</table>
+<h3>Pseudo-code</h3>
+<pre><code># Capability contract: requests declare needs, the router matches constraints (pseudo-code)
+@dataclass
+class Capability:
+    max_context: int
+    parallel_tools: bool
+    strict_json: bool
+    cache_ttl_s: int          # 0 = no prompt caching
+    usd_per_mtok_in: float
+    usd_per_mtok_out: float
+
+def eligible(req, models):
+    out = []
+    for m in models:
+        cap = m.capability
+        if req.tokens_est &gt; cap.max_context: continue
+        if req.needs_parallel_tools and not cap.parallel_tools: continue
+        if req.needs_strict_json and not cap.strict_json: continue
+        if m.quality[req.task_type] &lt; req.min_quality: continue  # from the eval matrix
+        out.append(m)
+    return out
+
+def render_prompt(req, model):
+    return PROMPTS[req.task_type][model.family].format(**req.vars)  # prompts versioned per model family</code></pre>
+<div class="case"><strong>Real-world case:</strong> when Windsurf lost its first-party Claude 3.x capacity in June 2025, it had <strong>less than five days</strong> to find other inference providers. The value of an abstraction layer has to be paid for before the cutoff — writing adapters in the middle of one is too late. In the industry, <a href="https://openrouter.ai/docs/guides/routing">OpenRouter's provider routing</a> turns multi-host routing and multi-model fallback into request parameters (a prioritized <code>models</code> list, <code>allow_fallbacks</code>, sorting by price / throughput / latency) — "abstraction layer as a service", at the price of one more third-party dependency.</div>
+
+<h2>Key Point 2: Multi-Vendor Routing — Warm Standby, Not Cold</h2>
+<p><strong>One-line trade-off</strong>: running real traffic on several vendors (active-active) is expensive and inconsistent; switching only when something breaks (active-passive) is cheap, but the standby path silently rots.</p>
+<h3>Principle</h3>
+<p>Day 23 covered circuit breakers, retries, and bulkheads; the new problem here is <strong>keeping the standby path fresh</strong>. A fallback that never carries traffic has stale prompts, quotas, accounts, and rate limits — on cutoff day you discover the standby account's rate limit is 1/20 of the primary's. So the standby vendor should <strong>permanently carry 5–15% of real traffic</strong>, with capacity confirmed in writing. The second problem is <strong>correlated failure</strong>: a cutoff rarely looks like a 5xx. It looks like 403s, a sudden quota drop, or a model version being retired, and health checks must treat those as failures too. Third, degrade <strong>by capability tier</strong>: when the primary is gone, completion tasks can drop to a small open-weight model, but complex agent tasks should queue rather than fall to a model that will mangle code.</p>
+<h3>Trade-offs</h3>
+<table>
+<tr><th>Option</th><th>You gain</th><th>You give up</th></tr>
+<tr><td><strong>Single vendor + cold standby</strong></td><td>Simplest; one set of prompt tuning</td><td>Standby path unproven; no capacity guarantee; quality unknown on switch day</td></tr>
+<tr><td><strong>Primary + warm standby (10% resident)</strong></td><td>Standby continuously validated by real traffic; capacity and quota proven</td><td>Two prompt sets and two eval tracks; slight UX inconsistency</td></tr>
+<tr><td><strong>Vendor per task type</strong></td><td>Best price-performance per task; naturally diversified</td><td>Any one cutoff takes out a whole feature class; most complex routing policy</td></tr>
+</table>
+<h3>Pseudo-code</h3>
+<pre><code># Routing with breakers and tier-aware degradation (pseudo-code)
+FATAL = {401, 403, 404}          # auth failure / model retired: not jitter, a cutoff signal
+
+def route(req):
+    for m in rank(eligible(req, MODELS), by=req.objective):   # cost or latency
+        if breaker[m].open(): continue
+        try:
+            resp = m.adapter.call(req, timeout=req.ttft_budget)
+            breaker[m].success()
+            ledger.charge(req.task_id, m.cost(resp.usage))
+            return resp
+        except ProviderError as e:
+            if e.status in FATAL:
+                breaker[m].trip(hold_s=3600); alert("supplier-level", m, e)
+            else:
+                breaker[m].failure()
+    if req.tier == "agent":
+        return enqueue(req)        # queue rather than drop to an under-capable model
+    return degrade(req)            # completion tasks: fall to a small open-weight model</code></pre>
+<div class="case"><strong>Real-world case:</strong> in August 2026 OpenAI announced it would stop supplying SpaceX-owned Cursor, with access ending in mid-November. Cursor said OpenAI models served only about 5% of its traffic — <strong>a diversified traffic mix turned a cutoff into a controlled migration</strong> — and Anthropic publicly said it would keep adding compute for Claude in Cursor. Compared with Windsurf in 2025, the difference was not technology; it was how diversified traffic already was before the cutoff.</div>
+
+<h2>Key Point 3: Open-Weight Floor + Per-Task Cost Budgets</h2>
+<p><strong>One-line trade-off</strong>: open weights give you sovereignty and a cost floor, but you own post-training, inference ops, and the capability gap; budgeting by per-token list price systematically underestimates what reasoning models really cost.</p>
+<h3>Principle</h3>
+<p>Gundlach et al. at MIT FutureTech (2025) estimate that the price of reaching a <em>fixed</em> benchmark level falls about 5–10× per year, while the price of <strong>running frontier models themselves</strong> rises about 3–18× per year — bigger models and more reasoning tokens. The price sheet gets cheaper while your actual bill may grow: on the same task a reasoning model can emit an order of magnitude more tokens. So the budget unit must move from "dollars per million tokens" to <strong>"dollars per completed task"</strong>, charged in real time per task, downgrading or stopping when over budget. Open weights are the floor of that ledger: their price cannot be raised unilaterally, and they cannot be taken back when you get acquired.</p>
+<h3>Trade-offs</h3>
+<table>
+<tr><th>Option</th><th>You gain</th><th>You give up</th></tr>
+<tr><td><strong>Closed frontier only</strong></td><td>Strongest capability, zero ops</td><td>Price and supply decided by the other side; margins capped by upstream</td></tr>
+<tr><td><strong>Hosted open weights</strong> (third-party inference)</td><td>No GPU ops; switching host means switching an endpoint</td><td>Still a host dependency, but you can move between hosts</td></tr>
+<tr><td><strong>Self-run open weights + own post-training</strong></td><td>Cost and roadmap under your control; RL on your own tasks</td><td>GPU capacity planning, inference optimization, a training team; the capability gap is closed by post-training</td></tr>
+</table>
+<h3>Pseudo-code</h3>
+<pre><code># Per-task budget ledger: bill per completed task, not per token (pseudo-code)
+class TaskBudget:
+    def __init__(self, task_id, usd_cap, tier_ladder):
+        self.spent, self.cap, self.ladder = 0.0, usd_cap, tier_ladder
+
+    def before_step(self, est_tokens, model):
+        projected = self.spent + model.cost_estimate(est_tokens)
+        if projected &lt;= self.cap:
+            return model
+        cheaper = self.ladder.next_below(model)       # step down: frontier → workhorse → open weights
+        if cheaper and self.spent + cheaper.cost_estimate(est_tokens) &lt;= self.cap:
+            return cheaper
+        raise BudgetExceeded(self.task_id, self.spent)  # product layer: tell the user or hand off
+
+    def after_step(self, usage, model):
+        self.spent += model.cost(usage)   # reasoning tokens count too: the part the price sheet hides
+        metrics.histogram("usd_per_task", self.spent, tags={"model": model.name})</code></pre>
+<div class="case"><strong>Real-world case:</strong> in March 2026 Cursor acknowledged that Composer 2 is built on Moonshot's open-weight <strong>Kimi K2.5</strong> plus extensive RL post-training, used under a commercial arrangement through Fireworks AI. According to TechCrunch's April 2026 reporting, its in-house Composer plus calling cheaper models such as Kimi helped its enterprise business reach <strong>slightly positive gross margins</strong> (individual developer accounts still lose money). GitHub Copilot moving to token-based billing is the other end: the reseller hands the cost risk back to the user.</div>
+
+<h2>Key Point 4: Contracts, Capacity Terms, and an Eval Gate Before Switching</h2>
+<p><strong>One-line trade-off</strong>: long contracts and reserved capacity buy price and supply certainty but deepen lock-in; short contracts stay flexible but give you nothing in writing when a cutoff comes.</p>
+<h3>Principle</h3>
+<p>Technical redundancy only shortens recovery after a cutoff; <strong>contract terms decide how much warning you get</strong>. Terms to negotiate: <em>termination notice period</em> (Windsurf had under five days), <em>change-of-control clause</em> (can the vendor terminate unilaterally when you are acquired? — in the Cursor case OpenAI's stated reason was distrust that the new parent would honor its terms), <em>model deprecation notice</em>, <em>reserved capacity and rate quotas</em>, <em>price-lock period</em>, and <em>data-use restrictions</em>. The other half is an eval gate: before moving to a new model, compare task pass rates on a golden set plus shadow traffic. The regression must be <strong>measurable and bounded</strong>; otherwise the switch just ships a quality incident to users.</p>
+<pre class="mermaid">
+sequenceDiagram
+    participant V as Vendor A
+    participant Ops as Platform on-call
+    participant R as Router
+    participant E as Eval harness
+    V-&gt;&gt;Ops: Termination notice / 403 spike
+    Ops-&gt;&gt;R: Freeze A's share of new traffic
+    Ops-&gt;&gt;E: Run golden set on candidate B and open weights
+    E--&gt;&gt;Ops: Capability matrix (pass-rate deltas per task)
+    Ops-&gt;&gt;R: Ramp by task type 10%→50%→100%
+    R-&gt;&gt;E: Continuous shadow comparison + user metrics
+    E--&gt;&gt;Ops: If regression exceeds threshold, queue / degrade that task type
+</pre>
+<h3>Pseudo-code</h3>
+<pre><code># Switch gate: each task type's quality drop must stay within bounds (pseudo-code)
+def promote(candidate, incumbent, task_types, max_drop=0.03):
+    plan = {}
+    for t in task_types:
+        base = eval_pass_rate(incumbent, GOLDEN[t]) if incumbent.alive else BASELINE[t]
+        cand = eval_pass_rate(candidate, GOLDEN[t])
+        shadow = shadow_agreement(candidate, t, sample=0.02)   # online shadow comparison
+        if base - cand &lt;= max_drop and shadow &gt;= 0.9:
+            plan[t] = "ramp"          # 10% → 50% → 100%
+        else:
+            plan[t] = "hold"          # stay on standby / queue / tell users capability is limited
+    return plan</code></pre>
+<div class="case"><strong>Real-world case:</strong> from April 4, 2026 Anthropic stopped letting subscription limits cover third-party harnesses such as OpenClaw (with a one-time credit as compensation); a broader billing change planned afterwards was then paused on June 15, 2026, the day it was due to take effect. For downstream builders the lesson is not which rule was right but that <strong>usage rights not backed by a contract can change at any time</strong>: a tool built on consumer subscription limits has no notice period at all.</div>
+
+<h2>Scaling and Optimization</h2>
+<ul>
+<li><strong>From multi-model to multi-host</strong>: deploy the same open-weight model on two inference providers plus one self-run cluster. What fails is a host, not the model, and prompts need no retuning.</li>
+<li><strong>Cost observability</strong>: break down usd_per_task P50/P99 by task type, user tier, and model; watch for long-tail tasks (agent loops) eating most of the budget — Day 53's fat-tail thinking projected onto the bill.</li>
+<li><strong>Regular cutoff drills</strong>: as with Day 44's chaos engineering, once a quarter force the primary vendor's traffic to zero for an hour off-peak to validate standby capacity and the eval gate.</li>
+</ul>
+
+<h2>Common Pitfalls + Interview Questions</h2>
+<ul>
+<li><strong>Pitfall: treating a cutoff as an availability problem.</strong> Only retries and 5xx breakers; real cutoffs show up as 403s, quota drops, and retired model versions, and they <em>don't self-heal</em>. Follow-up: "How does your breaker tell jitter from a cutoff?"</li>
+<li><strong>Pitfall: a cold standby that never carries traffic.</strong> On switch day you find the standby quota is too small and the prompts were never tuned.</li>
+<li><strong>Pitfall: costing by per-token list price.</strong> Reasoning models can use an order of magnitude more tokens; budget per completed task.</li>
+<li><strong>Pitfall: unifying the interface but not the evals.</strong> The switch throws no errors while quality silently drops — exactly Day 54's "fails fluently" failure mode.</li>
+<li><strong>Interview question</strong>: "Your primary vendor gives you 72 hours' notice. What do you do in the first 24?" A strong answer covers, in order: freeze traffic share, confirm standby capacity, run the eval gate, ramp by task type, and tell users what capability changes.</li>
+</ul>
+
+<h2>Further Resources</h2>
+<ul>
+<li>Gundlach, Lynch, Mertens, Thompson, <a href="https://arxiv.org/abs/2511.23455">The Price of Progress: Price Performance and the Future of AI</a> (MIT FutureTech, 2025) — fixed-performance prices falling vs frontier running costs rising.</li>
+<li><a href="https://github.blog/news-insights/company-news/github-copilot-is-moving-to-usage-based-billing/">GitHub Copilot is moving to usage-based billing</a> (GitHub Blog, 2026) — the official explanation of the move from subscriptions to metered billing.</li>
+<li><a href="https://techcrunch.com/2025/06/03/windsurf-says-anthropic-is-limiting-its-direct-access-to-claude-ai-models">Windsurf says Anthropic is limiting its direct access to Claude AI models</a> (TechCrunch, 2025) — a short-notice cutoff case.</li>
+<li><a href="https://openrouter.ai/docs/guides/routing">OpenRouter · Provider Routing</a> — parameterized multi-host routing and fallback.</li>
+<li>Michael Nygard, <em>Release It!</em> (2nd ed., 2018) — the classic on circuit breakers, bulkheads, and integration points as the top stability killer.</li>
+</ul>
+
+<h2>Reflections</h2>
+<details><summary>How much does carrying 10% of traffic on a warm standby cost? Argue with an order-of-magnitude estimate whether it is worth it.</summary>
+<div class="answer">
+<p>Say monthly model spend is $1M and the standby is 20% pricier per unit: 10% of traffic costs about $20K/month extra, plus a second prompt-and-eval track (about half an engineer). Compare: if a cutoff stops core features for 3 days at $3M monthly revenue, the direct loss is about $300K before churn. If the annual probability of a cutoff exceeds roughly 10%, the standby pays for itself — and the past 18 months already contain several public cutoffs and rule changes. Frame it as an <strong>insurance premium</strong>, not redundant waste.</p>
+</div>
+</details>
+<details><summary>Will multi-vendor routing give users a "split personality"? How do you keep quality differences from feeling like bugs?</summary>
+<div class="answer">
+<p>Yes. Switching models mid-session breaks style, tool-use habits, even the model's grasp of the codebase. Design principles: <strong>session stickiness</strong> (no model change within a session unless a breaker trips), <strong>route by task type rather than randomly</strong> (so differences fall on explainable boundaries), and <strong>tell users explicitly</strong> about significant degradation. This mirrors the session guarantees from Day 6: read-your-writes guarantees users see their own writes; here you guarantee that within a session the user faces the same "reasoner".</p>
+</div>
+</details>
+<details><summary>Suppose you are the model vendor. Which downstream customers are most likely to be cut off, and what does that imply for downstream design?</summary>
+<div class="answer">
+<p>Reason from the vendor's motives: being acquired, or about to be, by a competitor (Windsurf, Cursor); a product that competes head-on with the vendor's own apps; usage patterns that blow up unit cost (subscription limits drained by high-frequency agents). The implication is to <strong>include strategic risk in dependency assessment</strong>: thicken the standby during fundraising and M&amp;A talks, reduce single-vendor reliance the more your product overlaps with the vendor's own, and never build the core path on usage rights that are not in a contract.</p>
+</div>
+</details>
+<details><summary>Open-weight model updates can also break your product. Do open weights really eliminate supply-chain risk?</summary>
+<div class="answer">
+<p>They turn "taken away" into "no longer updated". The weights are yours and old versions run forever, so there is no cutoff; but upstream may stop releasing, licenses may tighten for new versions, and geopolitics may make a given country's models unacceptable to some customers (enterprise procurement review). So the open-weight floor needs multiple sources too: at least two bases from different origins in the eval matrix, and a post-training pipeline that can move between them. The risk does not vanish; it <strong>becomes a slow variable</strong>, and you get time to respond.</p>
+</div>
+</details>
+<details><summary>Compare this with Day 55, "Object Storage as the Source of Truth": both stake correctness on one vendor's semantics. What is the difference?</summary>
+<div class="answer">
+<p>Day 55 stakes it on a primitive like S3 conditional writes — <strong>documented, under an SLA, stable for years</strong>, with several object stores already compatible with the same semantics, so the replacement path is clear. An LLM dependency stakes it on <strong>capability</strong>, not an interface: the interface can be unified, but "this model gets this kind of task right" has no spec to be compatible with; only evals can prove it. So redundancy for the former lives at the protocol layer, and for the latter it must live at the <strong>eval layer</strong> — the eval matrix is the LLM era's compatibility spec.</p>
+</div>
+</details>
+<div class="nav"><a href="index.en.html">← Back to index</a></div>
+</div>
+</body></html>

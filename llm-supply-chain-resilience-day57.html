@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+
+<html lang="zh-CN"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Day 57 · LLM 供应链韧性 — System Design</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,"SF Pro Display","Noto Sans SC",sans-serif;background:#0e1419;color:#d4dae0;line-height:1.75}
+.container{max-width:820px;margin:0 auto;padding:24px 20px 60px}
+header{padding:40px 0 28px;border-bottom:1px solid rgba(100,200,255,0.15);margin-bottom:32px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem}
+.tag{padding:3px 10px;border-radius:4px;background:rgba(100,200,255,0.12);color:#64c8ff;border:1px solid rgba(100,200,255,0.25)}
+.tag.diff{background:rgba(94,234,212,0.1);color:#5eead4;border-color:rgba(94,234,212,0.3)}
+.tag.day{background:rgba(255,180,80,0.1);color:#ffb450;border-color:rgba(255,180,80,0.25)}
+h1{font-size:1.75rem;font-weight:800;background:linear-gradient(135deg,#64c8ff 0%,#5eead4 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:0.5px;line-height:1.3}
+h1 .en{display:block;font-size:1rem;color:#7a8590;-webkit-text-fill-color:#7a8590;margin-top:6px;font-weight:500}
+h2{font-size:1.2rem;color:#5eead4;margin:36px 0 14px;padding-left:12px;border-left:3px solid #5eead4}
+h3{font-size:1rem;color:#64c8ff;margin:20px 0 10px;font-weight:600}
+p{margin:10px 0;color:#c8cfd6}
+ul,ol{margin:10px 0 10px 22px;color:#c8cfd6}
+li{margin:6px 0}
+strong{color:#e8eef5;font-weight:600}
+em{color:#5eead4;font-style:normal;font-weight:500}
+code{font-family:"SF Mono",Menlo,Consolas,monospace;background:rgba(100,200,255,0.1);color:#5eead4;padding:1px 6px;border-radius:3px;font-size:0.88em}
+pre{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:14px 16px;overflow-x:auto;margin:12px 0;font-family:"SF Mono",Menlo,Consolas,monospace;font-size:0.84rem;line-height:1.55;color:#c8cfd6}
+pre code{background:none;color:inherit;padding:0;font-size:1em}
+.mermaid{background:#0a0f14;border:1px solid rgba(100,200,255,0.15);border-radius:6px;padding:18px;margin:14px 0;text-align:center;overflow-x:auto;cursor:zoom-in;transition:border-color 0.15s}
+.mermaid:hover{border-color:rgba(100,200,255,0.4)}
+.mermaid svg{width:100%;max-width:100%;height:auto;min-height:280px}
+.lightbox{position:fixed;inset:0;background:rgba(8,12,18,0.96);z-index:9999;display:none;align-items:center;justify-content:center;padding:24px;cursor:grab;backdrop-filter:blur(4px);overflow:hidden}
+.lightbox.open{display:flex}
+.lightbox.dragging{cursor:grabbing}
+.lightbox svg{width:auto;height:auto;max-width:96vw;max-height:92vh;transform-origin:center center;will-change:transform}
+.lightbox .hint{position:fixed;top:16px;right:20px;font-size:0.78rem;color:#7a8590;font-family:"SF Mono",Menlo,monospace;pointer-events:none}
+.callout{background:rgba(255,180,80,0.06);border-left:3px solid #ffb450;padding:12px 14px;margin:14px 0;border-radius:4px;font-size:0.94rem}
+.callout strong{color:#ffb450}
+.tradeoff{background:rgba(100,200,255,0.05);border:1px solid rgba(100,200,255,0.2);border-radius:6px;padding:12px 14px;margin:12px 0;font-size:0.94rem}
+.case{background:rgba(94,234,212,0.05);border-left:3px solid #5eead4;padding:12px 14px;margin:12px 0;border-radius:4px;font-size:0.94rem}
+.case strong{color:#5eead4}
+.nav{margin-top:50px;padding-top:24px;border-top:1px solid rgba(100,200,255,0.15);text-align:center}
+.nav a{color:#64c8ff;text-decoration:none;font-size:0.92rem;padding:8px 16px;border:1px solid rgba(100,200,255,0.3);border-radius:4px;transition:all 0.15s}
+.nav a:hover{background:rgba(100,200,255,0.1)}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:0.9rem}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid rgba(100,200,255,0.15)}
+th{color:#64c8ff;font-weight:600;background:rgba(100,200,255,0.05)}
+details{background:rgba(100,200,255,0.04);border:1px solid rgba(100,200,255,0.18);border-radius:6px;padding:12px 16px;margin:10px 0;transition:all 0.15s}
+details:hover{border-color:rgba(100,200,255,0.35)}
+details[open]{background:rgba(94,234,212,0.05);border-color:rgba(94,234,212,0.3)}
+details summary{font-weight:600;color:#e8eef5;list-style:none;outline:none;cursor:pointer;display:flex;align-items:flex-start;gap:10px;font-size:0.96rem}
+details summary::-webkit-details-marker{display:none}
+details summary::before{content:'▶';color:#64c8ff;font-size:0.75em;transition:transform 0.2s;flex-shrink:0;margin-top:5px}
+details[open] summary::before{transform:rotate(90deg);color:#5eead4}
+details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
+details .answer ul,details .answer ol{margin:6px 0 6px 22px}
+@media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+</style>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({startOnLoad:true,theme:'base',flowchart:{useMaxWidth:true,htmlLabels:true,nodeSpacing:50,rankSpacing:60},themeVariables:{primaryColor:'#1a2530',primaryTextColor:'#e8eef5',primaryBorderColor:'#64c8ff',lineColor:'#5eead4',secondaryColor:'#0e1419',tertiaryColor:'#0a0f14',background:'#0a0f14',mainBkg:'#1a2530',secondBkg:'#0e1419',textColor:'#d4dae0',fontFamily:'-apple-system,"SF Pro Display",sans-serif',fontSize:'16px'}});
+</script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const lb=document.createElement('div');lb.className='lightbox';
+  lb.innerHTML='<span class="hint">scroll = zoom · drag = pan · Esc / click bg = close</span>';
+  document.body.appendChild(lb);
+  let scale=1,panX=0,panY=0,dragging=false,moved=false,lx=0,ly=0;
+  const apply=()=>{const s=lb.querySelector('svg');if(s)s.style.transform=`translate(${panX}px,${panY}px) scale(${scale})`};
+  const reset=()=>{scale=1;panX=0;panY=0};
+  const close=()=>{lb.classList.remove('open');const s=lb.querySelector('svg');if(s)s.remove();reset()};
+  document.addEventListener('click',e=>{
+    if(e.target.closest('.lightbox')){if(moved){moved=false;return}close();return}
+    const w=e.target.closest('.mermaid');if(!w)return;
+    const svg=w.querySelector('svg');if(!svg)return;
+    const c=svg.cloneNode(true);c.removeAttribute('style');
+    c.style.maxWidth='96vw';c.style.maxHeight='92vh';
+    lb.appendChild(c);lb.classList.add('open');reset();apply();
+  });
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')close()});
+  lb.addEventListener('wheel',e=>{
+    if(!lb.classList.contains('open'))return;
+    e.preventDefault();
+    const svg=lb.querySelector('svg');if(!svg)return;
+    const ns=Math.max(0.3,Math.min(10,scale*(1-e.deltaY*0.002)));
+    const r=svg.getBoundingClientRect();
+    const cx=e.clientX-(r.left+r.width/2),cy=e.clientY-(r.top+r.height/2);
+    const k=ns/scale-1;panX-=cx*k;panY-=cy*k;scale=ns;apply();
+  },{passive:false});
+  lb.addEventListener('mousedown',e=>{
+    if(!lb.classList.contains('open'))return;
+    dragging=true;moved=false;lx=e.clientX;ly=e.clientY;lb.classList.add('dragging');e.preventDefault();
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    const dx=e.clientX-lx,dy=e.clientY-ly;
+    if(Math.abs(dx)+Math.abs(dy)>3)moved=true;
+    panX+=dx;panY+=dy;lx=e.clientX;ly=e.clientY;apply();
+  });
+  document.addEventListener('mouseup',()=>{dragging=false;lb.classList.remove('dragging')});
+});
+</script>
+</head><body><div class="container">
+<header>
+<div class="meta">
+<span class="tag day">Day 57</span>
+<span class="tag diff">Hard</span>
+<span class="tag">LLM Infra</span>
+<span class="tag">Reliability</span>
+<span class="tag">Vendor Risk</span>
+<span class="tag">2026-10-07</span>
+</div>
+<h1>LLM 供应链韧性<span class="en">LLM Supply-Chain Resilience: When Your Core Dependency Can Cut You Off, Reprice, or Compete</span></h1>
+</header>
+
+<h2>问题场景 + 需求约束</h2>
+<p>你负责一款 AI 编码助手：<strong>200 万 DAU</strong>，每天约 <strong>4000 万次模型调用</strong>，峰值约 <strong>2000 RPS</strong>，其中 <strong>75% 流量压在一家闭源前沿模型供应商</strong>上。传统依赖（数据库、云厂商）的风险是「宕机」；这条依赖的风险多三种：<em>断供</em>、<em>改价</em>、<em>下场竞争</em>。这三种都已经真实发生过：</p>
+<ul>
+<li><strong>断供</strong>：2025-06，Windsurf 披露 Anthropic 以<strong>不到五天的通知</strong>切断其对 Claude 3.x 几乎全部一手容量，背景是 OpenAI 收购 Windsurf 的传闻；2026-08 SpaceX 收购 Cursor 后，OpenAI 宣布终止向其供货（Cursor 称 OpenAI 模型约占其 5% 流量）。</li>
+<li><strong>改价 / 改规则</strong>：GitHub 称 Copilot 的 premium request 模式「no longer sustainable」，2026-06-01 起全面改为按 token 用量计费；Anthropic 2026-04 起不再让订阅额度覆盖 OpenClaw 等第三方 harness，随后又暂停了一项更大范围的计费调整——<strong>规则本身在一个季度内反复变化</strong>。</li>
+<li><strong>下场竞争</strong>：供应商自己做应用（Claude Code、Codex 等），你既是它的大客户，也是它的竞品。</li>
+</ul>
+<p><strong>需求</strong>：任一供应商在 <strong>72 小时内</strong>完全断供，核心功能可用、质量回退可度量且有上限；单任务成本有硬预算，毛利不为负；p95 首 token 延迟（TTFT）&lt; 1.5s 不因切换而失守。</p>
+<div class="callout"><strong>核心洞察：</strong>这不是「多加一个 fallback」能解决的可用性问题，而是<em>供应链管理</em>问题。供应商有自己的战略意图，失效模式是<strong>相关的、有预警但很短的、带商业动机的</strong>——和随机硬件故障完全不同。</div>
+
+<h2>高层架构</h2>
+<pre class="mermaid">
+graph LR
+    C["客户端 / Agent"] --&gt; GW["LLM Gateway<br/><i>统一请求 schema</i>"]
+    GW --&gt; R{"Router<br/>能力档 · 预算 · 健康度"}
+    R --&gt; A1["Adapter: 供应商 A<br/><i>主力闭源</i>"]
+    R --&gt; A2["Adapter: 供应商 B<br/><i>热备闭源</i>"]
+    R --&gt; A3["Adapter: 开放权重<br/><i>托管 / 自建 vLLM</i>"]
+    R -.-&gt; L[("成本账本<br/>per-task budget")]
+    R -.-&gt; H[("健康 / 熔断状态")]
+    S["影子流量采样"] --&gt; EV["评测 Harness<br/><i>golden set + 回归</i>"]
+    A1 -.-&gt; S
+    EV --&gt;|"能力矩阵"| R
+    CT["合同与容量注册表<br/><i>通知期 · 配额 · 价格</i>"] --&gt; R
+</pre>
+<p><strong>Gateway</strong> 把业务请求翻译成内部统一 schema（消息、工具定义、缓存提示），业务代码不直接 import 任何厂商 SDK。<strong>Router</strong> 按「这个任务需要哪档能力、预算还剩多少、谁现在健康」选模型。<strong>Adapter</strong> 吸收各家差异（工具调用格式、prompt caching 语义、流式事件）。<strong>评测 Harness</strong> 持续用影子流量给每个候选模型打分，产出「能力矩阵」喂回 Router——没有这张矩阵，切换就是盲切。<strong>合同注册表</strong>把商务条款变成路由能读的数据。</p>
+
+<h2>关键点 1：模型抽象层与能力契约</h2>
+<p><strong>一句话 trade-off</strong>：抽象越厚，切换越快；但会抹平各家独有的能力（缓存、长上下文、特定工具格式），你为可移植性付性能税。</p>
+<h3>原理</h3>
+<p>抽象层的目标不是「所有模型都一样」，而是<strong>把差异显式化</strong>。每个模型声明一份能力契约：上下文长度、是否支持并行工具调用、结构化输出是否严格、prompt cache 的粒度与 TTL、价格。业务请求也声明它<em>需要</em>什么。路由时做的是约束匹配，而不是字符串替换模型名。最危险的反模式是<strong>半抽象</strong>：接口统一了，但 prompt 是对着某一家调出来的——切换时接口不报错，质量却悄悄掉。所以 prompt 也要按模型族版本化，和 adapter 一起存放。</p>
+<h3>选型 Trade-off</h3>
+<table>
+<tr><th>方案</th><th>换来什么</th><th>牺牲什么</th></tr>
+<tr><td><strong>直连厂商 SDK</strong></td><td>第一时间用上新特性，延迟最低</td><td>切换成本按代码行数计；断供时要改业务代码</td></tr>
+<tr><td><strong>最小公分母接口</strong></td><td>切换只改配置</td><td>prompt caching、扩展思考等差异化能力用不上，成本和质量都吃亏</td></tr>
+<tr><td><strong>能力契约 + 可选扩展（推荐）</strong></td><td>默认可移植，需要时显式用独有能力并登记依赖</td><td>要维护能力矩阵与每家的 prompt 变体，评测成本随模型数线性增长</td></tr>
+</table>
+<h3>伪代码</h3>
+<pre><code># 能力契约：请求声明需求，路由做约束匹配（pseudo-code）
+@dataclass
+class Capability:
+    max_context: int
+    parallel_tools: bool
+    strict_json: bool
+    cache_ttl_s: int          # 0 = 不支持 prompt caching
+    usd_per_mtok_in: float
+    usd_per_mtok_out: float
+
+def eligible(req, models):
+    out = []
+    for m in models:
+        cap = m.capability
+        if req.tokens_est &gt; cap.max_context: continue
+        if req.needs_parallel_tools and not cap.parallel_tools: continue
+        if req.needs_strict_json and not cap.strict_json: continue
+        if m.quality[req.task_type] &lt; req.min_quality: continue  # 来自评测矩阵
+        out.append(m)
+    return out
+
+def render_prompt(req, model):
+    return PROMPTS[req.task_type][model.family].format(**req.vars)  # prompt 按模型族版本化</code></pre>
+<div class="case"><strong>现实案例：</strong>Windsurf 2025-06 被切断 Claude 3.x 一手容量时，<strong>只有不到五天</strong>去找其他推理供应商。这说明抽象层的价值在断供前就要付清——临时去写 adapter 来不及。行业上，<a href="https://openrouter.ai/docs/guides/routing">OpenRouter 的 provider routing</a> 把同一模型的多家托管方、多模型 fallback 做成请求参数（<code>models</code> 优先级列表、<code>allow_fallbacks</code>、按价格/吞吐/延迟排序），是「抽象层即服务」的样本；代价是再引入一层第三方依赖。</div>
+
+<h2>关键点 2：多供应商路由——热备，而不是冷备</h2>
+<p><strong>一句话 trade-off</strong>：多家同时承载真实流量（active-active）贵且质量不一致；只在出事时切过去（active-passive）便宜，但备用路径会悄悄腐烂。</p>
+<h3>原理</h3>
+<p>Day 23 讲过熔断、重试与舱壁；这里的新问题是<strong>备用路径的保鲜</strong>。一条从不走流量的 fallback，它的 prompt、配额、账号、限流参数都会过期——断供那天你才发现备用账号的 rate limit 只有主力的 1/20。所以要让备用供应商<strong>常年承载 5–15% 的真实流量</strong>，并保有书面确认的容量。第二个问题是<strong>相关故障</strong>：断供往往不是 5xx，而是 403、配额骤降、或某模型版本下线，健康检查必须把这些也当成故障信号。第三，降级要<strong>按能力档</strong>进行：主力不可用时，补全类任务可降到开放权重小模型，复杂 agent 任务宁可排队也不能降到会胡改代码的模型。</p>
+<h3>选型 Trade-off</h3>
+<table>
+<tr><th>方案</th><th>换来什么</th><th>牺牲什么</th></tr>
+<tr><td><strong>单供应商 + 冷备</strong></td><td>最省事，单一 prompt 调优</td><td>备用路径未经验证；容量无保证；切换当天质量未知</td></tr>
+<tr><td><strong>主力 + 热备（10% 常驻）</strong></td><td>备用路径持续被真实流量验证，容量与配额已证实</td><td>两套 prompt 与评测；用户体验有轻微不一致</td></tr>
+<tr><td><strong>按任务类型分供应商</strong></td><td>每类任务用性价比最优模型，天然分散</td><td>任一家断供都会打掉一类功能；路由策略最复杂</td></tr>
+</table>
+<h3>伪代码</h3>
+<pre><code># 带熔断与能力档降级的路由（pseudo-code）
+FATAL = {401, 403, 404}          # 鉴权失败 / 模型下线：不是抖动，是断供信号
+
+def route(req):
+    for m in rank(eligible(req, MODELS), by=req.objective):   # 成本 or 延迟
+        if breaker[m].open(): continue
+        try:
+            resp = m.adapter.call(req, timeout=req.ttft_budget)
+            breaker[m].success()
+            ledger.charge(req.task_id, m.cost(resp.usage))
+            return resp
+        except ProviderError as e:
+            if e.status in FATAL:
+                breaker[m].trip(hold_s=3600); alert("supplier-level", m, e)
+            else:
+                breaker[m].failure()
+    if req.tier == "agent":
+        return enqueue(req)        # 宁可排队，不降到能力不够的模型
+    return degrade(req)            # 补全类：降到开放权重小模型</code></pre>
+<div class="case"><strong>现实案例：</strong>OpenAI 2026-08 宣布停止向 SpaceX 旗下的 Cursor 供货，访问在 11 月中旬关闭；Cursor 的说法是 OpenAI 模型只占约 5% 流量——<strong>分散的流量结构把一次断供变成了一次可控迁移</strong>；Anthropic 方面则公开表示会继续给 Cursor 加算力。对比 2025 年的 Windsurf，差别不在技术，而在断供前流量已经分散到什么程度。</div>
+
+<h2>关键点 3：开放权重兜底 + 按每任务成本做预算</h2>
+<p><strong>一句话 trade-off</strong>：开放权重给你主权和成本下限，但要自己承担后训练、推理运维和能力差距；按 token 标价做预算会系统性低估推理模型的真实成本。</p>
+<h3>原理</h3>
+<p>MIT FutureTech 的 Gundlach 等人（2025）估算：达到<em>固定</em>基准水平的价格每年下降约 5–10 倍，但<strong>跑前沿模型本身</strong>的价格每年上升约 3–18 倍——模型更大、推理 token 更多。也就是说，单价表在变便宜，你实际的账单却可能变贵：同一任务，推理模型可能多吐一个数量级的 token。预算单位因此必须从「每百万 token 多少钱」换成<strong>「每个完成任务多少钱」</strong>，并按任务实时扣账、超预算即降档或中止。开放权重是这套账本的地板：它的价格不会被单方面上调，也不会在你被收购时被收回。</p>
+<h3>选型 Trade-off</h3>
+<table>
+<tr><th>方案</th><th>换来什么</th><th>牺牲什么</th></tr>
+<tr><td><strong>只用闭源前沿</strong></td><td>能力最强、零运维</td><td>价格与供货由对方决定；毛利被上游锁死</td></tr>
+<tr><td><strong>托管开放权重</strong>（第三方推理商）</td><td>无 GPU 运维，换供应商只换 endpoint</td><td>仍有托管方依赖，但可在多家托管方之间迁移</td></tr>
+<tr><td><strong>自建开放权重 + 自有后训练</strong></td><td>成本与路线自主；可针对自家任务做 RL</td><td>GPU 容量规划、推理优化、训练团队；能力差距要靠后训练补</td></tr>
+</table>
+<h3>伪代码</h3>
+<pre><code># 每任务预算账本：按完成任务计费，而不是按 token（pseudo-code）
+class TaskBudget:
+    def __init__(self, task_id, usd_cap, tier_ladder):
+        self.spent, self.cap, self.ladder = 0.0, usd_cap, tier_ladder
+
+    def before_step(self, est_tokens, model):
+        projected = self.spent + model.cost_estimate(est_tokens)
+        if projected &lt;= self.cap:
+            return model
+        cheaper = self.ladder.next_below(model)       # 降一档：前沿 → 主力 → 开放权重
+        if cheaper and self.spent + cheaper.cost_estimate(est_tokens) &lt;= self.cap:
+            return cheaper
+        raise BudgetExceeded(self.task_id, self.spent)  # 交给产品层：提示用户或转人工
+
+    def after_step(self, usage, model):
+        self.spent += model.cost(usage)   # 推理 token 也计入：这是被单价表藏起来的部分
+        metrics.histogram("usd_per_task", self.spent, tags={"model": model.name})</code></pre>
+<div class="case"><strong>现实案例：</strong>Cursor 2026-03 承认 Composer 2 以 Moonshot 的开放权重 <strong>Kimi K2.5</strong> 为底座、再做大量 RL 后训练，经 Fireworks AI 的商业授权使用。据 TechCrunch 2026-04 报道，自研 Composer 加上调用 Kimi 等更便宜的模型，帮助其企业业务扭到<strong>略为正的毛利</strong>（个人开发者账户仍亏损）。GitHub Copilot 改按 token 用量计费，则是另一端：转售方把成本风险转回给用户。</div>
+
+<h2>关键点 4：合同、容量条款与切换前的评测门</h2>
+<p><strong>一句话 trade-off</strong>：长约与预留容量换来价格和供货确定性，但锁定更深；短约灵活，但断供时没有任何书面保障。</p>
+<h3>原理</h3>
+<p>技术冗余只能缩短断供后的恢复时间，<strong>合同条款决定你有多少预警时间</strong>。要谈的关键条款：<em>终止通知期</em>（Windsurf 只有不到五天）、<em>控制权变更条款</em>（你被收购时对方能否单方终止——Cursor 案中 OpenAI 的理由正是对新母公司守约的不信任）、<em>模型下线通知期</em>、<em>预留容量与限流配额</em>、<em>价格锁定期</em>、<em>数据使用限制</em>。另一面是评测门：切到新模型前，用 golden set 加影子流量比较任务通过率，回退必须<strong>可度量且有上限</strong>，否则切换就是把质量事故推给用户。</p>
+<pre class="mermaid">
+sequenceDiagram
+    participant V as 供应商 A
+    participant Ops as 平台 on-call
+    participant R as Router
+    participant E as 评测 Harness
+    V-&gt;&gt;Ops: 终止通知 / 403 激增
+    Ops-&gt;&gt;R: 冻结 A 的新流量份额
+    Ops-&gt;&gt;E: 对候选 B、开放权重跑 golden set
+    E--&gt;&gt;Ops: 能力矩阵（各任务通过率差值）
+    Ops-&gt;&gt;R: 按任务类型分批切流 10%→50%→100%
+    R-&gt;&gt;E: 持续影子比对 + 用户侧指标
+    E--&gt;&gt;Ops: 回退超阈值则该类任务排队 / 降级
+</pre>
+<h3>伪代码</h3>
+<pre><code># 切换门：每类任务的质量回退必须在上限内（pseudo-code）
+def promote(candidate, incumbent, task_types, max_drop=0.03):
+    plan = {}
+    for t in task_types:
+        base = eval_pass_rate(incumbent, GOLDEN[t]) if incumbent.alive else BASELINE[t]
+        cand = eval_pass_rate(candidate, GOLDEN[t])
+        shadow = shadow_agreement(candidate, t, sample=0.02)   # 线上影子比对
+        if base - cand &lt;= max_drop and shadow &gt;= 0.9:
+            plan[t] = "ramp"          # 10% → 50% → 100%
+        else:
+            plan[t] = "hold"          # 继续用热备 / 排队 / 显式告诉用户能力受限
+    return plan</code></pre>
+<div class="case"><strong>现实案例：</strong>Anthropic 2026-04-04 起不再让订阅额度覆盖 OpenClaw 等第三方 harness（提供一次性额度补偿），之后计划的更大范围计费调整又在 2026-06-15 生效当天被暂停。对下游来说，教训不是哪条规则对，而是<strong>非合同保障的使用权随时可能变</strong>：把业务建在消费者订阅额度上的工具，没有任何通知期可言。</div>
+
+<h2>扩展与优化</h2>
+<ul>
+<li><strong>从多模型到多托管方</strong>：同一开放权重模型部署在两家推理商加一个自建集群，断的是托管方而不是模型，prompt 无需重调。</li>
+<li><strong>成本可观测</strong>：按任务类型、用户层级、模型拆 usd_per_task 的 P50/P99；警惕长尾任务（agent 循环）吃掉大部分预算——这是 Day 53 肥尾思维在账单上的投影。</li>
+<li><strong>定期断供演练</strong>：像 Day 44 的混沌工程一样，每季度在低峰期把主力供应商流量强制降为 0 一小时，验证热备容量与评测门。</li>
+</ul>
+
+<h2>常见陷阱 + 面试问题</h2>
+<ul>
+<li><strong>陷阱：把断供当成可用性问题</strong>。只做重试与 5xx 熔断；但真实断供表现为 403、配额骤降、模型版本下线，且<em>不会自愈</em>。面试追问：「你的熔断器如何区分抖动和断供？」</li>
+<li><strong>陷阱：冷备从不走流量</strong>。切换当天才发现备用账号配额不够、prompt 没调过。</li>
+<li><strong>陷阱：按每 token 标价算成本</strong>。推理模型的 token 量可能高一个数量级；预算必须以完成任务为单位。</li>
+<li><strong>陷阱：抽象层只统一接口不统一评测</strong>。切换时接口无报错，质量静默下降——这正是 Day 54「错得流畅」的失效模式。</li>
+<li><strong>面试题</strong>：「主力供应商给你 72 小时通知，你的前 24 小时做什么？」好答案按顺序覆盖：冻结流量份额、确认热备容量、跑评测门、按任务类型分批切流、对用户沟通能力变化。</li>
+</ul>
+
+<h2>深入资源</h2>
+<ul>
+<li>Gundlach, Lynch, Mertens, Thompson，<a href="https://arxiv.org/abs/2511.23455">The Price of Progress: Price Performance and the Future of AI</a>（MIT FutureTech，2025）— 固定性能价格下降 vs 前沿运行成本上升。</li>
+<li><a href="https://github.blog/news-insights/company-news/github-copilot-is-moving-to-usage-based-billing/">GitHub Copilot is moving to usage-based billing</a>（GitHub Blog，2026）— 订阅转按量计费的官方说明。</li>
+<li><a href="https://techcrunch.com/2025/06/03/windsurf-says-anthropic-is-limiting-its-direct-access-to-claude-ai-models">Windsurf says Anthropic is limiting its direct access to Claude AI models</a>（TechCrunch，2025）— 短通知断供的样本。</li>
+<li><a href="https://openrouter.ai/docs/guides/routing">OpenRouter · Provider Routing</a> — 多托管方路由与 fallback 的参数化设计。</li>
+<li>Michael Nygard，<em>Release It!</em>（第 2 版，2018）— 熔断、舱壁与「集成点是稳定性第一杀手」的经典论述。</li>
+</ul>
+
+<h2>深入思考</h2>
+<details><summary>热备承载 10% 流量要多花多少钱？用一个数量级估算论证它值不值。</summary>
+<div class="answer">
+<p>设月模型成本 100 万美元，热备单价比主力高 20%，10% 流量即多付约 2 万美元/月，外加一套 prompt 与评测的人力（约 0.5 人）。对比：若断供导致核心功能停摆 3 天，按月收入 300 万美元计，直接损失约 30 万美元，还没算流失。只要年断供概率高于约 10%，热备就划算——而过去 18 个月公开的断供与规则突变已有好几起。关键是把它算成<strong>保险费</strong>，而不是冗余浪费。</p>
+</div>
+</details>
+<details><summary>多供应商路由会不会让用户体验「人格分裂」？怎样让质量差异不被用户感知为 bug？</summary>
+<div class="answer">
+<p>会。同一会话中途换模型，风格、工具调用习惯、甚至对代码库的理解都会断层。设计原则：<strong>会话粘性</strong>（会话内不换模型，除非熔断），<strong>按任务类型而非随机分流</strong>（让差异落在可解释的边界上），对显著降级<strong>显式告知</strong>。这与 Day 6 一致性里的「会话保证」同构：read-your-writes 保证的是用户看到自己的写，这里保证的是用户在一个会话里面对的是同一个「推理者」。</p>
+</div>
+</details>
+<details><summary>假如你就是模型供应商：从供应方视角，什么样的下游客户最可能被断供？这对下游设计有什么启示？</summary>
+<div class="answer">
+<p>反推供应方动机：被竞争对手收购或即将被收购（Windsurf、Cursor 两例）、产品与供应商自营应用正面竞争、使用模式让单位成本失控（订阅额度被 agent 高频消耗）。启示是把<strong>战略风险也纳入依赖评估</strong>：融资与并购谈判期间提前加厚热备，与供应商自营产品重合度越高越要降低单一依赖，并避免把核心路径建在未入合同的使用权上。</p>
+</div>
+</details>
+<details><summary>开放权重模型的版本更新也可能破坏你的产品。开放权重真的消除了供应链风险吗？</summary>
+<div class="answer">
+<p>它把风险从「被收回」变成「被停更」。权重已在你手里，旧版本永远能跑，所以不会被断供；但上游可能不再发布新版、许可证可能对新版本收紧，地缘政治也可能让某国模型在部分客户处不可用（企业采购审查）。所以开放权重兜底也要多源：至少两个不同来源的底座都在评测矩阵里，自有后训练流程能在两者之间迁移。风险没有消失，只是<strong>变成了慢变量</strong>，你有时间应对。</p>
+</div>
+</details>
+<details><summary>把本期与 Day 55「对象存储当真相源」对照：两者都把正确性押在一家厂商的语义上，差别在哪？</summary>
+<div class="answer">
+<p>Day 55 押的是 S3 条件写这样<strong>有文档、有 SLA、长期稳定</strong>的原语，且多家对象存储已兼容同一语义，替换路径清晰。LLM 依赖押的是<strong>能力</strong>而非接口：接口可以统一，但「这个模型能把这类任务做对」没有规范可兼容，只能靠评测证明。所以前者的冗余是协议层的，后者必须是<strong>评测层</strong>的——评测矩阵才是 LLM 时代的「兼容性规范」。</p>
+</div>
+</details>
+<div class="nav"><a href="index.html">← 回到 index</a></div>
+</div>
+</body></html>
