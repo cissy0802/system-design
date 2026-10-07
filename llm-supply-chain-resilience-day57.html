@@ -107,10 +107,9 @@ document.addEventListener('DOMContentLoaded',()=>{
 <span class="tag">Vendor Risk</span>
 <span class="tag">2026-10-07</span>
 </div>
-<h1>LLM 供应链韧性<span class="en">LLM Supply-Chain Resilience: When Your Core Dependency Can Cut You Off, Reprice, or Compete</span></h1>
+<h1 data-tts="7aa0eaff30944d1e">LLM 供应链韧性<span class="en">LLM Supply-Chain Resilience: When Your Core Dependency Can Cut You Off, Reprice, or Compete</span></h1>
 </header>
-
-<h2>问题场景 + 需求约束</h2>
+<h2 data-tts="82ded9ef0a9bee04">问题场景 + 需求约束</h2>
 <p>你负责一款 AI 编码助手：<strong>200 万 DAU</strong>，每天约 <strong>4000 万次模型调用</strong>，峰值约 <strong>2000 RPS</strong>，其中 <strong>75% 流量压在一家闭源前沿模型供应商</strong>上。传统依赖（数据库、云厂商）的风险是「宕机」；这条依赖的风险多三种：<em>断供</em>、<em>改价</em>、<em>下场竞争</em>。这三种都已经真实发生过：</p>
 <ul>
 <li><strong>断供</strong>：2025-06，Windsurf 披露 Anthropic 以<strong>不到五天的通知</strong>切断其对 Claude 3.x 几乎全部一手容量，背景是 OpenAI 收购 Windsurf 的传闻；2026-08 SpaceX 收购 Cursor 后，OpenAI 宣布终止向其供货（Cursor 称 OpenAI 模型约占其 5% 流量）。</li>
@@ -119,8 +118,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 </ul>
 <p><strong>需求</strong>：任一供应商在 <strong>72 小时内</strong>完全断供，核心功能可用、质量回退可度量且有上限；单任务成本有硬预算，毛利不为负；p95 首 token 延迟（TTFT）&lt; 1.5s 不因切换而失守。</p>
 <div class="callout"><strong>核心洞察：</strong>这不是「多加一个 fallback」能解决的可用性问题，而是<em>供应链管理</em>问题。供应商有自己的战略意图，失效模式是<strong>相关的、有预警但很短的、带商业动机的</strong>——和随机硬件故障完全不同。</div>
-
-<h2>高层架构</h2>
+<h2 data-tts="e844142c147bfdda">高层架构</h2>
 <pre class="mermaid">
 graph LR
     C["客户端 / Agent"] --&gt; GW["LLM Gateway<br/><i>统一请求 schema</i>"]
@@ -136,19 +134,18 @@ graph LR
     CT["合同与容量注册表<br/><i>通知期 · 配额 · 价格</i>"] --&gt; R
 </pre>
 <p><strong>Gateway</strong> 把业务请求翻译成内部统一 schema（消息、工具定义、缓存提示），业务代码不直接 import 任何厂商 SDK。<strong>Router</strong> 按「这个任务需要哪档能力、预算还剩多少、谁现在健康」选模型。<strong>Adapter</strong> 吸收各家差异（工具调用格式、prompt caching 语义、流式事件）。<strong>评测 Harness</strong> 持续用影子流量给每个候选模型打分，产出「能力矩阵」喂回 Router——没有这张矩阵，切换就是盲切。<strong>合同注册表</strong>把商务条款变成路由能读的数据。</p>
-
-<h2>关键点 1：模型抽象层与能力契约</h2>
+<h2 data-tts="e4ada9ba285b3aa3">关键点 1：模型抽象层与能力契约</h2>
 <p><strong>一句话 trade-off</strong>：抽象越厚，切换越快；但会抹平各家独有的能力（缓存、长上下文、特定工具格式），你为可移植性付性能税。</p>
-<h3>原理</h3>
+<h3 data-tts="d93f883cfbad09ec">原理</h3>
 <p>抽象层的目标不是「所有模型都一样」，而是<strong>把差异显式化</strong>。每个模型声明一份能力契约：上下文长度、是否支持并行工具调用、结构化输出是否严格、prompt cache 的粒度与 TTL、价格。业务请求也声明它<em>需要</em>什么。路由时做的是约束匹配，而不是字符串替换模型名。最危险的反模式是<strong>半抽象</strong>：接口统一了，但 prompt 是对着某一家调出来的——切换时接口不报错，质量却悄悄掉。所以 prompt 也要按模型族版本化，和 adapter 一起存放。</p>
-<h3>选型 Trade-off</h3>
+<h3 data-tts="fd5db069e5336b5f">选型 Trade-off</h3>
 <table>
 <tr><th>方案</th><th>换来什么</th><th>牺牲什么</th></tr>
 <tr><td><strong>直连厂商 SDK</strong></td><td>第一时间用上新特性，延迟最低</td><td>切换成本按代码行数计；断供时要改业务代码</td></tr>
 <tr><td><strong>最小公分母接口</strong></td><td>切换只改配置</td><td>prompt caching、扩展思考等差异化能力用不上，成本和质量都吃亏</td></tr>
 <tr><td><strong>能力契约 + 可选扩展（推荐）</strong></td><td>默认可移植，需要时显式用独有能力并登记依赖</td><td>要维护能力矩阵与每家的 prompt 变体，评测成本随模型数线性增长</td></tr>
 </table>
-<h3>伪代码</h3>
+<h3 data-tts="30d58ef579c73bbc">伪代码</h3>
 <pre><code># 能力契约：请求声明需求，路由做约束匹配（pseudo-code）
 @dataclass
 class Capability:
@@ -173,19 +170,18 @@ def eligible(req, models):
 def render_prompt(req, model):
     return PROMPTS[req.task_type][model.family].format(**req.vars)  # prompt 按模型族版本化</code></pre>
 <div class="case"><strong>现实案例：</strong>Windsurf 2025-06 被切断 Claude 3.x 一手容量时，<strong>只有不到五天</strong>去找其他推理供应商。这说明抽象层的价值在断供前就要付清——临时去写 adapter 来不及。行业上，<a href="https://openrouter.ai/docs/guides/routing">OpenRouter 的 provider routing</a> 把同一模型的多家托管方、多模型 fallback 做成请求参数（<code>models</code> 优先级列表、<code>allow_fallbacks</code>、按价格/吞吐/延迟排序），是「抽象层即服务」的样本；代价是再引入一层第三方依赖。</div>
-
-<h2>关键点 2：多供应商路由——热备，而不是冷备</h2>
+<h2 data-tts="a96c4f55fcabdcad">关键点 2：多供应商路由——热备，而不是冷备</h2>
 <p><strong>一句话 trade-off</strong>：多家同时承载真实流量（active-active）贵且质量不一致；只在出事时切过去（active-passive）便宜，但备用路径会悄悄腐烂。</p>
-<h3>原理</h3>
+<h3 data-tts="2c1a8e053f51922e">原理</h3>
 <p>Day 23 讲过熔断、重试与舱壁；这里的新问题是<strong>备用路径的保鲜</strong>。一条从不走流量的 fallback，它的 prompt、配额、账号、限流参数都会过期——断供那天你才发现备用账号的 rate limit 只有主力的 1/20。所以要让备用供应商<strong>常年承载 5–15% 的真实流量</strong>，并保有书面确认的容量。第二个问题是<strong>相关故障</strong>：断供往往不是 5xx，而是 403、配额骤降、或某模型版本下线，健康检查必须把这些也当成故障信号。第三，降级要<strong>按能力档</strong>进行：主力不可用时，补全类任务可降到开放权重小模型，复杂 agent 任务宁可排队也不能降到会胡改代码的模型。</p>
-<h3>选型 Trade-off</h3>
+<h3 data-tts="fd5db069e5336b5f">选型 Trade-off</h3>
 <table>
 <tr><th>方案</th><th>换来什么</th><th>牺牲什么</th></tr>
 <tr><td><strong>单供应商 + 冷备</strong></td><td>最省事，单一 prompt 调优</td><td>备用路径未经验证；容量无保证；切换当天质量未知</td></tr>
 <tr><td><strong>主力 + 热备（10% 常驻）</strong></td><td>备用路径持续被真实流量验证，容量与配额已证实</td><td>两套 prompt 与评测；用户体验有轻微不一致</td></tr>
 <tr><td><strong>按任务类型分供应商</strong></td><td>每类任务用性价比最优模型，天然分散</td><td>任一家断供都会打掉一类功能；路由策略最复杂</td></tr>
 </table>
-<h3>伪代码</h3>
+<h3 data-tts="7e7cd7ff80585321">伪代码</h3>
 <pre><code># 带熔断与能力档降级的路由（pseudo-code）
 FATAL = {401, 403, 404}          # 鉴权失败 / 模型下线：不是抖动，是断供信号
 
@@ -206,19 +202,18 @@ def route(req):
         return enqueue(req)        # 宁可排队，不降到能力不够的模型
     return degrade(req)            # 补全类：降到开放权重小模型</code></pre>
 <div class="case"><strong>现实案例：</strong>OpenAI 2026-08 宣布停止向 SpaceX 旗下的 Cursor 供货，访问在 11 月中旬关闭；Cursor 的说法是 OpenAI 模型只占约 5% 流量——<strong>分散的流量结构把一次断供变成了一次可控迁移</strong>；Anthropic 方面则公开表示会继续给 Cursor 加算力。对比 2025 年的 Windsurf，差别不在技术，而在断供前流量已经分散到什么程度。</div>
-
-<h2>关键点 3：开放权重兜底 + 按每任务成本做预算</h2>
+<h2 data-tts="1d693b3eef2d439a">关键点 3：开放权重兜底 + 按每任务成本做预算</h2>
 <p><strong>一句话 trade-off</strong>：开放权重给你主权和成本下限，但要自己承担后训练、推理运维和能力差距；按 token 标价做预算会系统性低估推理模型的真实成本。</p>
-<h3>原理</h3>
+<h3 data-tts="b31b997a16d8470b">原理</h3>
 <p>MIT FutureTech 的 Gundlach 等人（2025）估算：达到<em>固定</em>基准水平的价格每年下降约 5–10 倍，但<strong>跑前沿模型本身</strong>的价格每年上升约 3–18 倍——模型更大、推理 token 更多。也就是说，单价表在变便宜，你实际的账单却可能变贵：同一任务，推理模型可能多吐一个数量级的 token。预算单位因此必须从「每百万 token 多少钱」换成<strong>「每个完成任务多少钱」</strong>，并按任务实时扣账、超预算即降档或中止。开放权重是这套账本的地板：它的价格不会被单方面上调，也不会在你被收购时被收回。</p>
-<h3>选型 Trade-off</h3>
+<h3 data-tts="fd5db069e5336b5f">选型 Trade-off</h3>
 <table>
 <tr><th>方案</th><th>换来什么</th><th>牺牲什么</th></tr>
 <tr><td><strong>只用闭源前沿</strong></td><td>能力最强、零运维</td><td>价格与供货由对方决定；毛利被上游锁死</td></tr>
 <tr><td><strong>托管开放权重</strong>（第三方推理商）</td><td>无 GPU 运维，换供应商只换 endpoint</td><td>仍有托管方依赖，但可在多家托管方之间迁移</td></tr>
 <tr><td><strong>自建开放权重 + 自有后训练</strong></td><td>成本与路线自主；可针对自家任务做 RL</td><td>GPU 容量规划、推理优化、训练团队；能力差距要靠后训练补</td></tr>
 </table>
-<h3>伪代码</h3>
+<h3 data-tts="d246e14e9fed718a">伪代码</h3>
 <pre><code># 每任务预算账本：按完成任务计费，而不是按 token（pseudo-code）
 class TaskBudget:
     def __init__(self, task_id, usd_cap, tier_ladder):
@@ -237,10 +232,9 @@ class TaskBudget:
         self.spent += model.cost(usage)   # 推理 token 也计入：这是被单价表藏起来的部分
         metrics.histogram("usd_per_task", self.spent, tags={"model": model.name})</code></pre>
 <div class="case"><strong>现实案例：</strong>Cursor 2026-03 承认 Composer 2 以 Moonshot 的开放权重 <strong>Kimi K2.5</strong> 为底座、再做大量 RL 后训练，经 Fireworks AI 的商业授权使用。据 TechCrunch 2026-04 报道，自研 Composer 加上调用 Kimi 等更便宜的模型，帮助其企业业务扭到<strong>略为正的毛利</strong>（个人开发者账户仍亏损）。GitHub Copilot 改按 token 用量计费，则是另一端：转售方把成本风险转回给用户。</div>
-
-<h2>关键点 4：合同、容量条款与切换前的评测门</h2>
+<h2 data-tts="52c99bb94eaa9d1f">关键点 4：合同、容量条款与切换前的评测门</h2>
 <p><strong>一句话 trade-off</strong>：长约与预留容量换来价格和供货确定性，但锁定更深；短约灵活，但断供时没有任何书面保障。</p>
-<h3>原理</h3>
+<h3 data-tts="860bdc9c78b7a4cb">原理</h3>
 <p>技术冗余只能缩短断供后的恢复时间，<strong>合同条款决定你有多少预警时间</strong>。要谈的关键条款：<em>终止通知期</em>（Windsurf 只有不到五天）、<em>控制权变更条款</em>（你被收购时对方能否单方终止——Cursor 案中 OpenAI 的理由正是对新母公司守约的不信任）、<em>模型下线通知期</em>、<em>预留容量与限流配额</em>、<em>价格锁定期</em>、<em>数据使用限制</em>。另一面是评测门：切到新模型前，用 golden set 加影子流量比较任务通过率，回退必须<strong>可度量且有上限</strong>，否则切换就是把质量事故推给用户。</p>
 <pre class="mermaid">
 sequenceDiagram
@@ -256,7 +250,7 @@ sequenceDiagram
     R-&gt;&gt;E: 持续影子比对 + 用户侧指标
     E--&gt;&gt;Ops: 回退超阈值则该类任务排队 / 降级
 </pre>
-<h3>伪代码</h3>
+<h3 data-tts="515f3e661f9ffc16">伪代码</h3>
 <pre><code># 切换门：每类任务的质量回退必须在上限内（pseudo-code）
 def promote(candidate, incumbent, task_types, max_drop=0.03):
     plan = {}
@@ -270,15 +264,13 @@ def promote(candidate, incumbent, task_types, max_drop=0.03):
             plan[t] = "hold"          # 继续用热备 / 排队 / 显式告诉用户能力受限
     return plan</code></pre>
 <div class="case"><strong>现实案例：</strong>Anthropic 2026-04-04 起不再让订阅额度覆盖 OpenClaw 等第三方 harness（提供一次性额度补偿），之后计划的更大范围计费调整又在 2026-06-15 生效当天被暂停。对下游来说，教训不是哪条规则对，而是<strong>非合同保障的使用权随时可能变</strong>：把业务建在消费者订阅额度上的工具，没有任何通知期可言。</div>
-
-<h2>扩展与优化</h2>
+<h2 data-tts="aafb5044bc1f0a15">扩展与优化</h2>
 <ul>
 <li><strong>从多模型到多托管方</strong>：同一开放权重模型部署在两家推理商加一个自建集群，断的是托管方而不是模型，prompt 无需重调。</li>
 <li><strong>成本可观测</strong>：按任务类型、用户层级、模型拆 usd_per_task 的 P50/P99；警惕长尾任务（agent 循环）吃掉大部分预算——这是 Day 53 肥尾思维在账单上的投影。</li>
 <li><strong>定期断供演练</strong>：像 Day 44 的混沌工程一样，每季度在低峰期把主力供应商流量强制降为 0 一小时，验证热备容量与评测门。</li>
 </ul>
-
-<h2>常见陷阱 + 面试问题</h2>
+<h2 data-tts="809cebf485812fcb">常见陷阱 + 面试问题</h2>
 <ul>
 <li><strong>陷阱：把断供当成可用性问题</strong>。只做重试与 5xx 熔断；但真实断供表现为 403、配额骤降、模型版本下线，且<em>不会自愈</em>。面试追问：「你的熔断器如何区分抖动和断供？」</li>
 <li><strong>陷阱：冷备从不走流量</strong>。切换当天才发现备用账号配额不够、prompt 没调过。</li>
@@ -286,8 +278,7 @@ def promote(candidate, incumbent, task_types, max_drop=0.03):
 <li><strong>陷阱：抽象层只统一接口不统一评测</strong>。切换时接口无报错，质量静默下降——这正是 Day 54「错得流畅」的失效模式。</li>
 <li><strong>面试题</strong>：「主力供应商给你 72 小时通知，你的前 24 小时做什么？」好答案按顺序覆盖：冻结流量份额、确认热备容量、跑评测门、按任务类型分批切流、对用户沟通能力变化。</li>
 </ul>
-
-<h2>深入资源</h2>
+<h2 data-tts="af46da817a3877ac">深入资源</h2>
 <ul>
 <li>Gundlach, Lynch, Mertens, Thompson，<a href="https://arxiv.org/abs/2511.23455">The Price of Progress: Price Performance and the Future of AI</a>（MIT FutureTech，2025）— 固定性能价格下降 vs 前沿运行成本上升。</li>
 <li><a href="https://github.blog/news-insights/company-news/github-copilot-is-moving-to-usage-based-billing/">GitHub Copilot is moving to usage-based billing</a>（GitHub Blog，2026）— 订阅转按量计费的官方说明。</li>
@@ -295,8 +286,7 @@ def promote(candidate, incumbent, task_types, max_drop=0.03):
 <li><a href="https://openrouter.ai/docs/guides/routing">OpenRouter · Provider Routing</a> — 多托管方路由与 fallback 的参数化设计。</li>
 <li>Michael Nygard，<em>Release It!</em>（第 2 版，2018）— 熔断、舱壁与「集成点是稳定性第一杀手」的经典论述。</li>
 </ul>
-
-<h2>深入思考</h2>
+<h2 data-tts="e2b3623860650747">深入思考</h2>
 <details><summary>热备承载 10% 流量要多花多少钱？用一个数量级估算论证它值不值。</summary>
 <div class="answer">
 <p>设月模型成本 100 万美元，热备单价比主力高 20%，10% 流量即多付约 2 万美元/月，外加一套 prompt 与评测的人力（约 0.5 人）。对比：若断供导致核心功能停摆 3 天，按月收入 300 万美元计，直接损失约 30 万美元，还没算流失。只要年断供概率高于约 10%，热备就划算——而过去 18 个月公开的断供与规则突变已有好几起。关键是把它算成<strong>保险费</strong>，而不是冗余浪费。</p>
