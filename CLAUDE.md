@@ -12,7 +12,7 @@ BigCat：资深工程师、含分布式系统背景、偏好精确高效的表�
 4. **包含能画出来的架构**。用 Mermaid 画图（避免 ASCII art 因 CJK 等宽字体宽度不一致而错位）。
 5. **能写出伪代码**。Python/Go 伪代码说明关键代码路径。
 6. **指出面试讨论点**。这个主题在面试中会怎么问、主面试官期望什么、常见陷阱。
-7. 长度：整页 1500-2200 字。
+7. 长度：整页 1500-2200 字（2026-10-17 起另加越界 ~400 字、十条要点 ~350 字；硬上限见 `.maxchars`）。
 
 规则
 检查仓库已有的 *-day*.html 文件，找第一个缺失的编号。按以下顺序选主题（从基础到高阶）：
@@ -71,6 +71,21 @@ HTML 输出格式
 - 【扩展与优化】：产品增长后怎么调整，哪里是瓶颈
 - 【常见陷阱】：设计中容易错的点、面试里老问、答不出的部分
 - 【面试问题示例】：3-5 个可能的面试追问
+- 【越界 · 跨学科的联想】（**2026-10-17 起**，必写，3–5 条；放在正文最后一节（常见陷阱 / 面试问题）之后、【关键资源】之前；中英两页都写，英文页标题 `Crossovers`）：`<h2>越界 · 跨学科的联想</h2>` + `<div class="crossx"><ul><li><b>学科 · 概念/人物</b>：…</li></ul></div>`。写本期某个设计思想和另一个领域的什么东西是**同一个结构**，像在哪、不像在哪（例：背压 ↔ 生态里的密度制约、共识协议 ↔ 群体决策、肥尾风险 ↔ 投资里的尾部对冲）。可挂的领域按 BigCat 兴趣：意识、佛学、量子力学、神经科学、东西方哲学、心理学、生物进化、复杂性科学；旁支领导力、投资、商业。**别挂回分布式系统 / 软件工程本身**（跨 Day 的串联留给正文和【深入思考】，越界框不与它们重复）。每条约 60–90 字（一两句），只有展开的那 1 条可到约 120 字。具体研究、人物、年份必须真实准确，拿不准就换一条。正文引用的公司案例和资料留在正文；我们自己联想到的才进越界。
+- 【十条要点】（**2026-10-17 起**，必写，正好 10 条；紧跟越界框之后、【关键资源】之前；中英两页都写，英文页标题 `Ten takeaways`）：`<h2>十条要点</h2>` + `<ol class="takeaways"><li>…</li></ol>`。读者拿它直接记笔记：每条一句完整的话，约 20–45 字，**单独抄出去也能看懂**（写出组件名、算法名、公司名，不用「它」「这一层」这类要靠上下文的代词）。覆盖各关键点最值得记的原理、trade-off、案例和陷阱，可含越界里的一两条；顺序跟正文走。**只总结正文已经写过的东西**，不加新信息、不放引语。人名/公司名不必每条都当主语开头：全组里主角的名字出现两三次就够，其余各条直接写观点、机制或事实（写「冷备从不走流量，切换当天才暴露配额不足」，不写「X 公司发现冷备……」）。
+
+  越界与十条要点的 CSS（**2026-10-17 起**；本仓没有 TEMPLATE，新页把这几行原样追加进内联 `<style>`，不要改已发布页）：
+  ```css
+  .crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+  .crossx ul{list-style:none;margin:0}
+  .crossx li{margin:12px 0;font-size:0.94rem}
+  .crossx b{color:#ffb450}
+  .takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+  .takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+  .takeaways li:first-child{border-top:none}
+  .takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
+  ```
+  篇幅：越界约 400 字、十条要点约 350 字，`.maxchars` 已为这两节从 4000 上调到 4750（2026-10-17 起），其余各节不要因此加长。`publish.sh` 只对从未提交过的新页卡：十条要点正好 10 条、越界 3–5 条。
 - 【关键资源】：1-2 个资源。优先 Designing Data-Intensive Applications (Kleppmann)、High Scalability blog、公司工程博客、ByteByteGo 书籍
 - 【English Summary】：2-3 句英文概述。记住术语英文表达
 - 【深入思考】：5 个开放式问题，每个用 `<details><summary>问题</summary><div>答案/思路</div></details>` 包裹，点击展开答案。问题要超出正文已直接提到的内容，强迫读者把概念串起来——可包含：反直觉的二阶效应、生产故障复盘、容量/成本的数量级估算、跨章节关联、面试官最爱追问的『假如换个约束怎么办』。答案要给出推理路径而非只给结论。
