@@ -52,6 +52,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -278,6 +286,26 @@ def promote(candidate, incumbent, task_types, max_drop=0.03):
 <li><strong>陷阱：抽象层只统一接口不统一评测</strong>。切换时接口无报错，质量静默下降——这正是 Day 54「错得流畅」的失效模式。</li>
 <li><strong>面试题</strong>：「主力供应商给你 72 小时通知，你的前 24 小时做什么？」好答案按顺序覆盖：冻结流量份额、确认热备容量、跑评测门、按任务类型分批切流、对用户沟通能力变化。</li>
 </ul>
+<h2>越界 · 跨学科的联想</h2>
+<div class="crossx"><ul>
+<li><b>商业 · 波特五力</b>：Michael Porter 1979 年的五力模型说，供应商集中、转换成本高、又可能前向一体化时，供应商议价能力最强，三条恰好对应本篇的断供、改价、下场竞争。不像的是，五力讲行业利润怎么被瓜分；这里供应商还能在一周内让你的产品停摆。</li>
+<li><b>生态学 · 投资组合效应</b>：Schindler 等人 2010 年在《Nature》上指出，布里斯托尔湾红鲑由数百个小种群组成，各自丰歉不同步，总渔获因此稳得多。多供应商分流是同一个道理；不同在于鲑鱼的多样性自然长成，热备的多样性要每月付钱维持。</li>
+<li><b>神经科学 · 突触修剪</b>：大脑发育中会削掉少用的突触，常被激活的连接则被保留加固，即「用进废退」。从不走流量的冷备，配额、prompt、账号一起悄悄失效，是同一个机制；区别是大脑修剪省能量是好事，系统里的「修剪」是没人察觉的坏事。</li>
+<li><b>生物进化 · 内共生</b>：Lynn Margulis 1967 年系统提出线粒体源自被吞入的细菌，之后大部分基因转进宿主细胞核，外部依赖变成体内器官。自建开放权重加自有后训练是同一步：把供应商收进来。代价也像：从此双方互相离不开，主权换来的是更深的绑定。</li>
+</ul></div>
+<h2>十条要点</h2>
+<ol class="takeaways">
+<li>LLM 依赖除了宕机，还有断供、改价和供应商下场竞争三种风险。</li>
+<li>模型抽象层要把差异显式化：每个模型声明能力契约，路由做约束匹配而不是替换模型名。</li>
+<li>只统一接口、prompt 仍对着一家调的半抽象，切换时不报错，质量却静默下降。</li>
+<li>冷备从不走流量，切换当天才暴露配额不足、prompt 没调过；热备应常年承载 5–15% 真实流量。</li>
+<li>真实断供表现为 403、配额骤降或模型下线，熔断器必须把这些当成供应商级故障。</li>
+<li>降级按能力档进行：补全类任务可降到开放权重小模型，复杂 agent 任务宁可排队。</li>
+<li>OpenAI 停止向 Cursor 供货时只占其约 5% 流量，分散的流量结构让断供变成可控迁移。</li>
+<li>模型单价在降、推理 token 在涨，预算单位应是每个完成任务的成本，而不是每百万 token 单价。</li>
+<li>开放权重是成本与供货的地板，不会被单方面涨价或收回，代价是自担后训练和推理运维。</li>
+<li>终止通知期和控制权变更条款决定预警时间；切换前还要过 golden set 加影子流量的评测门。</li>
+</ol>
 <h2 data-tts="af46da817a3877ac">深入资源</h2>
 <ul>
 <li>Gundlach, Lynch, Mertens, Thompson，<a href="https://arxiv.org/abs/2511.23455">The Price of Progress: Price Performance and the Future of AI</a>（MIT FutureTech，2025）— 固定性能价格下降 vs 前沿运行成本上升。</li>

@@ -51,6 +51,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -270,6 +278,27 @@ def speculative_step(ctx):
 <div class="callout"><strong>4. Writing an unstable prompt prefix.</strong> Stuffing a current timestamp or random ID into the system prompt makes the prefix hash never match, so the cache is built for nothing. Put the cache at the token-stable end of the prefix.</div>
 <div class="callout"><strong>5. Sizing capacity by averages.</strong> Input/output lengths are long-tailed; a few ultra-long contexts can exhaust KV memory, triggering preemption or OOM. Design by distribution with admission control.</div>
 <p style="margin-top:14px"><strong>Common interview questions:</strong> (1) Why is single-request GPU utilization so low during decode, and how does continuous batching save it? (2) Estimate how many requests a single node can serve concurrently for 70B at 8k context. (3) How does prefix-aware routing trade off "cache hit rate" against "load balance"? (4) Why is speculative decoding lossless, and when does it actually get slower? (5) What bottleneck governs TTFT vs TPOT, and how do you optimize each?</p>
+
+<h2>Crossovers</h2>
+<div class="crossx"><ul>
+<li><b>Neuroscience · Working-memory capacity (Nelson Cowan, 2001)</b>: Cowan estimated we can hold only about four chunks in mind at once, so the ceiling on thinking is working memory, not total knowledge. KV Cache is the same: memory, not compute, caps concurrency. The difference: the brain chunks several items into one, while KV compression can only make each item smaller.</li>
+<li><b>Psychology · Kahneman's System 1 / System 2</b>: fast, effortless intuition handles things first, and slow, effortful reasoning wakes only when something feels off. That is model cascading: a small model absorbs most requests and hard cases escalate. Unlike us, though, a cascade lives or dies on whether the small model can say "I'm not sure"; our System 1 rarely knows when it is wrong.</li>
+<li><b>Neuroscience · Predictive processing</b>: the brain does not process the senses frame by frame; it predicts with an internal model and lets sensory input correct only the errors. Speculative decoding likewise has a draft model guess a few tokens and the big model check them in one parallel pass, keeping whatever matches. Both save serial cost with a cheap prediction plus an expensive check, and both save more the better the prediction. The difference: speculative verification is strict token by token, so the output matches the big model exactly, while the brain's priors often overrule the evidence and make us see what we expect, which is where illusions come from.</li>
+<li><b>Evolutionary biology · Size-based division of labor in leafcutter ants</b>: leafcutter (Atta) workers differ several-fold in size; large ones cut leaves and guard the nest, tiny ones tend the fungus garden. Prefill/decode disaggregation likewise hands two opposite workloads to separately tuned GPU pools. Unlike ant castes, fixed during development, the pool ratio can be rebalanced as traffic shifts.</li>
+</ul></div>
+<h2>Ten takeaways</h2>
+<ol class="takeaways">
+<li>LLM serving needs two SLOs: TTFT decides whether it feels laggy, TPOT decides whether the stream flows smoothly.</li>
+<li>Prefill processes the whole prompt in parallel and is compute-bound; decode emits one token at a time and is memory-bandwidth-bound.</li>
+<li>Continuous batching reschedules at every token iteration, so finished requests leave at once and GPU utilization reaches 70-80%.</li>
+<li>Bigger batches raise throughput but slow per-request TPOT, so throughput and latency are two sides of one resource and the SLO caps batch size.</li>
+<li>For most serving systems the real ceiling is KV Cache memory, not compute: concurrency is basically a memory division problem.</li>
+<li>PagedAttention manages KV Cache with OS-style virtual-memory paging, cutting memory waste from 60-80% to single digits.</li>
+<li>Prefix caches live on specific GPUs, so LLM load balancing is stateful; production mixes prefix affinity with a load-threshold fallback.</li>
+<li>A timestamp or random ID in the system prompt makes the prefix hash never match, leaving prompt caching useless.</li>
+<li>Model cascading lets a small model absorb easy requests and escalates hard ones, the same structure as Kahneman's System 1 and System 2.</li>
+<li>Speculative decoding has a draft model guess and the big model verify in parallel; it is lossless but can cut total throughput under heavy load.</li>
+</ol>
 
 <h2>Further Resources</h2>
 <ul>

@@ -51,6 +51,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -273,6 +281,26 @@ def confirm(alert):
 <div class="callout">
 <strong>5. Ignoring the double edge of the aggregation window.</strong> Aggregation raises precision, but too wide a window merges two independent incidents or delays the first report. Follow-up: in a cascading avalanche failure, will your aggregation hide the root cause?</div>
 
+<h2>Crossovers</h2>
+<div class="crossx"><ul>
+<li><b>Psychology · Kahneman and Tversky's cab problem</b>: 85% of a city's cabs are Green and 15% Blue; a witness who identifies colors correctly 80% of the time says the cab was Blue. Most people answer "80% Blue"; Bayes gives about 41%. The mind ignores base rates by default, the same blind spot as a team that only reports "0.1% false positives per detector."</li>
+<li><b>Evolutionary biology · Nesse's smoke-detector principle</b>: Using signal detection analysis, Randolph Nesse argued that defenses like fever, vomiting and anxiety are tuned by selection to fire falsely often, because one missed threat can be fatal while a false alarm costs only some energy. The match: both set thresholds by asymmetric costs. The mismatch: a body never learns to distrust its own alarms, but on-call engineers do, which is why an alerting system must instead guard a precision floor.</li>
+<li><b>Immunology · two-signal T cell activation</b>: A T cell activates only when it receives both an antigen signal and a costimulatory signal from a separate pathway; one signal alone tends toward tolerance. That is stacking independent layers: because the two signals come from different sources, their errors multiply down. Autoimmune disease is what a false positive looks like when this backstop fails.</li>
+<li><b>Neuroscience · Kandel's Aplysia habituation</b>: Eric Kandel showed that repeatedly touching a sea slug without consequence weakens its gill-withdrawal reflex as synaptic transmission declines. On-call engineers swiping away a noisy pager is the same habituation, except the slug tunes out a harmless stimulus while humans tune out the true alerts along with the noise.</li>
+</ul></div>
+<h2>Ten takeaways</h2>
+<ol class="takeaways">
+<li>An alerting system is only as useful as P(true | alert), and at a tiny base rate that number is governed by the false positive rate, not detection rate.</li>
+<li>Ten million checks a day at a 0.1% false positive rate yields about 10,000 bogus alerts burying roughly 5 real incidents, for about 0.05% precision.</li>
+<li>Axelsson used Bayes in intrusion detection to show that a trustworthy alarm may require an unrealistically low false positive rate.</li>
+<li>There are three ways to fight a low base rate: lower per-detector false positives, shrink the decision domain to raise the base rate, or chain independent layers so false positive rates multiply.</li>
+<li>Shrinking the decision domain trades recall for precision, so shadow evaluation, postmortems and fault injection must measure what falls outside it.</li>
+<li>A triage layer creates no new signal; it deduplicates, aggregates and scores confidence, paging only what clears the precision floor.</li>
+<li>Low-confidence alerts belong in a queryable archive rather than the pager, because one noisy page erodes trust in every later alert.</li>
+<li>Chaining two layers multiplies false positive rates only if their failure modes are independent, so an LLM judging its own output barely helps.</li>
+<li>A real backstop comes from independent oracles such as deterministic assertions and differential checks, the paradigm Jepsen follows with its independent consistency checkers.</li>
+<li>Per-decision false positive rates and alert counts both mislead; watch per-report precision and human signals like ack rate and ignore rate.</li>
+</ol>
 <h2>Deep-Dive Resources</h2>
 <ul>
 <li><strong>Stefan Axelsson, "The Base-Rate Fallacy and the Difficulty of Intrusion Detection"</strong> (ACM TISSEC, 2000): the theoretical bedrock — a Bayesian proof that false-alarm rate is the bottleneck.</li>

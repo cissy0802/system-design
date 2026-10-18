@@ -51,6 +51,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -273,6 +281,27 @@ SELECT add_retention_policy('telemetry', INTERVAL '90 days'); -- archive cold da
 <div class="callout"><strong>4. Ignoring clocks and out-of-order data</strong>: bad device clocks and offline backfill cause out-of-order arrival. Use event-time + watermarks (see Day 20), never write by arrival order.</div>
 <div class="callout"><strong>5. Reconnect storm (thundering herd)</strong>: a broker restart or network blip makes millions of devices reconnect at once and kill the cluster. Reconnects must use random backoff + jitter.</div>
 <div class="callout"><strong>6. Not separating "droppable" from "must-keep"</strong>: temperature samples are droppable, alerts/billing are not. Downstream consumers must be idempotent (dedup by <code>device_id + ts</code>).</div>
+
+<h2>Crossovers</h2>
+<div class="crossx"><ul>
+<li><b>Evolutionary biology · The octopus's distributed nervous system</b>: an octopus has about 500 million neurons, roughly two-thirds of them in its arms; the arms grasp and explore on their own while the central brain sends only the gist. Same split as an edge gateway doing the local emergency stop while the cloud gets summaries. The difference: evolution hard-wires the arm's rules, while edge logic can be rewritten by OTA at any time.</li>
+<li><b>Neuroscience · Predictive coding (Rao &amp; Ballard, 1999)</b>: higher brain areas keep predicting the input from below, and lower areas pass up only the prediction error, so no surprise costs almost no bandwidth. Gorilla's XOR compression has the same shape: it predicts "same as last value" and stores only the bits that differ, so an unchanged temperature shrinks to about one bit. The difference: Gorilla's predictor is always "the last value", while the brain's model learns from its errors and keeps guessing better.</li>
+<li><b>Complexity science · The Millennium Bridge wobble (London, 2000)</b>: on opening day, walkers adjusted their stride to the deck's sideways sway, falling into step and amplifying it until the bridge closed two days later. A reconnect storm is the same "everyone does the same thing at once" feedback. The difference: the bridge locked in phase gradually, whereas a reconnect storm is triggered by one event at one instant, which is why random jitter breaks it up.</li>
+<li><b>Psychology · Fuzzy-trace theory (Brainerd &amp; Reyna)</b>: people store a verbatim trace and a gist trace; verbatim detail fades fast while the gist lasts, much like raw per-second data kept hot and only hourly aggregates kept cold. The difference: human memory reconstructs and can even distort the gist, whereas downsampling loses precision but never rewrites the facts.</li>
+</ul></div>
+<h2>Ten takeaways</h2>
+<ol class="takeaways">
+<li>IoT telemetry is write-heavy, long-connection, and unreliable-network: ten million devices sending 20 metrics every 10 seconds means 20 million points per second.</li>
+<li>MQTT replaces HTTP's per-request handshake with one long-lived pub/sub connection and a header as small as 2 bytes, making it the default for huge fleets of low-power devices.</li>
+<li>Pick MQTT QoS by data value: QoS 0 for temperature samples, QoS 1 plus idempotent dedup for alerts, and never the costly QoS 2 for ten million devices.</li>
+<li>An edge gateway aggregates locally, triggers an emergency stop within 100ms on anomalies, and buffers while offline, cutting about 90% of upstream bandwidth.</li>
+<li>Mainstream edge-cloud collaboration gives the edge real-time reduction and safety decisions, and the cloud model training, global optimization, and long-term storage.</li>
+<li>Kafka sits between the MQTT brokers and the time-series DB as a reservoir, absorbing 3x rush-hour spikes so backpressure never avalanches back to devices.</li>
+<li>Facebook's Gorilla uses delta-of-delta timestamps and XOR-encoded values to shrink each data point from 16 bytes to about 1.37 bytes on average.</li>
+<li>Cardinality explosion is the top time-series DB killer: high-cardinality fields like trip_id or random UUIDs belong in fields, not in in-memory indexed tags.</li>
+<li>Hot/warm/cold tiering plus a downsampling pyramid keeps recent data queryable in milliseconds and moves 90-day-old data to Parquet in object storage, cutting cost tenfold.</li>
+<li>When a broker restarts, ten million devices reconnecting at once cause a reconnect storm, so reconnects need random backoff with jitter to break the synchrony.</li>
+</ol>
 
 <h2>Deeper Resources</h2>
 <ul>

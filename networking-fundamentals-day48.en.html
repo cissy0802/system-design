@@ -51,6 +51,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -259,6 +267,26 @@ Client --DNS/Anycast--&gt; [L4 LB: consistent hash picks edge, DSR return]
 <li>Why is TLS 1.3 0-RTT fast, and why dangerous? How would you enable it safely at the gateway?</li>
 </ol>
 
+<h2>Crossovers</h2>
+<div class="crossx"><ul>
+<li><b>Investing · diversification and correlation</b>: HTTP/1.1's six TCP connections are like six loosely correlated holdings, so one loss doesn't drag down the rest; HTTP/2 puts every request into one byte stream, pushing correlation to 1, so a single dropped packet hits the whole portfolio. The difference: QUIC doesn't buy more positions, it keeps a separate ledger for each position inside one account.</li>
+<li><b>Neuroscience · spinal reflex vs. cortex</b>: You pull your hand off a hot pan before you feel the pain, because the reflex arc closes in the spinal cord without waiting for the brain to understand. L4 likewise forwards on the four-tuple alone, while L7, like the cortex, decides only after reading the HTTP, slower and costlier. The difference: the nervous system evolved its two tiers, while L4+L7 is a split engineers chose deliberately to absorb load.</li>
+<li><b>Complexity science · slime-mold networks</b>: In 2010 Tero and colleagues reported in Science that Physarum polycephalum, growing between food sources laid out like the cities around Tokyo, built a tube network whose efficiency and fault tolerance rivaled the real Tokyo rail system. Anycast's "nearest" likewise has no central planner; it emerges from local announcements and local route choices. The difference: the slime mold thickens tubes by actual flow, whereas BGP picks routes by policy and AS path rather than measured latency, so "nearest" is not always fastest.</li>
+<li><b>Quantum mechanics · the no-communication theorem</b>: Measurements on entangled particles are instantly correlated, yet the theorem shows the correlation cannot carry information, so light speed still caps signaling. RTT's physical floor is just as non-negotiable: 0-RTT doesn't beat light, it uses a session ticket stored earlier to move one round trip into the previous visit.</li>
+</ul></div>
+<h2>Ten takeaways</h2>
+<ol class="takeaways">
+<li>A transoceanic RTT is about 120ms, a cold HTTPS request needs about 3 RTTs, and connection setup often eats half of mobile time-to-first-byte.</li>
+<li>TCP's ordered byte stream makes one lost packet stall data that has already arrived, which is the root of transport-level head-of-line blocking.</li>
+<li>To choose TCP or UDP, ask whether losing a packet is acceptable: real-time voice and games use UDP, while APIs and payments use TCP or QUIC.</li>
+<li>HTTP/2 removes application-level head-of-line blocking, but all streams share one TCP connection, so on lossy links it can lose to HTTP/1.1's multiple connections.</li>
+<li>HTTP/3 runs on QUIC, where each stream has its own sequence space, so a loss stalls only that stream, and connection migration survives network switches.</li>
+<li>TLS 1.3 cuts the handshake from 2 RTTs to 1, and returning clients can use a session ticket for 0-RTT.</li>
+<li>0-RTT early data can be replayed, so it may carry only idempotent requests like GET; transfers and orders must wait for the full handshake.</li>
+<li>An L4 load balancer sees only the four-tuple and has huge throughput; L7 must terminate TLS and parse HTTP to do path routing, canaries and rate limiting, at much higher cost.</li>
+<li>A long DNS TTL delays failover until caches expire; disaster-recovery setups often use 30 to 60 seconds, though too short a TTL adds resolver load.</li>
+<li>The speed of light fixes the cost of each RTT, so architecture can only cut the number of round trips and amortize handshakes with keep-alive connection pools.</li>
+</ol>
 <h2>Deeper Resources</h2>
 <ul>
 <li><strong>High Performance Browser Networking</strong> (Ilya Grigorik, free at <a href="https://hpbn.co/">hpbn.co</a>): the authoritative text on latency sources and optimizations across TCP/UDP/TLS/HTTP.</li>

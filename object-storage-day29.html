@@ -52,6 +52,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -204,6 +212,26 @@ def init_upload(key, size):
 <li><strong>忘了孤儿 multipart</strong>：不配 lifecycle abort，成本月月漏。</li>
 <li><strong>面试追问</strong>：① 11 个 9 到底怎么算出来的？（故障域独立性 + 修复速度 vs 故障率的概率模型）② 一个 5TB 对象怎么传？怎么断点续传？③ 强一致和最终一致在对象存储里各放弃了什么？④ 热点 key 怎么办？和数据库分片的热点是不是同一个问题？⑤ 删除一个对象后空间什么时候真的释放？（GC + tombstone）</li>
 </ul>
+<h2>越界 · 跨学科的联想</h2>
+<div class="crossx"><ul>
+<li><b>生物进化 · DNA 修复</b>：DNA 双链互为模板，一条链受损可照另一条补回，修复酶还在细胞里不停巡查损伤，像副本加 scrubbing。不像在于：细胞容忍少量突变，突变甚至是进化的原料；对象存储要求一个比特都不能错。</li>
+<li><b>神经科学 · Lashley 的记忆痕迹实验</b>：Karl Lashley 切除大鼠不同部位的皮层，发现迷宫记忆受损程度主要看切掉多少，而不是切哪里（1950 年总结为《寻找记忆痕迹》），像纠删码那样分散存放、不靠某一块。不像的是：大脑是逐渐变差，纠删码在 k 份以内完好无损，超过就一下全丢。</li>
+<li><b>佛学 · 刹那生灭与相续</b>：佛学说诸法刹那生灭，看似连续的东西只是前后相续；对象存储也没有原地修改，所谓「改」是写一个新版本，key 的连续性只是一条版本链。不像在于：佛学说相续背后没有恒常的主体，S3 的 key 却正是那个被刻意保持不变的名字。</li>
+<li><b>投资 · Markowitz 组合理论</b>：Markowitz 1952 年指出，分散化降低风险的效果取决于资产之间的相关性，资产一起涨跌就分散不了。11 个 9 的计算同样押在故障相互独立上，同批次坏盘、同机架断电就是存储里的「相关性趋近 1」。不像的是，盘可以靠跨 AZ 放置主动拆开相关性，市场危机里的相关性却很难事先拆掉。</li>
+</ul></div>
+<h2>十条要点</h2>
+<ol class="takeaways">
+<li>对象存储把文件当作不可变 blob、用扁平 keyspace 寻址，牺牲原地修改和目录语义，换来近乎无限的水平扩展。</li>
+<li>对象存储的控制面只存「key → 分片位置」的强一致索引，数据面只存不可变字节块，两者各自独立扩展。</li>
+<li>三副本简单、重建快，但空间放大 200%；纠删码把放大压到几十个百分点，代价是编码 CPU、修复读放大和小文件不划算。</li>
+<li>Backblaze Vault 用 17+3 纠删码，丢任意 3 份也不丢数据，存储放大只有约 1.18 倍。</li>
+<li>大对象走 multipart upload：分片并行上传、失败只重传那一片，最后由 CompleteMultipartUpload 拼成完整对象。</li>
+<li>presigned URL 让客户端把字节直接 PUT 到存储层，绕开应用服务器，省带宽也省一跳延迟。</li>
+<li>没配 lifecycle 规则自动中止未完成的 multipart upload，孤儿分片会一直占盘计费。</li>
+<li>S3 在 2020 年底上线强 read-after-write 一致性，背后是把元数据层重做成分片内强一致的 KV。</li>
+<li>对象 key 用单调递增的时间前缀，写入会集中砸在同一个元数据分片上，形成热点。</li>
+<li>11 个 9 的持久性靠故障域独立和修复速度，持续巡检缩短修复窗口，相关故障会让概率模型失效。</li>
+</ol>
 <h2 data-tts="5c05603c12ad7a3a">深入资源</h2>
 <ul>
 <li><strong>《Designing Data-Intensive Applications》</strong>（Kleppmann）— 复制、分区、一致性的底层原理，对象存储的元数据层正是这些概念的应用。</li>

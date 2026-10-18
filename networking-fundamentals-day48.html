@@ -52,6 +52,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -248,6 +256,26 @@ Client --DNS/Anycast--&gt; [L4 LB: 一致性哈希选边缘, DSR 回程]
 <li>L4 和 L7 负载均衡分别在什么层、能看到什么、什么场景必须用 L7？</li>
 <li>Anycast 怎么实现「就近」？它对 TCP 长连接有什么隐患（路由抖动换节点）？</li>
 <li>TLS 1.3 0-RTT 为什么快、为什么危险？你会怎么在网关层安全启用它？</li>
+</ol>
+<h2>越界 · 跨学科的联想</h2>
+<div class="crossx"><ul>
+<li><b>投资 · 分散化与相关性</b>：HTTP/1.1 的 6 条 TCP 像 6 只低相关的持仓，一条丢包不拖累其他；HTTP/2 把全部请求押进一条字节流，相关性变成 1，一次丢包全组回撤。不像处：QUIC 不是多买几只，而是在同一个账户里给每笔头寸单独记账。</li>
+<li><b>神经科学 · 脊髓反射与大脑皮层</b>：手碰到烫锅先缩回、后才觉得疼，反射弧在脊髓里闭环，不等大脑理解。L4 也只看四元组就转发，L7 像皮层，读懂 HTTP 才决策，慢而贵。不像处：神经系统的两层是演化长出来的，L4+L7 是为了扛量刻意切开的。</li>
+<li><b>复杂性科学 · 黏菌造路网</b>：2010 年 Tero 等人在《Science》报告，多头绒泡菌在仿照关东城市布置的食物点之间长出的管网，效率与容错接近真实的东京铁路网。Anycast 的「就近」同样没有中央调度，由各地宣告、各自选路涌现出来。不像处：黏菌按实际流量加粗常用管道，BGP 选路看的是策略和 AS 路径，不是实测延迟，所以「最近」未必最快。</li>
+<li><b>量子力学 · 不可通信定理</b>：纠缠粒子的测量结果瞬间相关，但这条定理证明这种相关无法用来传递信息，光速仍是上限。网络里 RTT 的物理下限同样谈不了，0-RTT 并没有快过光，只是靠事先存好的会话票据，把一次来回挪到了上一次访问里。</li>
+</ul></div>
+<h2>十条要点</h2>
+<ol class="takeaways">
+<li>跨洋链路单个 RTT 约 120ms，冷启动 HTTPS 约要 3 个 RTT，连接建立常吃掉移动端首字节时间的一半。</li>
+<li>TCP 的有序字节流让一个丢包卡住后面已到达的数据，这是传输层队头阻塞的根源。</li>
+<li>选 TCP 还是 UDP 先问丢一个包业务能否接受：实时语音和游戏走 UDP，API 和支付走 TCP 或 QUIC。</li>
+<li>HTTP/2 解决了应用层队头阻塞，但所有 stream 共用一条 TCP，高丢包链路上可能不如 HTTP/1.1 的多连接。</li>
+<li>HTTP/3 跑在 QUIC 上，每条 stream 有独立序列空间，丢包只卡自己那条流，还支持换网不断的连接迁移。</li>
+<li>TLS 1.3 把握手从 2 个 RTT 压到 1 个，回访用户凭会话票据可以做 0-RTT。</li>
+<li>0-RTT 的 early data 可被重放，只能承载 GET 这类幂等请求，转账、下单必须走完整握手。</li>
+<li>L4 负载均衡只看四元组、吞吐极高；L7 终止 TLS、读懂 HTTP 才能做路径路由、灰度和限流，成本高得多。</li>
+<li>DNS TTL 太长会让故障切换卡到缓存过期，灾备场景常设 30–60 秒，但太短又加重解析压力。</li>
+<li>光速定死了单个 RTT，架构能做的只有减少来回次数，并用 keep-alive 连接池把握手摊薄。</li>
 </ol>
 <h2 data-tts="541d71eb48271962">深入资源</h2>
 <ul>

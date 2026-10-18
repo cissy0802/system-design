@@ -52,6 +52,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -263,6 +271,26 @@ def confirm(alert):
 <strong>4. 用告警数/覆盖率证明进步。</strong> 活动指标。追问：ack 率、忽略率、真报占比多少？没人看的系统覆盖率 100% 也是死的。</div>
 <div class="callout">
 <strong>5. 忽略聚合窗口的双刃。</strong> 聚合抬 precision，但窗口过大会把两起独立事故合并、或延迟首报。追问：一次雪崩式级联故障，你的聚合会不会把 root cause 藏起来？</div>
+<h2>越界 · 跨学科的联想</h2>
+<div class="crossx"><ul>
+<li><b>心理学 · Kahneman 与 Tversky 的出租车问题</b>：城里 85% 是绿车、15% 是蓝车，目击者认色准确率 80%，他说看到蓝车——多数人答「80% 是蓝车」，贝叶斯算出来只有约 41%。人脑天生忽略底率，和团队只报「检测器 0.1% 误报」是同一个盲点。</li>
+<li><b>生物进化 · Nesse 的「烟雾探测器原则」</b>：Randolph Nesse 用信号检测分析指出，发烧、呕吐、焦虑这类防御被自然选择调得宁可频繁误报，因为漏掉一次威胁可能致命，误报只费点能量。像在都按代价不对称来定阈值；不像在身体不会「学会不信」自己的警报，而 on-call 会——所以告警系统反过来必须守住精确率地板。</li>
+<li><b>免疫学 · T 细胞的双信号激活</b>：T 细胞要同时收到抗原信号和来自另一通路的共刺激信号才会启动，单有一个信号反而趋向耐受。这就是「串联独立层」：两路信号来源不同，错误才能相乘地压低；自身免疫病就是这道兜底失灵后的误报。</li>
+<li><b>神经科学 · Kandel 的海兔习惯化</b>：Eric Kandel 发现，反复轻触海兔而不带来后果，它的缩鳃反射会越来越弱，突触传递随之减弱。on-call 对噪声 pager 的「划过去」是同一种习惯化；不同的是海兔忘掉的是无害刺激，人忘掉的却会连真报一起。</li>
+</ul></div>
+<h2>十条要点</h2>
+<ol class="takeaways">
+<li>告警系统的可用性由 P(真│报) 决定，底率极低时它主要被误报率而非检出率支配。</li>
+<li>每天 1000 万次检查、单次误报 0.1%，就是约 1 万条噪声淹没约 5 起真事故，precision 只剩约 0.05%。</li>
+<li>Axelsson 在入侵检测里用贝叶斯证明：要让告警可信，所需的误报率可能低到不现实。</li>
+<li>应对低底率有三条路：压单检测器误报率、缩小判定域抬高底率、串联独立层让误报率相乘。</li>
+<li>缩小判定域是用召回换 precision，要靠影子判定、事后复盘和故障注入量化域外漏报。</li>
+<li>分诊层不产生新信号，只做去重、聚合和置信打分，只放行超过精确率地板的告警。</li>
+<li>低置信告警宁可进可查询的归档也不进 pager，因为一条噪声侵蚀的是对所有后续告警的信任。</li>
+<li>串联两层只在失败模式独立时才让误报率相乘，同模型同 prompt 的 LLM 自任裁判几乎不降误报。</li>
+<li>可靠的兜底来自确定性断言、差分复核等独立 oracle，Jepsen 用独立 checker 判定一致性就是这一范式。</li>
+<li>判定级误报率和告警数都会骗人，该盯的是报告级 precision 以及 ack 率、忽略率这类人侧信号。</li>
+</ol>
 <h2 data-tts="d184706682235110">深入资源</h2>
 <ul>
 <li><strong>Stefan Axelsson, "The Base-Rate Fallacy and the Difficulty of Intrusion Detection"</strong>（ACM TISSEC, 2000）：本主题理论奠基，贝叶斯证明误报率才是瓶颈。</li>

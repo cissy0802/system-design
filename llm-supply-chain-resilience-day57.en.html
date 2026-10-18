@@ -52,6 +52,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -287,6 +295,26 @@ def promote(candidate, incumbent, task_types, max_drop=0.03):
 <li><strong>Interview question</strong>: "Your primary vendor gives you 72 hours' notice. What do you do in the first 24?" A strong answer covers, in order: freeze traffic share, confirm standby capacity, run the eval gate, ramp by task type, and tell users what capability changes.</li>
 </ul>
 
+<h2>Crossovers</h2>
+<div class="crossx"><ul>
+<li><b>Business · Porter's Five Forces</b>: In Michael Porter's 1979 five-forces model, supplier power peaks when suppliers are concentrated, switching costs are high, and forward integration is credible: exactly this issue's cutoff, repricing, and competing-with-you. The difference: Porter describes how industry profit gets divided; here a supplier can also take your product offline within a week.</li>
+<li><b>Ecology · The Portfolio Effect</b>: Schindler and colleagues (Nature, 2010) showed that Bristol Bay sockeye salmon comprise hundreds of small populations whose good and bad years do not line up, so the total catch is far steadier. Multi-vendor traffic splitting is the same idea; unlike salmon diversity, which grows on its own, warm-standby diversity has to be paid for every month.</li>
+<li><b>Neuroscience · Synaptic Pruning</b>: The developing brain trims rarely used synapses while frequently active connections are kept and strengthened: use it or lose it. A cold standby that never carries traffic quietly loses its quotas, prompts, and accounts by the same mechanism; the difference is that pruning saves the brain energy, while in a system it is decay nobody notices.</li>
+<li><b>Evolution · Endosymbiosis</b>: Lynn Margulis argued in 1967 that mitochondria descend from engulfed bacteria; most of their genes later moved into the host nucleus, turning an outside dependency into an organ. Self-hosted open weights plus in-house post-training is the same move: bringing the supplier inside. The cost is similar too: the two can no longer live apart, so sovereignty buys a deeper bond.</li>
+</ul></div>
+<h2>Ten takeaways</h2>
+<ol class="takeaways">
+<li>Beyond outages, an LLM dependency carries three extra risks: cutoff, repricing, and the vendor competing with you.</li>
+<li>A model abstraction layer should make differences explicit: each model declares a capability contract, and routing does constraint matching, not model-name swaps.</li>
+<li>A half-abstraction with a unified API but prompts tuned for one vendor switches without errors while quality silently drops.</li>
+<li>A cold standby that never carries traffic reveals short quotas and untuned prompts on switch day; keep a warm standby on 5–15% of real traffic.</li>
+<li>Real cutoffs show up as 403s, sudden quota cuts, or model retirement, so the circuit breaker must treat them as supplier-level failures.</li>
+<li>Degrade by capability tier: completion tasks can fall back to small open-weight models, while complex agent tasks should queue instead.</li>
+<li>OpenAI models were only about 5% of Cursor's traffic when OpenAI cut it off, so a diversified traffic mix turned a cutoff into a controlled migration.</li>
+<li>Per-token prices fall while reasoning-token counts rise, so budget in cost per completed task, not price per million tokens.</li>
+<li>Open weights set a floor for cost and supply that cannot be repriced or revoked, at the price of owning post-training and inference ops.</li>
+<li>Termination notice and change-of-control clauses set your warning time; before switching, pass an eval gate of golden sets plus shadow traffic.</li>
+</ol>
 <h2>Further Resources</h2>
 <ul>
 <li>Gundlach, Lynch, Mertens, Thompson, <a href="https://arxiv.org/abs/2511.23455">The Price of Progress: Price Performance and the Future of AI</a> (MIT FutureTech, 2025) — fixed-performance prices falling vs frontier running costs rising.</li>

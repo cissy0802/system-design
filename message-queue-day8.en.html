@@ -48,6 +48,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -297,6 +305,28 @@ graph LR
 <li>A backlog of 100M messages—how do you catch up fast? What levers, what costs?</li>
 <li>A poison message in an ordered queue deadlocks it—what do you do? How do you design the DLQ?</li>
 <li>What do producer <code>ack=0/1/all</code> mean? When are messages lost?</li>
+</ol>
+
+<h2>Crossovers</h2>
+<div class="crossx"><ul>
+<li><b>Neuroscience · Hippocampal replay</b>: during sleep the hippocampus replays the day's experiences in sequence, gradually writing them into cortical long-term memory, much as Kafka retains its log so a new consumer group can catch up from an old offset. The difference: the brain's replay is selective and reconstructive, while a log replay is byte-for-byte faithful.</li>
+<li><b>Cell biology · Protein quality control</b>: a misfolded protein is first handed to chaperones for another folding attempt; if rescue keeps failing, it is tagged with ubiquitin and sent to the proteasome, or sequestered in an aggregate so it cannot jam the line. Same shape as "retry N times, then DLQ"; unlike a DLQ, the cell destroys the evidence instead of keeping it for redrive.</li>
+<li><b>Psychology · Zeigarnik effect</b>: unfinished tasks keep tugging at attention. Writing them into a trusted external list lets the mind let go, exactly as a producer returns as soon as the event is in the queue. The difference: a personal to-do list has no lag alert, so the backlog grows silently.</li>
+<li><b>Complexity science · Simon's watchmakers</b>: in "The Architecture of Complexity" (1962), Herbert Simon tells of two watchmakers. One assembles each watch in a single run and loses everything when interrupted; the other builds stable subassemblies and loses only a small piece. Simon used this to argue that decomposable hierarchies evolve faster and resist disruption. A synchronous RPC chain is the first watchmaker; independent consumer groups behind a queue are the second. But Simon was describing assembly, while the queue isolates failures at run time.</li>
+<li><b>Business · Voucher numbers in accounting</b>: accountants never assume a document travels only once; they reconcile by a unique voucher number so each entry is booked once, the same idea as a dedup table keyed on event_id absorbing redeliveries. The difference: reconciliation is usually a batch after the fact, while consumer-side idempotency decides on the spot for every message.</li>
+</ul></div>
+<h2>Ten takeaways</h2>
+<ol class="takeaways">
+<li>One event stream feeding several independent consumer groups, each with its own offset, is pub/sub fan-out: a slow downstream only backs up itself.</li>
+<li>Kafka is an append-only log that keeps messages after consumption and can replay them; RabbitMQ is a smart broker that deletes on ack and excels at routing.</li>
+<li>SQS needs zero ops and scales almost without limit, but is the most basic: standard queues are unordered, FIFO queues are ordered but throttled.</li>
+<li>Exactly-once delivery is impossible over the network; in practice "exactly once" means at-least-once delivery plus idempotent consumers.</li>
+<li>Kafka's EOS relies on idempotent producers plus transactions and holds only from Kafka to Kafka; writes to an external DB still need your own idempotency.</li>
+<li>A message queue turns the blocking cascades of synchronous calls into observable consumer lag, and unmonitored lag means an invisible backlog.</li>
+<li>Within one consumer group a partition is read by only one consumer, so the partition count caps consumption parallelism.</li>
+<li>Endless retries on a poison message stall an ordered queue; separate retryable errors, then send the message to a DLQ with its failure context after N tries.</li>
+<li>Partitioning by order_id keeps each order's events in sequence while still scaling out; global ordering means giving up parallelism.</li>
+<li>A DLQ mirrors a cell's protein quality control: try to repair, quarantine what cannot be fixed, and never let one bad item block the whole line.</li>
 </ol>
 
 <h2>Further Reading</h2>

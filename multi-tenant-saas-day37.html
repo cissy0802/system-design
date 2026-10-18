@@ -52,6 +52,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -217,6 +225,26 @@ GROUP BY 1,2,3;
 <li>一个巨型租户占了单 shard 80% 容量，怎么办？resharding 怎么做到零停机？</li>
 <li>设计 per-tenant 限流，免费版和企业版配额不同，热点租户突发怎么不影响别人？</li>
 <li>按用量计费的流水线如何保证账单 exactly-once、出账争议时可回放？</li>
+</ol>
+<h2>越界 · 跨学科的联想</h2>
+<div class="crossx"><ul>
+<li><b>生物进化 · 真核细胞的区室化</b>：真核细胞共用一份细胞质和能量供应，却用膜把溶酶体的消化酶关进小隔间，漏出来就伤自己；线粒体甚至留着自己的一小段基因组，像独享库——pool 里套 silo，正是 bridge。不像的是，细胞各区室同属一个主人，彼此并非互不信任。</li>
+<li><b>复杂性科学 · 奥斯特罗姆的公地治理</b>：哈丁 1968 年断言公地必遭滥用；奥斯特罗姆 1990 年的《公共事物的治理之道》却发现，边界清晰、按份取用、逐级惩罚的社区能长期共享牧场渔场。per-tenant 配额加 429 就是这套设计。不像在于，租户不参与定规则。</li>
+<li><b>投资 · 风险池与自保</b>：保险把大量互不相关的风险放进一个池子摊薄成本，大企业则常设专属自保公司自己扛——对应小租户 pool、大客户 silo。不像的是，保险池最怕风险相关，而噪声邻居恰恰是一个租户把波动直接传给邻居。</li>
+<li><b>商业 · 复式记账（帕乔利，1494）</b>：账本只追加不涂改，记错了用冲销分录更正，余额随时可从流水重算；保留原始 usage event、聚合值只当派生物，是同一原则。不同处在于会计靠借贷平衡自检，计量流水线要靠幂等键去重。</li>
+</ul></div>
+<h2>十条要点</h2>
+<ol class="takeaways">
+<li>多租户隔离是一条光谱：Silo 独享、Pool 共享、Bridge 混合，每多一分隔离就少一分成本效率。</li>
+<li>隔离边界可以逐层选择，多数成熟 SaaS 最终演进成 bridge：小客户放 pool，企业和高合规客户切 silo。</li>
+<li>SaaS 天然以 tenant_id 为分片键，同租户数据落同一 shard，绝大多数查询不产生跨 shard 扇出。</li>
+<li>hash(tenant_id) 只让租户数均匀、不让负载均匀，巨型租户要经 Tenant Catalog 路由到专属 shard。</li>
+<li>Notion 按 workspace 分片，同 workspace 数据落同一库，从 32 库零停机 reshard 到 96 库。</li>
+<li>Pool 模型漏写一个 WHERE tenant_id 就是跨租户泄露，要靠 Postgres RLS、ORM 强制注入和跨租户测试纵深防御。</li>
+<li>治噪声邻居有三道防线：per-tenant 令牌桶限流、每租户资源配额、按租户轮询的公平调度。</li>
+<li>全局限流保系统不被打挂，per-tenant 限流保租户之间的公平，两层必须叠加使用。</li>
+<li>用量计费用 at-least-once 投递加幂等键去重做到 effectively-once，原始事件持久化才能回放重算账单。</li>
+<li>原始 usage event 是财务真相、聚合值只是派生物，这与复式记账只追加不涂改、余额可从流水重算是同一原则。</li>
 </ol>
 <h2 data-tts="2363376e37ef6d58">深入资源</h2>
 <ul>

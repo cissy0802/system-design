@@ -51,6 +51,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -215,6 +223,26 @@ def init_upload(key, size):
 <li><strong>Follow-ups</strong>: ① How is eleven 9s actually computed? (a probability model over fault-domain independence + repair speed vs failure rate) ② How do you upload a 5 TB object? Resume it? ③ What does each of strong vs eventual consistency give up in object storage? ④ How do you handle hot keys — is it the same problem as database sharding? ⑤ When is space actually freed after deleting an object? (GC + tombstone)</li>
 </ul>
 
+<h2>Crossovers</h2>
+<div class="crossx"><ul>
+<li><b>Evolution · DNA repair</b>: the two DNA strands are templates for each other, so a damaged strand can be rebuilt from its partner, and repair enzymes keep patrolling for damage, much like replicas plus scrubbing. The difference: a cell tolerates a few mutations, which are even the raw material of evolution; object storage tolerates no wrong bit at all.</li>
+<li><b>Neuroscience · Lashley's engram experiments</b>: Karl Lashley removed different patches of rat cortex and found maze memory suffered according to how much was removed, not where (summed up in 1950 as "In Search of the Engram"), memory spread out the way erasure coding spreads shards. Unlike it, the brain degrades gradually, while erasure coding is perfect up to k shards and falls off a cliff past that.</li>
+<li><b>Buddhism · momentariness and continuity</b>: Buddhist thought holds that phenomena arise and vanish moment by moment, and what looks continuous is only a stream of successors. Object storage likewise has no in-place edits: a "change" writes a new version, and a key's continuity is just a version chain. The difference: Buddhism says no enduring self sits behind the stream, while an S3 key is exactly the name deliberately kept fixed.</li>
+<li><b>Investing · Markowitz portfolio theory</b>: in 1952 Harry Markowitz showed that diversification cuts risk only as far as assets are uncorrelated; if everything moves together, spreading out buys nothing. The eleven-nines math bets on independent failures too, and a bad batch of disks or a rack losing power is storage's "correlation going to one." Unlike markets, though, storage can deliberately break correlation by placing shards across AZs, whereas crisis correlations are hard to engineer away in advance.</li>
+</ul></div>
+<h2>Ten takeaways</h2>
+<ol class="takeaways">
+<li>Object storage treats files as immutable blobs in a flat keyspace, giving up in-place edits and directory semantics for near-limitless horizontal scale.</li>
+<li>In object storage the control plane holds a strongly consistent key-to-shard-location index, the data plane holds immutable byte chunks, and each scales independently.</li>
+<li>Three-way replication is simple and repairs fast but costs 200% overhead; erasure coding cuts overhead to tens of percent at the cost of encoding CPU, repair read amplification, and poor fit for small files.</li>
+<li>Backblaze Vault uses 17+3 erasure coding, surviving the loss of any 3 shards with only about 1.18x storage overhead.</li>
+<li>Large objects use multipart upload: parts upload in parallel, a failure retries only that part, and CompleteMultipartUpload stitches them into one object.</li>
+<li>Presigned URLs let clients PUT bytes straight to the storage layer, bypassing app servers and saving both bandwidth and a network hop.</li>
+<li>Without a lifecycle rule that aborts incomplete multipart uploads, orphaned parts keep occupying disk and keep getting billed.</li>
+<li>S3 shipped strong read-after-write consistency in late 2020, which meant rebuilding the metadata layer as a sharded KV store that is strongly consistent within each shard.</li>
+<li>Object keys with monotonically increasing time prefixes funnel every write onto the same metadata shard and create a hot spot.</li>
+<li>Eleven nines of durability rests on independent fault domains and fast repair; continuous scrubbing shortens the repair window, and correlated failures break the probability model.</li>
+</ol>
 <h2>Deep-Dive Resources</h2>
 <ul>
 <li><strong>"Designing Data-Intensive Applications"</strong> (Kleppmann) — the underlying principles of replication, partitioning, and consistency; the metadata layer is exactly these concepts applied.</li>

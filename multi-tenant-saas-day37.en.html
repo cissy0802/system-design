@@ -51,6 +51,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -226,6 +234,27 @@ GROUP BY 1,2,3;
 <li>A giant tenant occupies 80% of a single shard — what do you do? How do you reshard with zero downtime?</li>
 <li>Design per-tenant rate limiting where free vs enterprise have different quotas, and a hot tenant's burst doesn't hurt others.</li>
 <li>How does a usage-based billing pipeline guarantee exactly-once bills and stay replayable for disputes?</li>
+</ol>
+
+<h2>Crossovers</h2>
+<div class="crossx"><ul>
+<li><b>Evolutionary biology · Compartments in the eukaryotic cell</b>: A eukaryotic cell shares one cytoplasm and one energy supply, yet walls off the lysosome's digestive enzymes behind a membrane, because a leak would digest the cell itself; mitochondria even keep a small genome of their own, like a dedicated database. Silo inside pool is exactly bridge. The difference: every compartment serves one owner, so none of them distrusts the others.</li>
+<li><b>Complexity science · Ostrom on governing the commons</b>: Hardin argued in 1968 that a commons is doomed to overuse; Ostrom's <i>Governing the Commons</i> (1990) found communities that share pastures and fisheries for centuries through clear boundaries, allotted shares and graduated sanctions. Per-tenant quotas plus a 429 are that design. Unlike her villagers, tenants never write the rules.</li>
+<li><b>Investing · Risk pools and self-insurance</b>: Insurance spreads cost by pooling many uncorrelated risks, while large firms often run a captive insurer and carry their own risk: small tenants in the pool, big customers in a silo. The mismatch: an insurance pool fears correlated risk, and a noisy neighbor is precisely one tenant passing its volatility straight to the others.</li>
+<li><b>Business · Double-entry bookkeeping (Pacioli, 1494)</b>: A ledger is append-only, errors are fixed with reversing entries rather than erasure, and any balance can be recomputed from the journal. Keeping raw usage events and treating aggregates as derived is the same rule. The difference: accounting checks itself by debits equalling credits, while a metering pipeline relies on idempotency keys to drop duplicates.</li>
+</ul></div>
+<h2>Ten takeaways</h2>
+<ol class="takeaways">
+<li>Multi-tenant isolation is a spectrum: Silo is dedicated, Pool is shared, Bridge mixes both, and every step toward isolation costs efficiency.</li>
+<li>The isolation boundary can be chosen per layer, and most mature SaaS ends up as bridge: small customers pooled, enterprise and regulated customers siloed.</li>
+<li>SaaS data shards naturally on tenant_id, so one tenant's rows live on one shard and nearly every query avoids cross-shard fan-out.</li>
+<li>Hashing tenant_id evens out tenant counts but not load, so a giant tenant must be routed to a dedicated shard via the Tenant Catalog.</li>
+<li>Notion shards by workspace, keeping each workspace on one database, and resharded from 32 to 96 databases with zero downtime.</li>
+<li>In a pool model one missing WHERE tenant_id leaks data across tenants, so defend in depth with Postgres RLS, ORM-enforced scoping and cross-tenant tests.</li>
+<li>Noisy neighbors are contained by three lines of defense: per-tenant token buckets, per-tenant resource quotas, and round-robin fair scheduling across tenant queues.</li>
+<li>A global rate limit keeps the system alive while a per-tenant limit keeps tenants fair, so the two layers must be stacked.</li>
+<li>Usage billing reaches effectively-once through at-least-once delivery plus idempotency-key dedup, with raw events persisted so bills can be replayed.</li>
+<li>Raw usage events are the financial source of truth and aggregates are derived, the same rule as append-only double-entry bookkeeping.</li>
 </ol>
 
 <h2>Deep-dive Resources</h2>

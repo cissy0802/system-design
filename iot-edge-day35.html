@@ -52,6 +52,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -264,6 +272,27 @@ SELECT add_retention_policy('telemetry', INTERVAL '90 days'); -- 冷数据归档
 <div class="callout"><strong>4. 忽略时钟与乱序</strong>：设备时钟不准、断网补传导致数据乱序到达。要用 event-time + watermark（见 Day 20），不能按到达顺序写。</div>
 <div class="callout"><strong>5. 重连风暴（Thundering Herd）</strong>：broker 重启或网络抖动，千万设备同时重连握手把集群打死。重连必须带<em>随机退避 + jitter</em>。</div>
 <div class="callout"><strong>6. 没区分"丢得起"与"丢不起"</strong>：温度采样可丢，告警/计费不可丢。下游消费必须幂等（用 <code>device_id + ts</code> 去重）。</div>
+<h2>越界 · 跨学科的联想</h2>
+<div class="crossx"><ul>
+<li><b>生物进化 · 章鱼的分布式神经系统</b>：章鱼约 5 亿个神经元，大约三分之二长在腕足里，腕足能就地完成抓握与探索，中枢脑只下达大意。这和边缘网关本地急停、云端只收摘要是同一种分工。不像在于：腕足的「规则」靠演化写死，边缘逻辑却能随时 OTA 改写。</li>
+<li><b>神经科学 · 预测编码（Rao &amp; Ballard，1999）</b>：大脑高层不断预测下层输入，下层只把「预测误差」往上送，没有意外就几乎不占带宽。Gorilla 的 XOR 压缩是同一结构：默认预测「和上一个值一样」，只存与预测不同的那几位，温度不变时一个点几乎只剩一个比特。不像在于：Gorilla 的预测器永远是「上一个值」，大脑的预测模型却会从误差里学习、越猜越准。</li>
+<li><b>复杂性科学 · 千禧桥的同步摇晃（伦敦，2000）</b>：大桥开放当天，行人随桥面侧摆不自觉调整步伐，步调越来越齐，摇晃越来越大，两天后封桥。重连风暴也是「大家同时做同一件事」的正反馈。不像在于：桥上是逐渐锁相，重连风暴是同一时刻被同一事件触发，所以随机 jitter 就能打散它。</li>
+<li><b>心理学 · 模糊痕迹理论（Brainerd &amp; Reyna）</b>：人同时存「逐字痕迹」和「要点痕迹」，逐字细节衰减快，要点保留久——像热数据存原始秒级、冷数据只留小时级聚合。不像在于：人的记忆会重构甚至篡改要点，降采样只丢精度，不改写事实。</li>
+</ul></div>
+<h2>十条要点</h2>
+<ol class="takeaways">
+<li>物联网遥测是写多读少、长连接、网络不可靠的系统，千万设备每 10 秒报 20 个指标就是每秒 2000 万个点。</li>
+<li>MQTT 用一条长连接加发布-订阅取代 HTTP 的每次握手，header 最小仅 2 字节，是海量低功耗设备的默认协议。</li>
+<li>MQTT 的 QoS 按数据价值分级：温度采样用 QoS 0，告警用 QoS 1 加下游幂等去重，千万设备别全用最贵的 QoS 2。</li>
+<li>边缘网关在本地聚合降采样、遇异常 100ms 内急停、断网时缓冲补传，能砍掉约 90% 的回传带宽。</li>
+<li>主流的边缘-云协同让边缘负责实时减量和安全决策，云端负责模型训练、全局优化和长期存储。</li>
+<li>Kafka 夹在 MQTT broker 和时序库之间当蓄水池，吸收早高峰 3 倍的写入抖动，防止反压一路传回设备造成雪崩。</li>
+<li>Facebook 的 Gorilla 用时间戳 delta-of-delta 加数值 XOR 压缩，把每个数据点从 16 字节压到平均约 1.37 字节。</li>
+<li>时序库的头号杀手是基数爆炸：trip_id、随机 UUID 这类高基数字段要放进 field，不能当 tag 进内存索引。</li>
+<li>热温冷分层加降采样金字塔，让近期数据毫秒级可查、90 天以上转 Parquet 进对象存储，成本降一个数量级。</li>
+<li>broker 重启后千万设备同时重连会形成重连风暴，重连必须带随机退避和 jitter，把同步的动作打散。</li>
+</ol>
+
 <h2 data-tts="de31d355a9882c5d">深入资源</h2>
 <ul>
 <li><strong>《Gorilla: A Fast, Scalable, In-Memory Time Series Database》</strong>（<a href="https://dl.acm.org/doi/10.14778/2824032.2824078">VLDB 2015</a>）：时序压缩的奠基之作，delta-of-delta + XOR 必读。</li>

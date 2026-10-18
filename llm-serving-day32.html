@@ -52,6 +52,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -259,6 +267,26 @@ def speculative_step(ctx):
 <div class="callout"><strong>4. 把 prompt 前缀写得不稳定。</strong> 在 system prompt 里塞当前时间戳、随机 ID，导致前缀哈希永不命中、缓存白建。缓存要放在「逐 token 稳定」的前缀末尾。</div>
 <div class="callout"><strong>5. 用平均值定容量。</strong> input/output 长度是长尾分布，几个超长上下文请求能吃光 KV 显存触发抢占（preemption）甚至 OOM。要按分布和 admission control 设计。</div>
 <p style="margin-top:14px"><strong>高频面试题：</strong>① 为什么 decode 阶段单请求 GPU 利用率极低，连续批处理如何救？② 估算 70B 模型 8k 上下文下单卡能并发多少请求。③ prefix-aware routing 怎么在「缓存命中率」和「负载均衡」间取舍？④ speculative decoding 为什么是无损加速，什么时候反而变慢？⑤ TTFT 与 TPOT 各受什么瓶颈支配，分别怎么优化？</p>
+<h2>越界 · 跨学科的联想</h2>
+<div class="crossx"><ul>
+<li><b>神经科学 · 工作记忆容量（Nelson Cowan，2001）</b>：人同时抓得住的信息块只有 4 个左右，思考的天花板是工作记忆而非知识总量；卡住并发的也是 KV Cache 显存而非算力。不像在于，大脑靠「组块」把多项压成一项，KV 压缩只能把每一项变小。</li>
+<li><b>心理学 · 卡尼曼的系统 1 / 系统 2</b>：快而省力的直觉先接手，觉得不对劲才唤醒慢而费力的推理，这就是模型级联：小模型接住多数请求，难例升级到大模型。不像的是，人的系统 1 常常不知道自己错了，级联的成败恰恰取决于小模型能不能报出「我没把握」。</li>
+<li><b>神经科学 · 预测加工（predictive processing）</b>：大脑先用内部模型预测，感官输入只负责纠错；投机解码也是草稿模型先猜几个 token、大模型一次并行核对，预测越准越省。不像在于，投机解码逐 token 严格核对，输出与大模型完全一致；大脑的先验却常压过证据，让人看见自己预期的东西。</li>
+<li><b>生物进化 · 切叶蚁的体型分工</b>：切叶蚁（Atta）工蚁体型差好几倍，大个子切叶守巢，小个子照料菌圃；prefill/decode 解耦也把特性相反的两类活交给各自调优的 GPU 池。不像的是，蚁的分工在发育时就定死了，两个池的配比却可以随流量随时调整。</li>
+</ul></div>
+<h2>十条要点</h2>
+<ol class="takeaways">
+<li>LLM 服务的 SLO 要拆成 TTFT 和 TPOT 两个，前者决定「卡不卡」，后者决定「流得顺不顺」。</li>
+<li>Prefill 一次性并行处理整段 prompt，是 compute-bound；decode 逐 token 生成，受显存带宽限制。</li>
+<li>连续批处理把调度粒度降到单次 token 迭代，结束的请求立刻让位，GPU 利用率可达 70–80%。</li>
+<li>batch 越大吞吐越高、单请求 TPOT 越慢，吞吐与单请求延迟是同一份资源的两面，要按 SLO 定 batch 上限。</li>
+<li>多数推理系统的真正天花板是 KV Cache 显存而非算力，「能并发几个请求」本质是一道显存除法题。</li>
+<li>PagedAttention 借操作系统虚拟内存的分页思路管理 KV Cache，把显存浪费从 60–80% 压到个位数。</li>
+<li>前缀缓存绑在具体 GPU 上，所以 LLM 负载均衡是有状态的，生产里用前缀亲和加负载阈值兜底。</li>
+<li>在 system prompt 里塞时间戳或随机 ID，会让前缀哈希永不命中，prompt caching 形同虚设。</li>
+<li>模型级联让小模型接住简单请求、难例再升级到大模型，和卡尼曼的系统 1 / 系统 2 是同一个结构。</li>
+<li>投机解码用草稿模型猜、大模型并行验证，输出无损，但在高负载大 batch 时反而可能拉低总吞吐。</li>
+</ol>
 <h2 data-tts="a9ecffe8e7888a6e">深入资源</h2>
 <ul>
 <li><strong>vLLM: Efficient Memory Management with PagedAttention</strong>（Kwon 等，SOSP 2023）+ vLLM 官方博客——KV Cache 分页的奠基工作。</li>

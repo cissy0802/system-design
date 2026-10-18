@@ -49,6 +49,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -288,6 +296,27 @@ graph LR
 <li>消费积压了 1 亿条，怎么快速追上？有哪些手段、各自代价？</li>
 <li>有序队列里出现一条毒消息，整条队列卡死，怎么办？DLQ 怎么设计？</li>
 <li>Producer <code>ack=0/1/all</code> 分别什么语义？什么时候会丢消息？</li>
+</ol>
+<h2>越界 · 跨学科的联想</h2>
+<div class="crossx"><ul>
+<li><b>神经科学 · 海马体重放</b>：睡眠中海马体按顺序重放白天的经历，再写进皮层长期记忆，像新 consumer group 从旧 offset 补读 log。不像在：大脑的重放有选择、会改写，log 回放逐字节忠实。</li>
+<li><b>细胞生物学 · 蛋白质质量控制</b>：错误折叠的蛋白先由分子伴侣尝试重折叠，救不回就被泛素标记送进蛋白酶体，和「重试 N 次再进 DLQ」同构；但细胞直接降解，不留证据等人 redrive。</li>
+<li><b>心理学 · 蔡格尼克效应</b>：未完成的事会一直占着注意力，写进可信的外部清单才能放手，正如 producer 写进队列就返回。区别是人的清单没有 lag 告警，积压悄无声息。</li>
+<li><b>复杂性科学 · 西蒙的钟表匠</b>：Herbert Simon 1962 年《复杂性的架构》里，一个钟表匠整表一口气组装，一被打断就前功尽弃；另一个先做稳定的子组件，打断只损失一小块。同步 RPC 链像前者，队列隔开的消费组像后者；但西蒙讲的是组装与演化，不是运行期故障。</li>
+<li><b>商业 · 会计凭证编号</b>：会计不指望单据只传一次，而靠唯一凭证号对账保证只入账一次，和 event_id 去重表同一思路。不像在：对账多是事后批量，幂等在每条消息落地时当场判断。</li>
+</ul></div>
+<h2>十条要点</h2>
+<ol class="takeaways">
+<li>一份事件配多个独立 consumer group、各自维护 offset，就是 pub/sub fan-out，慢下游只积压自己。</li>
+<li>Kafka 是消费后不删除的 append-only log，可以重放；RabbitMQ 是 ack 即删、擅长灵活路由的 broker。</li>
+<li>SQS 零运维、弹性近无限，但功能最简：标准队列无序，FIFO 队列有序却限流。</li>
+<li>网络层面的 exactly-once 不可达，工程上的「恰好一次」等于至少一次投递加消费端幂等去重。</li>
+<li>Kafka 的 EOS 靠幂等 producer 加事务，只在 Kafka 到 Kafka 内闭环，写外部 DB 仍要自己做幂等。</li>
+<li>消息队列把同步调用里的阻塞雪崩变成可监控的 consumer lag，不监控 lag 就等于看不见积压。</li>
+<li>同一 consumer group 内一个 partition 只能被一个 consumer 消费，partition 数就是并行度上限。</li>
+<li>毒消息无限重试会卡死有序队列；应区分可重试错误，重试 N 次后带着失败上下文进 DLQ。</li>
+<li>按 order_id 分区只保证单订单有序，状态机不乱又能横向扩展；全局有序等于放弃并行。</li>
+<li>DLQ 和细胞的蛋白质质量控制同构：先尝试修复，修不好就隔离，不让一个坏件堵住整条线。</li>
 </ol>
 <h2 data-tts="5b50e538dff6c4b6">深入资源</h2>
 <ul>
