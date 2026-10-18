@@ -51,6 +51,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -243,6 +251,26 @@ def append_audit(actor, action, subject_id, purpose):
 <li>Append-only audit chains directly conflict with the right to erasure — how do you satisfy both?</li>
 </ul>
 
+<h2>Crossovers</h2>
+<div class="crossx"><ul>
+<li><b>Neuroscience · Silent engrams (Tonegawa, 2015)</b>: Susumu Tonegawa's lab gave mice retrograde amnesia, then reactivated the original memory cells with optogenetics, and the memory came back. Forgetting is often not an erased trace but a broken retrieval path, much like crypto-shredding, where the ciphertext stays and only the key is gone. The difference: the brain's path can be reconnected, while compliance demands erasure that can never be undone.</li>
+<li><b>Psychology · The white bear experiment (Daniel Wegner, 1987)</b>: tell people not to think of a white bear and it shows up more often, because suppression needs a monitor that keeps watching for the bear. A "this user requested deletion" record works the same way: to forget someone, the system must first remember whom to forget.</li>
+<li><b>Quantum mechanics · The no-cloning theorem (Wootters and Zurek, 1982)</b>: an unknown quantum state cannot be copied, so there is only one, and deleting it is clean. Classical data is the opposite: copies are nearly free, which is exactly why GDPR erasure is hard. Crypto-shredding artificially recreates a single copy in a classical world.</li>
+<li><b>Investing · Mosaic theory</b>: analysts piece together scraps of public information, each immaterial on its own, into a material conclusion, and that is legitimate research. Re-identification via quasi-identifiers has the same shape: zip code, birthday and gender are harmless alone and identifying together. The difference: in investing the mosaic is skill; in privacy it is the attack.</li>
+</ul></div>
+<h2>Ten takeaways</h2>
+<ol class="takeaways">
+<li>Replicas, append-only logs and event sourcing all exist so data is never lost, while the GDPR right to erasure demands provable disappearance.</li>
+<li>A privacy compliance architecture has four parts: a DSAR orchestrator, a PII data catalog, a key vault with crypto-shredding, and a consent gate.</li>
+<li>Crypto-shredding gives each user a DEK and erases by destroying only that key, voiding ciphertext in backups and warehouses at once.</li>
+<li>Tombstone soft deletes merely hide PII, so they do not strictly satisfy GDPR Article 17 and serve only as the trigger for real deletion.</li>
+<li>Pseudonymized data keeps a reversible mapping table and remains PII; only irreversible anonymization falls outside GDPR.</li>
+<li>Quasi-identifiers such as zip code, birthday and gender can re-identify people in combination, and k-anonymity still falls to homogeneity attacks.</li>
+<li>Differential privacy quantifies a privacy budget with epsilon and is the only approach with a mathematical guarantee, at the cost of accuracy and an exhaustible budget.</li>
+<li>Audit logs become tamper-evident through hash chains plus WORM storage, but they should hold pseudonymous references, never plaintext PII.</li>
+<li>Consent is a source of truth over user, purpose, status and time, and a withdrawal must cascade downstream just like a deletion.</li>
+<li>Deletion across 40 services is a saga, and reporting success at 39 of 40 is the most dangerous kind of silent failure.</li>
+</ol>
 <h2>Deep Resources</h2>
 <ul>
 <li><strong>Designing Data-Intensive Applications, Ch 12</strong> (Kleppmann): closes with the ethics of data, tracking, and the systemic difficulty of "being forgotten."</li>

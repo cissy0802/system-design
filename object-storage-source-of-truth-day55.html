@@ -52,6 +52,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -258,6 +266,26 @@ s3.put_json(f"{repo}/HEAD", {"manifest": mid},
 <li><strong>CAS 争用没有退避</strong>。裸重试在高并发下放大成活锁；必须配指数退避 + 抖动，并把「争用导致的 412 率」做成一等指标——它是分片粒度不对的早期信号。</li>
 <li><strong>追问清单</strong>：① 对象存储<em>没有</em>条件写时你怎么补洞、代价几何？② 两个节点同时 CAS 成功是否可能，为什么？③ 300 push/s 的瓶颈在哪一层，怎么证明？④ 换成要求 p99 写延迟 &lt; 10 ms 的金融账本，你还选这套吗？⑤ 孤儿对象怎么 GC，会不会误删仍被引用的对象？</li>
 </ul>
+<h2>越界 · 跨学科的联想</h2>
+<div class="crossx"><ul>
+<li><b>复杂性科学 · 共识主动性（stigmergy，Pierre-Paul Grassé，1959）</b>：Grassé 观察白蚁筑巢时发现，个体彼此不直接协商，而是读写共同的环境，上一只留下的痕迹决定下一只做什么。零盘节点也不互相投票，只读写对象存储里的 index。不像在于：蚁巢容忍重复和冲突，靠数量冲淡错误；条件写则严格拒绝过期的那一笔，412 就是「痕迹已经变了」。</li>
+<li><b>生物进化 · 魏斯曼屏障（August Weismann，1892）</b>：魏斯曼区分种质与体细胞：遗传信息只沿生殖细胞往下传，躯体是一次性的载体。WAL 就是种质，NVMe 上的仓库是体细胞，坏了从种质再长一个。不像的是，种质靠复制传承还会突变，WAL 只追加、一个字节都不改。</li>
+<li><b>神经科学 · 互补学习系统（McClelland、McNaughton、O'Reilly，1995）</b>：海马快速记下每段经历，新皮层在睡眠重放中慢慢整合成结构化知识；这正像「先追加 WAL、再周期压成 snapshot」。不像在于：大脑的整合是有损的，旧细节会淡去；compaction 必须保证 snapshot 加尾部增量能精确重建。</li>
+<li><b>哲学 · 延展心智（Andy Clark 与 David Chalmers，1998）</b>：他们设想失忆的 Otto 把记忆写进随身笔记本，笔记本就成了他心智的一部分。零盘节点同样把「记住什么」整个外包，节点本身无状态。不像的是，Otto 只有一本笔记本，对象存储却同时被成百个节点读写，必须靠 CAS 定序。</li>
+</ul></div>
+<h2>十条要点</h2>
+<ol class="takeaways">
+<li>传统的有状态副本组加 Raft 能用，但扩容搬数据、节点重建、读扩展受限都是常态负担。</li>
+<li>S3 在 2024 年支持带 If-Match 的条件写，ETag 不匹配返回 412，相当于单 key 原子 CAS。</li>
+<li>零盘架构里数据对象无条件并发写，只有 index 的一次 CAS 决定顺序，CAS 成功才 ack。</li>
+<li>Cursor 的 Continuity 把 WAL 放在 S3 作唯一真相源，任何服务器都能接 push。</li>
+<li>本地 NVMe 上的仓库只是热缓存，服务读之前用条件 GET 对账，未变则 304、下载 0 字节。</li>
+<li>gossip 只让副本早点知道该拉新数据，丢了也不影响正确性，正确性全押在条件写上。</li>
+<li>写延迟下限是对象存储 PUT 的 p99：WarpStream 在 S3 Standard 上约 400 ms，换 Express One Zone 降到 169 ms。</li>
+<li>成本从 IOPS 和容量变成请求数，攒批窗口越长越省钱，但 p99 直接加上窗口长度。</li>
+<li>CAS 只覆盖单 key，所有可变状态必须收口到一个指针，其余对象全部不可变、内容寻址。</li>
+<li>Iceberg 和 Continuity 用的是同一骨架：写不可变文件，再 CAS 一个可变指针。</li>
+</ol>
 <h2 data-tts="9713ff3e48fff100">深入资源</h2>
 <ul>
 <li><a href="https://cursor.com/blog/git-at-any-scale">Git at any scale · Cursor</a> — Continuity 架构原文：S3 WAL 作真相源、CAS 定序、rendezvous hashing、gossip、吞吐数字。</li>

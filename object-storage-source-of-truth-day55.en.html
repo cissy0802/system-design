@@ -52,6 +52,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -268,6 +276,26 @@ s3.put_json(f"{repo}/HEAD", {"manifest": mid},
 <li><strong>Follow-up list</strong>: 1) With no conditional write available, how do you patch the hole and at what cost? 2) Can two nodes both win a CAS — why not? 3) Which layer bottlenecks at 300 pushes/s, and how would you prove it? 4) Would you still choose this for a financial ledger that demands write p99 &lt; 10 ms? 5) How do you GC orphan objects without deleting one that is still referenced?</li>
 </ul>
 
+<h2>Crossovers</h2>
+<div class="crossx"><ul>
+<li><b>Complexity science · Stigmergy (Pierre-Paul Grass&eacute;, 1959)</b>: Watching termites build, Grass&eacute; saw that individuals never negotiate directly; they read and write a shared environment, and the trace one leaves tells the next what to do. Zero-disk nodes don't vote either; they only read and write the index in object storage. The difference: a termite mound tolerates duplication and conflict and drowns errors in numbers, while a conditional write flatly rejects the stale attempt. A 412 means "the trace has changed."</li>
+<li><b>Evolutionary biology · The Weismann barrier (August Weismann, 1892)</b>: Weismann split germ plasm from soma: heredity flows only down the germ line, and the body is a disposable carrier. The WAL is the germ plasm, the repo on NVMe is soma, and a broken one regrows from the germ line. Unlike germ plasm, though, the WAL is never copied with mutations; it only appends and never changes a byte.</li>
+<li><b>Neuroscience · Complementary learning systems (McClelland, McNaughton and O'Reilly, 1995)</b>: The hippocampus records each episode quickly, and the neocortex slowly folds them into structured knowledge through replay during sleep, much like "append to the WAL, then periodically compact into a snapshot." The difference: the brain's consolidation is lossy and old details fade, while compaction must guarantee that snapshot plus tail rebuilds the state exactly.</li>
+<li><b>Philosophy · The extended mind (Andy Clark and David Chalmers, 1998)</b>: They imagined Otto, whose memory fails, writing everything into a notebook that becomes part of his mind. Zero-disk nodes outsource "what to remember" in the same way and stay stateless. The difference: Otto has the notebook to himself, while object storage is read and written by hundreds of nodes at once and needs CAS to impose an order.</li>
+</ul></div>
+<h2>Ten takeaways</h2>
+<ol class="takeaways">
+<li>A stateful replica group running Raft works, but moving data on scale-out, rebuilding nodes and capped read scaling are constant burdens.</li>
+<li>Since 2024, S3 supports conditional writes with If-Match; an ETag mismatch returns 412, which amounts to an atomic single-key CAS.</li>
+<li>In a zero-disk design, data objects are written concurrently without conditions; one CAS on the index fixes the order, and only then is the client acked.</li>
+<li>Cursor's Continuity keeps the WAL on S3 as the single source of truth, so any server can accept any push.</li>
+<li>The repo on local NVMe is only a warm cache; before serving a read, a conditional GET reconciles it, and an unchanged index returns 304 with zero bytes downloaded.</li>
+<li>Gossip only tells replicas sooner that new data exists; losing it costs nothing in correctness, which rests entirely on the conditional write.</li>
+<li>Write latency is floored by the object store's PUT p99: WarpStream sees about 400 ms on S3 Standard and 169 ms on S3 Express One Zone.</li>
+<li>Cost shifts from IOPS and capacity to request count; a longer batching window saves money but adds its full length to p99.</li>
+<li>Object-store CAS covers a single key, so all mutable state must funnel into one pointer while every other object stays immutable and content-addressed.</li>
+<li>Iceberg and Continuity share one skeleton: write immutable files, then CAS a single mutable pointer.</li>
+</ol>
 <h2>Going Deeper</h2>
 <ul>
 <li><a href="https://cursor.com/blog/git-at-any-scale">Git at any scale · Cursor</a> — the Continuity architecture first-hand: S3 WAL as source of truth, CAS ordering, rendezvous hashing, gossip, throughput numbers.</li>
