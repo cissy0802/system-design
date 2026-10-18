@@ -52,6 +52,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -240,6 +248,26 @@ def pick_bitrate(buf_sec, recent_bw, ladder):
 <div class="callout"><strong>3. 用一刀切固定码率梯队。</strong> 简单内容浪费带宽、复杂内容质量不够。资深答法要点出 per-title/per-shot + VMAF。</div>
 <div class="callout"><strong>4. 忽略起播与卡顿指标。</strong> 用户流失主因是「打不开/老转圈」，不是「不够清晰」。SLO 要锚定 TTFF 和 rebuffer ratio，而非平均码率。</div>
 <p><strong>高频追问：</strong>① 估算千万并发的出口带宽与一部电影的转码/存储成本量级。② 一段视频怎么从上传走到能在全球播放？画出 pipeline。③ ABR throughput-based 与 buffer-based 各自失效场景，怎么混合？④ 新剧首发如何避免回源风暴？⑤ 点播 vs 直播架构差异在哪（转码实时性、延迟、缓冲策略）？</p>
+<h2>越界 · 跨学科的联想</h2>
+<div class="crossx"><ul>
+<li><b>神经科学 · 视网膜中央凹与视神经压缩</b>：人眼约 1 亿多个感光细胞，只经约 100 万根视神经纤维送进大脑，高分辨率只留给中央凹那一小块，比特花在感知最在乎的地方。per-shot 编码按画面难度分配码率、用 VMAF 而非 PSNR 打分，是同一个思路。不像在于：眼睛靠转动把中央凹对准重点，编码器只能事先猜观众看哪里。</li>
+<li><b>心理学 · 卡尼曼的峰终定律</b>：Kahneman 等人 1993 年的冷水实验发现，人对一段经历的评价主要取决于最难受的时刻和结尾，而非平均感受。视频 SLO 锚定卡顿率而不是平均码率，正合这个结构。不像的是，峰终定律里时长常被忽略，卡顿率却把卡了多久算得清清楚楚。</li>
+<li><b>投资 · 格雷厄姆的安全边际</b>：Benjamin Graham 主张只在价格明显低于估值时买入，给估计误差留余地。ABR 把带宽估计打八五折再选档、缓冲告急立刻降到最低档，也是先保不亏、再求收益。不像在于：投资的余量留一次管很久，播放器每段都要重新算一遍。</li>
+<li><b>复杂性科学 · 分形输送网络（West、Brown、Enquist，1997）</b>：三人用血管这类层层分叉的输送网络，解释了代谢率随体重的 3/4 次幂缩放；心脏不可能直接给每个细胞送血。源站 → 大容量节点 → ISP 边缘 → 用户，正是同一种分层分支。不像在于：血液会循环回心脏，视频字节只走单程，还能提前预推到末梢。</li>
+</ul></div>
+<h2>十条要点</h2>
+<ol class="takeaways">
+<li>视频流是带宽放大加计算放大：千万并发乘几 Mbps 就是数十到上百 Tbps 出口，中心机房发不动。</li>
+<li>转码 pipeline 离线跑一次、播放路径在线跑亿次，两条路要彻底分开，控制面只传元数据不碰视频字节。</li>
+<li>码率梯队按内容复杂度定：Netflix 从 per-title 走到 per-shot，同画质下大幅省码率。</li>
+<li>转码算力是一次性成本、带宽是永久性成本，所以多花 CPU 换永久省带宽几乎总是划算。</li>
+<li>转码质量要用 VMAF 这类感知指标衡量，只看 PSNR 会出现省了码率但用户觉得糊。</li>
+<li>ABR 必须放在客户端：只有播放器实时知道自己的缓冲水位和瞬时带宽。</li>
+<li>throughput-based ABR 反应快但切档抖，buffer-based 的 BOLA 稳但起播慢，现代播放器两者混合。</li>
+<li>Netflix Open Connect 把缓存服务器放进 ISP 机房，热门内容夜间预推，长尾内容按需回源。</li>
+<li>segment 时长是起播与效率的旋钮：2 秒灵敏但请求多，10 秒高效但切档迟钝，点播常取 4–6 秒。</li>
+<li>用户流失主要因为打不开和老转圈，SLO 要锚定起播时间和卡顿率，而非平均码率。</li>
+</ol>
 <h2 data-tts="7246dd40d7cf046a">深入资源</h2>
 <ul>
 <li><strong>Netflix TechBlog — <a href="https://netflixtechblog.com/per-title-encode-optimization-7e99442b62a2">Per-Title Encode Optimization</a></strong>：内容自适应梯队与凸包的开山之作。</li>

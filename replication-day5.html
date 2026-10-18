@@ -49,6 +49,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -388,6 +396,27 @@ def accept_write(req):
 <li>主库挂了，你有 3 个 follower：A lsn=1000、B lsn=995、C lsn=1000 但跨 region。选谁？为什么？</li>
 <li>Multi-leader 配置下如何处理『同一行被两个 region 同时改』？LWW / CRDT / 业务裁决各适合什么？</li>
 <li>Postgres semi-sync 把 <code>synchronous_commit</code> 设 <code>remote_apply</code> 比 <code>on</code> 多保证什么？代价？</li>
+</ol>
+<h2>越界 · 跨学科的联想</h2>
+<div class="crossx"><ul>
+<li><b>分子生物学 · DNA 复制的三道校对</b>：DNA 聚合酶先挑碱基、再用外切酶回头校读，最后错配修复兜底，层层叠下来错误率约十亿分之一，和「多一个副本、多一道检查」同构。不像的是，生物故意不追求零误差：漏网的突变正是进化的原料，数据库里的分歧却只是事故。</li>
+<li><b>神经科学 · 互补学习系统（McClelland、McNaughton、O'Reilly，1995）</b>：海马体像 leader，白天快速写入新经历；新皮层像异步副本，靠睡眠中的回放慢慢追上。海马体受损的人往往丢掉最近的记忆、久远的反而还在，正像主库挂掉时还没复制出去的那段写入。不像在于，巩固不是逐字节拷贝，而是抽取要点再重写，更接近逻辑复制，而且是有损的。</li>
+<li><b>神经科学 · 裂脑人（Sperry 与 Gazzaniga，1960 年代）</b>：切断胼胝体后，两个半球各自接收信息、各自行动，就是字面意义的 split-brain。不像的是，大脑没有 fencing，左脑的「解释器」会当场编一个说得通的理由把两边的行为缝成一个故事，像 LWW 那样把分歧静默抹平。</li>
+<li><b>量子力学 · 不可克隆定理（Wootters 与 Zurek、Dieks，1982）</b>：未知的量子态无法被复制，所以量子纠错不能靠存副本，Shor 1995 年的九比特码改用纠缠把一个比特的信息摊到九个比特上。冗余还在，只是从「拷贝」换成了「分布式编码」。</li>
+<li><b>投资 · 相关性与分散</b>：持有十只同涨同跌的股票不算分散，危机里相关性一齐升高，它们会一起亏。只读副本也是这样：主库一条 DROP TABLE 几毫秒就同步过去，冗余没有独立性，就挡不住同一类故障。</li>
+</ul></div>
+<h2>十条要点</h2>
+<ol class="takeaways">
+<li>数据库复制的本质是为故障买保险，读扩展只是顺带的副作用。</li>
+<li>Leader-Follower 单主拓扑没有写冲突，难点在故障切换，是绝大多数 OLTP 场景的正确答案。</li>
+<li>Multi-leader 和 Leaderless 换来就近写，代价是要用 CRDT、LWW 或业务裁决处理写冲突。</li>
+<li>LWW 用在余额这类数值上会静默丢掉一笔并发扣款，数值和集合要用 CRDT 或显式合并函数。</li>
+<li>Postgres 的 semi-sync 副本全挂时默认阻塞写入，MySQL 超时后则静默降级为 async。</li>
+<li>Raft 多数派只等最快的 N/2+1 个副本，把单个慢副本移出关键路径，尾延迟比固定 sync 副本更稳。</li>
+<li>异步复制的 lag 会造成读不到自己的写、单调读倒退、因果前缀颠倒三种用户可见异常。</li>
+<li>没有 fencing 的 failover 是脑裂定时炸弹：新主拿更高的 epoch，旧主复活后的写一律被拒。</li>
+<li>GitHub 2018 年一次 43 秒的跨区域网络分区触发自动 failover，酿成 24 小时故障，此后跨区域切换改为人工确认。</li>
+<li>只读副本不是备份：主库 DROP TABLE 几毫秒后副本也跟着删，备份要靠 PITR 快照。</li>
 </ol>
 <h2 data-tts="cb3caad0d0deb209">深入资源</h2>
 <ul>

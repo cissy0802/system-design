@@ -52,6 +52,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -228,6 +236,26 @@ def reconcile(ledger_rows, psp_rows):
 <li><strong>漏处理 PSP 的 unknown/timeout</strong>：既不能当成功也不能当失败——要主动查询 PSP 状态或交给对账兜底。</li>
 </ul>
 <p><strong>高频面试追问：</strong>① 客户端重试时如何保证不重复打款？② PSP 返回超时，你怎么知道钱到底动没动？③ 退款怎么记账（为什么不能改原记录）？④ 为什么支付不用 2PC？⑤ 怎么做到对账「到分」？哪类 break 可自动平、哪类必须人工？</p>
+<h2>越界 · 跨学科的联想</h2>
+<div class="crossx"><ul>
+<li><b>生物进化 · DNA 双链与错配修复</b>：DNA 每个碱基都有互补链对照，错配修复靠两条链不一致发现复制错误，和借贷必须相抵是同一种冗余校验。不像在于：细胞把错的碱基原地换掉，账本从不改原记录，只追加冲正分录。</li>
+<li><b>神经科学 · 记忆再巩固（Nader 等，2000）</b>：Nader、Schafe 与 LeDoux 在大鼠恐惧记忆实验中发现，被提取的记忆会重新变得不稳定，可被削弱或改写。人脑记忆像一列可变 balance，读一次就可能被覆盖、不留轨迹；支付账本恰好反过来，只许追加不许重写。</li>
+<li><b>量子力学 · 测量前的叠加态</b>：PSP 超时后状态保持 PENDING，查询那一刻才「坍缩」成成功或失败，像测量前的叠加。不像在于：钱其实早有确定结果，只是你不知道，这是经典的信息缺失，不是测量前本无定值。</li>
+<li><b>认知科学 · 预测编码（Rao 与 Ballard，1999）</b>：大脑拿内部模型的预测比对感官输入，只上传误差去修正模型。对账同构：ledger 是模型，PSP 和银行流水是感官，break 是预测误差。不同的是大脑会悄悄改模型，ledger 只能用新分录纠偏。</li>
+</ul></div>
+<h2>十条要点</h2>
+<ol class="takeaways">
+<li>支付系统的 correctness 远高于 availability：宁可拒绝服务，也不能重复扣款或记错一分。</li>
+<li>金额一律用整数 minor units（分）存储，用 float 存钱会让浮点误差累积到分。</li>
+<li>idempotency key 保证同一笔支付任意重试都只动一次钱，同 key 配不同请求体应直接报错。</li>
+<li>Stripe 把一次支付拆成多个 recovery point 落库，崩溃后从上个阶段续跑而非从头重来。</li>
+<li>双重记账要求每笔交易借贷之和恒为 0，账本只 append，退款和纠错靠冲正分录。</li>
+<li>不可变 ledger 的实时余额不靠全表 SUM，而是周期 snapshot 物化余额再加增量分录。</li>
+<li>外部 PSP 不参与事务协调，所以支付不用 2PC，而用 Saga 串联本地事务、Outbox 原子投递消息。</li>
+<li>已打款这类不可逆步骤无法补偿，只能 forward recovery 重试到成功，所以下游必须幂等。</li>
+<li>PSP 超时既不算成功也不算失败：保持 PENDING，带原 key 重查，最后靠对账兜底。</li>
+<li>借贷守恒只证明账本内部自洽，ledger、PSP、银行流水三方对账才检验账与现实一致。</li>
+</ol>
 <h2 data-tts="24387f300e5f3fa1">深入资源</h2>
 <ul>
 <li><a href="https://stripe.com/blog/idempotency" target="_blank">Stripe — Designing robust and predictable APIs with idempotency</a>：幂等 key + recovery point 的权威实现。</li>

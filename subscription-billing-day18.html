@@ -52,6 +52,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -248,6 +256,28 @@ def flush_every_minute():                        # 二级：落 Postgres
 <div class="callout"><strong>4. 改价就地改存量订阅。</strong> 价格必须版本化，存量订阅引用旧版本；否则一次调价把所有老客户账单全改了，等着上新闻。</div>
 <div class="callout"><strong>5. 迟到用量事件直接塞进已定稿账单。</strong> 已 finalize 的 invoice 应不可变；迟到事件入下期或走显式 credit note 调整，而不是偷偷改历史。</div>
 <p style="margin-top:14px"><strong>高频追问：</strong>① 周期出账用 cron 还是 per-subscription timer，怎么保证不漏不重？② 中途升级的 proration 一步步算给我看（按秒）。③ 10 亿用量事件/天的 metering 怎么设计，迟到事件怎么办？④ 年付怎么做收入确认，现金和收入为什么要分开记？⑤ inclusive vs exclusive 税，多币种为什么不实时换汇？</p>
+<h2>越界 · 跨学科的联想</h2>
+<div class="crossx"><ul>
+<li><b>生物进化 · 周期蝉的集体出土</b>：北美周期蝉每 13 或 17 年在同一季节集中出土，用数量一次喂饱天敌，靠制造尖峰换存活。计费系统正好反着来：把 anchor date 打散到全月，是为了不让自己和下游支付被尖峰压垮。</li>
+<li><b>哲学 · 忒修斯之船</b>：订阅换了套餐、加了席位、价格也换了版本，还是同一个订阅吗？计费的回答是把身份钉在 subscription_id 上，再把每个周期的 invoice 冻结成不可变快照。船可以一直换木板，航海日志不能改。</li>
+<li><b>心理学 · 损失厌恶</b>：Kahneman 与 Tversky 1979 年的前景理论指出，损失带来的痛感强于同等收益带来的快乐。存量订阅 grandfather 旧价、降级记 credit 而非退款，都避开了让老客户直面“涨价”这种损失框架。不像的是，计费这样做首先为了防套现、省手续费，心理效果只是副产品。</li>
+<li><b>神经科学 · 记忆巩固</b>：海马体先快速记下当天经历，睡眠中再把要点转存进皮层，细节随之流失。两级 metering 同理：Redis 先累加，定时 flush 进 Postgres 小时桶，单事件明细换成聚合量。不像的是，大脑每次回忆都会改写记忆，已定稿的 invoice 却不许改。</li>
+</ul></div>
+
+<h2>十条要点</h2>
+<ol class="takeaways">
+<li>金额永远用整数 minor units 存储，float 的舍入误差终会在对账时炸成几分钱的 break。</li>
+<li>订阅是 trialing、active、past_due、canceled 的显式状态机，用多个布尔字段拼状态会产生非法组合。</li>
+<li>周期出账以 (subscription_id, period_start) 为唯一键，cron 重跑也只会命中已存在的 invoice。</li>
+<li>Proration 按秒把周期切成两段：退旧价未用部分记负 credit，补新价剩余部分记正 charge。</li>
+<li>负 proration 通常记成账户 credit 抵下期而不退现金，以免退款手续费和“升级再退款”套现。</li>
+<li>计费的吞吐瓶颈在每天约 10 亿条用量事件的 metering，靠 Redis 加 Postgres 两级聚合扛住。</li>
+<li>迟到的用量事件不改已定稿账单：宽限窗内计入本期，窗外走可审计的 credit note 调整。</li>
+<li>多币种为每种货币预设价格而不实时换汇，税额在出账瞬间按当时税率冻结进 invoice。</li>
+<li>10 万订阅若都在每月 1 号出账会形成尖峰，打散 anchor date 也顺带给下游支付削峰。</li>
+<li>年付收到的现金先记为递延收入，再按月转为已确认收入，现金与收入须在 Ledger 中分开记。</li>
+</ol>
+
 <h2 data-tts="2e95a94ebe15b50a">深入资源</h2>
 <ul>
 <li><strong>Stripe Billing — Subscriptions Overview &amp; Prorations</strong>（<a href="https://docs.stripe.com/billing/subscriptions/overview">overview</a> / <a href="https://docs.stripe.com/billing/subscriptions/prorations">prorations</a>）：生命周期状态机与按秒 proration 的权威实现。</li>

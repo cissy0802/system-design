@@ -51,6 +51,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -260,6 +268,26 @@ def pick(items):
 <li><strong>Interview Q:</strong> how to handle delayed feedback (conversion arriving days later) for labels? (Answer: waiting window, negative correction, importance weighting.)</li>
 </ul>
 
+<h2>Crossovers</h2>
+<div class="crossx"><ul>
+<li><b>Neuroscience · Feature Integration Theory (Treisman &amp; Gelade, 1980)</b>: vision first extracts color and orientation cheaply and in parallel across the whole field, then attention binds features into objects one at a time at high cost — the same retrieve-cheap, rank-expensive funnel. The difference: attention reaches back top-down to reshape early filtering, while a recommendation funnel mostly flows one way.</li>
+<li><b>Evolution · The marginal value theorem of foraging (Charnov, 1976)</b>: an animal should leave a food patch once its intake drops below the habitat average and gamble on an unknown one — natural selection's solution to explore-exploit. Unlike the animal, a recommender explores with the user's attention, not its own.</li>
+<li><b>Complexity science · Preferential attachment (Barabási–Albert, 1999)</b>: new nodes prefer to link to already well-connected nodes, and the network grows a power law; popular items getting ever more exposure is the same rich-get-richer loop. The BA model has no brake, while a recommender can flatten the peak with exploration budget and re-rank diversity.</li>
+<li><b>Investing · Soros's reflexivity</b>: traders' beliefs move prices, and prices then "confirm" the beliefs. Evaluating a new model on an old model's logs works the same way: the model shapes the data, then the data vouches for the model. The difference is that market reflexivity eventually corrects in a crash, while a filter bubble usually just narrows quietly.</li>
+</ul></div>
+<h2>Ten takeaways</h2>
+<ol class="takeaways">
+<li>The hard part of recommendation is compute and latency, not training a CTR model: no heavy model can score a billion candidates.</li>
+<li>The multi-stage funnel narrows through retrieval, pre-rank, ranking and re-rank, cutting an order of magnitude per stage with heavier models later.</li>
+<li>Two-tower retrieval precomputes item vectors into an ANN index and computes one user vector online, so it cannot use user×item cross features before scoring.</li>
+<li>Using only impressed-but-not-clicked items as retrieval negatives causes selection bias; mix in corpus-wide random negatives and correct sampling bias by item popularity.</li>
+<li>Production retrieval is a union of dozens of channels (two-tower, collaborative filtering, trending, follows, geo), since no single channel covers every intent.</li>
+<li>Pre-rank is usually a distilled small version of the ranking model, a compute buffer that keeps thousands of candidates from overwhelming ranking.</li>
+<li>Cold start is an explore-exploit problem: Thompson sampling gives high-variance new items a chance at exposure so they can collect feedback.</li>
+<li>Google's TIGER turns retrieval into autoregressive generation of Semantic IDs, helping cold-start and long-tail items at higher latency than one ANN query.</li>
+<li>A click is relevance times the probability of being seen; without position de-biasing, the model locks in "clicked because it ranked first."</li>
+<li>Optimizing CTR alone breeds clickbait, which is why YouTube moved to watch time; recommendation feedback loops also collapse diversity into filter bubbles.</li>
+</ol>
 <h2>Deep Resources</h2>
 <ul>
 <li><strong>YouTube</strong>: "Deep Neural Networks for YouTube Recommendations" (Covington et al, RecSys 2016) — the foundational two-stage retrieval+ranking paper.</li>

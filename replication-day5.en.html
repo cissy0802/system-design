@@ -48,6 +48,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -398,6 +406,28 @@ def accept_write(req):
 <li>Primary died; you have 3 followers: A lsn=1000, B lsn=995, C lsn=1000 but in another region. Pick one. Why?</li>
 <li>In a multi-leader setup, how do you handle "same row mutated concurrently in two regions"? When is LWW / CRDT / app-level arbitration appropriate?</li>
 <li>What does Postgres semi-sync's <code>synchronous_commit=remote_apply</code> guarantee beyond <code>on</code>? At what cost?</li>
+</ol>
+
+<h2>Crossovers</h2>
+<div class="crossx"><ul>
+<li><b>Molecular biology · DNA replication's three checks</b>: DNA polymerase selects bases, proofreads with its exonuclease, and mismatch repair catches what slips through; stacked together the error rate falls to roughly one in a billion, the same shape as "one more replica, one more check." Unlike a database, life never aims for zero error: the mutations that slip by are the raw material of evolution, while divergence in a database is just an incident.</li>
+<li><b>Neuroscience · Complementary learning systems (McClelland, McNaughton, O'Reilly, 1995)</b>: the hippocampus acts like a leader, writing new experiences fast; the neocortex is an async replica that catches up through replay during sleep. People with hippocampal damage often lose recent memories while old ones survive, much like the writes that never left a dead primary. The difference: consolidation is not a byte copy but a gist-extracting rewrite, closer to lossy logical replication.</li>
+<li><b>Neuroscience · Split-brain patients (Sperry and Gazzaniga, 1960s)</b>: with the corpus callosum cut, each hemisphere receives and acts on its own, a literal split-brain. Unlike a cluster, the brain has no fencing; the left hemisphere's "interpreter" improvises a plausible reason that stitches both sides into one story, silently smoothing over the divergence much as LWW does.</li>
+<li><b>Quantum mechanics · The no-cloning theorem (Wootters and Zurek; Dieks, 1982)</b>: an unknown quantum state cannot be copied, so quantum error correction cannot keep replicas. Shor's 1995 nine-qubit code instead uses entanglement to spread one qubit's information across nine. The redundancy survives; it just moves from copying to distributed encoding.</li>
+<li><b>Investing · Correlation and diversification</b>: ten stocks that rise and fall together are not diversification; in a crisis correlations jump and they lose together. Read replicas behave the same way: a DROP TABLE on the primary reaches them in milliseconds, and redundancy without independence cannot stop a shared failure.</li>
+</ul></div>
+<h2>Ten takeaways</h2>
+<ol class="takeaways">
+<li>Database replication is fundamentally insurance against failure; read scaling is only a side effect.</li>
+<li>Single-leader replication has no write conflicts, its hard part is failover, and it is the right answer for most OLTP systems.</li>
+<li>Multi-leader and leaderless setups buy local writes at the cost of resolving conflicts with CRDTs, LWW, or app-level arbitration.</li>
+<li>LWW on a numeric field like a balance silently drops one of two concurrent debits; counters and sets need CRDTs or explicit merge functions.</li>
+<li>When every Postgres semi-sync replica is down, writes block by default, while MySQL silently degrades to async after a timeout.</li>
+<li>Raft majorities wait only for the fastest N/2+1 replicas, removing one slow replica from the critical path and steadying tail latency.</li>
+<li>Async replication lag causes three visible anomalies: missing your own writes, non-monotonic reads, and broken causal prefixes.</li>
+<li>Failover without fencing is a split-brain time bomb: the new leader gets a higher epoch, and the revived old leader's writes are rejected.</li>
+<li>In 2018 a 43-second cross-region partition triggered GitHub's automatic failover and a 24-hour outage; cross-region failover now requires human confirmation.</li>
+<li>A read replica is not a backup: a DROP TABLE on the primary reaches it within milliseconds, so backups need PITR snapshots.</li>
 </ol>
 
 <h2>Deep Resources</h2>

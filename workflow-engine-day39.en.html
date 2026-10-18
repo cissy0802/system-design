@@ -52,6 +52,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -261,6 +269,26 @@ func ChargePayment(ctx, order) error {
 <div class="callout"><strong>4. Common ask:</strong> why do microservices avoid distributed 2PC? (blocking, coordinator single point, long-held locks, participant-failure amplification.) What does Saga trade? (gives up isolation I for availability — intermediate state is externally visible, business must tolerate it.)</div>
 <div class="callout"><strong>5. Common ask:</strong> how does a workflow engine guarantee no state loss and no duplicated side effects after a crash? (event-sourced persistence + deterministic replay + Activity idempotency keys.)</div>
 
+<h2>Crossovers</h2>
+<div class="crossx"><ul>
+<li><b>Neuroscience · Hippocampal replay</b>: in 1994 Wilson and McNaughton found that hippocampal place cells in sleeping rats re-fire in the same order as during the day's maze runs, so the brain also consolidates state by replaying an event sequence. Where it differs: brain replay is compressed and selective, and the reconsolidation experiments by Nader and colleagues in 2000 showed that recalling a memory can rewrite it. History is immutable, and replay must match it entry by entry or fail with a non-determinism error. Engineering wants exactly the rigidity the brain does not offer.</li>
+<li><b>Evolution · Dollo's law of irreversibility</b>: Dollo argued in 1893 that complex structures lost in evolution do not return in their original form. Whales went back to the sea without regrowing gills; they offset the loss with lungs and long breath-holds. That is semantic compensation, not physical rollback. Unlike a Saga, evolution keeps no compensation stack and nobody undoes steps in reverse order.</li>
+<li><b>Complexity science · Stigmergy</b>: Grassé coined the term in 1959 while studying termite nest building. Individuals take no orders; they react to traces left in the environment, and the structure emerges. That is choreography. The likeness is coordination without a central brain; the difference is that a termite colony never needs debugging, while a stuck order needs someone to say which step it is stuck on.</li>
+<li><b>Business · Reversing entries in double-entry bookkeeping</b>: since Pacioli set out double-entry bookkeeping in 1494, accountants never erase a wrong entry; they post a reversing one. An append-only ledger corrected by new records has the same structure as event sourcing plus compensation, except that ledger reversals carry audit and legal weight.</li>
+</ul></div>
+<h2>Ten takeaways</h2>
+<ol class="takeaways">
+<li>A workflow engine turns state persistence, retries, timeouts and compensation into infrastructure, replacing hand-written state machines built on DB status fields and cron polling.</li>
+<li>Durable Execution relies on event sourcing plus deterministic replay: steps with recorded results return cached values, so side effects never run twice.</li>
+<li>Workflow code must be deterministic; now(), rand() and reads of external state belong in Activities, or replayed commands will not match history.</li>
+<li>Orchestration has a central coordinator call each service in turn, visible and easy to compensate; choreography relays events, decoupled but with no owner of the overall flow.</li>
+<li>A Saga splits a long transaction into local transactions and runs compensations in reverse on failure, a model from Garcia-Molina and Salem's 1987 paper.</li>
+<li>Compensation is a semantic offset, not a physical rollback, so irreversible steps go as late as possible; past them, only forward recovery remains.</li>
+<li>Activities are only at-least-once, so they need an idempotency key such as the order ID; Stripe's Idempotency-Key header is the classic example.</li>
+<li>Compensations can fail too: they must be idempotent and retryable, escalate to a manual-intervention queue after a deadline, and be backstopped by a reconciliation job.</li>
+<li>Changing workflow code while workflows are in flight causes non-determinism errors; getVersion() or patch lets old and new paths coexist.</li>
+<li>Accountants never erase entries, they post reversing ones, which mirrors event sourcing plus compensation: history is append-only and fixes are new records.</li>
+</ol>
 <h2>Further Resources</h2>
 <ul>
 <li><strong>Designing Data-Intensive Applications, Ch. 9 + Ch. 12</strong> (Kleppmann): the essence of distributed transactions, consensus, and "derived data / end-to-end idempotency".</li>

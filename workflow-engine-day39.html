@@ -53,6 +53,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -250,6 +258,26 @@ func ChargePayment(ctx, order) error {
 <div class="callout"><strong>3. 把不可补偿的步骤放太靠前。</strong> 一旦执行了不可撤销的操作（钱打给第三方），后面失败就无法整单回滚，只能前向重试——排序上尽量把它放到最后。</div>
 <div class="callout"><strong>4. 面试常问：</strong>为什么微服务要避免分布式 2PC？（阻塞、协调者单点、锁资源久、参与者故障放大）Saga 用什么换什么？（放弃隔离性 I，换可用性——中间态对外可见，需业务容忍）。</div>
 <div class="callout"><strong>5. 面试常问：</strong>workflow 引擎怎么保证进程崩溃后不丢状态、不重复副作用？（答：event sourcing 持久化 + 确定性重放 + Activity 幂等键）。</div>
+<h2>越界 · 跨学科的联想</h2>
+<div class="crossx"><ul>
+<li><b>神经科学 · 海马体重放</b>：1994 年 Wilson 与 McNaughton 发现，大鼠睡眠时海马位置细胞会按白天跑迷宫的顺序重新放电，大脑也靠「重放事件序列」来巩固状态。不像的地方在于：大脑的重放是压缩、有选择的，而且 2000 年 Nader 等人的再巩固实验表明，每次提取记忆都可能改写它；History 则不可变，重放必须逐条对齐，差一条就报非确定性错误。工程上要的恰恰是大脑不提供的那种死板。</li>
+<li><b>生物进化 · Dollo 不可逆定律</b>：Dollo 在 1893 年提出，演化丢掉的复杂结构不会原样回来。鲸回到海里没有长回鳃，而是用肺加长时间憋气抵消，这就是「语义补偿而非物理回滚」。不同的是，进化没有补偿栈，也没有谁负责逆序撤销。</li>
+<li><b>复杂性科学 · 共识主动性（stigmergy）</b>：Grassé 1959 年研究白蚁筑巢时提出这个词：个体不听指挥，只对环境里留下的痕迹做反应，整体结构自己长出来。这就是编舞。像的是没有中央大脑也能协作；不像的是蚁群不需要调试，而订单流程出错时得有人说清楚卡在哪一步。</li>
+<li><b>商业 · 复式记账的冲销分录</b>：自 Pacioli 1494 年系统写下复式记账法以来，会计记错了从不擦掉，而是再记一笔反向分录冲销。账本只追加、纠错靠新记录，和 event sourcing 加补偿事务是同一结构；区别是账本的冲销有审计和法律效力约束。</li>
+</ul></div>
+<h2>十条要点</h2>
+<ol class="takeaways">
+<li>工作流引擎把状态持久化、重试、超时和补偿下沉成基础设施，取代「DB 状态字段 + cron 轮询」的手写状态机。</li>
+<li>Durable Execution 靠 event sourcing 加确定性重放：已记录结果的步骤直接返回缓存值，不重复执行副作用。</li>
+<li>workflow 代码必须确定性，now()、rand() 和读外部状态都要挪进 Activity，否则重放时命令与历史对不上。</li>
+<li>编排由中央协调器依次调用各服务，流程可视、易补偿；编舞靠事件接力，解耦但全局流程无人拥有。</li>
+<li>Saga 把长事务拆成一串本地事务，失败时逆序执行补偿，模型源自 1987 年 Garcia-Molina 与 Salem 的论文。</li>
+<li>补偿是业务语义上的抵消而非物理回滚，不可撤销的步骤尽量放到最后，越过它就只能前向重试。</li>
+<li>Activity 只保证 at-least-once，必须用订单号这类业务唯一键做幂等，Stripe 的 Idempotency-Key 是经典实现。</li>
+<li>补偿本身也会失败，必须幂等、可重试，超过 deadline 就转人工介入队列，再用对账 job 兜底。</li>
+<li>在途 workflow 遇上代码改版会触发非确定性错误，要用 getVersion() 或 patch 让新旧路径共存。</li>
+<li>会计从不擦账、只记冲销分录，与 event sourcing 加补偿同构：历史只追加，纠错靠新记录。</li>
+</ol>
 <h2 data-tts="c0900c8d4db8a6ee">深入资源</h2>
 <ul>
 <li><strong>《Designing Data-Intensive Applications》第 9 章 + 第 12 章</strong>（Kleppmann）：分布式事务、共识与「派生数据/端到端幂等」的本质讨论。</li>

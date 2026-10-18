@@ -51,6 +51,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -257,6 +265,28 @@ def flush_every_minute():                        # level 2: to Postgres
 <div class="callout"><strong>4. Mutating existing subscriptions on price change.</strong> Prices must be versioned, existing subscriptions referencing the old version; otherwise one price change rewrites every legacy customer's bill — make the news.</div>
 <div class="callout"><strong>5. Stuffing late usage events into a finalized invoice.</strong> A finalized invoice should be immutable; late events go to the next period or a explicit credit note, not a silent rewrite of history.</div>
 <p style="margin-top:14px"><strong>Frequent follow-ups:</strong> ① Cron vs per-subscription timer for cycle billing — how do you guarantee no miss, no double? ② Walk me through mid-cycle upgrade proration step by step (by second). ③ How do you design metering for 1B usage events/day, and handle late events? ④ How does annual prepay do revenue recognition, and why separate cash from revenue? ⑤ Inclusive vs exclusive tax, and why not real-time FX for multi-currency?</p>
+
+<h2>Crossovers</h2>
+<div class="crossx"><ul>
+<li><b>Evolution · Periodical cicadas</b>: North American periodical cicadas emerge en masse every 13 or 17 years, satiating predators with sheer numbers: they survive by creating a spike. Billing does the opposite, scattering anchor dates across the month so the spike never overwhelms the system or the payment layer downstream.</li>
+<li><b>Philosophy · Ship of Theseus</b>: After a plan change, new seats and a new price version, is it still the same subscription? Billing answers by pinning identity to subscription_id and freezing each period's invoice as an immutable snapshot. The planks keep changing; the logbook never does.</li>
+<li><b>Psychology · Loss aversion</b>: Kahneman and Tversky's 1979 prospect theory showed that a loss hurts more than an equal gain pleases. Grandfathering legacy prices and crediting downgrades instead of refunding both spare existing customers the "price hike" loss frame. The difference: billing does this mainly to block refund fraud and fees; the psychology is a side effect.</li>
+<li><b>Neuroscience · Memory consolidation</b>: The hippocampus records the day quickly, then during sleep the gist is transferred to the cortex and detail falls away. Two-level metering works the same way: Redis accumulates, then flushes into Postgres hourly buckets, trading per-event detail for aggregates. Unlike the brain, which rewrites a memory each time it is recalled, a finalized invoice may never change.</li>
+</ul></div>
+
+<h2>Ten takeaways</h2>
+<ol class="takeaways">
+<li>Always store money as integer minor units; float rounding error eventually surfaces as a cents-level reconciliation break.</li>
+<li>A subscription is an explicit state machine (trialing, active, past_due, canceled); stitching state from booleans creates illegal combinations.</li>
+<li>Cycle billing keys each invoice on (subscription_id, period_start), so a re-run cron only hits the invoice that already exists.</li>
+<li>Proration splits the period by the second: a negative credit for unused time at the old price, a positive charge for the rest at the new one.</li>
+<li>Negative proration usually becomes account credit against the next bill rather than a cash refund, avoiding fees and upgrade-then-refund fraud.</li>
+<li>Billing's throughput bottleneck is metering roughly 1 billion usage events a day, handled by two-level aggregation in Redis and Postgres.</li>
+<li>Late usage events never rewrite a finalized invoice: inside the grace window they count this period, outside it they go through an auditable credit note.</li>
+<li>Multi-currency billing presets a price per currency instead of converting live, and tax is frozen into the invoice at the moment of billing.</li>
+<li>If 100,000 subscriptions all bill on the 1st, the spike is severe; scattering anchor dates also smooths the load on downstream payments.</li>
+<li>Annual prepaid cash is first booked as deferred revenue and recognized month by month, so the ledger must keep cash and revenue separate.</li>
+</ol>
 
 <h2>Further Resources</h2>
 <ul>

@@ -52,6 +52,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -250,6 +258,26 @@ def pick(items):
 <li><strong>面试题：</strong>新 item 怎么冷启？explore-exploit 如何量化分配探索预算？</li>
 <li><strong>面试题：</strong>延迟反馈（转化几天后才回）怎么处理 label？（答：等待窗口、负样本修正、importance weighting。）</li>
 </ul>
+<h2>越界 · 跨学科的联想</h2>
+<div class="crossx"><ul>
+<li><b>神经科学 · 特征整合理论（Treisman &amp; Gelade，1980）</b>：视觉先在整个视野里并行、廉价地抽取颜色和朝向，再由注意力逐个、昂贵地把特征绑定成物体，正是「召回粗筛、精排细看」的漏斗。不像在于：大脑的注意会自上而下改写早期筛选，推荐漏斗基本是单向的。</li>
+<li><b>生物进化 · 觅食理论的边际值定理（Charnov，1976）</b>：动物在一片食物上吃到收益低于环境平均值就该离开，去未知的斑块碰运气，是自然选择解出的 explore-exploit。不同是动物在为自己权衡，推荐系统拿的是用户的注意力去探索。</li>
+<li><b>复杂性科学 · 优先连接（Barabási–Albert，1999）</b>：新节点更爱连向已经连接多的节点，网络长出幂律分布；热门 item 越推越热是同一个「富者愈富」。区别是 BA 模型没有刹车，推荐系统可以用探索预算和重排多样性主动削峰。</li>
+<li><b>投资 · 索罗斯的反身性</b>：市场参与者的看法改变价格，价格又反过来「证实」这个看法。用旧模型的日志评估新模型也是这样，模型塑造了数据，再被数据确认。不像的是，市场的反身性最终会以崩盘纠偏，推荐系统的茧房常常只是悄悄收窄。</li>
+</ul></div>
+<h2>十条要点</h2>
+<ol class="takeaways">
+<li>推荐系统的难点不在训 CTR 模型，而在算力与延迟：不可能给十亿候选各跑一遍重模型。</li>
+<li>多阶段漏斗按召回、粗排、精排、重排逐级收窄，每级砍一个数量级，模型越往后越重。</li>
+<li>双塔召回把 item 向量离线灌进 ANN 索引、线上只算一次 user 向量，所以打分前不能做 user×item 交叉特征。</li>
+<li>召回只拿「曝光未点击」当负样本会有选择偏差，要掺全库随机负样本，并按 item 热度做采样偏差纠正。</li>
+<li>生产环境的召回是几十路通道的并集（双塔、协同过滤、热门、关注、地理），因为没有单一通道能覆盖所有意图。</li>
+<li>粗排通常是精排的蒸馏小模型，夹在召回和精排之间做算力缓冲，防止几千候选直接压垮精排。</li>
+<li>冷启动的核心是 explore-exploit：Thompson sampling 让估计方差大的新 item 有机会拿到曝光、采集反馈。</li>
+<li>Google TIGER 用 Semantic ID 把检索变成自回归生成，对冷启和长尾 item 更友好，但延迟高于一次 ANN 查询。</li>
+<li>点击是相关性乘以检视概率，不做 position 去偏，模型会把「排在前面所以被点」自我固化。</li>
+<li>只优化 CTR 会催生标题党，YouTube 正因此改为优化观看时长；推荐的反馈回路还会让多样性塌缩成信息茧房。</li>
+</ol>
 <h2 data-tts="39f98a3f5f88766b">深入资源</h2>
 <ul>
 <li><strong>YouTube</strong>：《Deep Neural Networks for YouTube Recommendations》(Covington et al, RecSys 2016)——两阶段召回+排序的奠基论文。</li>

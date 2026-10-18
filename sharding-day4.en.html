@@ -51,6 +51,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -436,6 +444,27 @@ def read(key):
 <li>Designing a multi-tenant SaaS, one customer spikes to 30% of platform traffic. How do you "move them out" invisibly?</li>
 <li>What are the key phases of online resharding? How do you detect data drift during dual write?</li>
 <li>Why provision many more logical shards than physical instances? Use a concrete scale-out scenario to show the benefit.</li>
+</ol>
+
+<h2>Crossovers</h2>
+<div class="crossx"><ul>
+<li><b>Eastern philosophy · Zhuangzi's Cook Ding</b>: Cook Ding's knife stayed sharp for nineteen years because he cut along the gaps between joints; choosing a shard key is finding the data's own seams so most queries and joins stay in one piece. The difference: an ox's joints are fixed, while access patterns drift with the business, and today's seam can harden into tomorrow's bone.</li>
+<li><b>Behavioral ecology · Animal territories</b>: a newcomer songbird can only squeeze in between its immediate neighbors while distant territories stay untouched, just as a new node on a consistent-hashing ring takes over only the adjacent arc. Unlike the ring, territorial borders are renegotiated through song and fights; on the ring they are simply computed.</li>
+<li><b>Complexity science · Preferential attachment (Barabási and Albert, 1999)</b>: new links favor nodes that already have many, so networks grow a few giant hubs and a power-law degree distribution; celebrity accounts are such hubs. Hash sharding assumes keys are roughly equal, an assumption a power-law world breaks from the start.</li>
+<li><b>Evolution · Honeybee swarming</b>: when a hive gets crowded, the workers first raise new queens, then the old queen leaves with a large share of the workers to found a new nest; one colony becomes two without stopping work, like a well-planned online reshard. The difference: a swarm has no rollback and no shadow read.</li>
+</ul></div>
+<h2>Ten takeaways</h2>
+<ol class="takeaways">
+<li>Sharding is irreversible architectural debt: you gain unbounded scale-out and lose cross-shard transactions, full joins, and automatic secondary indexes.</li>
+<li>If data size and QPS won't outgrow a single machine within a year, don't shard; scale up, add a cache, and add read replicas first.</li>
+<li>Hash sharding spreads keys evenly and makes point lookups one hash away, but every range scan must fan out to all shards.</li>
+<li>Range sharding keeps keys in order and suits time-series scans, but with time-ordered writes the newest shard is always the hottest.</li>
+<li>With hash(key) % N as the shard function, growing from 16 to 32 nodes forces about 93.75% of keys to move.</li>
+<li>Consistent hashing with virtual nodes moves only about 1/N of the data when a node joins or leaves, and spreads its load evenly.</li>
+<li>Statistically uniform is not actually uniform: celebrity accounts, whale tenants, and the tail of time-series data can each crush a single shard.</li>
+<li>Salting appends suffixes to a hot key to spread writes across partitions, at the cost of fan-out-and-merge reads, so it fits write-heavy keys only.</li>
+<li>Online resharding runs through dual writes, backfill, shadow-read verification, gradual cutover, and teardown; each of Notion's two reshards took about six months.</li>
+<li>With far more logical shards than physical instances (say 1024 vs 32), scaling out means moving logical shards without touching the routing function.</li>
 </ol>
 
 <h2>Key Resources</h2>

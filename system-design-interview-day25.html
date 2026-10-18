@@ -52,6 +52,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -217,6 +225,26 @@ def pick_deep_dive(components):
 <li>如果一致性要求从最终一致变成强一致，架构怎么改？</li>
 <li>某个组件挂了会怎样？怎么降级 / 重试 / 熔断？</li>
 <li>怎么知道线上出问题了？你会监控哪几个指标、SLO 怎么定？</li>
+</ol>
+<h2>越界 · 跨学科的联想</h2>
+<div class="crossx"><ul>
+<li><b>心理学 · Ericsson 与 Simon 的出声思维法</b>：1980 年两人在《Psychological Review》发表「Verbal reports as data」，把受试者边做题边说出的念头当成研究认知过程的数据，和面试里的出声推理是同一个结构：让看不见的决策过程变得可观察。不像在哪：他们的方法要求只说出脑中所想、不要解释，因为被要求解释会改变解题过程本身；面试偏偏要你一边做一边解释为什么。</li>
+<li><b>心理学 · Kahneman 的系统 1 与系统 2</b>：刚接到新约束就抢答，靠的是快而自动的系统 1；先静想 30 秒再开口，是给慢而费力的系统 2 留出启动时间。不同的是，面试还要求把系统 2 的推演过程讲给别人听。</li>
+<li><b>经济学 · Herbert Simon 的「满意化」</b>：Simon 1956 年指出，时间和信息有限的人不求最优，只求「够好」就停。45 分钟里主动砍范围正是满意化；差别在于面试考的不只是停在哪，还要你把停下的理由说出口。</li>
+<li><b>商业 · Michael Porter 的「战略就是取舍」</b>：Porter 1996 年在《哈佛商业评论》的《What Is Strategy?》里说，战略的本质是选择不做什么。trade-off 表达里「我放弃了什么」是同一个结构；不像的是 Porter 的取舍是长期定位，面试的满分句式却要说出约束一变就改选。</li>
+</ul></div>
+<h2>十条要点</h2>
+<ol class="takeaways">
+<li>系统设计面试考的是判断力、技术深度、操作成熟度和沟通四个维度，不是背了多少组件。</li>
+<li>开放题的第一动作是范围界定：分清功能与非功能需求，并主动声明这次不展开哪些功能。</li>
+<li>只挑 1–2 个有 trade-off 张力的核心功能讲透，深度永远优于广度。</li>
+<li>Alex Xu 的四步框架真正的价值在时间盒：澄清和估算各约 5 分钟，高层约 10 分钟，深挖约 15 分钟。</li>
+<li>画完高层架构先停下来拿面试官的 buy-in，免得花 15 分钟把错的系统设计得很漂亮。</li>
+<li>主动提出 2–3 个候选深挖点让面试官挑一个，既展示判断力，又对齐了他想考的方向。</li>
+<li>出声推理即使结论错了也能拿 partial credit，但遇到新约束或硬问题时，先安静组织 30 秒更显资深。</li>
+<li>满分的 trade-off 表达要讲出被淘汰的方案和代价，最后再说约束一变自己会改选什么。</li>
+<li>senior 把一个系统做对，staff 还要看到跨系统的二阶效应、迁移成本和组织约束。</li>
+<li>面试里 BOTE 估算足以 justify 分片，生产里同样的决策要靠真实指标、压测和可观测性来验证。</li>
 </ol>
 <h2 data-tts="d0b1525c142d95a2">深入资源</h2>
 <ul>

@@ -52,6 +52,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -281,6 +289,26 @@ schedule_renew(lease, before_expiry="10m")           # 续租或重新申请
 <div class="callout">
 <strong>5. 把 secret 提交进 git</strong>：哪怕事后删除，历史里仍在，且可能已被爬取。一旦提交即视为泄露，必须立即轮换——这也是为什么动态短期凭证比静态密钥安全得多。
 </div>
+<h2>越界 · 跨学科的联想</h2>
+<div class="crossx"><ul>
+<li><b>免疫学 · T 细胞双信号</b>：T 细胞光认出抗原（信号一）还不够，还要抗原呈递细胞给出共刺激（信号二）才会激活，缺了第二个就转入无反应。像 AuthN 与 AuthZ 分两道查、都过才放行；不像在免疫的第二道看情境，系统授权按策略逐条判定。</li>
+<li><b>金融 · 现金 vs 存款账户</b>：JWT 是 bearer 票据，像现金——谁拿着谁能花，验真只看防伪（签名），不用打电话问银行，所以快、在哪都能用，可一旦被偷就无法挂失。Session 像存款账户，每笔都过账本，慢一点但随时能冻结。「短 access token + 可撤销 refresh token」相当于身上只揣零钱、大额放银行。不像的是：现金不会过期，token 自带到期时间，过期本身就是一种迟到的撤销。</li>
+<li><b>商业 · 委托代理问题</b>：Jensen 与 Meckling（1976）讨论股东把决策权交给经理人后如何限定与监督。OAuth 的 scope、短期 token、可撤销授权，就是给代理人开一份有限授权书。不像在：经理人有自己的利益要靠激励对齐，第三方应用只需被权限框住。</li>
+<li><b>生物进化 · 红皇后假说</b>：Van Valen（1973）提出物种必须不停演化，才能在共同演化的对手面前维持原地。密钥轮换、动态短期凭证同理：静态密钥站着不动，就等于在攻击者面前慢慢退化。不像在：演化靠随机变异被动试错，轮换是主动、可排期的。</li>
+</ul></div>
+<h2>十条要点</h2>
+<ol class="takeaways">
+<li>认证（AuthN）回答「你是谁」，登录时做一次；授权（AuthZ）回答「能做什么」，每次资源访问都要判断。</li>
+<li>没有或无效凭证返回 401，身份有效但越权返回 403，有时故意返回 404 来隐藏资源是否存在。</li>
+<li>Broken Access Control 长期高居 OWASP Top 10 首位，漏掉资源归属校验就是典型的 IDOR。</li>
+<li>集中式 PDP 策略统一、可审计，但每请求多一跳，要靠 sidecar 本地缓存策略摊薄延迟。</li>
+<li>OAuth 2.0 是授权委托框架而非认证协议，判断「用户是谁」要用 OIDC 签发的 id_token。</li>
+<li>有用户参与的场景一律用 Authorization Code + PKCE，攻击者截到 code 也拿不到 verifier。</li>
+<li>JWT 用「过期前无法撤销」换来每请求本地验签、零查询；Session 恰好反过来，可即时撤销。</li>
+<li>JWT 验签必须显式锁定算法并校验 iss 和 aud，否则 alg:none 与算法混淆攻击能伪造 token。</li>
+<li>「短 access token + 可轮换、可撤销的 refresh token」是兼顾 stateless 性能与止血的工业做法。</li>
+<li>Vault 动态短期凭证到期自动回收；secret 一旦提交进 git 就视为泄露，必须立即轮换。</li>
+</ol>
 <h2 data-tts="79603c7e4555b836">深入资源</h2>
 <ul>
 <li><strong>oauth.net + 《OAuth 2.0 Simplified》(Aaron Parecki)</strong>：OAuth/OIDC 的权威入口与通俗读本。</li>

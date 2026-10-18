@@ -51,6 +51,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -232,6 +240,27 @@ def auth(req):
 <li>"How does round robin fall apart with long-lived connections? How do you fix it?" (Leads into least-conn / P2C.)</li>
 </ol>
 
+<h2>Crossovers</h2>
+<div class="crossx"><ul>
+<li><b>Evolution · The square-cube law (Galileo, 1638)</b>: Double an animal's length and its weight grows eightfold while bone cross-section only grows fourfold, so bodies cannot grow forever. That is the physical ceiling of vertical scaling. Life's way out was multicellularity: scale out with many small units. The difference: cells differentiate into organs, while stateless replicas are kept deliberately identical and disposable.</li>
+<li><b>Psychology · Satisficing (Herbert Simon, 1956)</b>: With limited information, Simon argued, people settle for good enough rather than optimal, and often land close to optimal anyway. P2C looks at just two backends and still gets near-optimal balance. Unlike satisficing, though, P2C has no aspiration threshold; it simply compares the pair.</li>
+<li><b>Buddhism · No-self and continuity</b>: Buddhism holds there is no permanent self, only a moment-to-moment causal stream. A stateless instance likewise keeps no sense of who it is; identity is picked up from an external session each time, so any machine can be swapped out. The difference: Buddhism calls that stream impermanent too, while system design needs Redis and the database to be durable.</li>
+<li><b>Complexity science · Spontaneous synchrony (London Millennium Bridge, 2000)</b>: The new bridge swayed slightly, walkers fell into step with it, the sway grew, and it closed after two days. A cache expiring everywhere at once, with a thousand instances hitting the database together, is the same amplification; probabilistic early refresh deliberately breaks the rhythm. Unlike the bridge, the cache herd is synchronized by a shared expiry time, not by feedback.</li>
+<li><b>Business · Premature scaling (Startup Genome, 2011)</b>: Studying over 3,000 high-growth tech startups, the report named premature scaling, hiring and spending before product-market fit, as the top cause of failure. It is the same mistake as premature distribution: prepaying complexity for imagined scale. The difference: a company rarely shrinks back gracefully, while machines can at least scale in.</li>
+</ul></div>
+<h2>Ten takeaways</h2>
+<ol class="takeaways">
+<li>Vertical scaling needs no code changes and keeps ACID intact; a single box now reaches 192 vCPUs and 2TB of RAM, so do not distribute too early.</li>
+<li>Vertical scaling costs you a single point of failure, nonlinear pricing and a hard ceiling; horizontal scaling prices linearly but forces statelessness and harder debugging.</li>
+<li>Stack Overflow in 2016 served 6,000 req/s on 9 web servers and 4 SQL Servers, the textbook case of pushing vertical scaling to the limit.</li>
+<li>L4 load balancers read only the connection tuple and run at huge throughput; L7 routes on path and headers at higher CPU cost, so production usually puts L4 in front of L7.</li>
+<li>Power of Two Choices samples two backends at random and picks the less busy one, cutting maximum load from O(log N) to O(log log N).</li>
+<li>Stateless services push sessions, caches and counters out to Redis or the database, which lets the load balancer send any request to any instance.</li>
+<li>Stateless does not mean cacheless: a local cache with a 30-second TTL plus pub/sub invalidation trades a little consistency for latency.</li>
+<li>For capacity estimates, memorize three numbers: a day is about 1e5 seconds, 1 QPS for a year is about 30M records, 1Gbps is about 125MB/s.</li>
+<li>After growth, the first bottleneck is usually database writes: replicas relieve reads, but writes need a bigger box or sharding.</li>
+<li>The most common mistake is premature distribution: Kubernetes and a swarm of microservices at a few thousand QPS make debugging ten times slower than a monolith.</li>
+</ol>
 <h2>Key Resources</h2>
 <ul>
 <li>📕 <em>Designing Data-Intensive Applications</em> (Kleppmann), Ch. 1: Reliable, Scalable, and Maintainable Applications.</li>

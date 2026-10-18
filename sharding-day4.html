@@ -52,6 +52,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -425,6 +433,26 @@ def read(key):
 <li>你设计一个 multi-tenant SaaS，某客户突然涨到全平台 30% 流量，怎么把它『单独搬出来』而其他人无感？</li>
 <li>online resharding 的关键阶段是什么？双写期间数据漂移怎么发现？</li>
 <li>为什么 logical shard 数量要远大于物理实例数？给一个具体的扩容场景说明它的好处。</li>
+</ol>
+<h2>越界 · 跨学科的联想</h2>
+<div class="crossx"><ul>
+<li><b>东方哲学 · 庄子「庖丁解牛」</b>：庖丁的刀十九年不钝，因为顺着骨节的缝下刀；选 shard key 也是找数据自己的缝，让多数查询和 join 落在同一块。不像的是，牛的关节天生固定，访问模式却会随业务漂移，今天的缝明天可能长成骨头。</li>
+<li><b>行为生态 · 动物的领地划分</b>：新来的鸣禽只能挤进相邻几户之间，远处领地不受影响，正如 consistent hashing 加节点只接管环上相邻一段。不像在于，领地边界靠鸣叫和打斗反复谈判，环上的边界一算就定。</li>
+<li><b>复杂性科学 · 偏好依附（Barabási–Albert，1999）</b>：新连接偏爱已有很多连接的节点，网络于是长出少数超级枢纽、度分布呈幂律，明星账号就是这种枢纽。哈希分片默认 key 大致平等，幂律世界里这个前提先天不成立。</li>
+<li><b>生物进化 · 蜜蜂分群</b>：蜂巢拥挤时先育新蜂王，老蜂王再带走一大半工蜂另立新巢，一群变两群而不停工，像有预案的在线 resharding。不像的是，分群没有回滚也没有 shadow read。</li>
+</ul></div>
+<h2>十条要点</h2>
+<ol class="takeaways">
+<li>分片是不可逆的架构债务：换来无限加机器，代价是失去跨分片事务、全表 join 和自动二级索引。</li>
+<li>如果一年内数据量和 QPS 不会超过单机上限，就不要分片，先垂直扩容、加 cache、加 read replica。</li>
+<li>Hash 分片分布均匀、点查只需算一次哈希，但范围扫描必须 fan-out 到所有 shard。</li>
+<li>Range 分片保留 key 的顺序、适合时序扫描，但按时间写入时最新的那个 shard 永远最热。</li>
+<li>用 hash(key) % N 做分片函数，节点数从 16 扩到 32 时约 93.75% 的 key 都要迁移。</li>
+<li>Consistent hashing 加虚拟节点让增删一个节点只迁移约 1/N 的数据，负载也均匀分摊到其他节点。</li>
+<li>统计均匀不等于实际均匀：明星账号、大租户和时序数据的尾部都能把单个 shard 打爆。</li>
+<li>Salting 给热 key 加后缀把写入分散到多个分区，代价是读取要 fan-out 再合并，只适合写多读少。</li>
+<li>Online resharding 要经过双写、backfill、shadow read 校验、灰度切流和拆链，Notion 两次各花约半年。</li>
+<li>逻辑 shard 远多于物理实例（如 1024 对 32）时，扩容只需搬迁逻辑 shard，不用改路由函数。</li>
 </ol>
 <h2 data-tts="8e927d622e470df1">关键资源</h2>
 <ul>

@@ -51,6 +51,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -292,6 +300,26 @@ schedule_renew(lease, before_expiry="10m")           # renew or re-request
 <strong>5. Committing a secret to git</strong>: even if deleted later, it stays in history and may already be scraped. Once committed, consider it leaked — rotate immediately. This is exactly why dynamic short-lived credentials are far safer than static keys.
 </div>
 
+<h2>Crossovers</h2>
+<div class="crossx"><ul>
+<li><b>Immunology · two-signal T-cell activation</b>: A T cell that recognizes an antigen (signal one) still needs co-stimulation from an antigen-presenting cell (signal two) to activate; without it, the cell goes anergic. Like checking AuthN and AuthZ separately and letting through only on both. Unlike: the immune second check reads context, while system authorization evaluates explicit policy.</li>
+<li><b>Finance · cash vs a bank account</b>: A JWT is a bearer instrument, like cash. Whoever holds it can spend it, and verification means checking the anti-counterfeit features (the signature) without calling the bank, so it is fast and works anywhere, but once stolen it cannot be reported and frozen. A session is a bank account: every transaction hits the ledger, slower but freezable at any moment. "Short access token + revocable refresh token" is carrying pocket change and keeping the rest in the bank. Unlike: cash never expires, while a token carries its own expiry, which is itself a delayed revocation.</li>
+<li><b>Business · the principal-agent problem</b>: Jensen and Meckling (1976) examined how shareholders who hand decision rights to managers bound and monitor them. OAuth scopes, short-lived tokens and revocable grants are a limited power of attorney for the agent. Unlike: a manager has interests that need aligning through incentives; a third-party app only needs to be fenced in by permissions.</li>
+<li><b>Evolutionary biology · the Red Queen hypothesis</b>: Van Valen (1973) proposed that species must keep evolving just to hold their ground against co-evolving rivals. Key rotation and dynamic short-lived credentials work the same way: a static key that stands still is slowly losing ground to attackers. Unlike: evolution tries things blindly through random variation, while rotation is deliberate and scheduled.</li>
+</ul></div>
+<h2>Ten takeaways</h2>
+<ol class="takeaways">
+<li>Authentication (AuthN) answers "who are you" once at login; authorization (AuthZ) answers "what may you do" on every resource access.</li>
+<li>Missing or invalid credentials get a 401, valid identity without permission gets a 403, and sometimes a deliberate 404 hides whether a resource exists.</li>
+<li>Broken Access Control has long topped the OWASP Top 10, and a skipped resource-ownership check is the classic IDOR.</li>
+<li>A centralized PDP gives unified, auditable policy but adds a hop per request, so sidecars cache policy locally to absorb the latency.</li>
+<li>OAuth 2.0 is a delegated-authorization framework, not an authentication protocol; to know who the user is, use the OIDC id_token.</li>
+<li>Any flow with a user in the loop should use Authorization Code + PKCE, so an attacker who intercepts the code still lacks the verifier.</li>
+<li>A JWT trades "no revocation before expiry" for local, lookup-free verification on every request; a session makes the opposite trade and revokes instantly.</li>
+<li>JWT verification must pin the algorithm and check iss and aud, or alg:none and algorithm-confusion attacks can forge tokens.</li>
+<li>Short access tokens plus rotating, revocable refresh tokens are the industry pattern for keeping stateless speed while still being able to stop the bleeding.</li>
+<li>Vault's dynamic short-lived credentials are reclaimed automatically at expiry; a secret committed to git counts as leaked and must be rotated at once.</li>
+</ol>
 <h2>Deep-Dive Resources</h2>
 <ul>
 <li><strong>oauth.net + "OAuth 2.0 Simplified" (Aaron Parecki)</strong>: the authoritative entry point and accessible read for OAuth/OIDC.</li>

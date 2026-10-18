@@ -52,6 +52,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -287,6 +295,26 @@ def admit(req):
 <li><strong>「429 vs 503，何时用哪个？」</strong> — 429 = <em>客户端超限</em>（用户自己的问题）；503 = <em>服务过载</em>（你的问题）。错用会让客户端的重试策略错。</li>
 <li><strong>「Retry-After 怎么算？」</strong> — token bucket 下 = <code>(1 - tokens) / refill_rate</code>；sliding window 下 = 到下一秒还有几毫秒；并且服务端必须加 jitter。</li>
 <li><strong>「为什么 token bucket 比 leaky bucket 更主流？」</strong> — 公开 API 客户端往往天然「攒着发」（cron job 一次发 50 个），token bucket 允许这种合理 burst；leaky bucket 严格匀速反而对正常用户不友好。</li>
+</ol>
+<h2>越界 · 跨学科的联想</h2>
+<div class="crossx"><ul>
+<li><b>神经科学 · 不应期（refractory period）</b>：神经元放电后约 1 毫秒的绝对不应期内无论刺激多强都不再放电，随后进入阈值逐渐回落的相对不应期，这给放电频率定了上限，很像令牌桶的 refill rate 加 GCRA 式的连续恢复。不像的是，被挡下的刺激直接丢失，没有 Retry-After 告诉上游何时再来。</li>
+<li><b>生理学 · 休克时的血流集中</b>：大失血时身体收缩皮肤、肠道、肾脏的血管，把有限的血量留给心和脑，正是「先丢导出、最后丢支付」的优先级抛弃。不像在于，被牺牲的器官撑久了会受损，身体也没有 fail-open 这个选项。</li>
+<li><b>复杂性科学 · 耦合振子同步（Kuramoto 模型）</b>：萤火虫、心肌细胞这类振子耦合够强就会自发同频。惊群也是同步：千个客户端收到同一个 Retry-After 便齐步重试，jitter 就是注入噪声，把系统压在同步阈值之下。不同的是，这里的同步来自同一个外部信号，而非振子之间相互拉扯。</li>
+<li><b>投资 · 2016 年 A 股熔断的磁吸效应</b>：沪深 300 跌 5% 停牌 15 分钟、跌 7% 全天收市，上线头 4 个交易日两次触发 7%，随即被暂停；临近阈值时大家抢在停牌前卖出，反而加速触线。这提醒我们 X-RateLimit-Remaining 公开剩余额度，本意是让客户端提前放慢，也可能诱发抢跑。</li>
+</ul></div>
+<h2>十条要点</h2>
+<ol class="takeaways">
+<li>Fixed Window 限流有边界双倍突发：0.999 秒和 1.001 秒各发 100 个，1 毫秒内 200 个全部放行。</li>
+<li>Token Bucket 允许攒令牌形成合理突发，Leaky Bucket 则让下游收到严格匀速的流量。</li>
+<li>GCRA 只存一个「理论到达时间」（TAT）变量，用 O(1) 内存实现滚动窗口和可配置的突发。</li>
+<li>Redis 加 Lua 脚本能原子地完成令牌桶的补令牌与扣令牌，但单实例约 30–50 万 QPS 就到顶。</li>
+<li>限流系统挂了默认 fail-open 放行，避免限流故障变成业务故障；计费配额层则应 fail-close 保钱。</li>
+<li>本地令牌桶加周期性异步聚合兼顾低延迟和接近精确，代价是秒级窗口内可能超发约 20%。</li>
+<li>多维度限流让 API key、IP、endpoint、全局并发各有一个桶，全部通过才放行，最严的一层生效。</li>
+<li>过载时按优先级抛弃：先丢导出和报表，Stripe 把创建支付这类关键请求留到最后才丢。</li>
+<li>429 表示客户端超限，503 表示服务过载；429 必须带准确的 Retry-After 头，错用会误导重试策略。</li>
+<li>所有客户端收到同一个 Retry-After 会同时重试再造惊群，服务端或 SDK 必须加 jitter 把重试时刻打散。</li>
 </ol>
 <h2 data-tts="7454086ad177ea46">深入资源</h2>
 <ul>

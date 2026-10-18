@@ -52,6 +52,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -219,6 +227,27 @@ def auth(req):
 <li>"L4 和 L7 LB 各放哪、为什么不直接全用 L7？"</li>
 <li>"如果让 session 改成 stateless，JWT 和 Redis session 你怎么选？"（考察 revocation、size、安全性权衡）</li>
 <li>"Round robin 在长连接场景下会怎么坏？怎么修？"（引出 least conn / P2C）</li>
+</ol>
+<h2>越界 · 跨学科的联想</h2>
+<div class="crossx"><ul>
+<li><b>生物进化 · 平方-立方定律（伽利略，1638）</b>：身长放大一倍，体重涨八倍，骨骼截面只涨四倍，所以动物不能无限变大，这就是垂直扩的物理上限。生命的出路是多细胞，用许多小单元横向扩。不像的是，多细胞的细胞会分化成不同器官，无状态实例却刻意保持一模一样、随时可替换。</li>
+<li><b>心理学 · 满意化（Herbert Simon，1956）</b>：Simon 认为人在信息有限时不求最优、只求够好，结果往往离最优不远；P2C 只看两台就做决定，也是用极少的信息换来接近最优的分配。不像在于，满意化是设一条及格线、达标就停，P2C 是两两比较，没有门槛。</li>
+<li><b>佛学 · 无我与相续</b>：佛学说没有常住不变的「我」，只有一刻接一刻的因果相续；无状态实例也不保存「我是谁」，身份靠外置的 session 一次次接上，哪台机器都能换掉。不像在于，佛学连这条相续也看作无常，系统设计却要求外置的 Redis 和数据库可靠持久。</li>
+<li><b>复杂性科学 · 自发同步（伦敦千禧桥，2000）</b>：千禧桥开通时微微侧摆，行人不自觉踩成同一步调，越同步摆得越凶，两天后只好封桥。缓存同时失效、上千实例一起打数据库也是同步放大，概率性提前刷新就是故意打乱步调。不像的是，桥上的同步是摆动拉出来的，缓存击穿则源于同一时刻过期。</li>
+<li><b>商业 · 过早扩张（Startup Genome，2011）</b>：这份报告分析了三千多家高增长科技创业公司，把「过早扩张」列为首要死因：还没找到产品市场契合就猛招人、猛投放。和过早分布式是同一个错，为想象中的规模预付复杂度。不像的是，公司扩张很难缩回去，机器至少还能缩容。</li>
+</ul></div>
+<h2>十条要点</h2>
+<ol class="takeaways">
+<li>垂直扩不用改代码、保得住 ACID，单机已能到 192 vCPU / 2TB 内存，别太早走分布式。</li>
+<li>垂直扩的代价是单点故障、价格非线性和物理上限；横向扩价格线性，但强迫服务无状态、调试更难。</li>
+<li>Stack Overflow 2016 年用 9 台 web server 加 4 台 SQL Server 扛 6000 req/s，是垂直扩到极致的范本。</li>
+<li>L4 负载均衡只看四元组、吞吐极高，L7 能按 path 和 header 路由但更吃 CPU，生产里常 L4 在前、L7 在后。</li>
+<li>Power of Two Choices 随机挑两台后端选较闲的一台，把最大负载从 O(log N) 降到 O(log log N)。</li>
+<li>无状态服务把 session、缓存和计数器外置到 Redis 或数据库，负载均衡器才能把任何请求发给任何实例。</li>
+<li>无状态不等于无缓存：本地缓存加 30 秒 TTL、再用 pub/sub 失效，是一致性和延迟之间的折中。</li>
+<li>容量估算先背三个数：1 天约 1e5 秒、1 QPS 一年约 3000 万条、1Gbps 约 125MB/s。</li>
+<li>增长后的第一瓶颈通常是数据库写：读可以靠副本缓解，写只能垂直扩或分片。</li>
+<li>最常见的错是过早分布式：千级 QPS 就上 K8s 和一堆微服务，调试时间变成单体的十倍。</li>
 </ol>
 <h2 data-tts="c42f32dd2a0dd9fc">关键资源</h2>
 <ul>

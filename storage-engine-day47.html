@@ -52,6 +52,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -257,6 +265,26 @@ WHERE user_id = 42 AND created_at &gt; '2026-01-01';
 <div class="callout"><strong>3. Postgres 更新很慢 / 表越来越大？</strong> 多半是 MVCC 死元组堆积 + 每次更新动全部索引。长事务阻塞 VACUUM 是头号元凶。</div>
 <div class="callout"><strong>4. 建了索引却没用上？</strong> 最左前缀不匹配、列被函数/隐式转换包裹、选择性太低、统计过期——用 <code>EXPLAIN</code> 验证而不是猜。</div>
 <p style="margin-top:14px"><strong>面试高频追问：</strong>①「为什么顺序写比随机写快，SSD 上还成立吗？」②「WAL 里既有 redo 又有 undo，各自作用？ARIES 三阶段？」③「MVCC 下两个事务同时更新同一行会怎样（写写冲突/first-committer-wins）？」④「聚簇索引 vs 二级索引，回表是什么，覆盖索引怎么避免？」⑤「Snapshot Isolation 能防住哪些异常，防不住什么（write skew）？」</p>
+<h2>越界 · 跨学科的联想</h2>
+<div class="crossx"><ul>
+<li><b>神经科学 · 互补学习系统（McClelland、McNaughton、O'Reilly，1995）</b>：海马体快速记下新经验，再在睡眠中反复重放，慢慢并入新皮层的长期知识，和 MemTable 先接住写入、后台 compaction 合并进下层是同一个两级结构：前台求快，后台求整。不像在于：大脑整合时会抽象、改写、遗忘细节，compaction 必须逐字节保真，连删除都要留墓碑。</li>
+<li><b>佛学 · 刹那生灭与相续</b>：说一切有部和经量部讲诸法刹那生灭，所谓「同一个东西」只是前后刹那的相续；MVCC 也不覆盖旧行，每次更新生出新版本，「一行」其实是一条版本链。不像的是，数据库仍以主键当不变的锚，佛学连这个锚也不承认。</li>
+<li><b>商业 · 复式记账（Luca Pacioli，1494）</b>：账本只增不改，记错了不擦掉，而是另记一笔冲正分录，和 WAL 只追加、删除写墓碑、回滚写补偿记录（CLR）同构。不像在于：会计分录要永久留给审计，WAL 过了 checkpoint 就可截断回收。</li>
+<li><b>生物进化 · 生活史权衡</b>：生物的能量预算有限，生长、繁殖、自我维护不能同时拉满，这和读、写、空间放大至少牺牲一个的 RUM 三角是同一种约束。不像的是，进化靠选择缓慢摸到平衡点，工程师可以按读写比直接挑一个角。</li>
+</ul></div>
+<h2>十条要点</h2>
+<ol class="takeaways">
+<li>存储引擎的读、写、空间三种放大至少要牺牲一个，选引擎就是选能承受哪种放大。</li>
+<li>B+Tree 原地更新有序页，点查只读一个叶子页，代价是随机写和页级写放大。</li>
+<li>LSM-Tree 把写追加进 MemTable、顺序刷成不可变的 SSTable，点查要查多层，靠 Bloom Filter 跳过大部分层。</li>
+<li>WAL 的铁律是：redo 日志先顺序写盘并 fsync，被修改的脏页才允许刷盘。</li>
+<li>ARIES 崩溃恢复分 Analysis、Redo、Undo 三阶段，先重放全部历史，再回滚未提交事务。</li>
+<li>每事务 fsync 才能做到 RPO=0，组提交摊薄代价；放松 fsync 会在崩溃时丢掉已回复 OK 的事务。</li>
+<li>MVCC 让每次更新生成新版本、事务按快照读，读写互不阻塞，旧版本靠 VACUUM 或 purge 回收。</li>
+<li>Postgres 一次更新要动全部索引，长事务阻塞 VACUUM 是表膨胀的头号元凶。</li>
+<li>统计过期、最左前缀不匹配、函数包裹列都会让索引失效，要用 EXPLAIN 验证而不是猜。</li>
+<li>Snapshot Isolation 防不住 write skew：两个事务读同一快照、各改各的行，合起来破坏跨行约束。</li>
+</ol>
 <h2 data-tts="e149562be11d34ea">深入资源</h2>
 <ul>
 <li><strong>《Designing Data-Intensive Applications》第 3 章</strong>（Kleppmann）：B-tree vs LSM、WAL、存储引擎权衡的最佳入门。</li>

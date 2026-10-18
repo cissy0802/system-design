@@ -51,6 +51,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -238,6 +246,26 @@ def reconcile(ledger_rows, psp_rows):
 </ul>
 <p><strong>Frequent interview follow-ups:</strong> ① how do you avoid double payouts when the client retries? ② the PSP times out — how do you know whether money actually moved? ③ how do you record a refund (why can't you edit the original)? ④ why don't payments use 2PC? ⑤ how do you reconcile "to the cent"? Which breaks auto-settle and which need a human?</p>
 
+<h2>Crossovers</h2>
+<div class="crossx"><ul>
+<li><b>Evolutionary biology · The DNA double strand and mismatch repair</b>: every base is checked against a complementary strand, and mismatch repair catches copying errors because the two strands disagree, the same redundancy check as debits and credits that must cancel. Unlike a ledger, the cell swaps the wrong base out in place; the ledger never edits the original and only appends a reversing entry.</li>
+<li><b>Neuroscience · Memory reconsolidation (Nader et al., 2000)</b>: in fear-memory experiments on rats, Nader, Schafe and LeDoux found that a retrieved memory becomes unstable again and can be weakened or rewritten. Human memory behaves like a mutable balance column: one read may overwrite it, leaving no trail. A payment ledger is built the opposite way, allowing appends and never rewrites.</li>
+<li><b>Quantum mechanics · Superposition before measurement</b>: after a PSP timeout the payment stays PENDING and only "collapses" into success or failure when you query, which looks like superposition. Where it breaks: the money already has a definite outcome you simply do not know, classical missing information rather than no definite value before measurement.</li>
+<li><b>Cognitive science · Predictive coding (Rao and Ballard, 1999)</b>: the brain keeps comparing its internal model's predictions with sensory input and passes only the error upward to correct the model. Reconciliation has the same shape: the ledger is the model, PSP and bank statements are the senses, a break is a prediction error. The difference: the brain quietly revises its model, while a ledger corrects itself only with new entries.</li>
+</ul></div>
+<h2>Ten takeaways</h2>
+<ol class="takeaways">
+<li>In payments, correctness far outranks availability: better to refuse service than double-charge or misrecord a cent.</li>
+<li>Store amounts as integer minor units (cents); storing money as float lets rounding error accumulate to the cent.</li>
+<li>An idempotency key makes any number of retries move money only once, and the same key with a different body should be rejected.</li>
+<li>Stripe splits a payment into persisted recovery points, so a crashed request resumes from the last phase instead of starting over.</li>
+<li>Double-entry requires debits and credits in every transaction to sum to zero; the ledger is append-only and fixes are reversing entries.</li>
+<li>Real-time balances on an immutable ledger come from periodic materialized snapshots plus incremental entries, not a full-table SUM.</li>
+<li>External PSPs do not join your transaction, so payments skip 2PC and use a Saga of local transactions plus an Outbox for atomic messaging.</li>
+<li>Irreversible steps such as a completed payout cannot be compensated, only retried forward until they succeed, so downstream must be idempotent.</li>
+<li>A PSP timeout is neither success nor failure: keep the payment PENDING, re-query with the original key, and let reconciliation catch the rest.</li>
+<li>Balanced debits and credits only prove internal consistency; three-way reconciliation of ledger, PSP and bank statements checks the books against reality.</li>
+</ol>
 <h2>Going Deeper — Resources</h2>
 <ul>
 <li><a href="https://stripe.com/blog/idempotency" target="_blank">Stripe — Designing robust and predictable APIs with idempotency</a>: the canonical key + recovery-point implementation.</li>

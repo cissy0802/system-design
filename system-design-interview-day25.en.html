@@ -51,6 +51,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -228,6 +236,26 @@ def pick_deep_dive(components):
 <li>How do you know there's a problem in prod? Which metrics do you monitor, how do you set SLOs?</li>
 </ol>
 
+<h2>Crossovers</h2>
+<div class="crossx"><ul>
+<li><b>Psychology · Ericsson and Simon's think-aloud protocols</b>: In their 1980 Psychological Review paper "Verbal reports as data," they treated what subjects said while solving problems as data about cognition, the same move as thinking out loud in an interview: making an invisible decision process observable. The difference: their method asks people to voice thoughts without explaining them, because being asked to explain changes the solving itself; the interview demands exactly that explanation.</li>
+<li><b>Psychology · Kahneman's System 1 and System 2</b>: Blurting an answer the moment a new constraint lands is fast, automatic System 1; taking 30 quiet seconds first gives slow, effortful System 2 time to start. Unlike the lab, the interview also wants System 2's reasoning narrated to someone else.</li>
+<li><b>Economics · Herbert Simon's satisficing</b>: In 1956 Simon argued that people with limited time and information stop at "good enough" rather than searching for the optimum. Cutting scope in 45 minutes is satisficing; the difference is that the interview grades not only where you stop but whether you say why.</li>
+<li><b>Business · Michael Porter on strategy as trade-offs</b>: In "What Is Strategy?" (Harvard Business Review, 1996) Porter wrote that the essence of strategy is choosing what not to do, the same structure as naming what you give up in a trade-off. Unlike Porter's long-lived positioning, the full-marks interview answer ends by saying when you would switch.</li>
+</ul></div>
+<h2>Ten takeaways</h2>
+<ol class="takeaways">
+<li>A system design interview scores judgment, technical depth, operational maturity and communication, not how many components you can list.</li>
+<li>The first move on an open-ended prompt is scoping: separate functional from non-functional requirements and say out loud what you will not cover.</li>
+<li>Pick one or two core features with real trade-off tension and go deep; depth beats breadth every time.</li>
+<li>The real value of Alex Xu's four-step framework is the timebox: about 5 minutes each to clarify and estimate, 10 for high level, 15 for the deep dive.</li>
+<li>After the high-level diagram, stop and get the interviewer's buy-in so you don't spend 15 minutes polishing the wrong system.</li>
+<li>Offering two or three candidate deep-dive areas and letting the interviewer choose shows judgment and aligns with what they want to test.</li>
+<li>Thinking out loud earns partial credit even when the conclusion is wrong, but after a new constraint or hard question, 30 quiet seconds reads as more senior.</li>
+<li>A full-marks trade-off statement names the rejected options and the cost, then says which option you would switch to if the constraints changed.</li>
+<li>A senior engineer gets one system right; a staff engineer also sees cross-system second-order effects, migration cost and organizational constraints.</li>
+<li>In an interview a back-of-envelope estimate can justify sharding; in production the same decision needs real metrics, load tests and observability.</li>
+</ol>
 <h2>Deeper Resources</h2>
 <ul>
 <li><strong>System Design Interview – An Insider's Guide, Alex Xu</strong> (ByteByteGo): the canonical source of the 4-step framework, with a full walkthrough of a classic question per chapter.</li>

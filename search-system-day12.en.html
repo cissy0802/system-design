@@ -51,6 +51,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -265,6 +273,27 @@ def search(q, entry, top_layer):
 <li><strong>Interview Q:</strong> why does <code>from+size</code> deep pagination explode, and what replaces it? (each shard fetches from+size → <code>search_after</code> cursor)</li>
 <li><strong>Interview Q:</strong> why is deleting a doc from an HNSW vector index tricky? (in-place deletion breaks graph connectivity; usually soft-delete + periodic rebuild)</li>
 </ul>
+
+<h2>Crossovers</h2>
+<div class="crossx"><ul>
+<li><b>Neuroscience · hippocampal indexing theory (Teyler &amp; DiScenna, 1986)</b>: the theory holds that the hippocampus stores not the memory itself but pointers to activity patterns spread across the neocortex, so a small cue can pull back a whole episode, the same shape as term &rarr; posting list. The difference: the brain rewrites a memory each time it recalls it, while an inverted index only points and never touches the source document.</li>
+<li><b>Complexity science · Kleinberg's navigable small world (2000)</b>: Milgram's letter-forwarding experiment showed that chains between strangers are short; Kleinberg proved that on a 2D lattice, greedy routing (pass the letter to the acquaintance closest to the target) is fast only when long-range links fall off with the square of distance. HNSW's long upper-layer edges and short lower-layer edges build that distribution by hand. Unlike a social network, which grows on its own, HNSW's layers are assigned by the algorithm.</li>
+<li><b>Psychology · dual-process thinking (Kahneman, <i>Thinking, Fast and Slow</i>, 2011)</b>: System 1 is fast, rough and nearly effortless; System 2 is slow, careful and costly. Multi-stage retrieval splits the work the same way: cheap BM25 plus vector recall, then an expensive cross-encoder over only the top 100. Unlike System 2, which often lazily endorses System 1's answer, the reranker reorders every time.</li>
+<li><b>Buddhism · momentariness and continuity</b>: Abhidharma teaches that phenomena arise and perish in every moment, and what looks like one lasting thing is a series of new moments. A Lucene segment is never edited in place either: an update is a new segment plus a tombstone, and a document's identity is a series of versions. The contrast: Buddhism uses this to loosen attachment to permanence, while a search system needs merge to collapse the series into one definite current value.</li>
+</ul></div>
+<h2>Ten takeaways</h2>
+<ol class="takeaways">
+<li>The hard part of a search backend is not installing Elasticsearch but keeping 50k docs/s of writes and 50k QPS of queries fast at the same time.</li>
+<li>An inverted index flips document &rarr; terms into term &rarr; posting list, so a multi-word query is an intersection of posting lists.</li>
+<li>BM25's intuition: higher term frequency, shorter documents and rarer terms all raise the score.</li>
+<li>Lucene segments are immutable once written; updates become new segments plus tombstones, and Elasticsearch refreshes every 1s by default before docs become searchable.</li>
+<li>Piling up small segments slows queries, so background merges combine them into large ones and finally purge deleted documents.</li>
+<li>A single Lucene index caps out around 2.1 billion documents; Discord hit that limit and split into about 40 Elasticsearch clusters.</li>
+<li>Deep from+size pagination forces every shard to return from+size hits, so memory grows linearly with page number; use a search_after cursor instead.</li>
+<li>BM25's IDF is computed per shard, so uneven data makes scores incomparable across shards; DFS query-then-fetch corrects it with global stats.</li>
+<li>Production search is hybrid: BM25 keeps exact matches, vectors add semantic recall, and RRF fuses the two lists before reranking.</li>
+<li>A search index is derived data rebuildable from the primary DB; sync it through Outbox + CDC, because dual-writing DB and ES is an anti-pattern.</li>
+</ol>
 
 <h2>Further Resources</h2>
 <ul>

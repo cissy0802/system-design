@@ -56,6 +56,14 @@ details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 .resources a{color:#64c8ff;text-decoration:none;border-bottom:1px dashed rgba(100,200,255,0.4)}
 .resources a:hover{color:#5eead4}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -304,6 +312,26 @@ Snowflake: 1773294523890106368                  ← 19 位十进制数字
 <li>UUIDv4 用作 MySQL 主键有什么问题？v7 怎么解？给出实测数字量级。</li>
 <li>时钟回拨发生时，你设计的系统怎么响应？多大回拨需要熔断？</li>
 <li>客户端能不能本地生成 ID？要满足什么前提？</li>
+</ol>
+<h2>越界 · 跨学科的联想</h2>
+<div class="crossx"><ul>
+<li><b>量子力学 · 泡利不相容原理（1925）</b>：同一原子里两个电子不能占同一组量子数（n, l, m, s），唯一性来自「坐标分格」；Snowflake 也是靠时间戳、worker_id、序列号三个坐标保证不撞。不像在于：泡利原理是自然律，没人分配；worker_id 要 ZooKeeper 发号，一旦复用就真撞车。</li>
+<li><b>生物进化 · 分子钟（Zuckerkandl 与 Pauling，1962）</b>：序列差异大致随时间累积，于是能从 DNA 里「解出」两个物种分化的年代，就像从 Snowflake ID 解出创建时间。不像在于：分子钟各谱系快慢不一，要靠化石校准，正如机器时钟要靠 NTP 纠偏。</li>
+<li><b>统计学 · 德国坦克问题（二战）</b>：盟军用缴获坦克零件上的连续序列号，按「最大编号 × (1 + 1/样本数) − 1」一类公式推算德国月产量，战后对账发现比情报部门的估计准得多。这正是自增 ID 泄露业务量的原版：编号连续，看到几个样本就能估出总数。不同在于，坦克编号是印在钢上的，改不了；对外 ID 至少还能加一段随机位。</li>
+<li><b>物理 · 同时性的相对性（Einstein，1905）</b>：相距遥远、来不及互通光信号的两件事，「谁先谁后」随参照系而变，没有全局唯一的「现在」；Snowflake 也只给大致时间序，同一毫秒不同 worker 的先后由 worker_id 决定。不像在于：相对论里这是物理事实，ID 的乱序只是时钟精度造成的工程近似。</li>
+</ul></div>
+<h2>十条要点</h2>
+<ol class="takeaways">
+<li>消息 ID 同时决定数据在库里的物理位置、客户端排序和 URL 形态，所以要全局唯一、大致时间序、紧凑且无中心瓶颈。</li>
+<li>UUIDv4 的 122 位全随机、无需协调，但当 B-tree 主键会把插入打散到随机叶子页，表一大插入吞吐就崩。</li>
+<li>UUIDv7（RFC 9562，2024 年定稿）前 48 位是毫秒时间戳，字典序等于时间序，新行总落在 B-tree 最右侧。</li>
+<li>Twitter 2010 年开源的 Snowflake 把 64 位拆成 41 位时间戳、10 位 worker_id、12 位序列号，只占 UUID 一半空间。</li>
+<li>Snowflake 的唯一性全靠时间单调，时钟回拨是命门：小回拨等待，中回拨用逻辑时钟，大回拨直接拒绝服务。</li>
+<li>让 NTP 只 slew 不 step 能从源头消除时钟回拨，但 ID 生成代码里仍要有兜底。</li>
+<li>选型口诀：数据库主键用 UUIDv7，URL 里给人看的短 ID 用 ULID 或 KSUID，峰值极高又要 64 位就用 Snowflake。</li>
+<li>Snowflake 只是大致时间序，同一毫秒不同 worker 的 ID 大小由 worker_id 决定，代码不能假设新 ID 一定更大。</li>
+<li>自增 ID 让外人用两天的差值算出业务量，和二战德国坦克问题是同一招，对外可见的 ID 至少要带随机段。</li>
+<li>离线客户端生成的 ID 只用来幂等去重，消息排序按服务端收到时间，别让一个字段同时扛唯一标识和排序。</li>
 </ol>
 <h2 data-tts="7a59bfe9c4a0949a">深入资源</h2>
 <div class="resources">

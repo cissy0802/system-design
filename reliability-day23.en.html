@@ -51,6 +51,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -285,6 +293,28 @@ def call(dep, req):
 <div class="callout">
 <strong>5. Guessing breaker thresholds</strong>: too sensitive → normal blips trip it (false positives); too dull → effectively absent. Base it on a minimum request count + sliding-window error rate, and think through half-open probe concurrency (don't let probes become a thundering herd).
 </div>
+
+<h2>Crossovers</h2>
+<div class="crossx"><ul>
+<li><b>Neuroscience · Refractory period</b>: for about a millisecond after firing, a neuron ignores any stimulus, then lets only stronger signals through, much like a breaker's Open and Half-Open states. The difference: it runs on a fixed clock and ignores error rates.</li>
+<li><b>Evolution · CODIT in trees</b>: trees can't heal wounds; they can only wall decay off. Alex Shigo's CODIT model from the 1970s describes barriers a tree builds around a wound to seal fungi into compartments: a bulkhead. The cost matches too: sealed-off wood never conducts water again, trading local capacity for survival of the whole.</li>
+<li><b>Complexity science · London's Millennium Bridge</b>: opened in June 2000, it swayed as pedestrians' footsteps spontaneously synchronized with the deck, and closed two days later. It is the same lockstep as backoff without jitter; jitter breaks the sync with randomness, while the bridge got dampers to absorb the energy.</li>
+<li><b>Physiology · Blood centralization in shock</b>: after major blood loss, the body constricts vessels in the skin and gut to keep the heart and brain supplied, which is criticality-based load shedding. The difference: organs that get shed for too long take damage themselves.</li>
+</ul></div>
+
+<h2>Ten takeaways</h2>
+<ol class="takeaways">
+<li>The real threat in reliability engineering is cascading failure: one slow non-core dependency can exhaust the caller's thread pool.</li>
+<li>A dependency that slows down is more dangerous than one that dies, because slow calls quietly hold threads and connections.</li>
+<li>Chaining 30 dependencies at 99.9% each yields roughly 97% overall availability, so more unisolated dependencies means more fragility.</li>
+<li>A circuit breaker is a Closed, Open, Half-Open state machine that swaps waiting out timeouts for failing fast and lets the downstream recover.</li>
+<li>Trip breakers on a sliding-window error rate with a minimum request count; consecutive-failure counts misbehave at both high and low QPS.</li>
+<li>Retries need exponential backoff with full jitter, or clients synchronize into pulses and cause a retry storm.</li>
+<li>A proportional retry budget is safer than fixed retry counts: three layers retrying 3x each hit the bottom layer with 27x load.</li>
+<li>A bulkhead gives each dependency its own thread pool or semaphore quota, trading utilization for failures that stay contained.</li>
+<li>Under overload, rejecting some requests by criticality beats letting everything slow down until goodput hits zero.</li>
+<li>A fallback path must be simpler and more independent than the main path; a fallback cache on the same dead Redis is useless.</li>
+</ol>
 
 <h2>Further Resources</h2>
 <ul>

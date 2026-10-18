@@ -51,6 +51,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -267,6 +275,26 @@ WHERE user_id = 42 AND created_at > '2026-01-01';
 <div class="callout"><strong>4. Built an index but it's not used?</strong> Leftmost-prefix mismatch, column wrapped by a function/implicit cast, too-low selectivity, or stale stats — verify with <code>EXPLAIN</code>, don't guess.</div>
 <p style="margin-top:14px"><strong>Frequent interview follow-ups:</strong> (1) "Why are sequential writes faster than random — does it still hold on SSD?" (2) "The WAL holds both redo and undo — what does each do? The ARIES three phases?" (3) "Under MVCC, what happens when two transactions update the same row (write-write conflict / first-committer-wins)?" (4) "Clustered vs secondary index, what's a back-lookup, how does a covering index avoid it?" (5) "What anomalies does Snapshot Isolation prevent, and what does it NOT (write skew)?"</p>
 
+<h2>Crossovers</h2>
+<div class="crossx"><ul>
+<li><b>Neuroscience · Complementary learning systems (McClelland, McNaughton &amp; O'Reilly, 1995)</b>: the hippocampus records new experiences fast, then replays them during sleep so they are slowly folded into neocortical long-term knowledge. That is the same two-tier shape as a MemTable absorbing writes and background compaction merging them down: fast at the front, tidy at the back. The difference: the brain abstracts, rewrites and forgets details while consolidating, whereas compaction must be byte-for-byte faithful and even records deletions as tombstones.</li>
+<li><b>Buddhism · Momentariness and continuity</b>: the Sarvāstivāda and Sautrāntika schools held that every dharma arises and perishes in an instant, and "the same thing" is only a continuum of moments. MVCC likewise never overwrites a row; each update spawns a new version, so a "row" is really a version chain. Unlike Buddhism, the database still keeps the primary key as an unchanging anchor.</li>
+<li><b>Business · Double-entry bookkeeping (Luca Pacioli, 1494)</b>: a ledger is append-only; a mistake is never erased but offset by a reversing entry, just as the WAL only appends, deletes write tombstones and rollbacks write compensation records (CLRs). The difference: accounting entries are kept forever for auditors, while the WAL is truncated once a checkpoint passes.</li>
+<li><b>Evolutionary biology · Life-history trade-offs</b>: an organism's energy budget is finite, so growth, reproduction and self-maintenance cannot all be maxed out; the RUM triangle's rule that read, write and space amplification cannot all be minimized is the same constraint. Unlike evolution, which finds its balance slowly through selection, an engineer can pick a corner directly from the read/write ratio.</li>
+</ul></div>
+<h2>Ten takeaways</h2>
+<ol class="takeaways">
+<li>A storage engine must sacrifice at least one of read, write and space amplification; choosing an engine means choosing which one you can afford.</li>
+<li>A B+Tree updates sorted pages in place, so a point lookup reads one leaf page, at the cost of random writes and page-level write amplification.</li>
+<li>An LSM-tree appends writes to a MemTable and flushes immutable SSTables sequentially; point reads probe many levels, and Bloom filters skip most of them.</li>
+<li>The WAL rule: the redo log must be written sequentially and fsynced before any modified dirty page may be flushed.</li>
+<li>ARIES crash recovery runs Analysis, Redo and Undo: it first repeats all history, then rolls back uncommitted transactions.</li>
+<li>Only an fsync per transaction gives RPO=0, and group commit amortizes it; relaxing fsync loses transactions already acknowledged as OK on a crash.</li>
+<li>MVCC turns each update into a new version and lets transactions read a snapshot, so reads and writes never block each other; VACUUM or purge reclaims old versions.</li>
+<li>In Postgres every update touches all indexes, and a long transaction blocking VACUUM is the number-one cause of table bloat.</li>
+<li>Stale statistics, a leftmost-prefix mismatch or a function wrapping the column all make an index unusable; verify with EXPLAIN instead of guessing.</li>
+<li>Snapshot Isolation cannot prevent write skew: two transactions read the same snapshot, each changes a different row, and together they break a cross-row invariant.</li>
+</ol>
 <h2>Deep Resources</h2>
 <ul>
 <li><strong>Designing Data-Intensive Applications, Ch. 3</strong> (Kleppmann): the best intro to B-tree vs LSM, WAL, and storage engine trade-offs.</li>

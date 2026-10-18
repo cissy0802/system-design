@@ -52,6 +52,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -256,6 +264,27 @@ def search(q, entry, top_layer):
 <li><strong>面试题：</strong><code>from+size</code> 深分页为什么爆？换成什么？（每 shard 取 from+size → <code>search_after</code> 游标）</li>
 <li><strong>面试题：</strong>向量索引 HNSW 删除一个文档为什么麻烦？（图结构原地删会破坏连通性，通常软删 + 周期重建）</li>
 </ul>
+<h2>越界 · 跨学科的联想</h2>
+<div class="crossx"><ul>
+<li><b>神经科学 · 海马索引理论（Teyler 与 DiScenna，1986）</b>：这个理论认为海马不存记忆内容，只存指向新皮层活动模式的「指针」，一点线索就能召回整段经历，和「词 → posting list」同构。不像的是，大脑每次召回都会改写记忆，倒排索引只指路、不改原文。</li>
+<li><b>复杂性科学 · Kleinberg 的可导航小世界（2000）</b>：Milgram 的信件实验显示陌生人之间链条很短；Kleinberg 证明，在二维格点上，只有长程连接的概率按距离平方衰减时，「把信交给离目标更近的熟人」这种贪心走法才找得快。HNSW 上层长边、下层短边，就是人工搭出这种分布。不像的是，社会网络自己长成，HNSW 的层级是算法分配的。</li>
+<li><b>心理学 · 双系统（Kahneman《思考，快与慢》，2011）</b>：系统 1 快而粗、几乎不费力，系统 2 慢而准、代价高。多阶段检索也这样分工：BM25 加向量廉价召回，贵的 cross-encoder 只精排 top-100。不像的是，系统 2 常偷懒、直接认领系统 1 的答案，精排却每次都老实重排。</li>
+<li><b>佛学 · 刹那灭与相续</b>：阿毗达磨讲诸法刹那生灭，看似恒常的东西只是一串相续的新刹那。Lucene 的 segment 也从不原地改，更新是新段加 tombstone，文档身份只是版本的相续。不像的是，佛学借此破执，搜索系统却要靠 merge 收拢出一个确定的当前值。</li>
+</ul></div>
+<h2>十条要点</h2>
+<ol class="takeaways">
+<li>搜索后端的难点不是装上 Elasticsearch，而是 5 万/秒写入和 5 万 QPS 查询要同时快。</li>
+<li>倒排索引把「文档 → 词」反过来存成「词 → posting list」，多词查询就是对 posting list 求交集。</li>
+<li>BM25 打分的直觉是：词频越高、文档越短、词越稀有，分数越高。</li>
+<li>Lucene 的 segment 写盘后不可变，更新靠新段加 tombstone，Elasticsearch 默认每 1 秒 refresh 一次才可搜。</li>
+<li>小 segment 越积越多会拖慢查询，后台 merge 把小段合成大段，并真正清除被删文档。</li>
+<li>单个 Lucene index 上限约 21 亿文档，Discord 撞上这个上限后拆成约 40 个 Elasticsearch 集群。</li>
+<li>from+size 深分页要求每个 shard 都返回 from+size 条，内存随页码线性爆炸，正解是 search_after 游标。</li>
+<li>BM25 的 IDF 按 shard 各自计算，分布不均时跨 shard 分数不可比，要用 DFS query-then-fetch 校正。</li>
+<li>生产上用混合检索：BM25 保精确匹配，向量补语义召回，两路用 RRF 融合后再精排。</li>
+<li>搜索索引是可从主库重建的派生数据，同步走 Outbox + CDC，应用双写 DB 和 ES 是反模式。</li>
+</ol>
+
 <h2 data-tts="b231675208a4ecc8">深入资源</h2>
 <ul>
 <li><strong>DDIA</strong>《Designing Data-Intensive Applications》(Kleppmann) 第 3 章「Storage and Retrieval」讲全文索引与 LSM 思想。</li>

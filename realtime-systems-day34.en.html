@@ -51,6 +51,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -254,6 +262,27 @@ def merge(local, remote):
 <div class="callout"><strong>4. Full broadcast + O(n²) fan-out.</strong> A 100-player room without AOI/delta blows up bandwidth and CPU. Spatial index + interest management is the lifeline for large rooms.</div>
 <div class="callout"><strong>5. Whole-document LWW for collaborative editing.</strong> Too coarse a granularity overwrites and loses edits. Define merge at field/character level and think through the conflict semantics (Figma per-property, text editors per-character).</div>
 <p><strong>Frequent interview questions</strong>: ① Why don't games use TCP? How exactly does HoL blocking hurt? ② How do you correct a wrong prediction without it looking jarring? ③ How do you keep bandwidth from exploding with 100 players per room per tick? ④ Why must hit detection be server-authoritative, and how does lag compensation stay fair? ⑤ How do the consistency models of Figma collaboration and an FPS match differ, and why?</p>
+
+<h2>Crossovers</h2>
+<div class="crossx"><ul>
+<li><b>Neuroscience · Internal forward models</b>: Wolpert and colleagues proposed in 1995 that the brain sends a copy of each motor command to a forward model, predicts where the hand will land, then corrects with late-arriving sensory feedback &mdash; the same shape as client prediction plus server reconciliation. The difference: a game client replays inputs from the authoritative position, while the brain uses the prediction error to update the model itself, getting more accurate with practice.</li>
+<li><b>Consciousness · Flash-lag and postdiction</b>: Eagleman and Sejnowski showed in 2000 that perception of an instant is finalized only after integrating roughly 80ms of what follows, so awareness already lives slightly in the past. Entity interpolation renders other players 100ms late to buy smoothness; the brain makes the same trade.</li>
+<li><b>Physics · Relativity of simultaneity</b>: special relativity has no universal "now"; each observer's simultaneity differs. Lag compensation likewise grants every player their own present, but the server can rewind to the shooter's moment and rule on the hit; the physical world has no privileged frame to arbitrate.</li>
+<li><b>Psychology · Sunk cost fallacy</b>: Arkes and Blumer (1985) showed people keep paying for what they have already invested in. TCP head-of-line blocking is a protocol-level sunk cost: halt all fresh data for one stale packet. UDP's stance is to let the old one go and look at the next frame.</li>
+</ul></div>
+<h2>Ten takeaways</h2>
+<ol class="takeaways">
+<li>A real-time SLO is end-to-end p95 under 100ms with controlled jitter; a steady 80ms beats a link swinging between 30 and 150ms.</li>
+<li>The control plane (matchmaking, login) runs over HTTPS, while the real-time data plane runs over dedicated UDP/WebRTC channels, decoupled.</li>
+<li>TCP head-of-line blocking makes fresh packets wait for a stale one to be retransmitted, which is why high-frequency game sync abandons TCP.</li>
+<li>Production uses two channels: positions over unreliable UDP, overwritten next tick, and critical events like firing or death over a reliable channel.</li>
+<li>Client-side prediction applies input instantly; server reconciliation resets to the authoritative position and replays unacknowledged inputs.</li>
+<li>Entity interpolation renders other players about 100ms late, and lag compensation rewinds the world to what the shooter saw to judge hits.</li>
+<li>An authoritative server advances state on a fixed tick, and delta compression plus AOI interest management cut O(n&sup2;) fan-out to O(n&middot;k).</li>
+<li>Lockstep syncs only inputs and is bandwidth-cheap but demands bit-exact determinism; state sync resists cheating, tolerates loss, and dominates FPS.</li>
+<li>OT relies on a central server for ordering and keeps state compact; CRDTs merge commutatively, support offline and P2P, but carry heavy metadata.</li>
+<li>Figma uses a central server with a per-object, per-property LWW register; with a central sequencer, the full burden of a pure CRDT is unnecessary.</li>
+</ol>
 
 <h2>Deeper Resources</h2>
 <ul>

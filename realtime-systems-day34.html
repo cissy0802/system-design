@@ -52,6 +52,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -243,6 +251,26 @@ def merge(local, remote):
 <div class="callout"><strong>4. 全量广播 + O(n²) 扇出。</strong> 100 人房不做 AOI/delta，带宽和 CPU 直接爆。空间索引 + 兴趣管理是大房间的命根子。</div>
 <div class="callout"><strong>5. 协作编辑用"整文档 LWW"。</strong> 粒度太粗会互相覆盖丢编辑。要按字段/字符级别定义合并，想清楚冲突语义（Figma 按属性、文本类按字符）。</div>
 <p><strong>高频面试题</strong>：① 为什么游戏不用 TCP？队头阻塞具体怎么害人？② 客户端预测错了怎么纠正才不突兀？③ 100 人同房每 tick 怎么不把带宽打爆？④ 命中判定为何必须服务器权威，lag compensation 又如何保证公平？⑤ Figma 的协作和一局 FPS，一致性模型差在哪、为什么？</p>
+<h2>越界 · 跨学科的联想</h2>
+<div class="crossx"><ul>
+<li><b>神经科学 · 内部前向模型</b>：Wolpert 等人 1995 年提出，大脑发出运动指令时会复制一份给"前向模型"，先预测手会到哪，再拿迟到的感觉反馈校正误差——和客户端预测 + 服务器和解是同一个结构。不像的是：游戏客户端纠错后从权威位置重放输入，大脑则拿预测误差去更新模型本身，越练越准。</li>
+<li><b>意识研究 · 闪光滞后与"后溯"</b>：Eagleman 与 Sejnowski 2000 年的实验显示，我们对某一刻的知觉要整合其后约 80ms 的信息才定稿，意识本就活在稍早的过去。实体插值故意晚 100ms 渲染别人，换来平滑，大脑做的是同一笔交易。</li>
+<li><b>物理学 · 同时性的相对性</b>：狭义相对论里没有全宇宙统一的"现在"，每个观察者的"同时"各不相同。lag compensation 也承认每个玩家有自己的"现在"，但服务器能回退到射击者的那一刻算命中；物理世界没有这样的特权参考系可以裁决。</li>
+<li><b>心理学 · 沉没成本谬误</b>：Arkes 与 Blumer 1985 年的研究显示，人会为已投入的成本继续买单。TCP 的队头阻塞像是协议版的沉没成本：为一个已经过时的旧包停下所有新数据；UDP 的态度是旧的丢了就丢了，只看下一帧。</li>
+</ul></div>
+<h2>十条要点</h2>
+<ol class="takeaways">
+<li>实时系统的 SLO 是端到端 p95 低于 100ms 且抖动可控，稳定 80ms 胜过 30–150ms 间跳动的连接。</li>
+<li>撮合、登录等控制面走 HTTPS，实时状态数据面走 UDP/WebRTC 专用通道，两条路径解耦。</li>
+<li>TCP 的队头阻塞让已到达的新包排队等一个过时旧包重传，高频游戏同步因此逃离 TCP。</li>
+<li>实战用双通道：位置走不可靠 UDP 由下一 tick 覆盖，开火、死亡等关键事件走可靠通道。</li>
+<li>客户端预测让本地输入立刻生效，服务器和解以权威位置为基准重放未确认的输入。</li>
+<li>实体插值故意晚约 100ms 渲染其他玩家，lag compensation 再把世界回退到射击者所见时刻判定命中。</li>
+<li>权威服务器按固定 tick 推进状态，靠 delta 压缩与 AOI 兴趣管理把 O(n²) 扇出降到 O(n·k)。</li>
+<li>Lockstep 只同步输入、带宽极省但要求逐比特确定性；状态同步防作弊、容忍丢包，是 FPS 主流。</li>
+<li>OT 依赖中心服务器定序而状态紧凑，CRDT 可交换合并、支持离线与 P2P 但元数据开销大。</li>
+<li>Figma 用中心服务器加每对象每属性的 LWW register，有中心定序时不必背纯 CRDT 的全部包袱。</li>
+</ol>
 <h2 data-tts="048cf713197011d4">深入资源</h2>
 <ul>
 <li><strong>Gabriel Gambetta — Fast-Paced Multiplayer 系列</strong>：客户端预测/和解/插值/延迟补偿四步，含可跑 demo（<a href="https://www.gabrielgambetta.com/client-server-game-architecture.html">gabrielgambetta.com</a>）。</li>

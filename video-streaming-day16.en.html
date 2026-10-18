@@ -51,6 +51,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -250,6 +258,26 @@ def pick_bitrate(buf_sec, recent_bw, ladder):
 <div class="callout"><strong>4. Ignoring startup and rebuffer metrics.</strong> Users churn on "won't open / keeps spinning," not "not crisp enough." Anchor SLOs to TTFF and rebuffer ratio, not average bitrate.</div>
 <p><strong>Common follow-ups:</strong> ① Estimate the egress bandwidth for ten million concurrent, and the order-of-magnitude transcode/storage cost of one movie. ② How does a video go from upload to playable worldwide? Draw the pipeline. ③ Failure modes of throughput-based vs buffer-based ABR — how do you hybridize? ④ How do you avoid an origin storm on a hot premiere? ⑤ VOD vs live architectural differences (real-time transcode, latency, buffering strategy)?</p>
 
+<h2>Crossovers</h2>
+<div class="crossx"><ul>
+<li><b>Neuroscience · The fovea and optic-nerve compression</b>: Over a hundred million photoreceptors feed the brain through only about a million optic-nerve fibers, and high resolution is reserved for the tiny fovea: bits go where perception cares most. Per-shot encoding, which allocates bitrate by scene difficulty and scores it with VMAF rather than PSNR, follows the same idea. The difference: the eye moves to aim the fovea at what matters, while an encoder has to guess in advance where viewers will look.</li>
+<li><b>Psychology · Kahneman's peak-end rule</b>: In the 1993 cold-water study by Kahneman and colleagues, people judged an experience mostly by its worst moment and its ending, not its average. Anchoring video SLOs on rebuffer ratio rather than average bitrate fits that structure. Unlike the peak-end rule, which tends to ignore duration, rebuffer ratio counts exactly how long the stall lasted.</li>
+<li><b>Investing · Graham's margin of safety</b>: Benjamin Graham advised buying only when price sits well below estimated value, leaving room for estimation error. ABR discounts its bandwidth estimate to 85% before picking a rung and drops to the lowest rung when the buffer runs low: avoid loss first, then seek gains. The difference: an investor sets the margin once, while a player recomputes it for every segment.</li>
+<li><b>Complexity science · Fractal distribution networks (West, Brown, Enquist, 1997)</b>: They explained why metabolic rate scales with the 3/4 power of body mass using branching supply networks like blood vessels; the heart cannot feed every cell directly. Origin, then large storage nodes, then ISP edges, then users is the same tiered branching. The difference: blood circulates back to the heart, while video bytes travel one way and can be pushed to the tips in advance.</li>
+</ul></div>
+<h2>Ten takeaways</h2>
+<ol class="takeaways">
+<li>Video streaming amplifies both bandwidth and compute: ten million concurrent streams at a few Mbps means tens to hundreds of Tbps of egress, far beyond any central data center.</li>
+<li>The transcoding pipeline runs once offline and the playback path runs billions of times online, so keep them fully separate; the control plane moves metadata, never video bytes.</li>
+<li>Set the bitrate ladder by content complexity: Netflix moved from per-title to per-shot encoding and cut bitrate substantially at equal quality.</li>
+<li>Transcoding compute is a one-time cost and bandwidth is a permanent one, so spending more CPU to save bandwidth forever almost always pays.</li>
+<li>Measure encoding quality with a perceptual metric such as VMAF; optimizing for PSNR can save bitrate while viewers see a blurrier picture.</li>
+<li>ABR belongs in the client, because only the player knows its own buffer level and instantaneous bandwidth in real time.</li>
+<li>Throughput-based ABR reacts fast but switches erratically, buffer-based BOLA is stable but starts slowly, and modern players combine the two.</li>
+<li>Netflix Open Connect puts cache servers inside ISP facilities, pre-pushes popular titles overnight, and pulls long-tail content on demand.</li>
+<li>Segment length trades startup against efficiency: 2-second segments react quickly but multiply requests, 10-second ones are efficient but sluggish, and VOD usually picks 4 to 6 seconds.</li>
+<li>Users churn because video will not start or keeps spinning, so anchor SLOs to startup time and rebuffer ratio rather than average bitrate.</li>
+</ol>
 <h2>Deep-Dive Resources</h2>
 <ul>
 <li><strong>Netflix TechBlog — <a href="https://netflixtechblog.com/per-title-encode-optimization-7e99442b62a2">Per-Title Encode Optimization</a></strong>: the seminal work on content-adaptive ladders and the convex hull.</li>

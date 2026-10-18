@@ -51,6 +51,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -298,6 +306,26 @@ def admit(req):
 <li><strong>"Why is token bucket more popular than leaky bucket?"</strong> — Public-API callers naturally arrive in bursts (a cron firing 50 requests at once); token bucket allows that legitimate burst. Strict leaky-bucket smoothing punishes normal users.</li>
 </ol>
 
+<h2>Crossovers</h2>
+<div class="crossx"><ul>
+<li><b>Neuroscience · the refractory period</b>: after a spike, a neuron cannot fire again for about a millisecond however strong the input, then passes through a relative refractory phase as its threshold falls back. That caps firing rate, much like a token bucket's refill rate with GCRA-style continuous recovery. Unlike a limiter, the blocked stimulus is simply lost; no Retry-After tells upstream when to come back.</li>
+<li><b>Physiology · centralization of circulation in shock</b>: after heavy blood loss the body constricts vessels in the skin, gut and kidneys to keep scarce blood for the heart and brain, which is priority shedding: drop exports first, payments last. The difference: starved organs get damaged if this lasts, and the body has no fail-open option.</li>
+<li><b>Complexity science · coupled-oscillator synchrony (the Kuramoto model)</b>: fireflies and heart-muscle cells fall into step once coupling is strong enough. A thundering herd is synchrony too: a thousand clients given the same Retry-After retry in lockstep, and jitter is injected noise that keeps the system below the sync threshold. Here, though, the sync comes from one shared external signal rather than oscillators pulling on each other.</li>
+<li><b>Investing · the magnet effect of China's 2016 circuit breaker</b>: a 5% drop in the CSI 300 halted trading for 15 minutes and 7% closed the market for the day; the 7% level was hit twice in its first four trading days and the rule was then suspended. Traders rushed to sell before the halt, pulling prices toward the trigger. A public X-RateLimit-Remaining, meant to make clients slow down early, can likewise invite a rush.</li>
+</ul></div>
+<h2>Ten takeaways</h2>
+<ol class="takeaways">
+<li>Fixed-window limiting allows a double burst at the boundary: 100 requests at 0.999s and 100 more at 1.001s all pass within one millisecond.</li>
+<li>A token bucket lets clients save tokens for a reasonable burst, while a leaky bucket gives downstream a strictly even flow.</li>
+<li>GCRA stores a single variable, the theoretical arrival time (TAT), to get a rolling window and configurable burst in O(1) memory.</li>
+<li>Redis plus a Lua script refills and spends tokens atomically, but a single instance tops out around 300k to 500k QPS.</li>
+<li>When the rate limiter itself fails, the default is fail-open so a limiter outage never becomes a business outage; billing quotas should fail closed.</li>
+<li>Local token buckets with periodic asynchronous aggregation give low latency and near-exact limits, at the cost of overshooting by up to about 20% within a second.</li>
+<li>Multi-dimensional limiting gives API key, IP, endpoint and global concurrency each a bucket; a request must pass all of them, so the strictest wins.</li>
+<li>Under overload, shed by priority: exports and reports go first, and Stripe drops critical requests such as creating payments last.</li>
+<li>429 means the client exceeded its quota and 503 means the service is overloaded; a 429 must carry an accurate Retry-After header.</li>
+<li>Clients that all receive the same Retry-After retry together and cause a new thundering herd, so the server or SDK must add jitter.</li>
+</ol>
 <h2>Deep Resources</h2>
 <ul>
 <li><strong>Stripe Engineering Blog — <em>"Scaling your API with rate limiters"</em></strong> (Paul Tarjan): four limiter classes, Redis Lua, the fail-open principle. The companion GitHub gist has runnable Ruby code.</li>
