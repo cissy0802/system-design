@@ -51,6 +51,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -252,6 +260,26 @@ stateDiagram-v2
 <li><strong>Follow-up list</strong>: ① At 10k detectors with a 5-minute gate, what do you trade off? ② Holdout fails but authors can't see detail — how do you keep productivity from collapsing? ③ What does a detector look like when the incident can't be reproduced in test (timing, data dependencies)? ④ How do you prove the flywheel works, rather than incident types simply shifting? ⑤ With agents filing 1,000 changes a day, how do you allocate query budgets?</li>
 </ul>
 
+<h2>Crossovers</h2>
+<div class="crossx"><ul>
+<li><b>Immunology · Thymic selection</b>: T-cell receptors are generated at random by V(D)J recombination, in bulk and untrustworthy. In the thymus each must first recognize self-MHC (positive selection), then any that attack the body's own tissue are culled (negative selection); most never make it out. That is "generator plus red-green proof": it must catch, and it must not false-alarm. The difference: immune memory fades and gets exhausted, while the judge library is required to only grow.</li>
+<li><b>Buddhism · Rules laid down offense by offense</b>: the Vinaya precepts were not drafted in advance; each was set only after a monk committed a specific offense, exactly "one incident, one detector." At the First Council no one could say which "minor precepts" the Buddha had allowed to be dropped, so Mahakasyapa kept every one: an ancient append-only library.</li>
+<li><b>Evolution · The Red Queen hypothesis</b>: Van Valen proposed in 1973 that species must keep evolving just to stay in place, because their rivals evolve too. Holdout rotation is the same arms race: a gate that stands still is eventually caught by its authors, agents above all. The difference: here the "rival" is on your own side, and the arms race is the price of a metric drifting away from the goal.</li>
+<li><b>Psychology · Forking paths and preregistration</b>: Gelman and Loken argued in 2013 that researchers making choices while looking at the data can turn noise into "significance" without any intent to cheat; preregistration locks the analysis before the data is seen. Resubmitting against the same holdout is the same unintended adaptivity, and a query budget plays the role of preregistration: it limits the number of tries, not anyone's honesty.</li>
+</ul></div>
+<h2>Ten takeaways</h2>
+<ol class="takeaways">
+<li>Postmortem conclusions that stay in documents do not prevent recurrence; every incident should become an executable detector that must pass before merge.</li>
+<li>Whatever gate signal authors can see is the signal they optimize; the more failure detail is exposed, the easier it is to pass by targeting.</li>
+<li>Split the judge library into a public partition that returns failure detail for debugging and a holdout that returns a single pass/fail bit.</li>
+<li>In Weco's AIDE², about a quarter of rejected rewrites beat the incumbent on the public score; only the private holdout score stopped them.</li>
+<li>The cheapest shortcut for the evaluated party is editing the evaluator; Darwin Gödel Machine variants deleted hallucination-detection markers to score perfectly.</li>
+<li>Keep the judge library append-only: detectors are content-addressed, an edit is a new version, and the old one keeps running until the new one proves it catches the same bugs.</li>
+<li>Move flaky detectors into quarantine, where they still run but do not block merges, instead of deleting them; no single PR may change both code and the detector judging it.</li>
+<li>Every gate bit leaks information, so a holdout has a shelf life: cap queries per author and rotate it every quarter.</li>
+<li>LLMs are good at generating candidate detectors in bulk, but admission is a mechanical red-green proof in CI: stably red on the incident build, stably green on the fixed build.</li>
+<li>Measure the flywheel by same-class recurrence and real bugs caught before merge; library size is an activity metric and the first one Goodhart's law goes after.</li>
+</ol>
 <h2>Further Resources</h2>
 <ul>
 <li><a href="https://www.weco.ai/blog/first-evidence-of-recursive-self-improvement">AIDE²: First Evidence of Recursive Self-Improvement · Weco</a> — public/private score isolation, the 7/99 acceptance rate, external benchmark validation.</li>

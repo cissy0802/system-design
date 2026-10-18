@@ -52,6 +52,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -244,6 +252,26 @@ stateDiagram-v2
 <li><strong>同一 PR 改代码又改测试</strong>。最隐蔽的门控绕过方式，需要在 CI 层面结构性禁止或强制第三方审批。</li>
 <li><strong>追问清单</strong>：① 库到 1 万条、门控要 5 分钟内，怎么取舍？② 留出失败但作者看不到细节，怎么避免开发效率崩溃？③ 事故无法在测试环境复现（时序、数据依赖）时，检测器长什么样？④ 怎么证明飞轮在起作用，而不是事故类型本身变了？⑤ agent 每天提 1000 个变更时，查询预算怎么分配？</li>
 </ul>
+<h2>越界 · 跨学科的联想</h2>
+<div class="crossx"><ul>
+<li><b>免疫学 · 胸腺选择</b>：T 细胞受体靠 V(D)J 基因重排随机生成，量大而不可信；进入胸腺后先要能识别自身 MHC（阳性选择），再剔除会攻击自身组织的（阴性选择），绝大多数就此淘汰。这正是「生成器 + 红绿双证」：既要抓得到，又不能误报。不像之处：免疫记忆会衰减、会耗竭，裁判库却要求只增不删。</li>
+<li><b>佛学 · 随犯随制</b>：律藏的戒条不是佛陀预先列好的，而是每有比丘犯事，才针对那一件立一条，恰是「一次事故沉淀一条检测」。第一次结集时没人说得清哪些是佛陀允许舍弃的「小小戒」，大迦叶干脆一条不舍，算是只增不改的古老版本。</li>
+<li><b>生物进化 · 红皇后假说</b>：Van Valen 1973 年提出，物种要不停进化才能留在原地，因为对手也在进化。留出集轮换是同一场军备竞赛：门控停着不动，作者（尤其是 agent）迟早追上它。不像之处：这里的「对手」本是自己人，军备竞赛是指标与目标错位的代价。</li>
+<li><b>心理学 · 分岔路径与预注册</b>：Gelman 与 Loken 2013 年指出，研究者看着数据一路做选择，不必刻意造假也能把噪声调成「显著」；预注册把分析方案锁在看数据之前。对同一留出集反复提交是同一种无意的自适应，查询预算就像预注册，限制的是试的次数而不是人的诚意。</li>
+</ul></div>
+<h2>十条要点</h2>
+<ol class="takeaways">
+<li>复盘结论停在文档里防不了再犯，每次事故都应沉淀成合入前必须通过的可执行检测。</li>
+<li>作者看得见的门控信号就是被优化的信号，公开的失败细节越多，越容易被「针对性通过」。</li>
+<li>裁判库分公开与留出两区：公开分区回失败细节供调试，留出分区只回「过/不过」一个比特。</li>
+<li>Weco 的 AIDE² 中，被拒改写约四分之一在公开分上胜过现任，只有私有留出分拦住了它们。</li>
+<li>被评对象最便宜的捷径是改评估器，Darwin Gödel Machine 的变体曾删掉幻觉检测标记来换满分。</li>
+<li>裁判库只增不改：用例按内容寻址，「修改」等于追加新版本，旧版本继续运行到新版本证明同样能抓 bug。</li>
+<li>flaky 用例应移入隔离区照常运行、不阻塞合入，而不是删掉；同一个 PR 不能既改代码又改判它的用例。</li>
+<li>每个门控比特都在泄漏信息，留出集有使用寿命，需要按作者限查询预算并每季度轮换。</li>
+<li>LLM 适合批量生成候选检测，准入则由 CI 机械执行红绿双证：事故构建稳定变红、修复构建稳定变绿。</li>
+<li>衡量飞轮要看同类再犯率和合入前拦下的真 bug 数，库大小只是活动指标，最先被 Goodhart 定律盯上。</li>
+</ol>
 <h2 data-tts="8126a9458640cba7">深入资源</h2>
 <ul>
 <li><a href="https://www.weco.ai/blog/first-evidence-of-recursive-self-improvement">AIDE²: First Evidence of Recursive Self-Improvement · Weco</a> — 公开分 / 私有分隔离、7/99 接受率与外部基准验证。</li>
