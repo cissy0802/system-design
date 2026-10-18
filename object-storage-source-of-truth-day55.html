@@ -266,14 +266,14 @@ s3.put_json(f"{repo}/HEAD", {"manifest": mid},
 <li><strong>CAS 争用没有退避</strong>。裸重试在高并发下放大成活锁；必须配指数退避 + 抖动，并把「争用导致的 412 率」做成一等指标——它是分片粒度不对的早期信号。</li>
 <li><strong>追问清单</strong>：① 对象存储<em>没有</em>条件写时你怎么补洞、代价几何？② 两个节点同时 CAS 成功是否可能，为什么？③ 300 push/s 的瓶颈在哪一层，怎么证明？④ 换成要求 p99 写延迟 &lt; 10 ms 的金融账本，你还选这套吗？⑤ 孤儿对象怎么 GC，会不会误删仍被引用的对象？</li>
 </ul>
-<h2>越界 · 跨学科的联想</h2>
+<h2 data-tts="96880f029b42c785">越界 · 跨学科的联想</h2>
 <div class="crossx"><ul>
 <li><b>复杂性科学 · 共识主动性（stigmergy，Pierre-Paul Grassé，1959）</b>：Grassé 观察白蚁筑巢时发现，个体彼此不直接协商，而是读写共同的环境，上一只留下的痕迹决定下一只做什么。零盘节点也不互相投票，只读写对象存储里的 index。不像在于：蚁巢容忍重复和冲突，靠数量冲淡错误；条件写则严格拒绝过期的那一笔，412 就是「痕迹已经变了」。</li>
 <li><b>生物进化 · 魏斯曼屏障（August Weismann，1892）</b>：魏斯曼区分种质与体细胞：遗传信息只沿生殖细胞往下传，躯体是一次性的载体。WAL 就是种质，NVMe 上的仓库是体细胞，坏了从种质再长一个。不像的是，种质靠复制传承还会突变，WAL 只追加、一个字节都不改。</li>
 <li><b>神经科学 · 互补学习系统（McClelland、McNaughton、O'Reilly，1995）</b>：海马快速记下每段经历，新皮层在睡眠重放中慢慢整合成结构化知识；这正像「先追加 WAL、再周期压成 snapshot」。不像在于：大脑的整合是有损的，旧细节会淡去；compaction 必须保证 snapshot 加尾部增量能精确重建。</li>
 <li><b>哲学 · 延展心智（Andy Clark 与 David Chalmers，1998）</b>：他们设想失忆的 Otto 把记忆写进随身笔记本，笔记本就成了他心智的一部分。零盘节点同样把「记住什么」整个外包，节点本身无状态。不像的是，Otto 只有一本笔记本，对象存储却同时被成百个节点读写，必须靠 CAS 定序。</li>
 </ul></div>
-<h2>十条要点</h2>
+<h2 data-tts="6ab92e5ff46d886b">十条要点</h2>
 <ol class="takeaways">
 <li>传统的有状态副本组加 Raft 能用，但扩容搬数据、节点重建、读扩展受限都是常态负担。</li>
 <li>S3 在 2024 年支持带 If-Match 的条件写，ETag 不匹配返回 412，相当于单 key 原子 CAS。</li>
@@ -318,8 +318,8 @@ s3.put_json(f"{repo}/HEAD", {"manifest": mid},
 </details>
 <div class="nav"><a href="index.html">← 回到 index</a></div>
 </div>
-<script src="https://hub.cissychen.com/comments.js" defer></script>
-<script src="https://hub.cissychen.com/search.js" defer></script>
-<script src="https://hub.cissychen.com/index-button.js" defer></script>
-<script src="https://hub.cissychen.com/i18n-tts.js" defer></script>
+<script defer="" src="https://hub.cissychen.com/comments.js"></script>
+<script defer="" src="https://hub.cissychen.com/search.js"></script>
+<script defer="" src="https://hub.cissychen.com/index-button.js"></script>
+<script defer="" src="https://hub.cissychen.com/i18n-tts.js"></script>
 </body></html>

@@ -397,7 +397,7 @@ def accept_write(req):
 <li>Multi-leader 配置下如何处理『同一行被两个 region 同时改』？LWW / CRDT / 业务裁决各适合什么？</li>
 <li>Postgres semi-sync 把 <code>synchronous_commit</code> 设 <code>remote_apply</code> 比 <code>on</code> 多保证什么？代价？</li>
 </ol>
-<h2>越界 · 跨学科的联想</h2>
+<h2 data-tts="d1126bf38fc647cc">越界 · 跨学科的联想</h2>
 <div class="crossx"><ul>
 <li><b>分子生物学 · DNA 复制的三道校对</b>：DNA 聚合酶先挑碱基、再用外切酶回头校读，最后错配修复兜底，层层叠下来错误率约十亿分之一，和「多一个副本、多一道检查」同构。不像的是，生物故意不追求零误差：漏网的突变正是进化的原料，数据库里的分歧却只是事故。</li>
 <li><b>神经科学 · 互补学习系统（McClelland、McNaughton、O'Reilly，1995）</b>：海马体像 leader，白天快速写入新经历；新皮层像异步副本，靠睡眠中的回放慢慢追上。海马体受损的人往往丢掉最近的记忆、久远的反而还在，正像主库挂掉时还没复制出去的那段写入。不像在于，巩固不是逐字节拷贝，而是抽取要点再重写，更接近逻辑复制，而且是有损的。</li>
@@ -405,7 +405,7 @@ def accept_write(req):
 <li><b>量子力学 · 不可克隆定理（Wootters 与 Zurek、Dieks，1982）</b>：未知的量子态无法被复制，所以量子纠错不能靠存副本，Shor 1995 年的九比特码改用纠缠把一个比特的信息摊到九个比特上。冗余还在，只是从「拷贝」换成了「分布式编码」。</li>
 <li><b>投资 · 相关性与分散</b>：持有十只同涨同跌的股票不算分散，危机里相关性一齐升高，它们会一起亏。只读副本也是这样：主库一条 DROP TABLE 几毫秒就同步过去，冗余没有独立性，就挡不住同一类故障。</li>
 </ul></div>
-<h2>十条要点</h2>
+<h2 data-tts="581b74adb6ed6ae6">十条要点</h2>
 <ol class="takeaways">
 <li>数据库复制的本质是为故障买保险，读扩展只是顺带的副作用。</li>
 <li>Leader-Follower 单主拓扑没有写冲突，难点在故障切换，是绝大多数 OLTP 场景的正确答案。</li>

@@ -284,15 +284,14 @@ def call(dep, req):
 <div class="callout">
 <strong>5. 断路器阈值拍脑袋</strong>：太敏感→正常抖动就跳闸误伤；太迟钝→形同虚设。要基于最小请求数 + 滑动窗口错误率，并想清楚 half-open 探测的并发控制（别让探测又变成惊群）。
 </div>
-<h2>越界 · 跨学科的联想</h2>
+<h2 data-tts="b0eac1b78ccc3247">越界 · 跨学科的联想</h2>
 <div class="crossx"><ul>
 <li><b>神经科学 · 不应期</b>：神经元放电后约 1 毫秒内对任何刺激都不响应，随后只放行更强的信号，像断路器的 Open 与 Half-Open。不像的是：它按固定时钟走，不看错误率。</li>
 <li><b>生物进化 · 树木的 CODIT</b>：树不能修复伤口，只能把腐朽围起来。Alex Shigo 在 1970 年代提出 CODIT 模型，描述树在伤口周围筑起屏障，把真菌关进隔间，正是舱壁。代价也一样：被封住的木质部永久不再输水，用局部换整体存活。</li>
 <li><b>复杂性科学 · 伦敦千禧桥</b>：2000 年 6 月开通后，行人脚步随桥面摆动自发同步，两天后被迫关闭。这和没有 jitter 的退避同理；jitter 靠注入随机拆散同步，桥则靠加装阻尼器吸收能量。</li>
 <li><b>生理学 · 休克时的血流集中</b>：大失血时身体收缩皮肤和肠道血管，优先供血给心脑，这就是按 criticality 的 load shedding。不像的是，被 shed 的器官时间一长会自己受损。</li>
 </ul></div>
-
-<h2>十条要点</h2>
+<h2 data-tts="cd1ea001ccee9bf3">十条要点</h2>
 <ol class="takeaways">
 <li>可靠性工程最该防的是级联故障：一个非核心依赖变慢，就可能耗尽调用方的线程池。</li>
 <li>下游「变慢」比「挂掉」更危险，因为慢请求会悄悄占住线程和连接直到资源耗尽。</li>
@@ -305,7 +304,6 @@ def call(dep, req):
 <li>过载时按 criticality 主动拒绝部分请求，远好于全部变慢、goodput 归零。</li>
 <li>fallback 路径必须比主路径更简单独立，与主路径共用同一个 Redis 的兜底形同虚设。</li>
 </ol>
-
 <h2 data-tts="d0579656aaf3bbe9">深入资源</h2>
 <ul>
 <li><strong>Amazon Builders' Library</strong>：Marc Brooker, <a href="https://aws.amazon.com/builders-library/timeouts-retries-and-backoff-with-jitter/" style="color:#64c8ff">Timeouts, retries, and backoff with jitter</a> —— 超时/重试/退避的权威实践。</li>

@@ -272,14 +272,14 @@ SELECT add_retention_policy('telemetry', INTERVAL '90 days'); -- 冷数据归档
 <div class="callout"><strong>4. 忽略时钟与乱序</strong>：设备时钟不准、断网补传导致数据乱序到达。要用 event-time + watermark（见 Day 20），不能按到达顺序写。</div>
 <div class="callout"><strong>5. 重连风暴（Thundering Herd）</strong>：broker 重启或网络抖动，千万设备同时重连握手把集群打死。重连必须带<em>随机退避 + jitter</em>。</div>
 <div class="callout"><strong>6. 没区分"丢得起"与"丢不起"</strong>：温度采样可丢，告警/计费不可丢。下游消费必须幂等（用 <code>device_id + ts</code> 去重）。</div>
-<h2>越界 · 跨学科的联想</h2>
+<h2 data-tts="62e584d4bee4a1d5">越界 · 跨学科的联想</h2>
 <div class="crossx"><ul>
 <li><b>生物进化 · 章鱼的分布式神经系统</b>：章鱼约 5 亿个神经元，大约三分之二长在腕足里，腕足能就地完成抓握与探索，中枢脑只下达大意。这和边缘网关本地急停、云端只收摘要是同一种分工。不像在于：腕足的「规则」靠演化写死，边缘逻辑却能随时 OTA 改写。</li>
 <li><b>神经科学 · 预测编码（Rao &amp; Ballard，1999）</b>：大脑高层不断预测下层输入，下层只把「预测误差」往上送，没有意外就几乎不占带宽。Gorilla 的 XOR 压缩是同一结构：默认预测「和上一个值一样」，只存与预测不同的那几位，温度不变时一个点几乎只剩一个比特。不像在于：Gorilla 的预测器永远是「上一个值」，大脑的预测模型却会从误差里学习、越猜越准。</li>
 <li><b>复杂性科学 · 千禧桥的同步摇晃（伦敦，2000）</b>：大桥开放当天，行人随桥面侧摆不自觉调整步伐，步调越来越齐，摇晃越来越大，两天后封桥。重连风暴也是「大家同时做同一件事」的正反馈。不像在于：桥上是逐渐锁相，重连风暴是同一时刻被同一事件触发，所以随机 jitter 就能打散它。</li>
 <li><b>心理学 · 模糊痕迹理论（Brainerd &amp; Reyna）</b>：人同时存「逐字痕迹」和「要点痕迹」，逐字细节衰减快，要点保留久——像热数据存原始秒级、冷数据只留小时级聚合。不像在于：人的记忆会重构甚至篡改要点，降采样只丢精度，不改写事实。</li>
 </ul></div>
-<h2>十条要点</h2>
+<h2 data-tts="846aeb0d09e32824">十条要点</h2>
 <ol class="takeaways">
 <li>物联网遥测是写多读少、长连接、网络不可靠的系统，千万设备每 10 秒报 20 个指标就是每秒 2000 万个点。</li>
 <li>MQTT 用一条长连接加发布-订阅取代 HTTP 的每次握手，header 最小仅 2 字节，是海量低功耗设备的默认协议。</li>
@@ -292,7 +292,6 @@ SELECT add_retention_policy('telemetry', INTERVAL '90 days'); -- 冷数据归档
 <li>热温冷分层加降采样金字塔，让近期数据毫秒级可查、90 天以上转 Parquet 进对象存储，成本降一个数量级。</li>
 <li>broker 重启后千万设备同时重连会形成重连风暴，重连必须带随机退避和 jitter，把同步的动作打散。</li>
 </ol>
-
 <h2 data-tts="de31d355a9882c5d">深入资源</h2>
 <ul>
 <li><strong>《Gorilla: A Fast, Scalable, In-Memory Time Series Database》</strong>（<a href="https://dl.acm.org/doi/10.14778/2824032.2824078">VLDB 2015</a>）：时序压缩的奠基之作，delta-of-delta + XOR 必读。</li>

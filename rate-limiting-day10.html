@@ -296,14 +296,14 @@ def admit(req):
 <li><strong>「Retry-After 怎么算？」</strong> — token bucket 下 = <code>(1 - tokens) / refill_rate</code>；sliding window 下 = 到下一秒还有几毫秒；并且服务端必须加 jitter。</li>
 <li><strong>「为什么 token bucket 比 leaky bucket 更主流？」</strong> — 公开 API 客户端往往天然「攒着发」（cron job 一次发 50 个），token bucket 允许这种合理 burst；leaky bucket 严格匀速反而对正常用户不友好。</li>
 </ol>
-<h2>越界 · 跨学科的联想</h2>
+<h2 data-tts="1a05db10ef736f48">越界 · 跨学科的联想</h2>
 <div class="crossx"><ul>
 <li><b>神经科学 · 不应期（refractory period）</b>：神经元放电后约 1 毫秒的绝对不应期内无论刺激多强都不再放电，随后进入阈值逐渐回落的相对不应期，这给放电频率定了上限，很像令牌桶的 refill rate 加 GCRA 式的连续恢复。不像的是，被挡下的刺激直接丢失，没有 Retry-After 告诉上游何时再来。</li>
 <li><b>生理学 · 休克时的血流集中</b>：大失血时身体收缩皮肤、肠道、肾脏的血管，把有限的血量留给心和脑，正是「先丢导出、最后丢支付」的优先级抛弃。不像在于，被牺牲的器官撑久了会受损，身体也没有 fail-open 这个选项。</li>
 <li><b>复杂性科学 · 耦合振子同步（Kuramoto 模型）</b>：萤火虫、心肌细胞这类振子耦合够强就会自发同频。惊群也是同步：千个客户端收到同一个 Retry-After 便齐步重试，jitter 就是注入噪声，把系统压在同步阈值之下。不同的是，这里的同步来自同一个外部信号，而非振子之间相互拉扯。</li>
 <li><b>投资 · 2016 年 A 股熔断的磁吸效应</b>：沪深 300 跌 5% 停牌 15 分钟、跌 7% 全天收市，上线头 4 个交易日两次触发 7%，随即被暂停；临近阈值时大家抢在停牌前卖出，反而加速触线。这提醒我们 X-RateLimit-Remaining 公开剩余额度，本意是让客户端提前放慢，也可能诱发抢跑。</li>
 </ul></div>
-<h2>十条要点</h2>
+<h2 data-tts="b87363e47ed299bc">十条要点</h2>
 <ol class="takeaways">
 <li>Fixed Window 限流有边界双倍突发：0.999 秒和 1.001 秒各发 100 个，1 毫秒内 200 个全部放行。</li>
 <li>Token Bucket 允许攒令牌形成合理突发，Leaky Bucket 则让下游收到严格匀速的流量。</li>
