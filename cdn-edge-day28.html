@@ -254,14 +254,14 @@ def handle(req):
 <li><strong>忽视边缘是「全局爆炸半径」</strong>：CDN 的一行配置/一条规则会同时推到全球。<em>Cloudflare 2019-07-02</em> 一条 WAF 正则触发<strong>灾难性回溯</strong>，CPU 打满，全网约 27 分钟、流量掉约 82%（<a href="https://blog.cloudflare.com/cloudflare-outage/">官方复盘</a>）；<em>Fastly 2021-06-08</em> 一个潜伏的软件缺陷被某客户配置触发，约 85% 网络中断近 1 小时（<a href="https://www.fastly.com/blog/summary-of-june-8-outage">官方总结</a>）。面试要答出：配置也要灰度发布、要有 kill switch。</li>
 <li><strong>Anycast 与长连接</strong>：追问「为什么有些场景不能纯 Anycast」——BGP 重路由会让 TCP/WebSocket 中途换 PoP 断连，需会话亲和或边缘转发。</li>
 </ul>
-<h2>越界 · 跨学科的联想</h2>
+<h2 data-tts="211b2dde69cb0102">越界 · 跨学科的联想</h2>
 <div class="crossx"><ul>
 <li><b>物理 · 同时性的相对性</b>：爱因斯坦 1905 年指出，相隔遥远的两地并没有一个所有观察者都公认的「同一时刻」。全球 purge 撞上的是同一堵墙：失效消息以有限速度扩散，每个 PoP 都活在自己的「现在」里。不像的地方在于，CDN 有 origin 这个特权真相，相对论里却没有特权参考系。</li>
 <li><b>心理学 · 卡尼曼的双系统</b>：《思考，快与慢》里的系统 1 像边缘缓存，快、省力、包办绝大多数判断；系统 2 像 origin，慢而费力，只在 miss 时才被唤起。像在都靠「先给够用的答案」扛住负载；不像在大脑没有 purge，过时的直觉无法被一个 tag 精确作废。</li>
 <li><b>神经科学 · 章鱼的腕足</b>：章鱼约五亿个神经元中，约三分之二分布在腕足里，腕足能就地完成探索和抓取，不必事事请示中央脑，这正是 Edge Compute 把鉴权、分流下沉到 PoP 的结构。不像的是，腕足的本地决策没有 kill switch，边缘代码却能一键关停。</li>
 <li><b>生态学 · 单一栽培与马铃薯饥荒</b>：1840 年代爱尔兰大面积种植几乎同一个马铃薯品种，晚疫病一到便全线溃败。一条配置瞬时推向全球就是数字版的单一栽培：同质带来效率，也带来同一个弱点。灰度发布和 Multi-CDN 相当于保留品种多样性，代价是更高的管理成本。</li>
 </ul></div>
-<h2>十条要点</h2>
+<h2 data-tts="7956e207adc913de">十条要点</h2>
 <ol class="takeaways">
 <li>CDN 的核心矛盾：内容推得离用户越近，命中率越高、延迟越低，但失效越难、一致性越弱。</li>
 <li>Anycast 让同一段 IP 前缀从全球 PoP 用 BGP 同时宣告，用户被路由到网络上最近的节点。</li>

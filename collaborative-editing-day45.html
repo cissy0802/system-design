@@ -159,14 +159,14 @@ def delete(target_id):
 <li><strong>presence 落盘</strong>：把光标位置当持久数据存是典型过度设计——它是易失的、可丢的。</li>
 <li><strong>选 OT 还是 CRDT？</strong>「有稳定中心服务器、要纯文本无膨胀、团队能 hold 住 transform」→ OT（Google Docs）；「要离线优先/P2P/本地优先、能接受 metadata 开销」→ CRDT（Yjs/Automerge）。</li>
 </ul>
-<h2>越界 · 跨学科的联想</h2>
+<h2 data-tts="99370aa3883f5a6c">越界 · 跨学科的联想</h2>
 <div class="crossx"><ul>
 <li><b>神经科学 · 传出副本（efference copy）</b>：von Holst 与 Mittelstaedt 1950 年提出，大脑发出动作指令时会复制一份去预测感觉后果，不等真实反馈就先「感到」结果，这和击键本地先行回显、等 ack 再转正是同一个结构。不像的是，预测错了大脑悄悄修正，编辑器却得 rebase 回滚，让刚敲的字闪一下消失。</li>
 <li><b>意识研究 · 全局工作空间（Bernard Baars，1988）</b>：大量无意识模块并行运作，只有挤进「工作空间」的那一条被串行化、广播给全脑；per-document 单进程权威也是并发输入、单点定序、全员广播。不像在于工作空间赢家通吃，落选信号就丢了，OT 却要把每个 op 都 transform 进全序。</li>
 <li><b>复杂性科学 · 共识主动性（stigmergy，Grassé 1959）</b>：白蚁之间不直接协调，只在环境里留下痕迹，后来者照着痕迹接着干，蚁巢就长出来了；CRDT 同样没有中心，副本只读写不可变的 id 和墓碑。不同在于蚁巢只求够用，CRDT 要数学上保证各副本字节级一致。</li>
 <li><b>生物进化 · 减数分裂的交叉互换</b>：两条同源染色体重组成后代的序列时，交换的是成段的片段，每段内部顺序原样保留；CRDT 的 interleaving 异常正相反，两段并发文字被逐字交错成乱码。像在都要把两条分叉的序列合成一条，差在生物保住了片段的连贯。</li>
 </ul></div>
-<h2>十条要点</h2>
+<h2 data-tts="b776bdc2ea2c06d8">十条要点</h2>
 <ol class="takeaways">
 <li>协作编辑不能对整个文档用 last-write-wins，必须把编辑拆成字符级、可合并的操作。</li>
 <li>协作编辑的一致性目标是强最终一致：收到同一批操作的副本，不管到达顺序如何都收敛到同一状态。</li>

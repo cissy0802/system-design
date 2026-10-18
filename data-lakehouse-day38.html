@@ -275,14 +275,14 @@ df = (spark.read.format("hudi")
 <strong>4. time travel 当免费午餐。</strong> 每个保留快照都钉住其引用的数据文件不被回收，<em>保留越久存储成本越高</em>；expire 又会让该时间点的回放失效。保留窗口是<em>审计需求 vs 存储成本</em>的权衡，要显式定。</div>
 <div class="callout">
 <strong>5. 面试常问：</strong>① 在只保证单对象原子的 S3 上，怎么实现多文件事务？（答：immutable 文件 + 原子切快照指针 + OCC）② COW 与 MoR 各自的写/读放大，CDC 场景选哪个？③ Hive 表慢在哪、Iceberg 怎么解（LIST 目录 vs 元数据剪枝）？④ time travel 的存储代价与回收策略？⑤ 多引擎并发写如何避免互相覆盖？</div>
-<h2>越界 · 跨学科的联想</h2>
+<h2 data-tts="91809e746194ef99">越界 · 跨学科的联想</h2>
 <div class="crossx"><ul>
 <li><b>神经科学 · 互补学习系统（McClelland、McNaughton、O'Reilly，1995）</b>：海马体白天快速记下经历，睡眠中反复重放，再慢慢并入新皮层的长期知识，正是 MoR 先追加 delta、后台 compaction 合进 base 的结构；缺觉时记忆变差，也像 compaction 停摆后读端越拖越慢。不像在于：大脑合并时会抽象、丢细节，compaction 必须一字不差。</li>
 <li><b>佛学 · 刹那生灭与相续</b>：佛学讲诸法刹那生灭，前一刻灭、后一刻生，「同一个东西」只是相续之上安立的名；湖仓里的表也是一串不可变快照，「这张表」只是 catalog 里的一个指针。不像的是，佛学否认背后有常住的主宰，湖仓却全靠这一个指针撑起一致性。</li>
 <li><b>商业 · 复式记账（Luca Pacioli，1494）</b>：账记错了不擦掉，而是补一笔冲销分录，历史一行不动，所以随时能还原任一天的账面；不可变数据文件加 delete 文件也是这样改数据。不像在于：会计账簿永久保存，湖仓却要 expire 快照回收存储，回放窗口有边界。</li>
 <li><b>哲学 · 忒修斯之船</b>：船板一块块换掉，还是不是原来那条船？湖仓给了个工程答案：每次提交都换掉一批文件，表的身份只认 catalog 指针。不像普鲁塔克的船，换下的旧板没扔，旧快照都还在，想回到哪一版就回到哪一版。</li>
 </ul></div>
-<h2>十条要点</h2>
+<h2 data-tts="d1f51588af0e68a9">十条要点</h2>
 <ol class="takeaways">
 <li>湖仓保留数据湖的开放 Parquet 文件，在上面加一层事务性元数据，同时拿到湖的低成本和数仓的 ACID。</li>
 <li>Iceberg、Delta Lake、Hudi 分别出自 Netflix、Databricks 和 Uber，思路同源，在元数据组织和写优化上取向不同。</li>

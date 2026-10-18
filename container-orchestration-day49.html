@@ -264,7 +264,7 @@ readinessProbe:  { httpGet: {path: /ready},   periodSeconds: 5 }
 <div class="callout"><strong>3. 把 Pod 当宠物。</strong> Pod 是牛不是宠物（cattle not pets），随时会被驱逐/重建，IP 会变。任何依赖固定 pod IP 或 pod 本地磁盘的设计都是错的——用 Service + PV。</div>
 <div class="callout"><strong>4. 以为容器=安全隔离。</strong> 容器共享内核，一个内核提权漏洞可穿透所有容器。跑不可信代码要上 gVisor/Kata/microVM，别指望 namespace。</div>
 <div class="callout"><strong>5. 面试高频：</strong> ① 一个 <code>kubectl apply</code> 到 pod 跑起来，中间经过哪些组件？② node 宕机后 pod 多久、如何被重建？③ 为什么声明式比命令式更能自愈？④ Service Mesh 解决什么、代价是什么、什么时候<em>不</em>该上？⑤ liveness 和 readiness 区别，配错各会怎样？</div>
-<h2>越界 · 跨学科的联想</h2>
+<h2 data-tts="168eaee7f50d088d">越界 · 跨学科的联想</h2>
 <div class="crossx"><ul>
 <li><b>生理学 · 稳态（Walter Cannon）</b>：Cannon 1926 年提出 homeostasis：体温、血糖偏离设定点，负反馈就把它拉回来，和 reconcile loop「读期望、读实际、算 diff」同构。不像在于：身体的设定点是演化写死的，K8s 的期望状态却由人随时改写一份 YAML。</li>
 <li><b>免疫学 · 细胞因子风暴</b>：免疫系统对局部感染反应过度，炎症信号层层放大，最后伤到的是全身器官；liveness 探针探了下游 DB，DB 抖一下全体 pod 被判死重启，也是防御机制自造的雪崩。不同的是，免疫反应没有 readiness 这种「先摘流量、不处决」的中间档。</li>
@@ -272,7 +272,7 @@ readinessProbe:  { httpGet: {path: /ready},   periodSeconds: 5 }
 <li><b>佛学 · 无常与无我</b>：pod 因缘而起、随时生灭，IP 也不固定，真正稳定的只是 Service 那个名字，近似「假名」。不像在于：佛学要人放下对名相的执着，K8s 恰恰把全部稳定性押在这个名字上。</li>
 <li><b>投资 · 安全边际（Benjamin Graham）</b>：Graham 在《聪明的投资者》（1949）里把安全边际定为投资的核心，留出余量去吸收估错和坏运气；bin-packing 塞到 90% 就像满杠杆，一台 node 挂掉就没有空位接住难民 pod。不同的是，集群的余量可以几分钟内用 autoscaler 买回来，市场里的余量往往要在崩盘前就备好。</li>
 </ul></div>
-<h2>十条要点</h2>
+<h2 data-tts="21b7d64ab22fe749">十条要点</h2>
 <ol class="takeaways">
 <li>容器不是轻量虚拟机，而是被 namespace 切视图、被 cgroup 切资源的普通 Linux 进程。</li>
 <li>容器共享宿主内核，一个内核提权漏洞就能穿透所有容器，跑不可信代码要用 gVisor、Kata 或 microVM。</li>

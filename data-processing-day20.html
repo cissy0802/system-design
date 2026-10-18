@@ -280,14 +280,14 @@ stream
 <div class="callout"><strong>3. Kappa 却没规划 Kafka retention。</strong> 要 replay 30 天却只存 3 天，纠错时数据已被删——Kappa 的可行性<em>直接绑定</em>日志保留期与重算成本。</div>
 <div class="callout"><strong>4. watermark 设太松或太紧。</strong> 太紧→大量迟到丢数；太松→窗口不关、延迟与状态双高。要按真实 skew 分布（看 p99 延迟）来定，并用 allowed lateness 兜底。</div>
 <p><strong>高频追问：</strong>① 为什么说「批是流的特例」？micro-batch 与 true streaming 的延迟下限差在哪？② Lambda 的两套代码具体怎么不一致、Kappa 怎么解决又引入什么新约束？③ Watermark 推进慢导致窗口不关、状态暴涨，怎么排查与缓解？④ 端到端 exactly-once 需要 source、算子、sink 各满足什么条件？⑤ 5000 万 eps、5s SLO，并行度与状态后端怎么估算？</p>
-<h2>越界 · 跨学科的联想</h2>
+<h2 data-tts="4ffa1c705ea611bf">越界 · 跨学科的联想</h2>
 <div class="crossx"><ul>
 <li><b>神经科学 · 事后归因（postdiction）</b>：大脑也在等 watermark。Eagleman 与 Sejnowski 2000 年用闪光滞后效应论证：意识对「此刻」的报告，会把闪光之后约 80 毫秒内到达的信息一起算进去，晚到的信号能改写先前的感知。像在都拿一小段等待换完整；不像在大脑没有 side output，迟到的信号被悄悄并进「当时」，我们察觉不到改写。</li>
 <li><b>物理 · 同时性的相对性</b>：爱因斯坦 1905 年指出，相隔两地的两件事是否「同时」取决于观察者，不存在全局的「现在」。event-time 与 processing-time 的错位是同一个困境，只能按事件自带的时间戳排序。不像在流处理里每条事件至少有一个公认的发生时刻。</li>
 <li><b>心理学 · 卡尼曼的系统 1 / 系统 2</b>：Lambda 的速度层像系统 1，快而近似；批层像系统 2，慢而精确，两路结果再合并。《思考，快与慢》（2011）里的种种偏差，正像两套逻辑口径对不齐。不像在大脑没法砍掉系统 1、改走 Kappa。</li>
 <li><b>商业 · 复式记账</b>：帕乔利 1494 年系统整理的复式记账从不涂改旧账，记错了就追加一笔冲正分录，账本本身就是真相之源，和 Kappa「日志不可改、纠错靠重放」同一思路。不像在会计只追加修正，Kappa 却是修好代码把整段历史重算一遍。</li>
 </ul></div>
-<h2>十条要点</h2>
+<h2 data-tts="3a63a302b069cf3d">十条要点</h2>
 <ol class="takeaways">
 <li>批处理是流处理的特例：有界数据就是知道何时结束的无界数据。</li>
 <li>Spark 的 micro-batch 延迟受批间隔下限约束，Flink 逐条流式处理可到毫秒级。</li>

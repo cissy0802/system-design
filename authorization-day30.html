@@ -258,14 +258,14 @@ def verify():                            # 巡检：重算每条 hash，断链�
 <li><strong>用业务库当审计源</strong>：业务表能 UPDATE，就不是可信审计。审计必须 append-only + 防篡改 + 独立存储。</li>
 <li><strong>把权限写进 JWT 然后无法撤销</strong>：JWT 内嵌大量权限 claim 后，权限一变旧 token 还有效（见 Day 24）。授权决策应实时查 PDP，JWT 只携带身份。</li>
 </ul>
-<h2>越界 · 跨学科的联想</h2>
+<h2 data-tts="44c17a7630ce7dea">越界 · 跨学科的联想</h2>
 <div class="crossx"><ul>
 <li><b>社会学 · 费孝通的「差序格局」</b>：《乡土中国》（1948）把西方社会比作一捆捆扎好的柴，人属于哪个团体，权利就跟着团体走，这是 RBAC；乡土中国则像石子入水的波纹，以自己为中心按关系远近一圈圈推开，这是 ReBAC 的可达性遍历。不像在于：波纹的边界因人因事伸缩，Zanzibar 的 rewrite 规则却必须写死、可审计。</li>
 <li><b>免疫学 · 自身免疫与免疫缺陷</b>：免疫系统也在 fail-closed 和 fail-open 之间取舍：判得太严会攻击自身组织，判得太松让病原长驱直入。像在两种错误的代价不对称；不像在免疫没有「全站拒绝」这个选项，只能带着误判一直运行。</li>
 <li><b>商业 · 复式记账（Pacioli，1494）</b>：每笔账同时记借和贷，两边对不上就露馅，和哈希链一样是让篡改「可检测」而非「不可能」。会计的老规矩是错账不涂改、另做冲正分录，正是审计日志追加 tombstone 而不 UPDATE 的做法。</li>
 <li><b>神经科学 · 记忆再巩固（Nader 等，2000）</b>：大鼠的恐惧记忆被重新唤起后会短暂变得可改写，此时阻断蛋白质合成就能削弱它。人脑记忆因此不是 append-only 日志，每次读取都可能重写，这也是关键事实要靠外部存证、不能只靠回忆的原因。</li>
 </ul></div>
-<h2>十条要点</h2>
+<h2 data-tts="e645337aa5194efd">十条要点</h2>
 <ol class="takeaways">
 <li>授权检查是每个 API 请求都要过的最热路径，check QPS 常比业务 QPS 高一个量级。</li>
 <li>业务服务不自己判权限，而是统一问中心化的授权决策点 PDP，Zanzibar 和 Himeji 都这么做。</li>
@@ -278,7 +278,6 @@ def verify():                            # 巡检：重算每条 hash，断链�
 <li>审计日志用 Outbox 保证不丢、用 append-only 哈希链让篡改可检测，并与业务库分开存储。</li>
 <li>授权服务挂掉时默认 fail-closed；列表页用批量 check 或反向索引，避免 N+1 授权。</li>
 </ol>
-
 <h2 data-tts="aeac4aec6287c190">深入资源</h2>
 <ul>
 <li><a href="https://research.google/pubs/zanzibar-googles-consistent-global-authorization-system/" target="_blank">Zanzibar: Google's Consistent, Global Authorization System</a> — USENIX ATC 2019，ReBAC 的奠基论文（关系元组、userset rewrite、Zookie、Leopard 索引）。</li>
