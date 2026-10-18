@@ -52,6 +52,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -253,6 +261,26 @@ processors:
 <div class="callout"><strong>4. 告警疲劳</strong>：几百条静态阈值告警，80% 是噪音 → on-call 麻木 → 真事故被淹没。改 SLO burn-rate 告警 + 严格区分 page（要人立刻起床）与 ticket。</div>
 <div class="callout"><strong>5. 可观测性系统自己挂了</strong>：监控和被监控系统共用基础设施，故障时监控也瞎。可观测性栈要独立部署、独立故障域，并有外部黑盒探测兜底。</div>
 <p style="margin-top:14px"><strong>高频面试题：</strong>① metrics / logs / traces 各解决什么、为什么不能只用一个？② head vs tail sampling 的取舍，tail 怎么保证同 trace 的 span 聚齐？③ SLO / error budget 怎么定，burn-rate 多窗口告警为什么比静态阈值好？④ 为什么 p99 不能跨机器求平均？histogram 和 summary 怎么选？⑤ 怎么控制可观测性成本（采样 + 基数 + 降采样三板斧）？</p>
+<h2>越界 · 跨学科的联想</h2>
+<div class="crossx"><ul>
+<li><b>心理学 · 信号检测论（Green 与 Swets，1966）</b>：判断「有没有信号」时，命中和虚报总是一起涨落，只挪阈值换不来两全，要两全得让信号与噪声本身更好区分。静态阈值告警就是在一根阈值上来回拉；burn rate 加上窗口和持续时间，等于提高了可分度。不像的是，实验里的被试不会因虚报太多而麻木，on-call 会。</li>
+<li><b>禅修 · 专注与开放监控（Antoine Lutz 等，2008）</b>：这篇神经科学综述把冥想分成两类：专注是盯住一个预设对象，开放监控是不设对象、觉察此刻浮现的一切。监控像前者，看预先定义的图；可观测性像后者，能问事先没想到的问题。不像在于，禅修的开放不求结论，排障最终要收敛到一个根因。</li>
+<li><b>神经科学 · 突触标记与捕获（Frey 与 Morris，1997）</b>：一次刺激先在突触上留个临时标记，几小时内若有足够强的事件，标记才被巩固成长期变化，否则消退。tail sampling 是同一个结构：先缓存整条 trace，等结局出来再决定去留。不像的是，大脑的标记几乎不占资源，Collector 的缓冲却是实打实的内存。</li>
+<li><b>投资 · 风险预算（risk budgeting）</b>：机构投资者不追求风险越小越好，而是先定一年能承受多少波动或跟踪误差，再把它分给各个主动下注。error budget 是同一个结构：可靠性是一笔可以花在发版上的额度。不像的是，投资的风险预算按事前估计的波动来算，error budget 记的是事后真实发生的故障。</li>
+</ul></div>
+<h2>十条要点</h2>
+<ol class="takeaways">
+<li>监控回答「系统健不健康」这类已知问题，可观测性回答「为什么不健康」这类事故现场才冒出来的未知问题。</li>
+<li>OTel Collector 是可观测性管道的控制点：采样、限流、脱敏都在这里改，不用重新发布几百个服务。</li>
+<li>Metrics、logs、traces 的本质区别是基数承受力，给 metric 加 user_id 这类高基数 label 会让时间序列数爆炸。</li>
+<li>三支柱靠 trace_id 和 exemplar 缝合：用 metric 发现异常，跳到一条代表性 trace，再拉出这条请求的全部日志。</li>
+<li>Head sampling 在入口随机决定去留，简单便宜，但决策时不知道结局，偶发的错误请求大概率被丢掉。</li>
+<li>Tail sampling 等整条 trace 结束再按错误和延迟决定去留，代价是 Collector 要按 trace_id 哈希路由并缓冲 span。</li>
+<li>Error budget 等于 1 减 SLO，99.9% 意味着一个月约可坏 43 分钟；预算没花完就大胆发版，花超了就冻结发布。</li>
+<li>Burn rate 告警盯错误预算的消耗速度，多窗口多燃烧率既能抓住快烧的灾难，又不会被短暂毛刺吵醒。</li>
+<li>百分位数不能二次聚合：十台机器的 p99 求平均不是全局 p99，要把 histogram 的 bucket 相加后再算分位。</li>
+<li>可观测性栈要独立部署、自成故障域，否则被监控系统一挂，监控也跟着瞎。</li>
+</ol>
 <h2 data-tts="b7d96711c978b613">深入资源</h2>
 <ul>
 <li><strong>《Site Reliability Engineering》&amp; 《SRE Workbook》</strong>（Google，免费在线 sre.google）：SLI/SLO/error budget 与 burn-rate 告警的权威来源。</li>

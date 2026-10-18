@@ -51,6 +51,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -264,6 +272,26 @@ processors:
 <div class="callout"><strong>5. The observability system itself goes down</strong>: when monitoring shares infra with the monitored system, an outage blinds the monitoring too. The observability stack needs an independent deployment and failure domain, plus external black-box probes as a backstop.</div>
 <p style="margin-top:14px"><strong>Frequent interview questions:</strong> ① What does each of metrics/logs/traces solve, and why can't you use just one? ② Head vs tail sampling trade-offs; how does tail guarantee a trace's spans are gathered? ③ How do you set SLO/error budget, and why is multi-window burn-rate alerting better than static thresholds? ④ Why can't you average p99 across machines? Histogram vs summary? ⑤ How do you control observability cost (the trio: sampling + cardinality + downsampling)?</p>
 
+<h2>Crossovers</h2>
+<div class="crossx"><ul>
+<li><b>Psychology · Signal detection theory (Green and Swets, 1966)</b>: when deciding whether a signal is present, hits and false alarms rise and fall together; moving the threshold alone cannot buy both, only making signal and noise more separable can. Static-threshold alerts just slide one threshold back and forth; burn rate, by adding windows and duration, raises separability. The difference: lab subjects do not go numb from too many false alarms, on-call engineers do.</li>
+<li><b>Meditation · Focused attention vs open monitoring (Antoine Lutz et al., 2008)</b>: this neuroscience review splits meditation in two: focused attention holds one chosen object, open monitoring holds no object and notices whatever arises. Monitoring resembles the first, watching predefined charts; observability resembles the second, able to ask questions nobody planned. Unlike meditation, debugging must eventually converge on one root cause.</li>
+<li><b>Neuroscience · Synaptic tagging and capture (Frey and Morris, 1997)</b>: a stimulus first leaves a temporary tag at a synapse; only if a strong enough event follows within hours is the tag consolidated into a lasting change, otherwise it fades. Tail sampling has the same shape: buffer the whole trace, wait for the outcome, then decide. The difference: a synaptic tag costs almost nothing, while the Collector's buffer is real memory.</li>
+<li><b>Investing · Risk budgeting</b>: institutional investors do not aim for the least risk possible; they first set how much volatility or tracking error a year can bear, then allocate it across active bets. An error budget has the same structure: reliability is an allowance you spend on shipping. The difference: an investment risk budget is an ex-ante volatility estimate, while an error budget counts failures that actually happened.</li>
+</ul></div>
+<h2>Ten takeaways</h2>
+<ol class="takeaways">
+<li>Monitoring answers known questions like "is the system healthy"; observability answers unknown ones like "why is it unhealthy", which only appear mid-incident.</li>
+<li>The OTel Collector is the control point of the telemetry pipeline: sampling, rate limiting and PII scrubbing change there without redeploying hundreds of services.</li>
+<li>Metrics, logs and traces differ mainly in how much cardinality they tolerate; a high-cardinality label like user_id makes metric time series explode.</li>
+<li>The three pillars are stitched by trace_id and exemplars: a metric spots the anomaly, an exemplar opens a representative trace, the trace_id pulls that request's logs.</li>
+<li>Head sampling decides at the entry point, cheap and stateless, but before the outcome is known, so rare error requests are usually dropped.</li>
+<li>Tail sampling decides after the trace completes based on errors and latency, at the cost of routing spans by trace_id hash and buffering them in the Collector.</li>
+<li>An error budget is 1 minus the SLO, so 99.9% allows about 43 bad minutes a month; budget left means ship boldly, budget spent means freeze releases.</li>
+<li>Burn-rate alerts watch how fast the error budget is being consumed; multi-window, multi-burn-rate rules catch fast burns without paging on brief spikes.</li>
+<li>Percentiles cannot be re-aggregated: averaging ten machines' p99 is not the global p99; sum the histogram buckets first, then compute the quantile.</li>
+<li>The observability stack needs its own deployment and failure domain, or it goes blind exactly when the monitored system fails.</li>
+</ol>
 <h2>Deep-Dive Resources</h2>
 <ul>
 <li><strong>Site Reliability Engineering & The SRE Workbook</strong> (Google, free at sre.google): the authoritative source on SLI/SLO/error budget and burn-rate alerting.</li>
