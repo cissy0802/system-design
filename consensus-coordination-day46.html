@@ -52,6 +52,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -267,6 +275,26 @@ def linearizable_read(key):
 <div class="callout"><strong>4. 用 lease 却假设时钟完美。</strong> Leader lease read 的正确性依赖「时钟漂移有上界」；VM 被冻结、NTP 跳变都能击穿它。要么留足安全边际，要么退回 quorum read。</div>
 <div class="callout"><strong>5. 拿共识当高吞吐存储。</strong> 每个写都过多数派复制，天然是低吞吐、强一致的控制面工具。别把用户业务数据的高频写扔进 etcd/ZK——它们是协调器，不是主数据库。</div>
 <p><strong>其他高频追问：</strong>①为什么协调服务不用 2PC？（2PC 协调者单点、参与者会被阻塞，不容错）②5 节点跨 3 AZ 怎么摆才能容忍一个 AZ 挂掉？③Raft 和 Paxos 到底差在哪？④watch 的通知怎么保证不漏（etcd revision + 断点续传）？</p>
+<h2>越界 · 跨学科的联想</h2>
+<div class="crossx"><ul>
+<li><b>生物进化 · 蜜蜂择巢的法定数（Thomas Seeley）</b>：分蜂群选新家时，侦察蜂在某个候选点聚到一定数量就触发全群起飞，Seeley 在《Honeybee Democracy》（2010）里把这叫 quorum。像在「过门槛才提交、提交后不回头」；不像在它数的是绝对数而非多数派，两个候选点理论上可以同时过线。</li>
+<li><b>神经科学 · 裂脑人（Sperry 与 Gazzaniga）</b>：切断胼胝体后，左右半球各自接收信息、各自指挥一只手，Sperry 因此获 1981 年诺贝尔奖。这是字面意义的脑裂：两个「自认 leader」同时行动。不同在于大脑没有 term 和多数派，左脑的「解释者」只会事后编出一个说得通的理由，正像一个没有 fencing 的系统。</li>
+<li><b>意识 · 全局工作空间理论（Baars 1988，Dehaene）</b>：大量并行的无意识处理器竞争，胜出的内容「点燃」后被广播到全脑，相当于 leader 定序后把日志推给所有 follower。不像的是，胜出靠激活强度而不靠投票，意识里的「已提交」也随时会被下一个念头覆盖。</li>
+<li><b>中国史 · 年号与正统</b>：改朝换代先改元，新年号把旧朝的诏令一并作废，像单调递增的 term。可年号没有多数派交集来兜底，南北朝、五代时几个政权各用各的年号、各称正统，就是一段持续几百年的脑裂。</li>
+</ul></div>
+<h2>十条要点</h2>
+<ol class="takeaways">
+<li>分布式协调要求所有节点对同一问题看到同一个答案，etcd、ZooKeeper、Chubby 是业界的标准共识服务。</li>
+<li>Replicated State Machine 把所有写序列化成一条日志，各节点按相同顺序 apply，得到相同状态。</li>
+<li>任意两个多数派必然相交，所以 2f+1 个节点只能容忍 f 个故障，也不会提交两个冲突的值。</li>
+<li>Raft 用强 leader 和连续日志换来可理解性，代价是只能顺序提交、leader 成为写吞吐瓶颈。</li>
+<li>单调递增的 term 加多数派选举，让被分区孤立的旧 leader 即使还自称 leader 也提交不了任何写。</li>
+<li>纯 TTL 锁挡不住 GC 停顿，只有单调递增的 fencing token 加存储端校验才能拒绝醒来的旧持锁者。</li>
+<li>直接读 leader 本地内存可能读到旧值，Raft 的 ReadIndex 先用一轮多数派心跳确认领导权再读。</li>
+<li>Jepsen 测出早期 etcd 的 consistent read 并不线性化，etcd 此后改用 ReadIndex 和 quorum read。</li>
+<li>单个 Raft 组的写吞吐被 leader 卡死，Multi-Raft 把 key space 切成大量独立 Raft 组来水平扩展。</li>
+<li>共识组永远用奇数节点，而且只适合做低频写的控制面协调器，不适合存高频写的业务数据。</li>
+</ol>
 <h2 data-tts="1edef13c5bc0b6c0">深入资源</h2>
 <ul>
 <li><strong>Raft 论文</strong>《In Search of an Understandable Consensus Algorithm》(Ongaro &amp; Ousterhout, USENIX ATC 2014) — <a href="https://raft.github.io/">raft.github.io</a> 有论文、可视化动画与各语言实现。入门共识的最佳起点。</li>

@@ -52,6 +52,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -272,6 +280,26 @@ stream
 <div class="callout"><strong>3. Kappa 却没规划 Kafka retention。</strong> 要 replay 30 天却只存 3 天，纠错时数据已被删——Kappa 的可行性<em>直接绑定</em>日志保留期与重算成本。</div>
 <div class="callout"><strong>4. watermark 设太松或太紧。</strong> 太紧→大量迟到丢数；太松→窗口不关、延迟与状态双高。要按真实 skew 分布（看 p99 延迟）来定，并用 allowed lateness 兜底。</div>
 <p><strong>高频追问：</strong>① 为什么说「批是流的特例」？micro-batch 与 true streaming 的延迟下限差在哪？② Lambda 的两套代码具体怎么不一致、Kappa 怎么解决又引入什么新约束？③ Watermark 推进慢导致窗口不关、状态暴涨，怎么排查与缓解？④ 端到端 exactly-once 需要 source、算子、sink 各满足什么条件？⑤ 5000 万 eps、5s SLO，并行度与状态后端怎么估算？</p>
+<h2>越界 · 跨学科的联想</h2>
+<div class="crossx"><ul>
+<li><b>神经科学 · 事后归因（postdiction）</b>：大脑也在等 watermark。Eagleman 与 Sejnowski 2000 年用闪光滞后效应论证：意识对「此刻」的报告，会把闪光之后约 80 毫秒内到达的信息一起算进去，晚到的信号能改写先前的感知。像在都拿一小段等待换完整；不像在大脑没有 side output，迟到的信号被悄悄并进「当时」，我们察觉不到改写。</li>
+<li><b>物理 · 同时性的相对性</b>：爱因斯坦 1905 年指出，相隔两地的两件事是否「同时」取决于观察者，不存在全局的「现在」。event-time 与 processing-time 的错位是同一个困境，只能按事件自带的时间戳排序。不像在流处理里每条事件至少有一个公认的发生时刻。</li>
+<li><b>心理学 · 卡尼曼的系统 1 / 系统 2</b>：Lambda 的速度层像系统 1，快而近似；批层像系统 2，慢而精确，两路结果再合并。《思考，快与慢》（2011）里的种种偏差，正像两套逻辑口径对不齐。不像在大脑没法砍掉系统 1、改走 Kappa。</li>
+<li><b>商业 · 复式记账</b>：帕乔利 1494 年系统整理的复式记账从不涂改旧账，记错了就追加一笔冲正分录，账本本身就是真相之源，和 Kappa「日志不可改、纠错靠重放」同一思路。不像在会计只追加修正，Kappa 却是修好代码把整段历史重算一遍。</li>
+</ul></div>
+<h2>十条要点</h2>
+<ol class="takeaways">
+<li>批处理是流处理的特例：有界数据就是知道何时结束的无界数据。</li>
+<li>Spark 的 micro-batch 延迟受批间隔下限约束，Flink 逐条流式处理可到毫秒级。</li>
+<li>Lambda 架构跑批层和速度层两条链路，同一业务逻辑写两遍，口径很难对齐。</li>
+<li>Kappa 架构砍掉批层只留流链路，纠错就把 Kafka 日志从头 replay 到一张新结果表。</li>
+<li>Kappa 的可行性绑定日志保留期：要 replay 30 天却只存 3 天，纠错时数据已被删。</li>
+<li>窗口必须按 event-time 开；processing-time 窗口一遇乱序或回放，历史数据会全挤进同一分钟。</li>
+<li>Watermark 是「早于 T 的数据基本到齐」的启发式断言：给得激进快而不准，给得保守准而慢。</li>
+<li>迟到数据先用 allowed lateness 更新已发结果，更晚的进 side output 单独处理。</li>
+<li>端到端 exactly-once 等于 checkpoint 一致快照加 sink 事务提交，只做 checkpoint 仍会重复写下游。</li>
+<li>Lambda 的速度层与批层，和卡尼曼的系统 1 / 系统 2 同构：快的给近似，慢的来纠正。</li>
+</ol>
 <h2 data-tts="de3ab2ecb4979e87">深入资源</h2>
 <ul>
 <li><strong>《Designing Data-Intensive Applications》Ch 10–11</strong>（Kleppmann）：批处理与流处理、流批统一的本质讨论。</li>

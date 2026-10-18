@@ -48,6 +48,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -388,6 +396,26 @@ def place_order(user, sku, qty):
 <li>How can Spanner claim "global linearizable"? How does TrueTime's ε affect commit wait? What if you don't have GPS clocks (CockroachDB)?</li>
 </ol>
 
+<h2>Crossovers</h2>
+<div class="crossx"><ul>
+<li><b>Physics · relativity of simultaneity</b>: Einstein showed in 1905 that for two distant events, which came first depends on the observer; only events that can influence each other (inside a light cone) have a fixed order. Lamport said happens-before was inspired by exactly this, and causal consistency is "order only what lies inside the light cone." The difference: spacelike events in physics simply have no order, while systems often force one onto concurrent writes (LWW), an engineering choice rather than a fact of nature.</li>
+<li><b>Neuroscience · perceptual postdiction (Eagleman &amp; Sejnowski, 2000)</b>: flash-lag experiments suggest the brain folds in about 80 ms of information after a flash before settling what it saw "at that moment", much like Spanner's commit wait: let the uncertainty window pass, then announce the order. Unlike Spanner, which guarantees the order is true, the brain only delivers a self-consistent story, and the postdiction reading is itself still debated.</li>
+<li><b>Psychology · object permanence (Baillargeon, 1985)</b>: in violation-of-expectation studies, five-month-old infants stare longer at an impossible event (a screen rotating through a box it should have stopped against), so "things don't just vanish" is an expectation that arrives very early. Monotonic reads and read-your-writes protect exactly that intuition. The difference: infants face the physical world itself, while a distributed system has to work hard to honor it.</li>
+<li><b>Business · Bezos's Type 1 and Type 2 decisions</b>: in his 2015 shareholder letter Bezos split decisions into irreversible one-way doors and reversible two-way doors, slow for the first, fast for the second, and warned that big companies apply heavyweight process to everything. That is the same shape as "tier by cost of violation; don't default to strong consistency." The difference: a two-way door relies on undoing later, eventual consistency on merging later, which only works if the business is designed to be mergeable.</li>
+</ul></div>
+<h2>Ten takeaways</h2>
+<ol class="takeaways">
+<li>Consistency is a spectrum, not a switch: linearizable, sequential, causal, read-your-writes, monotonic, eventual, each weaker step buying lower latency and higher availability.</li>
+<li>Strong consistency must be justified, not assumed; it pays off only when correctness depends on the latest value, as with inventory, distributed locks and uniqueness constraints.</li>
+<li>What users actually feel is read-your-writes and monotonic reads, implemented with client-carried LSN or HLC tokens at almost no server cost.</li>
+<li>CAP only describes the choice between consistency and availability during a partition; PACELC adds the latency-versus-consistency trade-off the rest of the time.</li>
+<li>Most production systems land in two quadrants: PA/EL for social and display data, PC/EC for finance, inventory and configuration stores.</li>
+<li>Lamport timestamps give a total order but cannot tell causality from concurrency; vector clocks can, but grow with the number of nodes.</li>
+<li>A Hybrid Logical Clock combines physical time with a logical counter, preserving happens-before while staying close to wall-clock time at constant size.</li>
+<li>Tier consistency by cost of violation: in one "buy now" click, stock decrement needs linearizability, the order needs read-your-writes, and recommendation counters can be eventual.</li>
+<li>Classic traps: ordering by wall clocks, treating single-node ACID as distributed strong consistency, and assuming a W+R&gt;N quorum equals linearizability.</li>
+<li>Even infants expect objects not to vanish, which is why vanishing orders or shrinking comment lists, violations of read-your-writes and monotonic reads, draw instant complaints.</li>
+</ol>
 <h2>Deep Resources</h2>
 <ul>
 <li><strong>《Designing Data-Intensive Applications》Ch 5 §Consistency + Ch 9 §Consistency and Consensus</strong> (Kleppmann) — the most thorough industrial discussion of this topic.</li>

@@ -51,6 +51,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 </head><body><div class="container">
 
@@ -161,6 +169,26 @@ def delete(target_id):
 <li><strong>OT or CRDT?</strong> "Stable central server, want plain text without bloat, team can hold the transform" → OT (Google Docs); "want offline-first / P2P / local-first, can accept metadata overhead" → CRDT (Yjs/Automerge).</li>
 </ul>
 
+<h2>Crossovers</h2>
+<div class="crossx"><ul>
+<li><b>Neuroscience · efference copy</b>: von Holst and Mittelstaedt proposed in 1950 that when the brain issues a motor command it sends a copy ahead to predict the sensory result, so you "feel" the outcome before real feedback arrives. That is the same shape as optimistic local echo awaiting the server's ack. The difference: when the prediction is wrong the brain quietly corrects, while the editor must rebase and roll back, making freshly typed text flicker away.</li>
+<li><b>Consciousness · Global Workspace Theory (Bernard Baars, 1988)</b>: many unconscious modules run in parallel, and only the one that wins entry to the "workspace" is serialized and broadcast to the whole brain; a per-document authority is likewise concurrent input, single-point ordering, broadcast to all. Unlike it, the workspace is winner-take-all and losing signals vanish, whereas OT transforms every op into the total order.</li>
+<li><b>Complexity science · stigmergy (Grassé, 1959)</b>: termites never coordinate directly; they leave traces in the environment, later workers build on the traces, and the mound emerges. A CRDT likewise has no center: replicas only read and write immutable ids and tombstones. The difference is that a mound only needs to be good enough, while a CRDT must provably converge byte for byte.</li>
+<li><b>Evolution · meiotic crossing-over</b>: when two homologous chromosomes recombine into an offspring's sequence, they swap whole segments and each segment keeps its internal order. The CRDT interleaving anomaly is the opposite, shuffling two concurrent passages letter by letter into gibberish. Both merge two diverged sequences into one; biology keeps the pieces contiguous.</li>
+</ul></div>
+<h2>Ten takeaways</h2>
+<ol class="takeaways">
+<li>Collaborative editing cannot use whole-document last-write-wins; edits must be split into character-level, mergeable operations.</li>
+<li>The consistency goal is strong eventual consistency: replicas that receive the same set of ops converge to the same state, whatever the arrival order.</li>
+<li>OT recomputes position indexes against concurrent ops with a transform function; the data stays plain text, but the transform is very hard to get right.</li>
+<li>Decentralized OT struggles to satisfy TP2; the Jupiter algorithm uses a central server for total order so only TP1 is needed, the path Google Docs takes.</li>
+<li>A CRDT gives every character a globally unique, dense id and turns deletes into tombstones, so ops commute and need no central ordering.</li>
+<li>CRDTs have two classic traps, metadata bloat and interleaving anomalies; Automerge's columnar encoding cuts overhead to roughly 30% extra.</li>
+<li>On reconnect, peers exchange version vectors and send only missing ops, so the longer a client was offline, the bigger the CRDT advantage over OT.</li>
+<li>Figma uses last-writer-wins for object properties like color and position: losing one design edit is acceptable, losing text is not.</li>
+<li>One single-threaded authority process per document, routed by consistent hashing, reduces concurrency reasoning to a single-threaded problem.</li>
+<li>A tombstone can be collected only after every replica's version vector has passed the delete; presence data such as cursors should never be persisted.</li>
+</ol>
 <h2>Deep Resources</h2>
 <ul>
 <li><a href="https://www.figma.com/blog/how-figmas-multiplayer-technology-works/">How Figma's multiplayer technology works</a> — Evan Wallace on server-per-document, offline reconnect, LWW properties; the most readable industry writeup.</li>

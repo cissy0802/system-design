@@ -51,6 +51,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -246,6 +254,26 @@ def run_tool(call):
 <li><strong>Follow-up</strong>: "Retrieval budget is only 300ms—what if hybrid+rerank can't finish?" → parallelize dense/sparse recall, rerank only top-N, use a distilled small cross-encoder, route hot queries to the semantic cache.</li>
 </ul>
 
+<h2>Crossovers</h2>
+<div class="crossx"><ul>
+<li><b>Neuroscience · Hippocampal indexing theory</b>: Teyler and DiScenna proposed in 1986 that the hippocampus does not store memories themselves, only an index pointing to traces scattered across the neocortex; recall follows the index and reassembles the pieces. RAG has the same shape: index kept apart from content, look up first, then assemble into the context. The difference: the brain rewrites and distorts on every reconstruction, while RAG must return the exact source chunk, and traceability is precisely the part engineering has to add.</li>
+<li><b>Psychology · Encoding specificity</b>: Tulving and Thomson showed in 1973 that a memory comes back when the retrieval cue matches the context it was encoded in. Requiring queries and documents to share one embedding model is the hard version of that rule; a person in a new context just struggles to recall, whereas a mismatched vector space silently turns into noise.</li>
+<li><b>Evolution · Cryptobiosis</b>: in drought, tardigrades nearly shut down their metabolism and revive when water returns, riding out long gaps. A durable workflow waiting for approval does the same: release resources, stay still, resume in place on a signal. Unlike the tardigrade, though, the workflow cannot keep its state in its own body; external storage has to hold it.</li>
+<li><b>Business · One-way and two-way doors</b>: in his 2015 shareholder letter, Bezos split decisions into irreversible "one-way doors," made slowly and carefully, and reversible "two-way doors," left to small teams to decide fast. Sending high-risk tools to human approval while letting the agent run compensable actions is the same tiered delegation.</li>
+</ul></div>
+<h2>Ten takeaways</h2>
+<ol class="takeaways">
+<li>The RAG bottleneck is almost always retrieval recall, not generation; a chunk that is never retrieved does not exist for the model.</li>
+<li>Naive chunking loses context, so Contextual Retrieval prepends an LLM-written summary of where each chunk sits before embedding it.</li>
+<li>Anthropic reports Contextual Retrieval plus BM25 cuts retrieval failures by about 49%, and about 67% with reranking added.</li>
+<li>An in-memory agent loop restarts from scratch on every deploy, so long tasks need durable execution that persists each step and replays after a crash.</li>
+<li>External side effects of tool calls need idempotency keys, because there is always a crash window between the side effect and the write to disk.</li>
+<li>Agent loops need a hard step limit that falls back to a human, or a model that keeps calling tools will burn through the budget.</li>
+<li>Queries and documents must use the same embedding model; mixing them raises no error but turns similarity into noise and breaks recall.</li>
+<li>Switching embedding models means rebuilding a new index in the background, dual-writing updates, validating on a golden set, then cutting over atomically.</li>
+<li>Irreversible actions such as sending email or deleting data go through human approval, with the agent durably suspended until the approval signal arrives.</li>
+<li>A semantic cache must handle invalidation after knowledge-base updates and a careful similarity threshold, or answers go stale or miss the question.</li>
+</ol>
 <h2>Deep-dive Resources</h2>
 <ul>
 <li><a href="https://www.anthropic.com/engineering/building-effective-agents">Anthropic — Building Effective Agents</a>: workflow vs agent, when to use an agent, human checkpoints, and other practices.</li>

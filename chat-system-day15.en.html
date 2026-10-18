@@ -51,6 +51,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -240,6 +248,26 @@ def on_receive(msg):                     # receiver
 <div class="callout"><strong>5. Hot partitions with no bucketing.</strong> Using <code>channel_id</code> alone as the partition key lets active channels hammer a single partition. Use <code>(channel_id, bucket)</code>.</div>
 <p><strong>Common follow-ups</strong>: ① How do you hold 50M connections in memory, and what's the bottleneck? ② A sends to an offline B — what's the message's full lifecycle? ③ With multi-device login, how are messages synced across devices without dup or loss? ④ A million-member group — how does one message fan out without blowing up? ⑤ With E2E on, how do server-side search and moderation still work?</p>
 
+<h2>Crossovers</h2>
+<div class="crossx"><ul>
+<li><b>Complexity science · Stigmergy (Grass&eacute;, 1959)</b>: termites don't pass messages to each other; they leave pheromone on the nest, and whoever comes next reads the environment and acts. A big group's shared conversation log works the same way: write once into the environment, let each member read. The difference: pheromone evaporates, so stale information expires on its own, while chat logs must be kept forever.</li>
+<li><b>Psychology · Grounding in conversation (Clark &amp; Brennan, 1991)</b>: speakers confirm they've been heard through nods, "uh-huh" and paraphrase, and repeat themselves when nothing comes back, which is an ACK chain. Unlike a chat system, people settle for "good enough" grounding that shifts with the medium and the cost; chat ACKs must be per message and per hop.</li>
+<li><b>Neuroscience · Memory consolidation</b>: a new experience held in the hippocampus is fragile; it takes protein synthesis and replay during sleep to consolidate it into the cortex, just as "no lost messages" rests on the durable store, not on a connection that can drop anytime. The difference: the brain's storage is reconstructive and each recall can rewrite the memory (reconsolidation), whereas a message store must stay byte-exact.</li>
+<li><b>Buddhism · Momentariness and continuity</b>: early Buddhist schools held that every phenomenon arises and perishes in an instant, and the seemingly continuous self is only a chain of causes. Double Ratchet likewise has no long-lived key, only a chain derived step by step and discarded after use. Buddhism uses the idea to loosen attachment; the ratchet uses it to confine a leak to a short stretch.</li>
+</ul></div>
+<h2>Ten takeaways</h2>
+<ol class="takeaways">
+<li>Chat is a connection-amplification problem: millions of idle WebSocket connections are bound by memory and file descriptors, not CPU.</li>
+<li>WhatsApp on Erlang and Discord on Elixir both use the actor model, one lightweight process per connection, to hold a million connections per box.</li>
+<li>The Session Registry maps each user to their Gateway node, making it the heart of message routing; dead connections must be removed promptly.</li>
+<li>Partitioning messages by channel_id alone turns big channels into hot spots, so Discord buckets by time with (channel_id, bucket).</li>
+<li>Big groups use a shared conversation log pulled on read; fanning out to every inbox only suits small groups and explodes at a million members.</li>
+<li>Delivery means persisted to storage, not written to a socket, so the server must persist first and ACK second.</li>
+<li>The standard chat answer is at-least-once delivery plus client-side idempotent IDs for dedup, not costly exactly-once.</li>
+<li>A per-conversation monotonic seq lets clients sort and detect gaps, shrinking global ordering down to per-conversation ordering.</li>
+<li>Double Ratchet uses a one-time key per message for forward secrecy and post-compromise security; Sender Keys cut group fanout from N&sup2; to N.</li>
+<li>Whether to use E2E is product positioning: WhatsApp and Signal encrypt by default, while Discord skips it to keep server-side search and moderation.</li>
+</ol>
 <h2>Deep Resources</h2>
 <ul>
 <li><strong>Discord eng blog, "How Discord Stores Trillions of Messages"</strong>: first-hand material on bucketed partition keys, the Cassandra→ScyllaDB migration, and hot-partition mitigation.</li>

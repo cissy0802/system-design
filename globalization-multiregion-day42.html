@@ -52,6 +52,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -191,6 +199,26 @@ tax = call_us(calc_tax)          # 跨区
 <li><strong>成本盲区</strong>：跨区数据传输费（AWS 跨区 egress）+ 每区冗余容量，多活约等于 2-3× 基础设施成本。面试官爱问「多花的钱换到了什么 SLA」。</li>
 <li><strong>追问：Spanner 靠什么给全球强一致？</strong> TrueTime——用 GPS+原子钟把时钟误差 bound 在几 ms，提交时「commit-wait」等过不确定窗口，保证外部一致性。这是用硬件换一致性。</li>
 </ul>
+<h2>越界 · 跨学科的联想</h2>
+<div class="crossx"><ul>
+<li><b>物理学 · 同时性的相对性（爱因斯坦，1905）</b>：狭义相对论里没有全宇宙共享的「此刻」，相隔遥远的两件事谁先谁后取决于观察者；跨区复制面对的也是「没有全局现在」。不像在于：物理里这是世界本身的结构，Spanner 却能用原子钟把不确定性压到几毫秒，再用 commit-wait 把它等过去。</li>
+<li><b>神经科学 · 脊髓反射</b>：手碰到烫的东西，缩手在脊髓里就完成了，不等信号上行到大脑再下来，因为神经传导太慢、往返太贵。这就是「本地先处理、中心事后知道」。不像的是，反射没有冲突要合并，大脑收到的只是既成事实。</li>
+<li><b>生物进化 · 异域物种形成（Ernst Mayr）</b>：一个种群被山海隔开，基因流断了，两边各自演化，重逢时可能已无法杂交。像脑裂：分区期间两区各自接管写，恢复后再也合不回去。不像在于，进化里分叉就是结果，系统却必须靠 fencing 或单写归属把分叉挡在发生之前。</li>
+<li><b>投资 · 马科维茨的分散化（1952）</b>：组合分散只在资产低相关时才降低风险，相关性趋近 1 时分散形同虚设；多加一个区也只有在各区不共享强一致依赖时才提升可用性。不像的是，金融里的相关性常在危机中才暴露，系统里的共享依赖画在架构图上，事先就能查出来。</li>
+</ul></div>
+<h2>十条要点</h2>
+<ol class="takeaways">
+<li>洲际一次同步写要付 100–180ms 的往返，光速无法靠工程消除，只能靠架构绕开。</li>
+<li>生产环境常组合路由：Anycast 把用户送进最近的边缘，边缘再按用户归属区做 L7 转发。</li>
+<li>GeoDNS 受 DNS 缓存 TTL 拖累、切换以分钟计，Anycast 切换快但 TCP 连接可能中途跳区断开。</li>
+<li>多活加 LWW 实现简单，但两区并发改同一个 key 时，输掉的那次更新会静默消失。</li>
+<li>余额、库存这类累加型数据不能用 LWW，要用单写归属区串行化或 CRDT 计数器。</li>
+<li>Spanner 用 GPS 加原子钟的 TrueTime 约束时钟误差，靠 commit-wait 换取全球外部一致性。</li>
+<li>数据驻留约束的是数据的物理存储位置而非请求发起地，备份、binlog 和审计日志同样受约束。</li>
+<li>跨区延迟优化看的是跨区往返次数而不是带宽：读打本区副本，只有写才回归属区。</li>
+<li>多数公司停在读多活、写归属区，真全多活要付冲突治理成本和约 2–3 倍的基础设施开销。</li>
+<li>加区只有在各区真正独立时才提升可用性，正如投资分散化只在资产低相关时降低风险。</li>
+</ol>
 <h2 data-tts="c2cd3342c1ad2658">深入资源</h2>
 <ul>
 <li>《Designing Data-Intensive Applications》(Kleppmann) — 第 5 章复制、第 9 章一致性与共识，多区问题的理论底座。</li>

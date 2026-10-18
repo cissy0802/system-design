@@ -51,6 +51,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -296,6 +304,26 @@ findings = ["failover runbook link 404",
 <li>What does a Game Day test vs automated chaos? Why is neither replaceable?</li>
 </ol>
 
+<h2>Crossovers</h2>
+<div class="crossx"><ul>
+<li><b>Philosophy · Popper's falsifiability</b>: In <i>The Logic of Scientific Discovery</i> (1934), Popper argued theories are never proven, only survive attempts to refute them; a steady-state hypothesis is written the same way, and the experiment tries to knock it down. The flip side holds too: a passing run does not prove resilience, it only means this particular blow missed.</li>
+<li><b>Complexity science · Perrow's Normal Accidents</b>: Sociologist Charles Perrow argued in <i>Normal Accidents</i> (1984) that in tightly coupled, interactively complex systems, accidents are structural, not operator error. Chaos engineering shares the premise but draws the opposite conclusion: Perrow thought some systems should not be built at all, while chaos engineering keeps poking them so hidden couplings surface early.</li>
+<li><b>Investing · Taleb's antifragility</b>: In <i>Antifragile</i> (2012), Taleb separates the robust, which withstands shocks, from the antifragile, which gains from them. Small, controlled fault injection is a dose of stress. The difference: software does not strengthen itself; it only becomes antifragile if the weaknesses found actually get fixed.</li>
+<li><b>Western philosophy · Stoic premeditation of evils</b>: Seneca urged rehearsing exile, ruin and loss in the mind so real misfortune would not find you unready; a Game Day is the organizational version. The Stoics rehearsed only in imagination, while a Game Day releases a real fault, times MTTR, and even sends the key expert on a pretend vacation.</li>
+</ul></div>
+<h2>Ten takeaways</h2>
+<ol class="takeaways">
+<li>Chaos engineering is not random breakage but a controlled experiment: define steady state, hypothesize, inject, try to falsify.</li>
+<li>Steady state should be a business output like checkout success rate, not a system metric like CPU or memory.</li>
+<li>Running control and experiment groups in parallel cancels time-based noise from traffic swings, seasonality and other deploys.</li>
+<li>Netflix uses stream starts per second (SPS) as steady state because it is smooth, predictable and maps to whether users can watch.</li>
+<li>Lower-level fault injection is more realistic but harder to control; application-level FIT shrinks blast radius to a single call.</li>
+<li>Chaos Monkey killing instances is the floor of resilient architecture; request-level injection refines it rather than replacing it.</li>
+<li>Staging has fake traffic, data and dependencies, so chaos run only in staging gives teams false confidence.</li>
+<li>Production experiments should start at 0.1–1% of traffic or one cell, with steady-state metrics wired to an instant kill switch.</li>
+<li>Injected downstream timeouts trigger retry amplification, and slow failures exhaust thread pools far worse than a fast 500.</li>
+<li>Game Days test people and process; Google DiRT even isolates key experts to expose a bus factor of one.</li>
+</ol>
 <h2>Deep Resources</h2>
 <ul>
 <li><strong>Chaos Engineering, Rosenthal &amp; Jones (O'Reilly)</strong>: maturity model + Netflix / Google DiRT / other practices, with a dedicated DiRT chapter.</li>

@@ -52,6 +52,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -364,6 +372,26 @@ graph TD
 <li>解释 BASE 模型的『S』（soft state）是什么意思，给个例子。</li>
 <li>用户量从 10w 到 1 亿，数据库怎么演进？分几个阶段、每个阶段瓶颈是什么。</li>
 <li>HTAP 数据库（TiDB）和『OLTP + CDC 到 OLAP』两套方案，怎么选？</li>
+</ol>
+<h2>越界 · 跨学科的联想</h2>
+<div class="crossx"><ul>
+<li><b>生物进化 · 生态位分化（Robert MacArthur，1958）</b>：五种林莺共住同一片云杉，靠在树冠不同高度觅食而共存；多库共存的数据栈也是按访问模式切分生态位。不像在于，林莺的分工是竞争压出来的，数据栈是架构师事先画的。</li>
+<li><b>神经科学 · 互补学习系统（McClelland、McNaughton、O'Reilly，1995）</b>：海马体快速记下单次经历，新皮层慢慢从大量经历里提炼规律，睡眠时的重放把前者送进后者，正像 OLTP 记交易、CDC 把数据送进 OLAP 做聚合。不像在于，大脑的巩固是有损的重写，皮层学到的是统计而非原样副本；数仓却要求和源库逐行对得上。</li>
+<li><b>心理学 · 快思考与慢思考（Daniel Kahneman）</b>：系统 1 快而省力、常出错，系统 2 慢而严谨；Redis 与 Postgres 的分工同构，把 Redis 当数据源就像把直觉当定论。不同的是，缓存错了可以失效重读，直觉的偏差很难察觉。</li>
+<li><b>投资 · 指数基金作默认（John Bogle，1976）</b>：除非能说清自己的优势，就买指数基金；「说不出为什么不用 Postgres 就用 Postgres」是同一种举证责任。不像的是，指数基金赢在成本低，Postgres 赢在功能广。</li>
+</ul></div>
+<h2>十条要点</h2>
+<ol class="takeaways">
+<li>数据库选型是约束推导而不是技术信仰，数据模型、访问模式、一致性、规模、运维成本五个轴决定选择。</li>
+<li>「NoSQL」是 KV、文档、宽列、图、搜索、时序等多类数据模型的总称，不是 SQL 的单一反面。</li>
+<li>SQL 的长处是跨表 ACID 事务、join 和强 schema 约束，NoSQL 的长处是原生水平扩展和 schema 灵活。</li>
+<li>OLTP 用行存方便按主键点查整行，OLAP 用列存只读需要的列，压缩率可达 5–20 倍。</li>
+<li>现代后端常是多库共存：OLTP 跑交易，CDC 经 Kafka 把数据送进搜索、数仓和数据湖。</li>
+<li>ACID 与 BASE 的界线在模糊：Spanner、CockroachDB 提供分布式 ACID，DynamoDB 2018 年起也支持事务。</li>
+<li>默认用 Postgres，除非能说出 QPS、数据量或特殊访问模式上不用 Postgres 的具体原因。</li>
+<li>单机关系库顶不住时依次走读副本、垂直分库、水平分片，分析 SQL 千万别在主库上跑。</li>
+<li>Redis 是缓存不是账户余额的数据源；DynamoDB 必须先想清楚怎么查，再设计 partition key。</li>
+<li>海马体快速记录、新皮层慢慢提炼规律，和 OLTP 加 CDC 到 OLAP 的分工是同一个结构。</li>
 </ol>
 <h2 data-tts="aaf0ab885c5a34d4">关键资源</h2>
 <ul>

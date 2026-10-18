@@ -51,6 +51,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -265,6 +273,28 @@ readinessProbe:  { httpGet: {path: /ready},   periodSeconds: 5 }
 <div class="callout"><strong>3. Treating Pods as pets.</strong> Pods are cattle, not pets — they get evicted/rebuilt anytime and their IP changes. Any design relying on a fixed pod IP or pod-local disk is wrong — use Service + PV.</div>
 <div class="callout"><strong>4. Assuming container = security isolation.</strong> Containers share a kernel; one kernel privilege-escalation bug pierces all of them. Running untrusted code requires gVisor/Kata/microVM — don't count on namespaces.</div>
 <div class="callout"><strong>5. Frequent interview asks:</strong> ① From a <code>kubectl apply</code> to a running pod, which components does it pass through? ② After a node dies, how and how fast is a pod rebuilt? ③ Why does declarative self-heal better than imperative? ④ What does a Service Mesh solve, at what cost, and when should you <em>not</em> adopt one? ⑤ liveness vs readiness, and what breaks when each is misconfigured?</div>
+
+<h2>Crossovers</h2>
+<div class="crossx"><ul>
+<li><b>Physiology · Homeostasis (Walter Cannon)</b>: Cannon coined homeostasis in 1926: when body temperature or blood sugar drifts from its set point, negative feedback pulls it back, the same shape as a reconcile loop that reads desired, reads actual, and acts on the diff. The difference: the body's set points were fixed by evolution, while Kubernetes lets anyone rewrite the desired state in a YAML file.</li>
+<li><b>Immunology · Cytokine storm</b>: the immune system overreacts to a local infection, inflammatory signals amplify each other, and the damage lands on organs across the whole body. A liveness probe that checks a downstream DB is the same self-made avalanche: one DB blip and every pod is declared dead and restarted. Unlike immunity, Kubernetes has readiness as a middle setting that pulls traffic without executing anything.</li>
+<li><b>Evolutionary biology · Endosymbiosis (Lynn Margulis, 1967)</b>: mitochondria began as outside bacteria that moved into the cell and produced its energy, so the host never had to "write" that metabolism itself; an Envoy sidecar sharing a pod and handling retries and mTLS for the app has the same structure. The closer match comes later: most mitochondrial genes migrated into the nucleus over evolutionary time, just as sidecar L4 features are moving down into the node-level ztunnel and kernel eBPF. The gap: the mitochondrial move took hundreds of millions of years; dropping the sidecar is taking a few releases.</li>
+<li><b>Buddhism · Impermanence and non-self</b>: pods arise from conditions and vanish at any moment, their IPs never fixed; the only stable thing is the Service name, something like a conventional designation. The difference: Buddhism asks you to let go of clinging to names, while Kubernetes stakes all its stability on exactly that name.</li>
+<li><b>Investing · Margin of safety (Benjamin Graham)</b>: in The Intelligent Investor (1949) Graham made the margin of safety the central idea of investing, a buffer that absorbs bad estimates and bad luck. Bin-packing nodes to 90% is like running at full leverage: when one node dies there is no slack to catch the displaced pods. The difference: a cluster can buy its slack back in minutes with an autoscaler, while a market buffer usually has to exist before the crash.</li>
+</ul></div>
+<h2>Ten takeaways</h2>
+<ol class="takeaways">
+<li>A container is not a lightweight VM but an ordinary Linux process whose view is sliced by namespaces and whose resources are sliced by cgroups.</li>
+<li>Containers share the host kernel, so one kernel privilege-escalation bug pierces them all; untrusted code needs gVisor, Kata, or a microVM.</li>
+<li>Kubernetes components never call each other directly; each watches desired state in the API Server and pulls reality toward it.</li>
+<li>etcd stores the whole cluster's state with Raft, making it the single source of truth and the first bottleneck in large clusters.</li>
+<li>A level-triggered controller rereads current state every loop, so a missed watch event is simply fixed on the next pass.</li>
+<li>The scheduler first filters out nodes that fail hard constraints, then scores the survivors and binds the pod to the best one.</li>
+<li>Tighter bin-packing raises utilization but leaves no room for evicted pods when a node dies, so high utilization and high availability pull against each other.</li>
+<li>A liveness probe should check only the process itself; dependency health belongs to readiness, or a downstream blip restarts every pod.</li>
+<li>A service mesh gives zero-code retries and mTLS through a per-pod Envoy sidecar, at the cost of doubled resources and an extra proxy hop.</li>
+<li>Mitochondria turning from outside bacteria into organelles, then moving genes into the nucleus, mirrors sidecar features sinking into the node and kernel.</li>
+</ol>
 
 <h2>Deeper Resources</h2>
 <ul>

@@ -52,6 +52,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -255,6 +263,27 @@ def best_snippet(doc_tokens, q_terms, W=160):
 <li>bi-encoder 和 cross-encoder 的本质区别？为什么前者能建索引、后者不能？</li>
 <li>5000 万文档、768 维向量，HNSW 索引大概占多少内存？怎么估？</li>
 <li>召回阶段 recall@200 只有 85%，精排再好也救不回那 15%——怎么提召回？</li>
+</ol>
+<h2>越界 · 跨学科的联想</h2>
+<div class="crossx"><ul>
+<li><b>心理学 · 卡尼曼的快思考与慢思考</b>：《思考，快与慢》（2011）把心智分成快而省力的系统 1 和慢而费力的系统 2；召回像系统 1 一眼扫出几百个候选，精排像系统 2 只细读少数。不像在于：人的系统 2 很懒，常直接签收系统 1 的答案，精排却每次都跑；共同的盲区是系统 1 没想到的，精排永远看不见。</li>
+<li><b>免疫学 · 先天免疫与适应性免疫</b>：先天免疫认一大类「像病原体」的模式，快而泛；抗体只认某个特定表位，准而窄，正像向量认意图、BM25 认精确词。不像的是，免疫系统会学习和记忆，倒排索引不会。</li>
+<li><b>社会选择 · 博尔达计数</b>：18 世纪的博尔达让每张选票按名次给分再相加，RRF 就是名次分换成 1/(k+名次) 的博尔达计数。老毛病也跟着来：只认名次，听不出「非常喜欢」和「勉强可以」。</li>
+<li><b>佛学 · 以手指月</b>：《楞严经》讲以手指月，莫把手指当月亮。BM25 盯手指（字面词），向量想看月亮（意思）；可向量找不到真月亮时，会指着最近的一颗星说就是它。</li>
+<li><b>心理学 · 信号检测论</b>：判断拆成辨别力和判断标准，挪标准只是拿漏报换误报。相似度阈值同理，只在漏召回和噪声间互换；想两头都好，得靠精排这类更强的辨别力。</li>
+</ul></div>
+<h2>十条要点</h2>
+<ol class="takeaways">
+<li>BM25 擅长 SKU、型号这类精确词和罕见词，却会因同义改写而漏召回。</li>
+<li>稠密向量懂语义意图，却对精确词、数字和型号不敏感，混合检索让两者互补。</li>
+<li>多阶段检索是漏斗：召回用便宜通道拉几百个求不漏，精排只对少数跑重模型求排准。</li>
+<li>HNSW 用近似换速度、召回高但内存大，IVF-PQ 省内存但召回较低、要训练码本。</li>
+<li>BM25 分无上界、余弦在 0 到 1 之间，直接加权平均会被 BM25 主导。</li>
+<li>RRF 按 1/(k+rank) 只用排名融合，免归一化，k 常取 60，代价是丢掉分数幅度。</li>
+<li>cross-encoder 让 query 和文档联合编码，精度高但无法预建索引，只能用在精排。</li>
+<li>Snippet 选命中最密、稀有词最多的窗口，高亮必须回映射到原文 offset。</li>
+<li>召回没捞到的文档精排救不回来，召回层的 recall@k 是整条漏斗的天花板。</li>
+<li>向量检索永远返回最近邻，只给相对排序，需要阈值或 cross-encoder 守门。</li>
 </ol>
 <h2 data-tts="d2e3bf108f15b44d">深入资源</h2>
 <ul>

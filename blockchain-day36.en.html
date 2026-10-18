@@ -51,6 +51,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -283,6 +291,26 @@ def verify(leaf, proof, root):
 <div class="callout"><strong>4. Finality isn't "confirmed = safe".</strong> PoW is probabilistic finality — more blocks lower the reorg probability but never to zero; only BFT is deterministic finality. Exchanges requiring many confirmations for large deposits do so for exactly this reason.</div>
 <div class="callout"><strong>5. Frequent interview follow-ups:</strong> (1) Why is PoS's attack cost higher than PoW's? (2) Where does the withdrawal-latency gap between Optimistic and ZK rollups come from? (3) Why not store a user avatar on-chain? (4) Why is BFT node count limited, and where does the O(n²) come from? (5) Soft fork vs hard fork compatibility difference?</div>
 
+<h2>Crossovers</h2>
+<div class="crossx"><ul>
+<li><b>Evolutionary biology · The handicap principle (Amotz Zahavi, 1975)</b>: A peacock's tail is believable precisely because it is costly and cannot be faked; PoW likewise turns "I cast a vote" into real cost burned, so cheating does not pay. The difference: the tail is expensive in order to advertise the bird's quality, while burned hash power says nothing about a miner's merit and only keeps voting power scarce.</li>
+<li><b>Animal behavior · Quorum decisions in honeybee swarms (Thomas Seeley)</b>: Scout bees inspect candidate nest sites on their own, and once enough scouts gather at one site to reach a quorum, the whole swarm commits, with no queen deciding. It resembles BFT committing only at a 2/3 vote; unlike BFT, the swarm shares one interest and has no lying traitors.</li>
+<li><b>Economics · The stone money of Yap (Milton Friedman, 1991)</b>: Yap's giant stone coins often never move; ownership lives in the island's shared memory of who owes whom, so the ledger is the consensus itself. The difference: it runs on the identity and reputation of a small community, closer to a permissioned chain, and fails among strangers.</li>
+<li><b>Psychology · Reconstructive memory (Elizabeth Loftus, 1974)</b>: Asking whether cars "smashed" or "hit" each other shifts witnesses' speed estimates; human memory is rewritten each time it is recalled. A blockchain is the opposite: nothing written can be changed, but if the first entry is wrong, the error is preserved forever too.</li>
+</ul></div>
+<h2>Ten takeaways</h2>
+<ol class="takeaways">
+<li>Blockchains differ from ordinary replication in the threat model: nodes do not just crash, they actively lie, forge, and collude.</li>
+<li>Permissionless consensus must make voting power scarce, or an attacker can swing votes with masses of fake identities in a Sybil attack.</li>
+<li>PoW uses hash power, PoS uses staked capital, and BFT uses known identities plus two voting rounds, each paying in speed, capital concentration, or node count.</li>
+<li>PoW offers only probabilistic finality, where more blocks lower reorg risk but never to zero; BFT commits deterministically in one block.</li>
+<li>Smart contracts must produce identical results on every node, which rules out true randomness, system clocks, floating point, and network calls.</li>
+<li>Gas prices every opcode and is prepaid by the caller, and running out reverts the call, turning the halting problem into a fee and blocking DoS.</li>
+<li>In 2016 The DAO lost about 3.6 million ETH to a reentrancy bug that paid out before zeroing the balance; the fix is to update state before external calls.</li>
+<li>Hash chaining means altering any past block requires redoing all later consensus, and a Merkle proof lets a light client verify a transaction with O(log n) hashes.</li>
+<li>Storing only an IPFS content hash on-chain prevents tampering but not disappearance: content no node pins can never be retrieved.</li>
+<li>Immutable does not mean correct: the chain locks in what was written but cannot tell whether it was true, and oracles are the weakest link.</li>
+</ol>
 <h2>Deeper Resources</h2>
 <ul>
 <li><strong>Bitcoin Whitepaper</strong> (Nakamoto, 2008): the origin of PoW, Merkle, and SPV — Nakamoto consensus explained in 9 pages.</li>

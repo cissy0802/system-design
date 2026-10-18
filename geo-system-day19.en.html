@@ -51,6 +51,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -310,6 +318,27 @@ def dispatch_nearby(lat, lon, radius):
 <div class="callout">
 <strong>5. Building an R-Tree for moving points as if they were static venues.</strong> 500K updates/s will crush the tree's rebalancing. Use an in-memory grid (O(1) bucket swap) for moving points; leave R-Trees for static data.
 </div>
+
+<h2>Crossovers</h2>
+<div class="crossx"><ul>
+<li><b>Neuroscience · Grid cells (the Mosers, 2005)</b>: Grid cells in the rat entorhinal cortex fire at the vertices of a hexagonal lattice, work that earned May-Britt and Edvard Moser a share of the 2014 Nobel Prize with John O'Keefe. Grid spacing also grows from dorsal to ventral, like a built-in multi-resolution H3. The difference: the brain uses its grid for path integration, answering "where am I", not indexing a million moving points to ask "who is nearby".</li>
+<li><b>Evolution · The honeycomb</b>: In <i>On the Origin of Species</i> Darwin treated the hive bee's cell as natural selection's masterpiece of saving wax, and in 1999 Thomas Hales proved that hexagons tile the plane with the least perimeter for equal area. H3 picks hexagons for equidistant neighbors, bees for cheap material: one shape, two objectives. But a comb is flat, so bees never need 12 pentagons to close a sphere.</li>
+<li><b>Business · Christaller's central place theory (1933)</b>: The geographer Walter Christaller drew towns' service areas as nested hexagonal market regions, and under his "administrative principle" each higher tier covers 7 lower ones, the same 7 as H3's children per level. Unlike his towns, though, dispatch supply can change cells every 4 seconds.</li>
+<li><b>Philosophy · "The map is not the territory" (Alfred Korzybski)</b>: However precise, a symbol is not the thing it names. Cell IDs and haversine are the map; road ETA is closer to the territory, and the "nearest driver" across a river is the map mistaken for the territory. The twist in engineering: maps are cheap and territory is expensive, so you filter with the map and consult the territory only for a few candidates.</li>
+</ul></div>
+<h2>Ten takeaways</h2>
+<ol class="takeaways">
+<li>A ride-hailing "nearby drivers" service is both read- and write-heavy: 2M online drivers reporting every 4 seconds means about 500K location writes per second.</li>
+<li>Space-filling curves collapse 2D latitude/longitude into a 1D key where spatial proximity roughly equals key proximity, so nearby queries can use ordinary sorted indexes.</li>
+<li>Geohash is dead simple and sits under Redis GEO, but two points that are physically close across a cell boundary can have completely different prefixes.</li>
+<li>S2 cuts the sphere with a Hilbert curve into strictly nested quadtree cells, suiting geo keys that need exact hierarchical range scans, as in Google Maps and Bigtable.</li>
+<li>H3 hexagons give six equidistant neighbors, at the cost of 12 unavoidable pentagons on the sphere and only approximate parent-child nesting.</li>
+<li>A nearby query must cover the center cell plus a ring of neighbors; querying only the center cell misses neighbors just across the cell edge.</li>
+<li>High-frequency moving points belong in an in-memory fixed grid with O(1) bucket swaps; leave R-Trees and PostGIS GiST to static data like venues.</li>
+<li>Cells only pre-filter: candidates get exact haversine distances, and dispatch finally ranks by road ETA, because straight-line nearest is not fastest arrival.</li>
+<li>Geo data should be sharded by geo cell rather than user ID; Uber's DISCO maps cells to nodes with Ringpop's consistent hashing.</li>
+<li>Hot cells at airports and concerts degrade a fixed grid to O(N), and are tamed by re-splitting, replicas, local caches and surge pricing.</li>
+</ol>
 
 <h2>Deeper Resources</h2>
 <ul>

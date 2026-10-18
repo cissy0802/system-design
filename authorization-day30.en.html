@@ -51,6 +51,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -259,6 +267,27 @@ def verify():                            # patrol: recompute each hash, alert on
 <li><strong>Using the business DB as audit source</strong>: if a business table can UPDATE, it isn't trustworthy audit. Audit must be append-only + tamper-evident + independent storage.</li>
 <li><strong>Baking permissions into a JWT, then unable to revoke</strong>: with many permission claims inside the JWT, a permission change leaves the old token valid (see Day 24). Authorization decisions should hit the PDP live; the JWT carries identity only.</li>
 </ul>
+
+<h2>Crossovers</h2>
+<div class="crossx"><ul>
+<li><b>Sociology · Fei Xiaotong's "differential mode of association"</b>: In <em>From the Soil</em> (1948), Fei likened Western society to bundles of tied firewood: you belong to a group and your rights follow the group, which is RBAC. Rural China instead resembled ripples from a stone dropped in water, spreading outward from the self by closeness of relation, which is ReBAC's reachability walk. The difference: the ripples stretch and shrink with person and situation, while Zanzibar's rewrite rules must be fixed and auditable.</li>
+<li><b>Immunology · autoimmunity vs immunodeficiency</b>: The immune system also trades fail-closed against fail-open: too strict and it attacks its own tissue, too lax and pathogens walk in. The likeness is the asymmetric cost of the two errors; the difference is that immunity has no "deny everything" switch and must keep running with its mistakes.</li>
+<li><b>Business · double-entry bookkeeping (Pacioli, 1494)</b>: Every transaction is recorded as both debit and credit, so a mismatch gives tampering away; like a hash chain, it makes tampering detectable rather than impossible. The old accounting rule of never erasing an error but posting a reversing entry is exactly appending a tombstone instead of running an UPDATE.</li>
+<li><b>Neuroscience · memory reconsolidation (Nader et al., 2000)</b>: A rat's fear memory, once reactivated, briefly becomes editable, and blocking protein synthesis at that moment weakens it. Human memory is therefore no append-only log: every read may rewrite it, which is why key facts need external records rather than recollection.</li>
+</ul></div>
+<h2>Ten takeaways</h2>
+<ol class="takeaways">
+<li>Authorization checks sit on the hottest path of every API request, and check QPS often runs an order of magnitude above business QPS.</li>
+<li>Services should not decide permissions themselves but ask a centralized Policy Decision Point (PDP), as both Zanzibar and Himeji do.</li>
+<li>RBAC is simple and auditable but suffers role explosion; ABAC is flexible but cannot easily answer "who can access X"; ReBAC naturally expresses hierarchy and sharing.</li>
+<li>ReBAC stores permissions as object#relation@subject tuples, so a check is a reachability walk over the relation graph with userset rewrites.</li>
+<li>Live recursive traversal makes writes cheap and reads expensive; a materialized reverse index such as Zanzibar's Leopard makes reads fast at the cost of write amplification and harder invalidation.</li>
+<li>Revocation cannot rely on plain TTL caching; use version numbers plus CDC invalidation, while Zanzibar's Zookie guarantees a check is no older than a given write.</li>
+<li>Mainstream multi-tenancy uses a shared database with Postgres RLS, turning "forgot WHERE tenant_id" from a human discipline into a database-enforced rule.</li>
+<li>Classic RLS pitfalls are pooled connections reused without RESET of the tenant context, and BYPASSRLS roles or superuser migrations skipping the policy.</li>
+<li>Audit logs use the Outbox pattern so nothing is lost, an append-only hash chain so tampering is detectable, and storage separate from the business database.</li>
+<li>When the authorization service is down, default to fail-closed; list pages should use batch checks or a reverse index to avoid N+1 authorization.</li>
+</ol>
 
 <h2>Deeper Resources</h2>
 <ul>

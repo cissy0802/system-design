@@ -51,6 +51,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -201,6 +209,26 @@ tax = call_us(calc_tax)          # cross-region
 <li><strong>Follow-up: how does Spanner give global strong consistency?</strong> TrueTime — GPS+atomic clocks bound clock error to a few ms; at commit it does "commit-wait", waiting out the uncertainty window to guarantee external consistency. It trades hardware for consistency.</li>
 </ul>
 
+<h2>Crossovers</h2>
+<div class="crossx"><ul>
+<li><b>Physics · relativity of simultaneity (Einstein, 1905)</b>: special relativity has no universe-wide "now"; for two distant events, which came first depends on the observer. Cross-region replication faces the same absence of a global present. Unlike physics, where this is the structure of the world itself, Spanner shrinks the uncertainty to a few milliseconds with atomic clocks and then simply waits it out with commit-wait.</li>
+<li><b>Neuroscience · the spinal reflex</b>: touch something hot and the withdrawal happens in the spinal cord, without waiting for a round trip to the brain, because nerve conduction is slow and the trip is expensive. Handle locally, let the center learn afterwards. Unlike replication, a reflex has no conflict to merge; the brain only receives a done deal.</li>
+<li><b>Evolution · allopatric speciation (Ernst Mayr)</b>: split a population with a mountain or a sea, cut the gene flow, and the halves evolve apart until they may no longer interbreed when they meet again. That is split-brain: both regions take writes during a partition and cannot be merged afterwards. Unlike evolution, where divergence is the outcome, a system must block the fork up front with fencing or single-writer ownership.</li>
+<li><b>Investing · Markowitz diversification (1952)</b>: spreading a portfolio cuts risk only when assets are weakly correlated; as correlation approaches 1, diversification does nothing. Adding a region likewise raises availability only if regions share no strongly consistent dependency. The difference: financial correlations often surface only in a crisis, while shared dependencies sit on the architecture diagram and can be audited in advance.</li>
+</ul></div>
+<h2>Ten takeaways</h2>
+<ol class="takeaways">
+<li>A synchronous intercontinental write costs a 100–180ms round trip; the speed of light cannot be engineered away, only designed around.</li>
+<li>Production routing usually combines layers: Anycast lands users at the nearest edge, which then forwards at L7 by the user's home region.</li>
+<li>GeoDNS fails over in minutes because of DNS cache TTLs, while Anycast switches fast but can break TCP connections mid-flight.</li>
+<li>Active-active with last-writer-wins is simple, but when two regions update the same key concurrently, the losing update silently disappears.</li>
+<li>Accumulating data such as balances and inventory must never use LWW; serialize it in a home region or use CRDT counters.</li>
+<li>Spanner bounds clock error with GPS and atomic clocks (TrueTime) and uses commit-wait to buy global external consistency.</li>
+<li>Data residency constrains where data is physically stored, not where requests come from, and backups, binlogs and audit logs count too.</li>
+<li>Cross-region latency work is about the number of cross-region round trips, not bandwidth: read local replicas, send only writes home.</li>
+<li>Most companies stop at read active-active with home-region writes; full active-active costs conflict governance and roughly 2–3x infrastructure.</li>
+<li>Adding regions improves availability only when they are truly independent, just as diversification cuts risk only for weakly correlated assets.</li>
+</ol>
 <h2>Deep-dive Resources</h2>
 <ul>
 <li><em>Designing Data-Intensive Applications</em> (Kleppmann) — Ch. 5 Replication, Ch. 9 Consistency &amp; Consensus; the theoretical bedrock for multi-region.</li>

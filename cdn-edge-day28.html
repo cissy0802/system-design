@@ -52,6 +52,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -246,6 +254,26 @@ def handle(req):
 <li><strong>忽视边缘是「全局爆炸半径」</strong>：CDN 的一行配置/一条规则会同时推到全球。<em>Cloudflare 2019-07-02</em> 一条 WAF 正则触发<strong>灾难性回溯</strong>，CPU 打满，全网约 27 分钟、流量掉约 82%（<a href="https://blog.cloudflare.com/cloudflare-outage/">官方复盘</a>）；<em>Fastly 2021-06-08</em> 一个潜伏的软件缺陷被某客户配置触发，约 85% 网络中断近 1 小时（<a href="https://www.fastly.com/blog/summary-of-june-8-outage">官方总结</a>）。面试要答出：配置也要灰度发布、要有 kill switch。</li>
 <li><strong>Anycast 与长连接</strong>：追问「为什么有些场景不能纯 Anycast」——BGP 重路由会让 TCP/WebSocket 中途换 PoP 断连，需会话亲和或边缘转发。</li>
 </ul>
+<h2>越界 · 跨学科的联想</h2>
+<div class="crossx"><ul>
+<li><b>物理 · 同时性的相对性</b>：爱因斯坦 1905 年指出，相隔遥远的两地并没有一个所有观察者都公认的「同一时刻」。全球 purge 撞上的是同一堵墙：失效消息以有限速度扩散，每个 PoP 都活在自己的「现在」里。不像的地方在于，CDN 有 origin 这个特权真相，相对论里却没有特权参考系。</li>
+<li><b>心理学 · 卡尼曼的双系统</b>：《思考，快与慢》里的系统 1 像边缘缓存，快、省力、包办绝大多数判断；系统 2 像 origin，慢而费力，只在 miss 时才被唤起。像在都靠「先给够用的答案」扛住负载；不像在大脑没有 purge，过时的直觉无法被一个 tag 精确作废。</li>
+<li><b>神经科学 · 章鱼的腕足</b>：章鱼约五亿个神经元中，约三分之二分布在腕足里，腕足能就地完成探索和抓取，不必事事请示中央脑，这正是 Edge Compute 把鉴权、分流下沉到 PoP 的结构。不像的是，腕足的本地决策没有 kill switch，边缘代码却能一键关停。</li>
+<li><b>生态学 · 单一栽培与马铃薯饥荒</b>：1840 年代爱尔兰大面积种植几乎同一个马铃薯品种，晚疫病一到便全线溃败。一条配置瞬时推向全球就是数字版的单一栽培：同质带来效率，也带来同一个弱点。灰度发布和 Multi-CDN 相当于保留品种多样性，代价是更高的管理成本。</li>
+</ul></div>
+<h2>十条要点</h2>
+<ol class="takeaways">
+<li>CDN 的核心矛盾：内容推得离用户越近，命中率越高、延迟越低，但失效越难、一致性越弱。</li>
+<li>Anycast 让同一段 IP 前缀从全球 PoP 用 BGP 同时宣告，用户被路由到网络上最近的节点。</li>
+<li>Anycast 把 DDoS 攻击流量摊到所有 PoP，有效抗攻击容量约等于全网总容量而非单点容量。</li>
+<li>BGP 重路由可能让 TCP/WebSocket 长连接中途换 PoP 而断开；GeoDNS 的 failover 则受 TTL 拖累。</li>
+<li>Tiered Cache 让下层 PoP 的 miss 先问上层，只有上层能回源，origin 请求因此收敛一个数量级。</li>
+<li>Request coalescing 把同一 cache key 的并发 miss 合并成一次回源，用来压住 thundering herd。</li>
+<li>cache key 带上 cookie 或追踪参数会让命中率瞬间归零，必须显式归一化 query 并控制 Vary。</li>
+<li>生产环境的失效通常是长 TTL、tag-based purge 加 stale-while-revalidate 的组合，purge everything 会引发缓存雪崩。</li>
+<li>Cloudflare Workers 用 V8 isolate 换来近零冷启动和极高密度，代价是单请求 CPU/内存硬上限、只能跑 JS/WASM。</li>
+<li>Cloudflare 2019 的正则回溯和 Fastly 2021 的潜伏缺陷都说明，边缘配置也要灰度发布并配 kill switch。</li>
+</ol>
 <h2 data-tts="9d673bc3f54f0ab5">深入资源</h2>
 <ul>
 <li><strong>Cloudflare 2019-07-02 outage 复盘</strong> — 正则回溯如何打垮全网，配置灰度的反面教材：<a href="https://blog.cloudflare.com/cloudflare-outage/">blog.cloudflare.com/cloudflare-outage</a></li>

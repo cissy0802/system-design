@@ -51,6 +51,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -209,6 +217,26 @@ route_to_human(patch, flags, coverage=assertion_coverage(claims, patch))</code><
 </ul>
 <p><strong>Interview follow-ups</strong>: ① How do you measure a "human final seat's" current miss rate? (seed known faults, measure catch rate) ② Base rate drops from 3% to 0.3% — what in your design changes? (crank up visibility and practice dose; humans alone are less reliable) ③ Why is making the AI write more explanation sometimes more dangerous? ④ When the independent oracle can't cover semantic intent, what handles the rest? ⑤ Does this contradict Day 41's "move humans out of the fast loop"? (No — the fast loop's stop-the-bleeding is automated; the slow loop's correctness review keeps the human and gives them visibility.)</p>
 
+<h2>Crossovers</h2>
+<div class="crossx"><ul>
+<li><b>Evolutionary biology · Aposematism</b>: In 1867 Darwin was puzzled by gaudy caterpillars; Wallace answered that toxic prey advertise their danger with bright colors so predators learn at a glance. A failure-visibility layer paints warning colors onto errors. The mismatch: LLM errors are closer to mimicry, something dangerous dressed as harmless.</li>
+<li><b>Neuroscience · Predictive coding</b>: The brain responds mainly to prediction error and largely ignores input that matches expectation. A fluent error generates no prediction error, so it slips through; an oracle's red flag manufactures one. The difference: the brain compares against its own model, while the oracle must be independent of the generator.</li>
+<li><b>Philosophy · Popper's falsifiability</b>: For Popper, a claim carries weight only if it names conditions under which facts could refute it. "I checked, it's fine" cannot be falsified; "balance is monotonically non-increasing" can. Where it breaks: Popper held that theories are never verified, whereas decidable properties like compiling or passing tests really can be confirmed by an oracle.</li>
+<li><b>Business · Toyota's jidoka</b>: Sakichi Toyoda's 1924 Type G automatic loom stopped itself the moment a thread broke, an idea that grew into the Toyota Production System's "make abnormalities visible" and the andon cord. The machine does the work and also surfaces its own faults, so one person can watch many machines. That is this article's "visibility before the human," factory edition. The mismatch: a broken thread is physical and obvious at a glance, while an LLM's semantic error has no such clean sensor, so that last stretch still needs a person.</li>
+</ul></div>
+<h2>Ten takeaways</h2>
+<ol class="takeaways">
+<li>Traditional software fails loud (exceptions, compile errors, crashes); LLMs fail fluent, wrong yet self-consistent and never self-reporting.</li>
+<li>Bainbridge's 1983 irony of automation: the better the automation, the more humans are left with rare but fatal interventions they never get to practice.</li>
+<li>Making the AI more accurate or making humans try harder does not scale with throughput; only making failures visible scales linearly with 5,000 patches a day.</li>
+<li>AI output should be code plus machine-decidable structured assertions, which an independent oracle tries to falsify so errors are flagged before a human sees them.</li>
+<li>When the same LLM both generates and self-checks, failures are correlated: the miss rate stays near p instead of p², creating only an illusion of verification.</li>
+<li>Whether a human actually verifies depends on whether verification cost is below the payoff of catching an error: base rate times the cost of a miss.</li>
+<li>Explanations reduce overreliance only when they lower verification cost; another fluent narrative raises trust and makes overreliance worse.</li>
+<li>A final review seat's effective catch rate rests on four parameters: base rate, verification cost, practice dose, and failure visibility; drop one and it collapses.</li>
+<li>Seeding known faults keeps reviewers alert and practiced and also measures the seat's true catch rate, much like TSA's Threat Image Projection.</li>
+<li>"More accurate AI is safer" is a fallacy: a lower base rate makes reviewers lax, so visibility and practice dose must rise with it.</li>
+</ol>
 <h2>Further resources</h2>
 <ul>
 <li><strong>Lisanne Bainbridge, <em>Ironies of Automation</em></strong> (Automatica, 1983) — the founding paper of human-automation interaction; the original prescription for the automation paradox. <a href="https://ckrybus.com/static/papers/Bainbridge_1983_Automatica.pdf" target="_blank">Full text</a></li>

@@ -52,6 +52,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -245,6 +253,27 @@ def normalize(rows):
 <div class="callout"><strong>3. 二态裁决。</strong> 把合法降级报成失败，误报淹没真报（接 Day 51）。追问：partial 结果算不算 bug？（答：如实声明=🟡，谎称完整=🔴。）</div>
 <div class="callout"><strong>4. 参照路径与实验路径共享 buggy 代码。</strong> 错误趋同 → 假 PASS。追问：两路都调用同一个算错的聚合函数，oracle 会发现吗？（不会。）</div>
 <div class="callout"><strong>5. 让 LLM 当正确性裁判。</strong> 裁判自身会静默出错，等于在正确性回路里塞了个不可靠 oracle（接 Day 44/51）。AI 只该产场景，不该判对错。</div>
+<h2>越界 · 跨学科的联想</h2>
+<div class="crossx"><ul>
+<li><b>神经科学 · 左脑「解释器」（Michael Gazzaniga）</b>：裂脑实验里，右脑看到雪景、左手挑了铲子，只看到鸡爪的左脑马上编出「铲子用来清理鸡舍」的理由。这和把 255/256 当完整答案同构：输入缺了一块，输出照样流利自信。不像在于，大脑没有 partial 标记可打，系统却能如实声明自己缺了什么。</li>
+<li><b>心理学 · 信号检测论（Green &amp; Swets，1966）</b>：击中、漏报、虚报取决于判定标准，标准放松虚报涨，收紧漏报涨。归一化强度就是这把标准：太弱误报刷屏，太粗把 0.4% 的偏差抹掉。不同在于，人的标准靠经验，归一化可以按业务最小单位显式定下来。</li>
+<li><b>分子生物学 · DNA 错配修复</b>：复制后 MutS 找出两条链不配对的位置，但得先知道哪条是原版；大肠杆菌靠母链 GATC 上的甲基化认出旧链，只切新链。差分 oracle 同样要先定哪一路是真值。不像的是，细胞只有两条链可比，母链本身错了就没有第三方兜底。</li>
+<li><b>投资 · 2008 年 CDO 的相关性假设</b>：评级模型假定各地房贷违约大体独立，分层就能把风险切薄；房价全国同跌时违约一起发生，安全垫同时失效。这就是参照路径和实验路径的错误趋同。不同在于，系统可以换独立实现，市场里却很难找到危机时依然不相关的资产。</li>
+<li><b>领导力 · 心理安全（Amy Edmondson，1996）</b>：她研究医院护理团队，发现领导和同事关系更好的病区，上报的用药差错反而更多：不是犯得多，是敢说。「如实标 partial」和「谎称完整」的分别就在这里。不像的是，团队靠文化让人开口，系统可以把声明写进降级契约硬性要求。</li>
+</ul></div>
+<h2>十条要点</h2>
+<ol class="takeaways">
+<li>混沌工程只装可用性 oracle 不够：错误率为 0、p99 正常，系统仍可能静默返回错结果。</li>
+<li>shard 超时后服务悄悄跳过它，把 255/256 的部分和当完整答案返回，是零告警的 gray failure。</li>
+<li>差分 oracle 把同一请求喂给无故障的参照路径和注入故障的实验路径，用跑出来的结果当真值。</li>
+<li>Golden 值 oracle 只覆盖预设输入，不变式 oracle 抓不到数值偏差，实战常把差分和不变式组合使用。</li>
+<li>归一化层要全列定序、按业务精度量化浮点、屏蔽 now() 和随机数，否则两路 checksum 次次不等。</li>
+<li>归一化太弱会误报刷屏、逼工程师关掉 oracle，太强会把 0.4% 这样的真实偏差一起抹掉。</li>
+<li>三态裁决里，缺数据但如实标 partial 算可接受降级，声称完整却缺数据才算正确性 bug。</li>
+<li>可接受降级只记账不 page，page 通道只留正确性 bug，告警精确率才守得住。</li>
+<li>参照路径和实验路径共享同一段错误代码会一起算错、给出假 PASS；Jepsen 用形式模型当真值来避开这种共模。</li>
+<li>AI 只适合当故障场景生成器，正确性裁判必须是确定性的差分加降级契约判定。</li>
+</ol>
 <h2 data-tts="55e39085ec509b0c">深入资源</h2>
 <ul>
 <li><strong>Netflix TechBlog — 《ChAP: Chaos Automation Platform》</strong>：experiment/control 双集群 + error budget 熔断的工程化。</li>

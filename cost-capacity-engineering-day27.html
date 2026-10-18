@@ -52,6 +52,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -254,6 +262,26 @@ else:
 <li>一张 $200 万账单怎么归因到 500 团队？共享成本（LB、控制面、Spot 折扣）怎么分摊才公平？</li>
 <li>什么负载适合 Spot？被抢占怎么优雅处理？怎么控制抢占风险？</li>
 <li>cost per request 突然涨 20%，怎么定位是哪个服务、什么原因？</li>
+</ol>
+<h2>越界 · 跨学科的联想</h2>
+<div class="crossx"><ul>
+<li><b>复杂性科学 · 临界减速（Scheffer 等，2009）</b>：系统逼近临界点时，受扰后恢复越来越慢，就像 ρ→1 的队列排空一波突发越来越久。不像的是，生态系统越过临界点会跳进另一个稳态、难以回头，队列只要负载降下来就恢复，除非重试放大成了正反馈。</li>
+<li><b>生态学 · 韧性与稳定（C. S. Holling，1973）</b>：Holling 区分「多快回到平衡」和「能吸收多大扰动不垮」，发现为稳定产出精细管理的系统反而更脆。榨干 headroom 是同一笔交易，只是机房的缓冲能花钱买回。</li>
+<li><b>神经科学 · 应变稳态（Sterling 与 Eyer，1988）</b>：大脑预判身体所需、提前调动资源，像 predictive 打底、reactive 兜底。不像在于长期过度预判会积成伤身的负荷，多开的机器只多花钱、随时能退。</li>
+<li><b>投资 · 卖出期权</b>：用 Spot 等于把「随时收回容量」的权利卖给云厂商，折扣就是权利金：平时稳赚，尾部集中亏。不像的是，权利金按波动率定价，Spot 折扣并不对应你被回收的概率。</li>
+</ul></div>
+<h2>十条要点</h2>
+<ol class="takeaways">
+<li>业界在线集群平均 CPU 利用率常只有 10–20%，成本工程是在 p99 SLO 约束下压低单位成本的约束优化。</li>
+<li>排队等待随 1/(1-ρ) 非线性增长，在线服务的目标利用率多定在 50–70%，并留 N+1 冗余。</li>
+<li>Google 的 Autopilot 论文指出，用户怕被 OOM kill 而过量申请资源，是集群浪费的主因。</li>
+<li>Reactive 扩缩容的命门是 lag：采集、决策、启动、预热加起来要几分钟，追不上陡峭突发。</li>
+<li>扩缩容的铁律是 scale-out 快、scale-in 慢，用 stabilization window 和 cooldown 防止 flapping。</li>
+<li>Netflix 的 Scryer 用 predictive 提前扩容；生产中让预测只抬容量下界，reactive 兜住没料到的尖峰。</li>
+<li>成本归因靠 tag 切账单、按用量分摊共享成本，终点是 cost per request 这类可跨季度比较的单位成本。</li>
+<li>cost per request 会被分母稀释、请求不同质和跨服务转嫁骗过，适合看趋势，做决策要看边际成本。</li>
+<li>采购分层：稳定基线买 Reserved/Savings Plan，峰值用 On-demand，只有可中断负载才放 Spot。</li>
+<li>把 headroom 榨干、Spot 拉满等于移除所有缓冲，和生态学家 Holling 说的「效率换韧性」是同一笔交易。</li>
 </ol>
 <h2 data-tts="60496bbc297e955f">深入资源</h2>
 <ul>

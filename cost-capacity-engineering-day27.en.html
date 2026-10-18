@@ -51,6 +51,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -268,6 +276,26 @@ else:
 <li>cost per request suddenly jumps 20% — how do you localize which service and why?</li>
 </ol>
 
+<h2>Crossovers</h2>
+<div class="crossx"><ul>
+<li><b>Complexity science · critical slowing down (Scheffer et al., 2009)</b>: as a system nears a tipping point, it recovers from shocks ever more slowly; a queue near ρ→1 does the same, taking longer and longer to drain a burst. The difference: an ecosystem that crosses the threshold flips into another stable state and rarely comes back, while a queue recovers once load drops, unless retry amplification turns it into a positive feedback loop.</li>
+<li><b>Ecology · resilience vs stability (C. S. Holling, 1973)</b>: Holling separated "how fast a system returns to equilibrium" from "how much disturbance it can absorb without collapsing," and noted that systems tuned for steady yield often grow brittle. Squeezing out headroom and maxing out Spot is the same trade; unlike an ecosystem, a fleet can buy its buffer back.</li>
+<li><b>Neuroscience · allostasis (Sterling and Eyer, 1988)</b>: the brain anticipates the body's needs and mobilizes resources ahead of time instead of only correcting after a deviation, much like predictive scaling as the floor with reactive as the backstop. Unlike: chronic over-anticipation builds an allostatic load that damages organs, while extra machines only cost money and can be released any time.</li>
+<li><b>Investing · selling options</b>: running on Spot means selling the cloud provider the right to take capacity back at will, and the discount is the premium. Option sellers earn steadily and lose in the tail, just as Spot saves money until a mass reclaim collapses capacity. Unlike option premiums, which are priced off volatility, Spot discounts do not precisely track your odds of being reclaimed.</li>
+</ul></div>
+<h2>Ten takeaways</h2>
+<ol class="takeaways">
+<li>Online clusters commonly average only 10–20% CPU, so cost engineering is a constrained optimization: lower unit cost without breaking p99 SLOs.</li>
+<li>Queueing delay grows like 1/(1-ρ), so online services usually target 50–70% utilization and keep N+1 redundancy.</li>
+<li>Google's Autopilot paper names over-requesting, driven by fear of OOM kills, as the main source of cluster waste.</li>
+<li>Reactive autoscaling's weak spot is lag: metrics, decision, boot and warm-up take minutes and miss steep bursts.</li>
+<li>The iron rule of autoscaling is fast scale-out and slow scale-in, with stabilization windows and cooldowns to prevent flapping.</li>
+<li>Netflix's Scryer scales ahead with prediction; in production, prediction should only raise the capacity floor while reactive scaling catches surprise spikes.</li>
+<li>Cost attribution slices the bill by tags and allocates shared cost by usage, ending in unit costs like cost per request that compare across quarters.</li>
+<li>Cost per request can be gamed by denominator dilution, uneven request types and cross-service cost shifting; use it for trends and marginal cost for decisions.</li>
+<li>Layer purchasing: Reserved or Savings Plans for the stable baseline, On-demand for peaks, and Spot only for interruptible work.</li>
+<li>Draining headroom and maxing out Spot removes every buffer, the same efficiency-for-resilience trade the ecologist Holling described.</li>
+</ol>
 <h2>Deeper Resources</h2>
 <ul>
 <li><strong>"Designing Data-Intensive Applications" (Kleppmann)</strong>: Ch. 1 on load parameters and scalability fundamentals.</li>

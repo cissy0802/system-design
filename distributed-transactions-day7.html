@@ -49,6 +49,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -459,6 +467,26 @@ def handle(key, req):
 <li>设计一个『跨服务转账』：服务 A 扣 100、服务 B 加 100。给 saga 补偿流程 + 失败模式分析。</li>
 <li>Idempotency key 的过期策略？过期后客户端再用同一 key 重试会发生什么？怎么避免重复扣款？</li>
 <li>『微服务要不要避免分布式事务』——你如何回答？给一个『把分布式事务转化为领域重新划分』的例子。</li>
+</ol>
+<h2>越界 · 跨学科的联想</h2>
+<div class="crossx"><ul>
+<li><b>商业 · 复式记账的冲销分录</b>：会计从不擦改已入账的分录，记错了就再做一笔反向冲销，账本只增不删。这和 saga 用补偿代替 rollback 同构。不像的是，冲销在同一本账里，借贷平衡一处保证；saga 的补偿散在五个团队的库里，中途谁都可能失败。</li>
+<li><b>神经科学 · 突触标记与捕获</b>：Frey 与 Morris 1997 年提出，突触先打临时标记，几小时内捕获到蛋白才固化为长期记忆。像 prepare 加 commit；但标记会超时消退，不像 2PC 持锁死等。</li>
+<li><b>领导力 · 任务式指挥</b>：老毛奇推行的 Auftragstaktik 只下达意图、由各部队自主行动，像 choreography。差别是军官共享同一意图，choreography 里没人掌握全局，出事难追踪。</li>
+<li><b>生物进化 · Stigmergy</b>：Grassé 1959 年研究白蚁筑巢时提出：个体不直接对话，靠环境里的痕迹协调，像服务把事件留在 Kafka 日志里。不像的是白蚁痕迹会被覆盖，事件日志只追加、可重放。</li>
+</ul></div>
+<h2>十条要点</h2>
+<ol class="takeaways">
+<li>2PC 的致命伤是阻塞：coordinator 在 prepare 之后挂掉，所有参与者都会持锁无限期等待。</li>
+<li>Stripe 扣款、已发出的邮件既不能 prepare 也不能回滚，所以跨微服务和外部 API 永远不要用 2PC。</li>
+<li>Spanner 能用 2PC，是因为它的 coordinator 和 participant 本身都是高可用的 Paxos group。</li>
+<li>Saga 由 Garcia-Molina 与 Salem 在 1987 年提出，把大事务拆成一串本地事务，失败时按反序执行补偿。</li>
+<li>补偿不是 rollback：退款能抵消扣款，邮件发了就只能再发一封致歉信，业务必须接受可见的中间状态。</li>
+<li>Orchestration 逻辑集中、易追踪，适合四步以上的流程；Choreography 解耦彻底，但业务流散在多个服务里。</li>
+<li>先写 DB 再发 Kafka 是 dual write 问题；Outbox 把事件和业务行写进同一个本地事务，再由 Debezium 读 WAL 投递。</li>
+<li>Outbox 加 CDC 是 at-least-once 投递，代价是秒级延迟和表膨胀，消费者必须按 event_id 去重。</li>
+<li>Idempotency key 必须在请求生成时固定、重试时复用，用 timestamp 当 key 会让去重失效。</li>
+<li>如果大多数流程都跨同两个服务，它们多半该合并：避免分布式事务的根本武器是画对领域边界。</li>
 </ol>
 <h2 data-tts="43b135e76de1a4b3">深入资源</h2>
 <ul>

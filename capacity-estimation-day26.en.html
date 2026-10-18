@@ -51,6 +51,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -235,6 +243,27 @@ sensitivity: read QPS is linear in "views/user"  → verify first
 <div class="callout"><strong>4. Chasing precision, agonizing over 86400 vs 10^5.</strong> Estimation wants orders of magnitude; 10^5 is plenty. Spend the time on "which assumption is most sensitive."</div>
 <div class="callout"><strong>5. Quoting numbers without stating assumptions.</strong> The interviewer can't judge you and can't discuss — the deliverable of estimation is the <em>assumption chain</em>, not a lone number.</div>
 <p><strong>Common follow-ups:</strong> ① Roughly how many seconds in a day, and why approximate to 10^5? ② Can this run on one machine — how do you tell at a glance? ③ If DAU grows 10×, which quantity breaks first and how does the architecture change? ④ Where did your peak factor come from, and how does the conclusion change if it's off by 2×? ⑤ Should storage include replicas and retention, and how do you estimate hot/cold tiering?</p>
+
+<h2>Crossovers</h2>
+<div class="crossx"><ul>
+<li><b>Physics · Fermi problems (Enrico Fermi)</b>: At the 1945 Trinity test, Fermi dropped scraps of paper, watched how far the blast wave carried them, and estimated about 10 kilotons of TNT on the spot; the measured yield was about 20, the same order of magnitude. The likeness: both split a big unknown into a few guessable factors whose errors partly cancel. The difference: a Fermi problem wants one number, while capacity estimation really delivers the assumption chain and its sensitive links.</li>
+<li><b>Biology · Galileo's square-cube law</b>: In Two New Sciences (1638), Galileo noted that scaling up an animal grows its weight with the cube of length but bone strength only with the square, so giants need disproportionately thick bones. When DAU grows 10×, each quantity grows with its own exponent, and the first to break dictates how the architecture changes shape. Unlike a species, a system can be resharded in one go instead of over generations.</li>
+<li><b>Neuroscience · the brain's energy budget (Peter Lennie, 2003)</b>: Lennie worked back from the cortex's total energy use to the cost of a single spike, and concluded that perhaps fewer than 1% of neurons can be strongly active at once: the same arithmetic as deriving machine count from per-box capacity. The difference: systems provision headroom for peak, while the brain enforces sparse firing to stay within budget.</li>
+<li><b>Psychology · planning fallacy and the outside view (Kahneman &amp; Tversky, 1979)</b>: People forecasting their own projects run optimistic; the fix is to start from a reference class of similar projects and adjust. Tagging each assumption as given, industry norm, or my guess forces that outside view. Unlike the planning fallacy, which leans one way, estimation error can be absorbed by peak factors and headroom.</li>
+</ul></div>
+<h2>Ten takeaways</h2>
+<ol class="takeaways">
+<li>Capacity estimation is not about precision: it gets QPS, storage, bandwidth and memory within 10× in two minutes to rule out infeasible designs.</li>
+<li>Every capacity number flows from two root assumptions, DAU and per-user behavior; keep that derivation chain in mind and nothing gets missed.</li>
+<li>A day has about 86,400 seconds, roughly 10^5, so daily requests divided by 100,000 gives average QPS.</li>
+<li>Latency numbers tell you what is physically possible: one cross-continent round trip of ~150 ms eats most of a 200 ms p99 budget.</li>
+<li>Provision for peak and cost for average; social apps use a 2-3× peak factor, while flash sales and live-stream launches can exceed 10×.</li>
+<li>A 100M-DAU photo feed peaks near 5k write QPS and 100k read QPS, and the 25:1 read/write ratio justifies caching and fanout-on-write.</li>
+<li>Estimate 1 KB metadata and 200 KB images separately; media goes to object storage and the CDN, never the database.</li>
+<li>A storage figure must include three replicas, index and WAL overhead, and headroom, and say whether it is logical or physical.</li>
+<li>The real deliverable of an estimate is a sourced assumption list, plus a sensitivity check for the one assumption that flips the conclusion if off by 2×.</li>
+<li>Back-of-envelope math picks the architecture's shape; load tests and production metrics set the exact capacity, as a relay rather than a replacement.</li>
+</ol>
 
 <h2>Further Resources</h2>
 <ul>

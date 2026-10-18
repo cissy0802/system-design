@@ -52,6 +52,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -199,6 +207,26 @@ route_to_human(patch, flags, coverage=assertion_coverage(claims, patch))</code><
 <li><strong>忘了给人留练习</strong>：不注入错例，终审席的真实抓取率是黑箱，且会悄悄退化。</li>
 </ul>
 <p><strong>面试追问</strong>：① 怎么量一个「人类终审席」当前的漏检率？（注入错例测抓取率）② 底率从 3% 降到 0.3%，设计要改哪？（可见性与练习剂量加码，纯靠人更不可靠）③ 为什么让 AI 多写解释有时更危险？④ 独立 oracle 覆盖不到语义意图时剩下怎么办？⑤ 这套设计和 Day 41「把人移出快回路」矛盾吗？（不——快回路止血靠自动化，慢回路正确性终审保住人并给他可见性）</p>
+<h2>越界 · 跨学科的联想</h2>
+<div class="crossx"><ul>
+<li><b>生物进化 · 警戒色（aposematism）</b>：1867 年达尔文想不通毛毛虫为何长得那么扎眼，华莱士答：有毒的猎物靠鲜艳颜色把危险广而告之，捕食者一眼就懂。失效可见性层就是给错误补上警戒色。不像的是，LLM 的错误更像拟态，危险的东西穿着无害的外衣。</li>
+<li><b>神经科学 · 预测编码（predictive coding）</b>：大脑主要对预测误差起反应，符合预期的输入几乎被忽略。流畅的错误不产生预测误差，所以溜过；oracle 标红就是人为制造一个误差信号。不像的是，大脑拿自己的模型去比，oracle 必须独立于生成者。</li>
+<li><b>哲学 · 波普尔的可证伪性</b>：波普尔认为一个主张有没有分量，看它是否给出了可能被事实推翻的条件；「我检查过了没问题」不可证伪，「余额单调不增」可以。不像在于，波普尔说理论永远无法被证实，而编译、测试这类可判定属性确实能被 oracle 坐实。</li>
+<li><b>商业 · 丰田的自働化（jidoka）</b>：丰田佐吉 1924 年的 G 型自动织机断了一根纱就自己停下，后来演化成丰田生产方式的「异常可视化」和安灯拉绳：机器不只干活，还负责把自己的故障亮出来，让一个人能照看很多台。这正是本篇「可见性在人之前」的工厂版。不像的是，断纱是物理的、一眼可判，LLM 的语义错误没有这么干脆的传感器，这一截仍得靠人。</li>
+</ul></div>
+<h2>十条要点</h2>
+<ol class="takeaways">
+<li>传统软件的失效响亮（异常、编译失败、崩溃），LLM 的失效是流畅的，错得自洽、不主动自曝。</li>
+<li>Bainbridge 1983 年的自动化悖论：自动化越好，留给人的越是小概率但致命的干预，人越没机会练习。</li>
+<li>让 AI 更准或让人更努力都不随吞吐扩展，只有让失效变得可见能随 5000/天的吞吐线性扩展。</li>
+<li>AI 输出应是代码加一组机器可判定的结构化断言，再由独立 oracle 去证伪，错误在到达人眼前就被标红。</li>
+<li>同一个 LLM 既生成又自检，失效高度相关：漏检率接近 p 而不是 p²，只制造「已核验」的假象。</li>
+<li>人会不会去核验，取决于核验成本是否低于抓到错误的收益，即底率乘以漏检的代价。</li>
+<li>解释只有真降低核验成本时才减少过度依赖；只是又一段流畅叙述，反而抬高信任、加重过度依赖。</li>
+<li>终审席的有效抓取率由四个参数决定：底率、核验成本、练习剂量、失效可见性，缺一个都塌。</li>
+<li>主动注入已知错例，既维持终审人的警惕和手感，又能量出终审席的真实抓取率，类似 TSA 的 TIP。</li>
+<li>「AI 越准越安全」是谬误：底率下降会让 reviewer 更松懈，必须同步加码可见性与练习剂量。</li>
+</ol>
 <h2 data-tts="abc2325a815cbead">深入资源</h2>
 <ul>
 <li><strong>Lisanne Bainbridge, <em>Ironies of Automation</em></strong> (Automatica, 1983) — 人机协同的奠基论文，自动化悖论的原始处方。<a href="https://ckrybus.com/static/papers/Bainbridge_1983_Automatica.pdf" target="_blank">全文</a></li>

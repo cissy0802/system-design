@@ -52,6 +52,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -260,6 +268,26 @@ def get_home_timeline(uid, limit=20):
 <div class="callout"><strong>4. 排序排在写时。</strong> push 时就定死顺序，新帖与模型更新无法实时反映；重排序应放读路径。</div>
 <div class="callout"><strong>5. 忽略可见性过滤。</strong> 拉黑/删除/隐私的帖子若不在读时过滤，会把已删内容推给用户——hydrate 后必须 filter。</div>
 <p><strong>高频追问</strong>：① 千万粉名人发帖，怎么不打爆系统？② push/pull 阈值怎么定，依据什么指标？③ 新关注一个人，ta 的历史帖怎么进我的 timeline（backfill）？④ 发帖到关注者可见的端到端延迟预算怎么拆？⑤ 时间序 vs 排序流，各自牺牲什么、什么产品该选哪个？</p>
+<h2>越界 · 跨学科的联想</h2>
+<div class="crossx"><ul>
+<li><b>复杂性科学 · 无标度网络（Barabási 与 Albert，1999）</b>：偏好依附让「富者愈富」，关注者数天然呈幂律分布，所以名人不是边角案例，而是网络结构必然长出的长尾。不像在于：Barabási 解释长尾怎么长出来，feed 系统只能接受它，再用阈值把两端分开伺候。</li>
+<li><b>神经科学 · 海马体索引理论（Teyler 与 DiScenna，1986）</b>：海马体不存记忆全文，只存指向新皮层各处表征的「索引」，回忆时再把它们重新激活，正像 timeline 只存 tweet_id、读时 hydrate。不像的是，大脑每次回忆都会改写内容，Tweet Store 每次取回的正文都一样。</li>
+<li><b>心理学 · 卡尼曼的系统 1 与系统 2</b>：系统 1 靠练熟的反应，快而省力；系统 2 现场推理，慢而耗能，正像 push 的预物化对 pull 的读时归并：常规的事预先算好，难的才留到当下算。不像在于：大脑的分工靠经验慢慢长出来，hybrid 的阈值却是工程师按关注者数和活跃度显式定的。</li>
+<li><b>商业 · 赫伯特·西蒙的注意力稀缺（1971）</b>：西蒙指出信息丰富会造成注意力贫乏，排序流正是替用户分配这份稀缺注意力的机制。不像的是，西蒙设想由组织替决策者过滤信息，而 feed 排序优化的是平台的参与度，用户未必知道有人替他筛过。</li>
+</ul></div>
+<h2>十条要点</h2>
+<ol class="takeaways">
+<li>Feed 系统的难点是读写放大不对称：合并关注对象的帖子，要么在发帖时做，要么在刷新时做。</li>
+<li>Push（fanout-on-write）读 O(1)、写 O(关注者数)；Pull（fanout-on-read）写 O(1)、读要归并所有关注对象。</li>
+<li>读写比约 100:1、多数人关注者不多，所以 push 把成本摊到稀疏的写上更划算。</li>
+<li>千万粉账号发一条帖就是千万次缓存写，所以工业界几乎都用 hybrid：普通人 push、名人读时 pull。</li>
+<li>Twitter 用 Redis 预物化 home timeline，高粉账号绕过 fanout，读时再与预物化部分合并。</li>
+<li>名人阈值定高读路径简单但有写风暴，定低则读时要合并的名人列表变长；进阶做法是只给活跃关注者 fanout。</li>
+<li>Timeline 缓存只存 tweet_id 不存正文：内存省百倍、编辑删除只改一处，代价是读时多一次 hydrate。</li>
+<li>Home timeline 必须有界（Twitter 约 800 条），否则大 key 无限膨胀，拖垮整个 Redis 分片。</li>
+<li>ML 排序和可见性过滤都应放在读路径上，只对聚合后的几百条候选打分，hydrate 后再滤掉删除和拉黑的帖子。</li>
+<li>关注者数天然呈幂律分布，所以名人问题是网络结构的必然，不是可以忽略的边角案例。</li>
+</ol>
 <h2 data-tts="5ec15ef2d8ddb32c">深入资源</h2>
 <ul>
 <li><strong>Raffi Krikorian《Timelines at Scale》</strong>（QCon/InfoQ）+ High Scalability 对 Twitter timeline 架构的拆解：fanout、Redis 物化、名人 hybrid 的一手材料。</li>

@@ -51,6 +51,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -261,6 +269,26 @@ kill_review = 0.90 * budget               # trip -> forced review (≈ system br
 <div class="callout"><strong>4. No stop-loss, going down with the ship.</strong> The sunk-cost fallacy keeps an overrunning project burning. Follow-up: what mechanism counters "we've invested this much, we can't stop"? (A mechanical kill line pre-placed at charter + staged commitment.)</div>
 <div class="callout"><strong>5. Ignoring the correlated tail.</strong> Assuming multiple projects diversify risk when they share a platform/team and blow up together. Follow-up: what's the precondition for portfolio diversification? (Uncorrelated tails; shared modes degrade the multiplicative protection — same independence requirement as Day 51.)</div>
 
+<h2>Crossovers</h2>
+<div class="crossx"><ul>
+<li><b>Evolutionary biology · Bet-hedging</b>: Dan Cohen's 1966 model showed why desert annual plants let only part of their seeds germinate each year and leave the rest in the soil. When good and bad years alternate at random, selection maximizes fitness as a geometric mean across years, not the arithmetic mean of a single year. That is the logic of staged commitment and reserves: give up the upside of a good year so you are never wiped out. The difference is that plants were taught this passively by selection; a project has to be designed for it on purpose.</li>
+<li><b>Complexity science · Self-organized criticality (Bak, Tang, Wiesenfeld, 1987)</b>: add sand to a pile grain by grain and the avalanche sizes follow a power law; one grain may move a single grain or collapse half the slope. Tightly coupled dependencies let a small slip occasionally cascade into a huge overrun in the same way. Unlike a sandpile, a project has someone who can cut the cascade with a kill line.</li>
+<li><b>Psychology · Escalation of commitment (Barry Staw, 1976)</b>: in Staw's experiment, people personally responsible for the original decision invested more after bad news, not less. That is exactly the impulse a kill line exists to resist; the difference is that the lab had one person, while a project adds team pride and funding politics, so the pull is stronger.</li>
+<li><b>Eastern philosophy · Sunzi, "first make yourself invincible"</b>: in The Art of War, the skilled commander first makes himself unbeatable, then waits for the enemy to become beatable, rather than predicting victory. Tail-risk control likewise bets on survival, not on accurate forecasts. The difference: Sunzi faces an enemy with intent, while a project's tail is indifferent randomness.</li>
+</ul></div>
+<h2>Ten takeaways</h2>
+<ol class="takeaways">
+<li>IT cost overruns follow a power-law fat tail: the mean sits about 73 points above the median, dragged up by a few extreme projects.</li>
+<li>In Flyvbjerg's data roughly one IT project in six is a black swan with a 200% average overrun, which a fixed 10% buffer cannot absorb.</li>
+<li>With tail exponent α ≤ 2 the variance diverges and with α ≤ 1 the mean diverges, so one new extreme sample moves the sample mean sharply.</li>
+<li>Plan fat-tailed risk on quantiles such as P80, and size reserves and kill lines on tail exposure beyond a threshold (CVaR-like).</li>
+<li>Reference-class forecasting replaces a point estimate with the historical distribution of similar projects, building on Kahneman and Tversky's outside view.</li>
+<li>A pre-declared kill line turns the sunk-cost fallacy into a mechanical rule: crossing it forces a review to cut scope, pivot or stop.</li>
+<li>Staged commitment is a real option: each gate commits only to the next gate and reprices the project on new information.</li>
+<li>A conjunctive success definition (on time and on budget and full scope) mechanically deflates success rates; CHAOS's 16.2% does not mean 83.8% failed.</li>
+<li>Budgeting a project by tail quantiles is the same discipline as provisioning capacity by P99 load instead of the mean.</li>
+<li>A portfolio of projects only diversifies risk when their tails are uncorrelated; a shared platform or team makes them blow up together.</li>
+</ol>
 <h2>Further resources</h2>
 <ul>
 <li><strong>Bent Flyvbjerg &amp; Dan Gardner, <em>How Big Things Get Done</em> (2023)</strong>: reference-class forecasting, the outside view, "think slow, act fast" — the popular synthesis of fat-tailed megaproject risk management.</li>

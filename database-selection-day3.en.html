@@ -51,6 +51,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -375,6 +383,27 @@ graph TD
 <li>What does the "S" (soft state) in BASE mean? Give an example.</li>
 <li>From 100k to 100M users, how does the database evolve? List phases and each phase's bottleneck.</li>
 <li>HTAP databases (TiDB) vs the "OLTP + CDC to OLAP" pattern — which do you pick?</li>
+</ol>
+
+<h2>Crossovers</h2>
+<div class="crossx"><ul>
+<li><b>Evolution · niche partitioning (Robert MacArthur, 1958)</b>: five warbler species share the same spruce trees by foraging at different heights in the canopy; a polyglot data stack likewise splits niches by access pattern. The difference: competition carved the warblers' division of labor, while an architect draws the data stack up front.</li>
+<li><b>Neuroscience · complementary learning systems (McClelland, McNaughton, O'Reilly, 1995)</b>: the hippocampus records single episodes fast, the neocortex slowly extracts regularities from many of them, and replay during sleep carries the first into the second, much as OLTP records transactions and CDC feeds OLAP for aggregation. Where it breaks: consolidation is a lossy rewrite, so the cortex keeps statistics rather than a faithful copy, whereas a warehouse must reconcile row by row with its source.</li>
+<li><b>Psychology · thinking fast and slow (Daniel Kahneman)</b>: System 1 is quick, effortless and error-prone; System 2 is slow and careful. Redis and Postgres split work the same way, and treating Redis as the source of truth is like treating a hunch as a verdict. Unlike intuition, though, a cache can be invalidated and reread.</li>
+<li><b>Investing · the index fund as default (John Bogle, 1976)</b>: unless you can name your edge, buy the index; "use Postgres unless you can say why not" puts the burden of proof in the same place. The difference: the index fund wins on low cost, Postgres on breadth.</li>
+</ul></div>
+<h2>Ten takeaways</h2>
+<ol class="takeaways">
+<li>Database selection is constraint derivation, not technology religion: data model, access pattern, consistency, scale and operational cost decide it.</li>
+<li>"NoSQL" is an umbrella for key-value, document, wide-column, graph, search and time-series models, not a single opposite of SQL.</li>
+<li>SQL brings cross-table ACID transactions, joins and strict schemas; NoSQL brings native horizontal scaling and schema flexibility.</li>
+<li>OLTP uses row storage for fast primary-key lookups of whole rows; OLAP uses columnar storage, reading only needed columns at 5-20x compression.</li>
+<li>Modern backends run several stores at once: OLTP handles transactions, and CDC through Kafka feeds search, the warehouse and the data lake.</li>
+<li>The ACID/BASE line is blurring: Spanner and CockroachDB offer distributed ACID, and DynamoDB has supported transactions since 2018.</li>
+<li>Default to Postgres unless you can name a concrete reason in QPS, data size or access pattern not to use Postgres.</li>
+<li>When a single relational node runs out, go read replicas, then vertical splits, then horizontal sharding, and never run analytics on the primary.</li>
+<li>Redis is a cache, not the source of truth for account balances; DynamoDB demands knowing your queries before choosing the partition key.</li>
+<li>The hippocampus recording fast while the neocortex slowly extracts regularities mirrors the OLTP-plus-CDC-to-OLAP split.</li>
 </ol>
 
 <h2>Key Resources</h2>

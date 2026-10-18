@@ -51,6 +51,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -241,6 +249,26 @@ promote(canary)                     # ramp up only when every metric passes
 <div class="callout"><strong>4. Common interview question:</strong> the relationship between MTTD/MTTR and the failure-to-catastrophe window? (Answer: their sum must be less than the window, or any "human response" is a paper plan; shrink the former with auto-detect + auto-containment, widen the latter by reducing coupling + bounding blast radius.)</div>
 <div class="callout"><strong>5. Common interview question:</strong> why "guardrails before scale"? What happens if you scale first and add guardrails later? (Answer: change volume/traffic go up first, so the blast radius and frequency of bad changes scale up together, and you discover the guardrails are missing exactly when you most need them; DORA data: with control systems absent, more change volume directly causes instability.)</div>
 
+<h2>Crossovers</h2>
+<div class="crossx"><ul>
+<li><b>Neuroscience · LeDoux's "low road" of fear</b>: the thalamus sends a shortcut signal straight to the amygdala, so your body freezes before you can tell a snake from a stick; the "high road" through the cortex arrives a beat later and decides whether to cancel the alarm. Same shape as the two control loops: the fast loop is crude but moves first, the slow loop is precise but only recalibrates. Unlike it, the brain's fast loop is hard-wired by evolution, while a system's thresholds can be retuned by the humans in the outer loop.</li>
+<li><b>Evolution · Nesse's "smoke detector principle"</b>: in 2001 the psychiatrist Randolph Nesse argued that defenses like fever, vomiting and anxiety are tuned to fire falsely often, because one missed threat costs far more than many false alarms. That is "rather halt than miss" in evolutionary form. The difference: the body pays for its own false alarms, while a system's false halts are paid for by its users.</li>
+<li><b>Plant biology · the hypersensitive response</b>: when a pathogen enters a leaf, the cells around the infection site kill themselves, leaving a ring of dead tissue that traps the invader. Sacrificing the local to save the whole is the same structure as a cell architecture locking a failure inside one cell. Unlike it, the plant's burned tissue is gone for good, while a cell is only isolated and can recover.</li>
+<li><b>Western philosophy · Elster's "Ulysses contract"</b>: in <i>Ulysses and the Sirens</i> (1979), Jon Elster examined precommitment: knowing the song would undo him, Ulysses had his crew bind him to the mast in advance. An absolute threshold anchored to a physical ceiling is likewise a decision made in calm on behalf of the moment of chaos. The difference: Ulysses bound himself; the threshold binds a machine.</li>
+</ul></div>
+<h2>Ten takeaways</h2>
+<ol class="takeaways">
+<li>In 2012 a Knight Capital deploy that missed one of eight servers lost more than $460 million in 45 minutes.</li>
+<li>When detection plus recovery (MTTD+MTTR) takes longer than the failure-to-catastrophe window, keeping humans in the fast loop is a design flaw.</li>
+<li>An alert is not a guardrail: Knight received 97 error emails before the open, yet nothing acted automatically to stop the bleeding.</li>
+<li>A circuit breaker trips when the downstream failure rate crosses a threshold, fails fast, and recovers by probing in a half-open state, preventing cascades.</li>
+<li>A kill switch must be fail-safe: its decision and execution paths cannot depend on the very system that is crashing.</li>
+<li>Automatic cutoffs should rather halt than miss, with thresholds anchored to business physical ceilings, not a "historical mean ×N" that the anomaly drags along.</li>
+<li>Bulkheads, cell architecture and shuffle sharding cap the blast radius structurally, at the cost of routing, data partitioning and operational complexity.</li>
+<li>A canary takes 1% of traffic while machines compare error rate and latency and roll back automatically; an exhausted error budget freezes releases.</li>
+<li>Guardrails before scale: when control systems lag, DORA observed that higher AI adoption came with worse delivery stability.</li>
+<li>Automation should start with tasks a machine oracle can verify, and detection and verification deserve investment as first-class infrastructure.</li>
+</ol>
 <h2>Further Reading</h2>
 <ul>
 <li><strong>Google SRE Book — Ch.3 Embracing Risk / Error Budgets</strong>: the first-hand account of error budgets as a release gate.</li>

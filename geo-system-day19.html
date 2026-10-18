@@ -52,6 +52,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -299,6 +307,26 @@ def dispatch_nearby(lat, lon, radius):
 <div class="callout">
 <strong>5. 把动点当静态门店建 R-Tree。</strong> 每秒 50 万 update 会把树的重平衡打挂。动点用内存网格（O(1) 换桶），R-Tree 留给静态数据。
 </div>
+<h2>越界 · 跨学科的联想</h2>
+<div class="crossx"><ul>
+<li><b>神经科学 · 网格细胞（Moser 夫妇，2005）</b>：大鼠内嗅皮层的网格细胞在空间里按六边形格点放电，Moser 夫妇因此与 O'Keefe 分享 2014 年诺贝尔奖；网格尺度还从背侧到腹侧逐级变大，像大脑自带的多分辨率 H3。不像的是，大脑用这套格子做路径积分、回答「我在哪」，不是给百万动点建索引去查「谁在附近」。</li>
+<li><b>生物进化 · 蜂巢的六边形</b>：达尔文在《物种起源》里把蜂房看作自然选择省蜡的杰作；1999 年 Thomas Hales 证明，等面积铺满平面时六边形周长最短。H3 选六边形图的是邻居等距，蜜蜂图的是省材料，同一个形状被两种目标选中；只是蜂巢是平面，不必为球面塞 12 个五边形。</li>
+<li><b>商业 · 克里斯塔勒的中心地理论（1933）</b>：地理学家 Walter Christaller 把城镇的服务范围画成层层嵌套的六边形市场区，其中「行政原则」每升一级覆盖 7 个下级区，和 H3 每级 7 个子格是同一个数。不像在于：他的城镇不会动，派单的 supply 每 4 秒就可能换一次格子。</li>
+<li><b>哲学 · 「地图不是疆域」（Alfred Korzybski）</b>：符号再精确也不是它指的东西。cell ID 和 haversine 都是地图，道路 ETA 才更接近疆域，隔河的「最近司机」就是把地图当成了疆域。不像的是，工程上地图便宜、疆域贵，所以先用地图粗筛，再只对少数候选去问疆域。</li>
+</ul></div>
+<h2>十条要点</h2>
+<ol class="takeaways">
+<li>网约车「附近的司机」读写都重：200 万在线司机每 4 秒上报一次 GPS，峰值约 50 万次位置写入每秒。</li>
+<li>空间填充曲线把二维经纬度降成一维 key，空间相邻约等于编码相邻，附近查询就能走普通有序索引。</li>
+<li>Geohash 实现极简、Redis GEO 底层就用它，但边界两侧物理很近的点，前缀可能完全不同。</li>
+<li>S2 用 Hilbert 曲线切球面、严格四叉嵌套，适合 Google Maps、Bigtable 这类需要精确层级范围扫描的地理键。</li>
+<li>H3 的六边形让 6 个邻居等距，代价是球面上必须塞 12 个五边形，父子层级只能近似嵌套。</li>
+<li>附近查询必须查「中心 cell + 一圈邻居」，只查中心 cell 会漏掉落在格子边线外侧的近邻。</li>
+<li>高频动点用内存固定网格（换桶是 O(1)），R-Tree / PostGIS GiST 留给门店这类静态数据。</li>
+<li>cell 只负责粗筛，候选再用 haversine 精算，派单最终按道路 ETA 排序，因为直线最近不等于到达最快。</li>
+<li>地理数据要按 geo cell 而非 user ID 分片，Uber DISCO 用 Ringpop 一致性哈希把 cell 映射到节点。</li>
+<li>机场、演唱会这类热 cell 会让固定网格退化成 O(N)，要靠动态切细、副本、本地缓存和 surge 定价削峰。</li>
+</ol>
 <h2 data-tts="5b305aa2b0bf85f1">深入资源</h2>
 <ul>
 <li><strong>《Designing Data-Intensive Applications》第 3 章</strong>（Kleppmann）：多维索引、R-Tree、空间填充曲线与 PostGIS 的本质讨论。</li>

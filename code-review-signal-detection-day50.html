@@ -52,6 +52,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -267,6 +275,26 @@ def govern(rule):
 <div class="callout">
 <strong>5. 面试追问：</strong> 「你怎么衡量一个 code review bot 是好是坏？」——答不出「有效误报率 / 采纳率 / 逃逸缺陷」而只会说「覆盖率高」的，就是没理解信号检测本质。追问二：「误报率降到 0 是好事吗？」（不是——大概率意味着漏报飙升）。
 </div>
+<h2>越界 · 跨学科的联想</h2>
+<div class="crossx"><ul>
+<li><b>神经科学 · 习惯化（Kandel 的海兔）</b>：海兔被反复轻触却没遇到危险，缩鳃反射就一次比一次弱；Kandel 拆解这条回路，2000 年拿到诺奖。工程师划过 bot 评论是同一种学习：没有后果的刺激被调低音量。不像在：海兔挨一次强刺激就能恢复敏感，人对 bot 的信任崩了，要几个月才回得来。</li>
+<li><b>生物进化 · 贝氏拟态</b>：无毒的食蚜蝇披上黄蜂的警戒色，只在冒牌货比真黄蜂少时管用；冒牌货一多，捕食者就不再躲这身颜色。误报稀释真报是同一条频率依赖规律。不像在：拟态者从中得利，误报谁也不得利。</li>
+<li><b>投资 · 巴菲特的二十格打孔卡</b>：巴菲特设想一辈子只有一张能打二十个孔的卡，人就只会出手想透的机会。分诊层的高阈值是同一种自我约束。不像在：投资者花的是自己的额度，bot 花的是全团队的注意力。</li>
+<li><b>心理学 · Kahneman 与 Klein 的直觉专长条件</b>：两人 2009 年的论文说，直觉要可靠，环境得有规律、反馈得及时。diff-time 报告修复率高也是这个道理：反馈落在作者上下文还在时。不像在：他们谈的是学会判断，这里是当场修 bug。</li>
+</ul></div>
+<h2>十条要点</h2>
+<ol class="takeaways">
+<li>自动 code review 的核心指标是 precision 而不是吞吐，没人看的真报等于漏报。</li>
+<li>Google 把「有效误报」定义为开发者看到后没有采取任何正向动作的报告。</li>
+<li>Google 的经验红线是有效误报率低于 10%，超线的检查会被开发者整体忽略。</li>
+<li>自动评审的目标函数不是最大化召回，而是在误报预算之内最大化召回。</li>
+<li>分诊层按 severity × confidence 把评论分成 blocking、折叠或丢弃，nitpick 交给 formatter。</li>
+<li>Meta 把 Infer 从批处理挪到 diff-time 后，同一个分析器的修复率从接近零跃升到显著水平。</li>
+<li>只报本次改动新引入的问题，存量债务只用来度量和排优先级，不贴进评审。</li>
+<li>规则误报率按 SLO error budget 管理，超预算自动降级或禁用，安全类预算更宽。</li>
+<li>拿评论数、覆盖率当 KPI 会奖励噪声，应改看采纳率、逃逸缺陷和有效误报率。</li>
+<li>海兔对无害触碰会习惯化，工程师对没有后果的 bot 评论也会同样学会忽略。</li>
+</ol>
 <h2 data-tts="2cc63cc7da9abedd">深入资源</h2>
 <ul>
 <li><strong>Sadowski et al.《Tricorder: Building a Program Analysis Ecosystem》(ICSE 2015)</strong>：NOT USEFUL 按钮、用户视角误报、分析器准入。</li>

@@ -52,6 +52,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -231,6 +239,26 @@ promote(canary)                     # 各项达标才逐步放量
 <div class="callout"><strong>3. 动态阈值被异常带跑。</strong> 「均值×3」在缓慢劣化或异常持续时会跟着涨,永远触发不了。关键闸要有锚在物理上限的绝对阈值兜底。</div>
 <div class="callout"><strong>4. 面试常问:</strong>MTTD/MTTR 和「故障→灾难」时间窗的关系?(答:前者之和必须小于后者,否则任何「人工响应」都是纸面方案;缩小前者靠自动检测+自动止血,放大后者靠降耦合+限爆炸半径)。</div>
 <div class="callout"><strong>5. 面试常问:</strong>为什么「先护栏后规模」?先放量再补护栏会怎样?(答:变更量/流量先上去,坏变更的爆炸半径和频率同步放大,你在最需要护栏时才发现没有;DORA 数据:控制系统缺位时,变更量增加直接导致不稳定)。</div>
+<h2>越界 · 跨学科的联想</h2>
+<div class="crossx"><ul>
+<li><b>神经科学 · LeDoux 恐惧的「低通路」</b>：丘脑把信号抄近路直送杏仁核，还没看清是蛇还是树枝，身体已经僵住；经过皮层的「高通路」慢一拍，再判断要不要解除警报。这和两个控制回路同构：快回路粗糙但先动，慢回路精细但只做校准。不像在于，大脑的快回路是演化写死的，系统的阈值却能由外回路的人来改。</li>
+<li><b>生物进化 · Nesse 的「烟雾探测器原理」</b>：精神病学家 Randolph Nesse 2001 年指出，发烧、呕吐、焦虑这类防御反应被调得很容易误报，因为漏报一次的代价远大于虚惊一场，这是「宁可误停」的演化版。不像的是，身体的误报由自己承担，系统误停却由用户买单。</li>
+<li><b>植物学 · 超敏反应（hypersensitive response）</b>：病原体侵入叶片时，侵染点周围的细胞主动死亡，形成一圈枯斑把病原困住，牺牲局部保全整体，和 cell 架构把故障锁在一个单元里是同一结构。不同在于，植物烧掉的组织回不来，cell 只是隔离，事后还能恢复。</li>
+<li><b>西方哲学 · Elster 的「尤利西斯契约」</b>：Jon Elster 在 1979 年的《Ulysses and the Sirens》里讨论预先承诺：尤利西斯知道听到歌声会失控，便事先让水手把自己绑在桅杆上。锚在物理上限的绝对阈值，也是平静时替混乱时做的决定。不像在于，尤利西斯绑的是自己，阈值绑的是机器。</li>
+</ul></div>
+<h2>十条要点</h2>
+<ol class="takeaways">
+<li>Knight Capital 2012 年一次漏更一台服务器的部署，在 45 分钟内亏损超过 4.6 亿美元。</li>
+<li>检测加恢复的时间（MTTD+MTTR）一旦长于「故障→灾难」的窗口，把人放在快回路里就是设计缺陷。</li>
+<li>有告警不等于有护栏：Knight 开盘前收到 97 封报错邮件，却没有任何自动动作去止血。</li>
+<li>熔断器在下游失败率超阈时跳闸、快速失败，半开态探活后自动恢复，防止级联雪崩。</li>
+<li>Kill switch 必须失效安全，判定和执行路径不能依赖那个正在崩溃的主系统。</li>
+<li>自动闸宁可误停也不漏杀，阈值要锚在业务物理上限，而非会被异常带跑的「历史均值×N」。</li>
+<li>隔板、cell 架构和 shuffle sharding 结构性地给爆炸半径封顶，代价是路由、数据分区和运维复杂度。</li>
+<li>金丝雀先放 1% 流量，由机器比对错误率和延迟并自动回滚；Error Budget 烧完就冻结发布。</li>
+<li>先护栏后规模：控制系统跟不上时，DORA 观察到 AI 采用度越高、交付稳定性越差。</li>
+<li>自动化应从有机器 oracle 能判对错的任务切入，检测与验证要当一等基础设施来投资。</li>
+</ol>
 <h2 data-tts="5a1016ceab891674">深入资源</h2>
 <ul>
 <li><strong>Google SRE Book — Ch.3 Embracing Risk / Error Budgets</strong>:错误预算作为发布闸门的一手论述。</li>

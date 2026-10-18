@@ -51,6 +51,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -255,6 +263,27 @@ def normalize(rows):
 <div class="callout"><strong>4. Reference and experiment paths share buggy code.</strong> Correlated failure → false PASS. Follow-up: both paths call the same wrong aggregation function — will the oracle catch it? (No.)</div>
 <div class="callout"><strong>5. Letting an LLM be the correctness judge.</strong> The judge itself silently errs — an unreliable oracle inside the correctness loop (see Day 44/51). AI should produce scenarios, not adjudicate.</div>
 
+<h2>Crossovers</h2>
+<div class="crossx"><ul>
+<li><b>Neuroscience · the left-brain "interpreter" (Michael Gazzaniga)</b>: in split-brain experiments the right hemisphere sees a snow scene and the left hand picks a shovel; the left hemisphere, which saw only a chicken claw, instantly explains that the shovel is for cleaning the chicken shed. Same shape as returning 255/256 as the whole answer: a missing input, a fluent and confident output. The difference: a brain has no partial flag to raise, while a system can say exactly what it is missing.</li>
+<li><b>Psychology · signal detection theory (Green &amp; Swets, 1966)</b>: hits, misses and false alarms all hinge on a decision criterion; loosen it and false alarms rise, tighten it and misses rise. Normalization strength is that criterion: too weak floods you with false alarms, too coarse erases a 0.4% gap. Unlike a human observer's, this criterion can be set explicitly at the smallest business unit.</li>
+<li><b>Molecular biology · DNA mismatch repair</b>: after replication MutS finds where the two strands disagree, but the cell must first know which strand is the original; E. coli reads methylation on GATC sites of the parent strand and cuts only the new one. A differential oracle likewise has to decide which path is ground truth. Unlike it, a cell has only two strands, so an error in the parent strand has no third party to catch it.</li>
+<li><b>Investing · the 2008 CDO correlation assumption</b>: rating models treated mortgage defaults across regions as roughly independent, so tranching seemed to slice risk thin; when house prices fell nationwide, defaults arrived together and every cushion failed at once. That is correlated failure between reference and experiment paths. The difference: a system can switch to an independent implementation, while markets rarely offer assets that stay uncorrelated in a crisis.</li>
+<li><b>Leadership · psychological safety (Amy Edmondson, 1996)</b>: studying hospital nursing teams, she found that units with better leadership and relationships reported more medication errors, not because they made more but because they spoke up. That is the gap between honestly flagging partial and claiming completeness. Unlike a team, which needs culture to get people talking, a system can make the declaration mandatory in its degradation contract.</li>
+</ul></div>
+<h2>Ten takeaways</h2>
+<ol class="takeaways">
+<li>An availability-only oracle is not enough for chaos engineering: zero errors and a normal p99 can coexist with silently wrong results.</li>
+<li>When a shard times out and the service quietly skips it, returning a 255/256 partial sum as complete, you get a gray failure with zero alerts.</li>
+<li>A differential oracle feeds the same request to a fault-free reference path and a fault-injected experiment path, using the computed result as ground truth.</li>
+<li>Golden-value oracles cover only preset inputs and invariant oracles miss numeric drift, so practice usually combines differential and invariant checks.</li>
+<li>The normalization layer must sort all rows, quantize floats to business precision and mask now() and randomness, or the two checksums never match.</li>
+<li>Normalization that is too weak floods engineers with false alarms until they disable the oracle; too strong, it erases real gaps like 0.4%.</li>
+<li>In a three-state verdict, missing data honestly flagged as partial is acceptable degradation; missing data while claiming completeness is a correctness bug.</li>
+<li>Acceptable degradation gets logged, not paged; keeping only correctness bugs on the paging channel protects alert precision.</li>
+<li>Reference and experiment paths that share the same buggy code fail together and yield a false PASS; Jepsen avoids this by using a formal model as ground truth.</li>
+<li>AI fits only the fault-scenario generator seat; the correctness judge must be deterministic diffing plus degradation-contract rules.</li>
+</ol>
 <h2>Deeper Resources</h2>
 <ul>
 <li><strong>Netflix TechBlog — "ChAP: Chaos Automation Platform"</strong>: engineering of experiment/control dual clusters + error-budget circuit breaker.</li>

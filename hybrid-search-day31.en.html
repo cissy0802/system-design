@@ -51,6 +51,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -264,6 +272,28 @@ def best_snippet(doc_tokens, q_terms, W=160):
 <li>What's the essential difference between bi-encoder and cross-encoder? Why can one be indexed and the other not?</li>
 <li>50M docs, 768-dim vectors — roughly how much memory does an HNSW index take? How do you estimate?</li>
 <li>recall@200 is only 85% — no ranker can recover the missing 15%. How do you improve recall?</li>
+</ol>
+
+<h2>Crossovers</h2>
+<div class="crossx"><ul>
+<li><b>Psychology · Kahneman's fast and slow thinking</b>: In <i>Thinking, Fast and Slow</i> (2011), Kahneman splits the mind into a fast, effortless System 1 and a slow, effortful System 2. Retrieval is System 1, glancing out a few hundred candidates; the cross-encoder is System 2, reading only a handful closely. The difference: a human System 2 is lazy and often just signs off on System 1's answer, while the reranker runs every time. The real blind spot is what System 1 never thought of: whatever retrieval misses, the reranker never sees.</li>
+<li><b>Immunology · innate vs adaptive immunity</b>: Innate immunity uses pattern-recognition receptors to flag broad "looks like a pathogen" features, fast and general; adaptive antibodies lock onto one specific epitope, precise and narrow. Same complementarity as vectors reading intent and BM25 matching exact terms. Unlike: the immune system learns and remembers; an inverted index does not.</li>
+<li><b>Social choice · the Borda count</b>: The 18th-century French mathematician Borda scored each ballot by position and summed the points. RRF is a Borda count with points of 1/(k+rank), likewise using order only, never intensity. It inherits Borda's old flaw: it cannot hear the difference between "love it" and "it'll do".</li>
+<li><b>Buddhism · the finger pointing at the moon</b>: The Surangama Sutra warns against mistaking the pointing finger for the moon. BM25 stares at the finger (the literal word); vectors try to see the moon (the meaning). Unlike: when vectors cannot find the real moon, they point at the nearest star and call it the moon, so thresholds and reranking must stand guard.</li>
+<li><b>Psychology · signal detection theory</b>: Signal detection theory separates a judgment into sensitivity and criterion; moving the criterion just trades misses for false alarms. A similarity threshold works the same way: raising or lowering it trades missed recall for noise. Doing better on both needs stronger discrimination, such as a cross-encoder.</li>
+</ul></div>
+<h2>Ten takeaways</h2>
+<ol class="takeaways">
+<li>BM25 excels at exact and rare terms like SKUs and model numbers, but misses results when users phrase things with synonyms.</li>
+<li>Dense vectors understand semantic intent but are blind to exact tokens, numbers and model names, so hybrid retrieval pairs the two.</li>
+<li>Multi-stage retrieval is a funnel: cheap recall pulls hundreds so nothing is missed, and expensive reranking orders only a few.</li>
+<li>HNSW trades exactness for speed with high recall but heavy memory; IVF-PQ saves memory at lower recall and needs a trained codebook.</li>
+<li>BM25 scores are unbounded while cosine sits between 0 and 1, so a naive weighted average gets dominated by BM25.</li>
+<li>RRF fuses lists using only rank, scoring 1/(k+rank) with k usually 60, avoiding normalization but discarding score magnitude.</li>
+<li>A cross-encoder jointly encodes query and document for high accuracy, but cannot be pre-indexed, so it belongs only in reranking.</li>
+<li>Snippets are query-biased summaries that pick the densest, rarest-term window, and highlights must map back to original-text offsets.</li>
+<li>Reranking cannot rescue documents retrieval never fetched; recall@k at the retrieval stage caps the whole funnel.</li>
+<li>Vector search always returns nearest neighbors, giving relative order rather than absolute relevance, so it needs a threshold or a cross-encoder as gatekeeper.</li>
 </ol>
 
 <h2>Deep-dive Resources</h2>

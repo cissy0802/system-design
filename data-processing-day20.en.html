@@ -51,6 +51,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -282,6 +290,26 @@ stream
 <div class="callout"><strong>4. Setting the watermark too loose or too tight.</strong> Too tight → lots of late data dropped; too loose → windows won't close, latency and state both high. Tune to the real skew distribution (look at p99 lateness) and use allowed lateness as a backstop.</div>
 <p><strong>Common follow-ups:</strong> ① Why is "batch a special case of stream"? Where does the latency floor differ between micro-batch and true streaming? ② How exactly do Lambda's two codebases drift, how does Kappa fix it, and what new constraint does it introduce? ③ A slow-advancing watermark keeps windows open and state ballooning — how do you diagnose and mitigate? ④ What must source, operators, and sink each satisfy for end-to-end exactly-once? ⑤ At 50M eps and a 5s SLO, how do you estimate parallelism and state size?</p>
 
+<h2>Crossovers</h2>
+<div class="crossx"><ul>
+<li><b>Neuroscience &middot; postdiction</b>: the brain waits for a watermark too. In 2000 Eagleman and Sejnowski used the flash-lag effect to argue that awareness of "now" folds in information arriving up to about 80 ms after the flash, so late signals can rewrite what was perceived. Alike: both trade a short wait for completeness. Unlike: the brain has no side output; late signals are silently merged into "back then," and we never notice the revision.</li>
+<li><b>Physics &middot; relativity of simultaneity</b>: Einstein showed in 1905 that whether two distant events are "simultaneous" depends on the observer; there is no global "now." The event-time vs processing-time gap is the same predicament, so you order by the timestamp each event carries. Unlike physics, each stream event at least has one agreed moment of occurrence.</li>
+<li><b>Psychology &middot; Kahneman's System 1 / System 2</b>: Lambda's speed layer is System 1, fast and approximate; the batch layer is System 2, slow and exact, and the two are merged. The biases in Thinking, Fast and Slow (2011) look like two code paths drifting apart. Unlike Lambda, the mind cannot drop System 1 and go Kappa.</li>
+<li><b>Business &middot; double-entry bookkeeping</b>: double-entry bookkeeping, systematized by Pacioli in 1494, never erases an old entry; a mistake gets a reversing entry appended, and the ledger itself is the source of truth, just like Kappa's immutable log. Unlike accounting, which only appends corrections, Kappa fixes the code and recomputes the whole history.</li>
+</ul></div>
+<h2>Ten takeaways</h2>
+<ol class="takeaways">
+<li>Batch processing is a special case of stream processing: bounded data is unbounded data that knows where it ends.</li>
+<li>Spark micro-batch latency is floored by the batch interval, while Flink's record-at-a-time streaming reaches milliseconds.</li>
+<li>Lambda architecture runs a batch layer and a speed layer, so the same business logic is written twice and rarely stays aligned.</li>
+<li>Kappa architecture drops the batch layer; to fix a bug, replay the Kafka log from the start into a new result table.</li>
+<li>Kappa is only as good as log retention: needing a 30-day replay with 3 days stored means the data is already gone.</li>
+<li>Windows must use event-time; processing-time windows cram all historical data into one minute during out-of-order arrival or replay.</li>
+<li>A watermark is a heuristic claim that data older than T has mostly arrived: aggressive is fast but lossy, conservative is accurate but slow.</li>
+<li>Late data is handled by allowed lateness, which updates emitted results, and anything later goes to a side output.</li>
+<li>End-to-end exactly-once needs consistent checkpoints plus transactional sink commits; checkpoints alone still duplicate downstream writes.</li>
+<li>Lambda's speed and batch layers mirror Kahneman's System 1 and System 2: the fast one approximates, the slow one corrects.</li>
+</ol>
 <h2>Deep-Dive Resources</h2>
 <ul>
 <li><strong>Designing Data-Intensive Applications, Ch 10–11</strong> (Kleppmann): batch and stream processing, and unifying the two.</li>

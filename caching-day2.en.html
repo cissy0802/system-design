@@ -51,6 +51,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -315,6 +323,27 @@ func GetHot(key string) (any, error) {
 <li>What's your cache consistency model? Discuss the failure cases for "DB first then delete cache" both ways.</li>
 <li>Implementation details for LRU vs LFU, time complexity, and which fits which scenario?</li>
 <li>How do you stop cache penetration (malicious lookups for non-existent keys)? Compute a Bloom filter's false positive rate.</li>
+</ol>
+
+<h2>Crossovers</h2>
+<div class="crossx"><ul>
+<li><b>Psychology · Memory as a cache tuned to the environment (Anderson &amp; Schooler, 1991)</b>: counting New York Times headlines, speech to children, and email, they found that the odds of a word showing up again depend on how recently and how often it appeared, along curves shaped like human forgetting. Forgetting is eviction by recency plus frequency. The difference: the brain never cleanly deletes an entry; old memories just get harder to retrieve.</li>
+<li><b>Neuroscience · Complementary learning systems (McClelland, McNaughton &amp; O'Reilly, 1995)</b>: the hippocampus records the day quickly, then replays it during sleep so the cortex can absorb it slowly. Structurally that is write-back: fast write first, flush later. Unlike a disk, the cortex does not copy; it blends new and old experience into patterns, so the flush itself rewrites the data.</li>
+<li><b>Evolution · Predator satiation in periodical cicadas</b>: 13- and 17-year cicadas emerge together in one year, in numbers predators cannot eat through: a deliberate avalanche aimed at the downstream. Caches add TTL jitter to avoid synchrony; cicadas survive by it. Same structure, opposite conclusion, depending on whether you are the one being hit.</li>
+<li><b>Economics · Hayek's price signal (1945)</b>: "The Use of Knowledge in Society" argues that a price compresses knowledge scattered across millions into one number everyone can read without going back to the source. Like a cache, it saves the lookups. Unlike one, a price has no TTL and nobody owns invalidation, so a stale value can drift from fundamentals for years until a crash forces everyone back to origin at once.</li>
+</ul></div>
+<h2>Ten takeaways</h2>
+<ol class="takeaways">
+<li>Phil Karlton called cache invalidation one of the two hard problems in computer science, the other being naming.</li>
+<li>Caching pays off at read/write ratios around 100:1; a hit rate under 80% usually means the cache layer adds little.</li>
+<li>Each cache layer saves a different latency: the browser saves the network, the CDN saves distance, in-process saves a Redis round trip, Redis saves a DB query.</li>
+<li>In-process caches are fastest, but N processes hold N copies and invalidation must be broadcast, which is hard to get right.</li>
+<li>LRU is simple but polluted by one-off scans; LFU resists scans but lets old hot keys settle in and block new ones.</li>
+<li>Caffeine's W-TinyLFU estimates frequency with a Count-Min Sketch for admission control, beating LRU hit rates by 5-15%.</li>
+<li>Cache-aside is the default for Redis plus a DB: write the DB, then delete the cache entry rather than update it, to avoid races.</li>
+<li>Write-back has the lowest write latency, but a cache crash loses unflushed data, so never use it for account balances.</li>
+<li>A hot key expiring causes a thundering herd, fixed by single-flight or leases; mass expiry causes an avalanche, fixed by TTL jitter.</li>
+<li>Cache penetration is blocked by caching empty results or a Bloom filter; a cold start drops hit rate to zero, so pre-warm or ramp traffic slowly.</li>
 </ol>
 
 <h2>Key Resources</h2>

@@ -49,6 +49,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -375,6 +383,26 @@ def place_order(user, sku, qty):
 <li>CAP 定理常被批评为『过时』，PACELC 解决了什么？为什么 99% 时间在 E 而不是 P？</li>
 <li>解释 Hybrid Logical Clock 比 Lamport timestamp 和 Vector Clock 各强在哪？size、可读性、因果判断？</li>
 <li>Spanner 为什么能号称『全球 linearizable』？TrueTime 的 ε 是怎么影响 commit 等待时间的？没有 GPS 钟怎么做（CockroachDB）？</li>
+</ol>
+<h2>越界 · 跨学科的联想</h2>
+<div class="crossx"><ul>
+<li><b>物理学 · 狭义相对论的「同时性的相对性」</b>：爱因斯坦 1905 年指出，遥远两件事的先后取决于观察者，只有能互相影响的事件才有确定先后。Lamport 说 happens-before 正是受此启发，因果一致性就是只给有因果的事件定序。不像在于：物理里并发事件本无先后，系统却常用 LWW 硬排一个，那是工程选择。</li>
+<li><b>神经科学 · 知觉的后发判定（Eagleman &amp; Sejnowski，2000）</b>：闪光滞后实验提示，大脑要算进闪光后约 80 毫秒的信息，才定下当时看到了什么，像 Spanner 先等过不确定窗口再公布顺序。不像的是，大脑给的只是自洽的版本，这一解释也仍有争议。</li>
+<li><b>心理学 · 客体永久性（Baillargeon，1985）</b>：五个月大的婴儿看到不可能事件会注视更久，「东西不会凭空消失」的预期来得极早；读不回退、读到自己写守的正是这条直觉。不像的是，物理世界天然兑现它，分布式系统得额外花力气。</li>
+<li><b>商业 · 贝索斯的单向门与双向门</b>：贝索斯 2015 年致股东信把决策分成不可逆、要慎重的单向门和可逆、要快的双向门，和「按违反代价分层、别默认强一致」同构。不像在于：双向门靠事后撤回，eventual 靠事后合并，前提是业务可合并。</li>
+</ul></div>
+<h2>十条要点</h2>
+<ol class="takeaways">
+<li>一致性是一条光谱而非开关：从 linearizable 到 eventual，每弱一档换来更低延迟和更高可用。</li>
+<li>强一致要被论证才能用，只在库存、分布式锁、唯一性约束这类依赖最新值的场景才值得。</li>
+<li>用户最能感知的是读自己写和单调读，靠客户端携带 LSN 或 HLC token 实现，几乎零代价。</li>
+<li>CAP 只讲分区时一致性与可用性二选一；PACELC 补上了平时延迟与一致性的取舍。</li>
+<li>生产系统多落在两个象限：社交展示走 PA/EL，金融、库存、配置中心走 PC/EC。</li>
+<li>Lamport timestamp 能排全序却分不清因果与并发；vector clock 分得清，但随节点数膨胀。</li>
+<li>Hybrid Logical Clock 结合物理时间与逻辑计数器，保住因果序，又贴近墙钟、大小恒定。</li>
+<li>按违反代价分层：同一次下单，扣库存要 linearizable，订单要读自己写，热度计数 eventual 即可。</li>
+<li>常见陷阱：用墙钟排序、把单机 ACID 当分布式强一致、以为 W+R&gt;N 就等于 linearizable。</li>
+<li>婴儿就预期东西不会凭空消失，所以订单消失、评论变少会让用户立刻投诉。</li>
 </ol>
 <h2 data-tts="5a6e3232e9238f61">深入资源</h2>
 <ul>

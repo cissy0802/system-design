@@ -52,6 +52,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -250,6 +258,26 @@ def bucket(user_id, exp_key, treat_ratio=0.5):
 <li>双边市场（外卖）里普通用户随机 A/B 为什么会失效？换什么实验设计？</li>
 <li>热实体（顶流门店）特征 QPS 单点过高，怎么扛？（联想 Day 2 缓存热 key）</li>
 </ul>
+<h2>越界 · 跨学科的联想</h2>
+<div class="crossx"><ul>
+<li><b>神经科学 · 互补学习系统（McClelland、McNaughton、O'Reilly，1995）</b>：海马体快速记下刚发生的单次经历，新皮层慢慢把它们吸收成长期的统计结构，睡眠中的回放把前者搬进后者，很像在线 Store、离线 Store 加一条物化管道。不像在哪：大脑的流向是从「最新」流进「全史」，而且每次回放都会改写记忆，等于天生带着 skew 运行，没有谁做逐位对账。</li>
+<li><b>心理学 · 后见之明偏差（Baruch Fischhoff，1975）</b>：知道结局的人会高估自己「当时就能预见」，这就是人脑里的标签泄漏：拿 T 之后的信息去评判 T 时刻。不像的是，模型加一道 event_ts ≤ T 的过滤就干净了，人却没法把已知的结局从脑子里删掉。</li>
+<li><b>生物进化 · 进化错配（evolutionary mismatch）</b>：性状在祖先环境里被「训练」好，搬进现代环境后照常运行却悄悄失效，比如嗜甜嗜脂在食物匮乏时有利、在今天成了负担。这和训练分布与线上分布漂移是同一结构；不像在于，进化没有漂移监控和告警，错配只能在疾病里显形。</li>
+<li><b>商业 · 古德哈特定律（Charles Goodhart，1975）</b>：一个指标一旦成了追逐的目标，就不再可靠地反映它原本要衡量的东西。A/B 只盯主指标就是在邀请这条定律，guardrail 指标是给它上的保险。不像的是，guardrail 只守得住你预先想到的副作用，而古德哈特说的是被优化的那个指标本身会变质。</li>
+</ul></div>
+<h2>十条要点</h2>
+<ol class="takeaways">
+<li>训练追求吞吐、推理追求延迟，同一个特征两边算出的值一旦不同，就是 training-serving skew：线下 AUC 高、线上掉。</li>
+<li>双 Store 是被迫的正确：列存数仓保留全历史供训练扫描，内存 KV 只存每个实体的最新值供毫秒点查。</li>
+<li>特征注册表是唯一真相源，一份定义驱动批与流两条管道，分别物化到离线 Store 和在线 Store。</li>
+<li>DoorDash 用 YCSB 基准测试选定 Redis 作在线 Store，它的在线特征写入只占读取的 0.1%。</li>
+<li>Point-in-time join 只取 event_ts ≤ 标签时刻的最新特征值；直接 join 特征表的当前值就是标签泄漏。</li>
+<li>Log-and-wait 让训练复用服务日志、零 skew 但冷启动慢；backfill 立刻可训练，但回溯逻辑必须与在线逐位一致。</li>
+<li>训练和服务各写一套转换代码（Python 版加 Java 版）是 skew 的头号来源，根治靠共享同一份定义或 DSL。</li>
+<li>一次线上预测里取特征常占一半以上延迟，靠批量 pipeline、并发拉取和进程内 L1 缓存压下来。</li>
+<li>模型上线要用稳定分桶的 A/B 实验建立因果，同时盯延迟、退款率等 guardrail 指标，防止主指标涨、副作用炸。</li>
+<li>外卖这类双边市场里按用户随机分流会让两组抢同一个骑手池、高估收益，应改用按城市 × 时间片的 switchback 实验。</li>
+</ol>
 <h2 data-tts="3c5b0ca1f711514e">深入资源</h2>
 <ul>
 <li><strong>DoorDash</strong>：<a href="https://doordash.engineering/2020/11/19/building-a-gigascale-ml-feature-store-with-redis/">Building a Gigascale ML Feature Store with Redis</a>——在线 Store 选型与压缩实战。</li>

@@ -52,6 +52,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -304,6 +312,26 @@ func GetHot(key string) (any, error) {
 <li>缓存一致性怎么做？说说『先写 DB 还是先删 cache』各自的失败场景。</li>
 <li>LRU 和 LFU 的实现细节，时间复杂度，分别什么场景下选哪个？</li>
 <li>Cache penetration（恶意查不存在的 key）怎么防？Bloom Filter 的误判率怎么算？</li>
+</ol>
+<h2>越界 · 跨学科的联想</h2>
+<div class="crossx"><ul>
+<li><b>心理学 · 记忆是为环境调好的缓存（Anderson &amp; Schooler，1991）</b>：他们统计《纽约时报》标题、儿童听到的话和电子邮件，发现一个词下次再出现的概率随「多久没出现」「出现过几次」变化的曲线，和人类遗忘曲线同形，遗忘相当于按近度加频度淘汰。不像的是，人脑不会干净地删掉一条，旧记忆只是越来越难取回。</li>
+<li><b>神经科学 · 互补学习系统（McClelland、McNaughton、O'Reilly，1995）</b>：海马体快速记下当天经历，睡眠中再回放、慢慢写进皮层，结构上就是 write-back：快写在前、落盘在后。不像在于，皮层不是照抄，而是把新旧经验揉成规律，「刷盘」本身就在改数据。</li>
+<li><b>生物进化 · 周期蝉的捕食者饱和</b>：13 年和 17 年周期蝉同一年集体破土，数量多到天敌吃不完，等于故意制造一场「雪崩」压垮下游。缓存给 TTL 加抖动是为了避免同步，蝉却靠同步求生；同一个结构，站在被打的一方和打人的一方，结论正好相反。</li>
+<li><b>经济学 · 哈耶克的价格信号（1945）</b>：《知识在社会中的运用》说价格把散在千万人手里的信息压成一个数，人人读它而不必回源。像缓存在于省掉了逐个查询；不像在于价格没有 TTL、也没人负责 invalidate，偏离基本面的旧值能撑很久，直到一次集中回源式的崩盘。</li>
+</ul></div>
+<h2>十条要点</h2>
+<ol class="takeaways">
+<li>缓存失效被 Phil Karlton 称为计算机科学两大难题之一，另一个是命名。</li>
+<li>读写比约 100:1 才适合加缓存；命中率低于 80% 通常说明缓存层没价值。</li>
+<li>多层缓存各省一段延迟：浏览器省网络，CDN 省距离，进程内缓存省 Redis RTT，Redis 省 DB 查询。</li>
+<li>进程内缓存延迟最低，但 N 个进程就有 N 份副本，失效要广播，很难做对。</li>
+<li>LRU 实现简单却怕一次性扫描污染，LFU 抗扫描却会让旧热点沉淀、新热点进不来。</li>
+<li>Caffeine 的 W-TinyLFU 用 Count-Min Sketch 估频率做准入控制，命中率比 LRU 高 5–15%。</li>
+<li>Cache-aside 是 Redis 加 DB 的默认写法：先写 DB 再删缓存，删而不是更新，避免并发乱序。</li>
+<li>Write-back 写延迟最低，但缓存宕机会丢掉未刷盘的数据，账户余额绝不能这样存。</li>
+<li>热 key 过期引发的击穿用 single-flight 或 lease 只放一个请求回源；大批 key 同时过期的雪崩靠 TTL 随机抖动化解。</li>
+<li>缓存穿透靠缓存空值或 Bloom Filter 挡住；服务冷启动时命中率归零，要预热或慢慢放量。</li>
 </ol>
 <h2 data-tts="e65beec73c0e0fb9">关键资源</h2>
 <ul>

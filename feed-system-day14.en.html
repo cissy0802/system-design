@@ -51,6 +51,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -270,6 +278,26 @@ def get_home_timeline(uid, limit=20):
 <div class="callout"><strong>5. Ignoring visibility filtering.</strong> If blocked/deleted/private posts aren't filtered at read, deleted content gets served — you must filter after hydrate.</div>
 <p><strong>Likely follow-ups</strong>: ① A celebrity with tens of millions of followers posts — how do you avoid blowing up the system? ② How do you set the push/pull threshold, on what metric? ③ When I newly follow someone, how do their historical posts enter my timeline (backfill)? ④ How do you budget the end-to-end post-to-visible latency? ⑤ Chronological vs ranked feed — what does each sacrifice, and which product should pick which?</p>
 
+<h2>Crossovers</h2>
+<div class="crossx"><ul>
+<li><b>Complexity science · Scale-free networks (Barabási and Albert, 1999)</b>: preferential attachment makes the rich get richer, so follower counts follow a power law and celebrities are not edge cases but the long tail the network inevitably grows. The difference: Barabási explains how the tail forms; a feed system can only accept it and use a threshold to serve both ends differently.</li>
+<li><b>Neuroscience · Hippocampal indexing theory (Teyler and DiScenna, 1986)</b>: the hippocampus does not store the full memory, only an index pointing to representations spread across the neocortex, reactivated at recall, much as a timeline stores only tweet_ids and hydrates on read. Unlike it, the brain rewrites a memory each time it recalls it, while the Tweet Store returns the same text every time.</li>
+<li><b>Psychology · Kahneman's System 1 and System 2</b>: System 1 runs on pre-practiced responses, fast and cheap; System 2 reasons on the spot, slow and costly, like push's precomputed timeline versus pull's read-time merge. Everyday matters go to System 1 and only hard problems wake System 2, just as ordinary accounts are computed ahead while celebrities wait for read time. The difference: nobody sets the brain's threshold; what becomes intuition grows from experience, whereas the hybrid threshold is set explicitly by engineers from follower count and activity.</li>
+<li><b>Business · Herbert Simon on scarce attention (1971)</b>: Simon observed that a wealth of information creates a poverty of attention, and a ranked feed is exactly a mechanism for allocating that scarce attention on the user's behalf. Unlike Simon's picture, where an organization filters for its decision makers, feed ranking optimizes the platform's engagement, and users may not know anyone filtered for them.</li>
+</ul></div>
+<h2>Ten takeaways</h2>
+<ol class="takeaways">
+<li>The hard part of a feed system is the read/write amplification asymmetry: merging followed accounts' posts happens either at post time or at refresh time.</li>
+<li>Push (fanout-on-write) reads in O(1) and writes O(followers); pull (fanout-on-read) writes in O(1) but must merge every followed account on read.</li>
+<li>With a read:write ratio near 100:1 and most users having few followers, push wins by spreading cost over sparse writes.</li>
+<li>One post from a ten-million-follower account means ten million cache writes, so industry almost always goes hybrid: push for ordinary users, pull for celebrities at read time.</li>
+<li>Twitter precomputes home timelines in Redis, lets high-follower accounts skip fanout, and merges their posts in at read time.</li>
+<li>A high celebrity threshold keeps reads simple but allows write storms; a low one lengthens the read-time merge list; fanning out only to active followers cuts waste.</li>
+<li>The timeline cache stores tweet_ids, not bodies: a hundredfold memory saving and single-place edits and deletes, at the cost of one extra hydrate on read.</li>
+<li>Home timelines must be bounded (about 800 entries at Twitter), or big keys grow without limit and drag down a whole Redis shard.</li>
+<li>ML ranking and visibility filtering belong on the read path: score only the few hundred aggregated candidates, then drop deleted or blocked posts after hydration.</li>
+<li>Follower counts naturally follow a power law, so the celebrity problem is built into the network's structure, not an edge case to ignore.</li>
+</ol>
 <h2>Deep Resources</h2>
 <ul>
 <li><strong>Raffi Krikorian, <em>Timelines at Scale</em></strong> (QCon/InfoQ) + High Scalability's breakdown of Twitter's timeline architecture: firsthand material on fanout, Redis materialization, celebrity hybrid.</li>

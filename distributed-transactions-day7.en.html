@@ -48,6 +48,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -473,6 +481,26 @@ def handle(key, req):
 <li>"Should microservices avoid distributed transactions?" — how do you answer? Give an example of "converting a distributed transaction into a domain redesign."</li>
 </ol>
 
+<h2>Crossovers</h2>
+<div class="crossx"><ul>
+<li><b>Business · Reversing entries in double-entry bookkeeping</b>: Accountants never erase a posted entry; a mistake is fixed by posting an equal and opposite reversing entry, so the ledger only ever grows. That is the same shape as a saga using compensation instead of rollback: the error leaves a trace and is cancelled by a counter-move. The difference: a reversal lives in one ledger where one place keeps debits and credits balanced, while a saga's compensations are scattered across five databases owned by five teams, any of which can fail midway.</li>
+<li><b>Neuroscience · Synaptic tagging and capture</b>: Frey and Morris proposed in Nature in 1997 that a stimulated synapse first sets a temporary "tag"; only if it captures the right proteins within a few hours does the change become long-term, otherwise the tag fades. That looks like prepare-then-commit, but unlike 2PC the tag has a timeout and simply gives up instead of holding locks forever.</li>
+<li><b>Leadership · Mission command</b>: Auftragstaktik, pushed by the elder Moltke in the Prussian army, hands down only the intent and lets units act on their own, much like choreography's lack of a center. The difference: officers share one intent, while in choreography nobody holds the whole flow, which is why failures are hard to trace.</li>
+<li><b>Evolution · Stigmergy</b>: Grass&eacute; coined the term in 1959 while studying termite nest-building: individuals don't talk directly, they leave traces in the environment that cue the next worker. Outbox plus Kafka works the same way, with services writing events to a shared log that downstream consumers react to. Unlike termite traces, which get overwritten, an event log is append-only and replayable.</li>
+</ul></div>
+<h2>Ten takeaways</h2>
+<ol class="takeaways">
+<li>The fatal flaw of 2PC is blocking: if the coordinator dies after prepare, every participant holds its locks and waits indefinitely.</li>
+<li>A Stripe charge or a sent email can neither prepare nor roll back, so never use 2PC across microservices or external APIs.</li>
+<li>Spanner gets away with 2PC because its coordinator and participants are themselves highly available Paxos groups.</li>
+<li>Saga, proposed by Garcia-Molina and Salem in 1987, splits a big transaction into local transactions and runs compensations in reverse on failure.</li>
+<li>Compensation is not rollback: a refund cancels a charge, but a sent email can only be followed by an apology, so the business must accept visible intermediate states.</li>
+<li>Orchestration keeps the logic central and traceable, suiting flows of four or more steps; choreography decouples fully but scatters the flow across services.</li>
+<li>Writing the DB and then publishing to Kafka is the dual write problem; Outbox commits the event with the business row in one local transaction and Debezium ships it from the WAL.</li>
+<li>Outbox with CDC delivers at least once, costs seconds of lag and a growing table, and forces consumers to dedupe by event_id.</li>
+<li>An idempotency key must be fixed when the request is created and reused on every retry; a timestamp as the key breaks deduplication.</li>
+<li>If most flows cross the same two services, they probably belong together: the root defense against distributed transactions is drawing domain boundaries right.</li>
+</ol>
 <h2>Deep Resources</h2>
 <ul>
 <li><strong>"Designing Data-Intensive Applications," Ch 7 §Transactions + Ch 9 §Atomic Commit and Two-Phase Commit</strong> (Kleppmann): the most complete industry-grade treatment of 2PC and the limits of distributed transactions.</li>

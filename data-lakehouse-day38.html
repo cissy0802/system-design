@@ -52,6 +52,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -267,6 +275,26 @@ df = (spark.read.format("hudi")
 <strong>4. time travel 当免费午餐。</strong> 每个保留快照都钉住其引用的数据文件不被回收，<em>保留越久存储成本越高</em>；expire 又会让该时间点的回放失效。保留窗口是<em>审计需求 vs 存储成本</em>的权衡，要显式定。</div>
 <div class="callout">
 <strong>5. 面试常问：</strong>① 在只保证单对象原子的 S3 上，怎么实现多文件事务？（答：immutable 文件 + 原子切快照指针 + OCC）② COW 与 MoR 各自的写/读放大，CDC 场景选哪个？③ Hive 表慢在哪、Iceberg 怎么解（LIST 目录 vs 元数据剪枝）？④ time travel 的存储代价与回收策略？⑤ 多引擎并发写如何避免互相覆盖？</div>
+<h2>越界 · 跨学科的联想</h2>
+<div class="crossx"><ul>
+<li><b>神经科学 · 互补学习系统（McClelland、McNaughton、O'Reilly，1995）</b>：海马体白天快速记下经历，睡眠中反复重放，再慢慢并入新皮层的长期知识，正是 MoR 先追加 delta、后台 compaction 合进 base 的结构；缺觉时记忆变差，也像 compaction 停摆后读端越拖越慢。不像在于：大脑合并时会抽象、丢细节，compaction 必须一字不差。</li>
+<li><b>佛学 · 刹那生灭与相续</b>：佛学讲诸法刹那生灭，前一刻灭、后一刻生，「同一个东西」只是相续之上安立的名；湖仓里的表也是一串不可变快照，「这张表」只是 catalog 里的一个指针。不像的是，佛学否认背后有常住的主宰，湖仓却全靠这一个指针撑起一致性。</li>
+<li><b>商业 · 复式记账（Luca Pacioli，1494）</b>：账记错了不擦掉，而是补一笔冲销分录，历史一行不动，所以随时能还原任一天的账面；不可变数据文件加 delete 文件也是这样改数据。不像在于：会计账簿永久保存，湖仓却要 expire 快照回收存储，回放窗口有边界。</li>
+<li><b>哲学 · 忒修斯之船</b>：船板一块块换掉，还是不是原来那条船？湖仓给了个工程答案：每次提交都换掉一批文件，表的身份只认 catalog 指针。不像普鲁塔克的船，换下的旧板没扔，旧快照都还在，想回到哪一版就回到哪一版。</li>
+</ul></div>
+<h2>十条要点</h2>
+<ol class="takeaways">
+<li>湖仓保留数据湖的开放 Parquet 文件，在上面加一层事务性元数据，同时拿到湖的低成本和数仓的 ACID。</li>
+<li>Iceberg、Delta Lake、Hudi 分别出自 Netflix、Databricks 和 Uber，思路同源，在元数据组织和写优化上取向不同。</li>
+<li>S3 只保证单对象原子写，表格式靠不可变数据文件加原子切换快照指针，给出快照隔离。</li>
+<li>并发提交走乐观并发控制：catalog 做 compare-and-swap，被别人抢先就检查冲突再重试。</li>
+<li>Iceberg 用 metadata file、manifest list、manifest 三级清单记录列级 min/max，不 LIST 目录就能剪掉大部分文件。</li>
+<li>流式和 CDC 高频写会产生海量小文件，compaction 和 expire snapshots 必须从第一天起作为常驻作业运行。</li>
+<li>Copy-on-Write 写时重写整个文件、读得快；Merge-on-Read 写时只追加 delta、读时再合并，适合 CDC upsert。</li>
+<li>湖仓面向分析型批量写，每秒几万笔单行更新的事务负载应该交给 Postgres 这类 OLTP 数据库。</li>
+<li>每个保留的快照都钉住它引用的数据文件，time travel 窗口越长，存储成本越高。</li>
+<li>海马体快速记录、睡眠中并入新皮层的记忆巩固，和 Merge-on-Read 加后台 compaction 是同一个结构。</li>
+</ol>
 <h2 data-tts="741f9efd2cf8027e">深入资源</h2>
 <ul>
 <li><strong>《Lakehouse: A New Generation of Open Platforms》</strong>（Armbrust, Ghodsi, Xin, Zaharia，CIDR 2021）：湖仓架构的奠基论文，论证存算分离 + 开放格式 + 元数据层。</li>

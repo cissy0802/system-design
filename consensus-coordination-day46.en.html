@@ -51,6 +51,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -277,6 +285,26 @@ def linearizable_read(key):
 <div class="callout"><strong>5. Treating consensus as high-throughput storage.</strong> Every write goes through majority replication — inherently low-throughput, strongly-consistent control-plane tooling. Don't dump high-frequency business writes into etcd/ZK; they're coordinators, not your primary database.</div>
 <p><strong>Other frequent follow-ups:</strong> (1) Why not use 2PC for coordination? (Coordinator single point; participants block; not fault-tolerant.) (2) How do you place 5 nodes across 3 AZs to survive one AZ dying? (3) What's the real difference between Raft and Paxos? (4) How do watches guarantee no missed events (etcd revision + resumable streaming)?</p>
 
+<h2>Crossovers</h2>
+<div class="crossx"><ul>
+<li><b>Evolutionary biology · The honeybee quorum (Thomas Seeley)</b>: when a swarm picks a new home, scouts gather at candidate sites, and once enough of them are at one site the whole swarm lifts off; Seeley calls this a quorum in <i>Honeybee Democracy</i> (2010). The likeness: commit only past a threshold, never look back. The difference: bees count an absolute number, not a majority, so two sites could in principle cross the line at once.</li>
+<li><b>Neuroscience · Split-brain patients (Sperry and Gazzaniga)</b>: with the corpus callosum cut, each hemisphere takes in its own information and steers its own hand, work that earned Sperry the 1981 Nobel Prize. It is split brain in the literal sense: two self-declared leaders acting at once. Unlike a cluster, the brain has no term and no majority; the left-hemisphere "interpreter" just invents a plausible story afterward, exactly like a system with no fencing.</li>
+<li><b>Consciousness · Global workspace theory (Baars 1988, Dehaene)</b>: many parallel unconscious processors compete, and the winner "ignites" and is broadcast across the brain, much as a leader orders the log and pushes it to every follower. The difference: the winner is chosen by activation strength rather than by a vote, and anything "committed" to awareness can be overwritten by the next thought.</li>
+<li><b>Chinese history · Era names and legitimacy</b>: a new dynasty first proclaims a new era name, voiding the old court's edicts, much like a monotonically rising term. But era names had no majority intersection behind them; during the Northern and Southern Dynasties and the Five Dynasties, rival states each kept their own era name and each claimed to be the rightful one, a split brain that lasted centuries.</li>
+</ul></div>
+<h2>Ten takeaways</h2>
+<ol class="takeaways">
+<li>Distributed coordination means every node sees the same answer to the same question; etcd, ZooKeeper and Chubby are the industry-standard consensus services.</li>
+<li>A replicated state machine serializes every write into one log, and nodes that apply it in the same order reach the same state.</li>
+<li>Any two majorities must overlap, so 2f+1 nodes tolerate f failures and can never commit two conflicting values.</li>
+<li>Raft buys understandability with a strong leader and a contiguous log, at the cost of in-order commits and a leader that caps write throughput.</li>
+<li>A monotonically increasing term plus majority elections means a partitioned old leader cannot commit anything, even while it still thinks it leads.</li>
+<li>Plain TTL locks cannot survive a GC pause; only a monotonic fencing token checked by the storage layer rejects a lock holder that wakes up late.</li>
+<li>Reading a leader's local memory can return stale data, so Raft's ReadIndex first confirms leadership with a round of majority heartbeats.</li>
+<li>Jepsen showed that early etcd "consistent reads" were not linearizable, after which etcd moved to ReadIndex and quorum reads.</li>
+<li>A single Raft group's write throughput is capped by its leader; Multi-Raft splits the key space into many independent Raft groups to scale out.</li>
+<li>Consensus groups should always have an odd number of nodes and serve as low-write control-plane coordinators, not as high-volume business storage.</li>
+</ol>
 <h2>Deeper Resources</h2>
 <ul>
 <li><strong>Raft paper</strong> "In Search of an Understandable Consensus Algorithm" (Ongaro & Ousterhout, USENIX ATC 2014) — <a href="https://raft.github.io/">raft.github.io</a> has the paper, a visualization, and implementations in many languages. The best starting point for consensus.</li>

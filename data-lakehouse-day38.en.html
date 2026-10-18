@@ -51,6 +51,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -278,6 +286,26 @@ df = (spark.read.format("hudi")
 <div class="callout">
 <strong>5. Common interview questions:</strong> ① On S3, which only guarantees single-object atomicity, how do you implement multi-file transactions? (immutable files + atomic snapshot-pointer swap + OCC) ② Write/read amplification of COW vs MoR — which for CDC? ③ Why is Hive slow and how does Iceberg fix it (directory LIST vs metadata pruning)? ④ Storage cost and reclamation strategy of time travel? ⑤ How do concurrent multi-engine writes avoid clobbering each other?</div>
 
+<h2>Crossovers</h2>
+<div class="crossx"><ul>
+<li><b>Neuroscience · Complementary learning systems (McClelland, McNaughton, O'Reilly, 1995)</b>: the hippocampus records the day's experiences fast, replays them during sleep, and slowly folds them into the neocortex's long-term knowledge, the same shape as MoR appending deltas and background compaction merging them into base files. Lose sleep and memory suffers, much as reads slow once compaction stalls. The difference: the brain abstracts and drops detail when it consolidates; compaction must be lossless.</li>
+<li><b>Buddhism · Momentariness and continuity</b>: Buddhist thought holds that every phenomenon arises and perishes moment by moment, and "the same thing" is only a name laid on the stream; a lakehouse table is likewise a chain of immutable snapshots, and "the table" is just a pointer in the catalog. Unlike Buddhism, which denies any abiding controller behind the stream, the lakehouse hangs all its consistency on that one pointer.</li>
+<li><b>Business · Double-entry bookkeeping (Luca Pacioli, 1494)</b>: an accountant never erases a wrong entry but posts a reversing one, leaving history untouched, so the books can be restored to any day; immutable data files plus delete files change data the same way. The difference: ledgers are kept forever, while a lakehouse expires snapshots to reclaim storage, so replay has a horizon.</li>
+<li><b>Philosophy · The Ship of Theseus</b>: replace the planks one by one; is it still the same ship? The lakehouse gives an engineer's answer: every commit swaps out a batch of files, and the table's identity is only the catalog pointer. Unlike Plutarch's ship, the old planks are kept, so you can sail back to any version.</li>
+</ul></div>
+<h2>Ten takeaways</h2>
+<ol class="takeaways">
+<li>A lakehouse keeps the data lake's open Parquet files and adds a transactional metadata layer, getting lake-level cost with warehouse-level ACID.</li>
+<li>Iceberg, Delta Lake and Hudi came out of Netflix, Databricks and Uber; they share one idea but differ in metadata layout and write optimization.</li>
+<li>S3 only guarantees atomic single-object writes, so table formats get snapshot isolation from immutable data files plus an atomic snapshot-pointer swap.</li>
+<li>Concurrent commits use optimistic concurrency control: the catalog does a compare-and-swap, and a writer that loses the race checks for conflicts and retries.</li>
+<li>Iceberg's three-level metadata (metadata file, manifest list, manifests) records column min/max stats, so queries prune most files without listing directories.</li>
+<li>High-frequency streaming and CDC writes create floods of small files, so compaction and snapshot expiry must run as standing jobs from day one.</li>
+<li>Copy-on-Write rewrites whole files on update and reads fast; Merge-on-Read appends deltas and merges at read time, which suits CDC upserts.</li>
+<li>Lakehouses are built for analytical batch writes; tens of thousands of single-row updates per second belong in an OLTP database like Postgres.</li>
+<li>Every retained snapshot pins the data files it references, so a longer time-travel window means a higher storage bill.</li>
+<li>Memory consolidation, where the hippocampus records fast and sleep folds memories into the neocortex, has the same structure as Merge-on-Read plus background compaction.</li>
+</ol>
 <h2>Resources</h2>
 <ul>
 <li><strong>"Lakehouse: A New Generation of Open Platforms"</strong> (Armbrust, Ghodsi, Xin, Zaharia, CIDR 2021): the foundational paper, arguing storage-compute separation + open formats + a metadata layer.</li>

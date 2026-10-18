@@ -48,6 +48,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -311,6 +319,26 @@ if resp.status == 429:
 <li>How does GraphQL's N+1 arise, and how does DataLoader solve it?</li>
 </ol>
 
+<h2>Crossovers</h2>
+<div class="crossx"><ul>
+<li><b>Evolution · The frozen accident and gene duplication (Crick 1968, Ohno 1970)</b>: Crick argued that once every protein depends on the genetic code, the code can no longer change, since reassigning one codon breaks all proteins at once. That is exactly why a published contract is costly to break. Evolution's way out is duplication: Susumu Ohno showed that after a gene is copied, the old copy keeps its job and only the new one is free to mutate, much like /v1 and /v2 living side by side. The difference: evolution writes no compat layer, and an unused old copy simply decays into a pseudogene.</li>
+<li><b>Psychology · Hoffman's interface theory of perception</b>: cognitive scientist Donald Hoffman argues that perception works like desktop icons, offering useful handles while hiding the underlying machinery. An opaque cursor does the same, hiding sort keys and shards so the internals can change. Unlike Hoffman's case, where hiding was selected by evolution, an API hides by deliberate design to keep the freedom to change.</li>
+<li><b>Complexity science · Coupled oscillators (the Kuramoto model, 1975)</b>: a population of interacting oscillators spontaneously phase-locks, like fireflies flashing in unison. Clients that all receive a 429 and all retry at the same instant are a harmful version of that synchrony, and jitter is noise injected on purpose to scatter the phases. The difference: fireflies synchronize to find mates, while a system must avoid synchrony.</li>
+<li><b>Western philosophy · The Ship of Theseus</b>: replace the planks one by one, and is it still the same ship? Date-based versioning gives an engineering answer: the core logic has been rewritten many times, yet as long as the behavior callers observe at the boundary is unchanged, it is the same contract. Unlike the philosophers, an API only recognizes identity that can be observed from outside.</li>
+</ul></div>
+<h2>Ten takeaways</h2>
+<ol class="takeaways">
+<li>The hard part of a public API is not writing endpoints: once the contract is published, every caller pays for breaking it.</li>
+<li>Large platforms typically use a gateway for auth, rate limiting and version routing, REST and GraphQL outside, and gRPC between internal services.</li>
+<li>REST's resource model is cacheable by URL in CDNs and browsers, but it tends to over-fetch or under-fetch, so one view needs several round trips.</li>
+<li>GraphQL lets clients fetch exactly the fields they need in one trip, but every query goes through POST /graphql, which makes HTTP caching and rate limiting hard.</li>
+<li>gRPC runs on HTTP/2 and Protobuf, strongly typed and high-throughput, but browsers cannot call it directly, so it lives almost entirely between internal services.</li>
+<li>Offset pagination scans and discards earlier rows on deep pages and skips or duplicates rows under heavy writes; cursor pagination uses the index and stays stable.</li>
+<li>Pagination cursors should be opaque tokens, keeping the paging implementation out of the public contract so the internals can change later.</li>
+<li>Adding a field is backward-compatible; removing fields, changing types or semantics, and changing defaults are breaking changes.</li>
+<li>Stripe pins each account to its signup-date API version and downgrades responses through a transform chain, at the cost of a compat layer that grows every year.</li>
+<li>Rate limiting is a contract: a 429 should carry Retry-After and quota headers, writes should carry an Idempotency-Key, and retries need jitter to avoid retry storms.</li>
+</ol>
 <h2>Deeper Resources</h2>
 <ul>
 <li><strong>Designing Data-Intensive Applications, Ch 4 §Encoding &amp; Evolution</strong> (Kleppmann): backward/forward compatibility and schema evolution — the theoretical root of API versioning.</li>

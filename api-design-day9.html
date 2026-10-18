@@ -49,6 +49,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -299,6 +307,26 @@ if resp.status == 429:
 <li>什么变更算 breaking、什么不算？日期版本 + 兼容层相比 /v2 的代价在哪？</li>
 <li>一个第三方反复触发 429 还在猛重试，怎么从 API 契约层面让它「文明退避」？</li>
 <li>GraphQL 的 N+1 问题怎么来、DataLoader 怎么解决？</li>
+</ol>
+<h2>越界 · 跨学科的联想</h2>
+<div class="crossx"><ul>
+<li><b>生物进化 · 冻结偶然与基因复制（Crick 1968，Ohno 1970）</b>：Crick 认为遗传密码一旦被全部蛋白质依赖就改不动了，改一个密码子等于同时改坏所有蛋白，这正是「契约公开后破坏代价由所有调用方承担」。进化的出路是复制：Ohno 指出基因复制后旧拷贝维持原功能、新拷贝才自由变异，像 /v1 与 /v2 并存。不像的是，进化不写兼容层，旧拷贝没用了就慢慢退化成假基因。</li>
+<li><b>心理学 · Hoffman 的知觉界面理论</b>：认知科学家 Donald Hoffman 主张知觉像电脑桌面图标，只给有用的把手、藏起底层实现；opaque cursor 同理，把排序键和分片藏起来，底层才能换。不像在于：Hoffman 说的隐藏是演化选出来的，而 API 的隐藏是设计者为保留修改自由主动选的。</li>
+<li><b>复杂性科学 · 耦合振子同步（Kuramoto 模型，1975）</b>：一群相互影响的振子会自发锁相，像萤火虫齐闪；客户端在同一时刻收到 429、同一时刻重试，就是有害的同步，抖动（jitter）是故意注入噪声去打散相位。不同在于，萤火虫靠同步求偶，系统却要避免同步。</li>
+<li><b>西方哲学 · 忒修斯之船</b>：船板一块块换掉，它还是原来那条船吗？日期版本给了一个工程答案：核心逻辑早已重写多遍，只要调用方从边界上观察到的行为不变，契约就还是同一份。不像的是，哲学追问对象本身的同一性，API 只承认外部可观察的同一性。</li>
+</ul></div>
+<h2>十条要点</h2>
+<ol class="takeaways">
+<li>公开 API 的难点不在写接口，而在契约一旦公开，破坏它的代价由所有调用方承担。</li>
+<li>大平台的常见形态：Gateway 收口认证、限流和版本路由，对外用 REST 与 GraphQL，内部服务间用 gRPC。</li>
+<li>REST 的资源模型可以按 URL 被 CDN 和浏览器缓存，但容易 over-fetch 或 under-fetch，一个视图要多次往返。</li>
+<li>GraphQL 让客户端一次按需取齐字段，代价是查询都走 POST /graphql，HTTP 缓存和限流变难。</li>
+<li>gRPC 基于 HTTP/2 和 Protobuf，强类型、高吞吐，但浏览器不能直连，几乎只用于内部服务间。</li>
+<li>Offset 分页深翻页要扫描并丢弃前面的行，高频写入时还会漏读或重复；cursor 分页走索引且稳定。</li>
+<li>分页游标要编码成 opaque token，把分页实现排除在公开契约之外，将来才能换底层实现。</li>
+<li>加字段是向后兼容的；删字段、改类型或语义、改默认值才是 breaking change。</li>
+<li>Stripe 的日期版本把账号 pin 在注册时的版本、响应经 downgrade 链降级，代价是兼容层逐年累积。</li>
+<li>限流是契约：429 要带 Retry-After 和配额头，写请求配 Idempotency-Key，重试加抖动以免重试风暴。</li>
 </ol>
 <h2 data-tts="2b7c75a6d27736c7">深入资源</h2>
 <ul>

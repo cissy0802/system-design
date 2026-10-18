@@ -51,6 +51,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -256,6 +264,26 @@ def handle(req):
 <li><strong>Anycast and long-lived connections</strong>: the follow-up "why can't some cases use pure Anycast" — BGP re-routing can move a TCP/WebSocket mid-flight to another PoP and break it, needing session affinity or edge forwarding.</li>
 </ul>
 
+<h2>Crossovers</h2>
+<div class="crossx"><ul>
+<li><b>Physics · Relativity of simultaneity</b>: In 1905 Einstein showed that two distant places share no "same moment" that every observer agrees on. A global purge hits the same wall: the invalidation spreads at finite speed, and each PoP lives in its own "now". The difference: a CDN has the origin as a privileged source of truth, while relativity has no privileged frame.</li>
+<li><b>Psychology · Kahneman's two systems</b>: In <i>Thinking, Fast and Slow</i>, System 1 is the edge cache: fast, cheap, handling most judgments. System 2 is the origin: slow, effortful, woken only on a miss. Both survive load by serving a good-enough answer first; unlike a CDN, the brain has no purge, so a stale intuition cannot be retired by tag.</li>
+<li><b>Neuroscience · The octopus's arms</b>: Roughly two-thirds of an octopus's ~500 million neurons sit in its arms, which explore and grasp locally without consulting the central brain. That is Edge Compute's shape: push auth and routing out to the PoP. The difference: an arm's local decisions have no kill switch; edge code does.</li>
+<li><b>Ecology · Monoculture and the potato famine</b>: In the 1840s Ireland grew vast fields of nearly one potato variety, and late blight swept through all of it. A config pushed to the whole world at once is digital monoculture: uniformity buys efficiency and a single shared weakness. Staged rollout and multi-CDN keep the variety, at the cost of more to manage.</li>
+</ul></div>
+<h2>Ten takeaways</h2>
+<ol class="takeaways">
+<li>The core CDN tension: the closer content sits to users, the higher the hit ratio and the lower the latency, but the harder invalidation and the weaker consistency.</li>
+<li>Anycast announces one IP prefix from PoPs worldwide via BGP, so each user is routed to the network-nearest node.</li>
+<li>Anycast spreads DDoS traffic across every PoP, so effective attack capacity approaches total network capacity, not one site's.</li>
+<li>BGP re-routing can move a long-lived TCP/WebSocket connection to another PoP mid-flight and break it, while GeoDNS failover is held back by TTLs.</li>
+<li>Tiered Cache sends lower-tier PoP misses to an upper tier first and lets only the upper tier hit origin, cutting origin requests by an order of magnitude.</li>
+<li>Request coalescing merges concurrent misses for the same cache key into one origin fetch, which tames the thundering herd.</li>
+<li>Putting cookies or tracking params in the cache key drives the hit ratio to zero, so normalize the query explicitly and control Vary.</li>
+<li>Production invalidation usually combines long TTLs, tag-based purge and stale-while-revalidate, because purge-everything triggers a cache avalanche.</li>
+<li>Cloudflare Workers trade per-request CPU/memory caps and a JS/WASM-only runtime for near-zero cold starts and very high density via V8 isolates.</li>
+<li>The Cloudflare 2019 regex backtracking and the Fastly 2021 dormant bug both show that edge config needs staged rollout and a kill switch.</li>
+</ol>
 <h2>Further Reading</h2>
 <ul>
 <li><strong>Cloudflare 2019-07-02 outage post-mortem</strong> — how a regex backtrack took down the network; a cautionary tale for staged config rollout: <a href="https://blog.cloudflare.com/cloudflare-outage/">blog.cloudflare.com/cloudflare-outage</a></li>

@@ -51,6 +51,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -293,6 +301,28 @@ graph LR
 <div class="callout">
 <strong>5. Not cleaning up flags</strong>: Knight Capital reused a retired flag, triggering dead code, $440M in 45 minutes. Temporary flags must have expiry and cleanup.
 </div>
+
+<h2>Crossovers</h2>
+<div class="crossx"><ul>
+<li><b>Evolution · Gene duplication (Ohno)</b>: Susumu Ohno argued in 1970 that new functions often arise from duplicated genes: the old copy keeps doing its job while the new copy is free to mutate. That is the Expand-Contract shape exactly: add the new column, leave the old one alone, and buy safety with redundancy. Where it breaks: evolution never runs a Contract step, so spare copies often rot into silent pseudogenes, much like a retired flag nobody deleted.</li>
+<li><b>Neuroscience · Synaptic pruning</b>: The developing brain overproduces synapses, then prunes the unused ones on a large scale. Temporary feature flags should likewise be cut once rollout hits 100%. The difference: the brain prunes automatically, while dead flags never vanish by themselves and need expiry dates and discipline.</li>
+<li><b>Investing · The Kelly criterion and scaling in</b>: Kelly's 1956 result says the less sure you are, the smaller your bet should be. A canary that starts at 5% and only steps up after passing analysis is the same evidence-driven position sizing. Unlike a trade, though, a release can take the whole 5% back; a realized loss cannot be undone.</li>
+<li><b>Western philosophy · The Ship of Theseus</b>: A rolling update replaces instances batch by batch; once the last one is swapped, is it still the same service? Plutarch's identity puzzle gets an engineering answer here: identity lives in the interface contract, not the parts. Where it breaks: old and new planks never talk to each other, but old and new versions must read each other's data.</li>
+</ul></div>
+
+<h2>Ten takeaways</h2>
+<ol class="takeaways">
+<li>A release platform's goal is not just shipping but shrinking a bad version's blast radius and rolling it back automatically.</li>
+<li>In 2012 Knight Capital missed one server in a deploy, reused a retired flag, and lost about $440M in 45 minutes.</li>
+<li>Rolling, blue-green and canary all trade extra resources and slower rollout for a smaller blast radius and faster rollback.</li>
+<li>During rolling and canary deploys old and new versions run side by side, so the hard part shifts to forward and backward compatibility.</li>
+<li>Canary analysis should compare against a baseline running the old version on equal traffic, not against fixed absolute thresholds.</li>
+<li>Kayenta, open-sourced by Netflix and Google, scores each metric with a Mann-Whitney U test and rolls them into a pass or fail.</li>
+<li>Feature flags decouple deploy from release, enabling progressive rollout, instant kill switches and A/B experiments.</li>
+<li>Temporary feature flags need an expiry date and their code removed after 100% rollout, or they become time bombs.</li>
+<li>Code can roll back but data cannot, so schema changes go through expand, migrate and contract, shipped as separate releases.</li>
+<li>With a schema change in flight, rolling forward with a fix is often safer than rolling back, because data is already in the new shape.</li>
+</ol>
 
 <h2>Deep Resources</h2>
 <ul>

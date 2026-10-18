@@ -51,6 +51,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -260,6 +268,26 @@ def bucket(user_id, exp_key, treat_ratio=0.5):
 <li>A hot entity (top store) has excessive single-point feature QPS—how do you hold it? (recall Day 2 caching hot keys)</li>
 </ul>
 
+<h2>Crossovers</h2>
+<div class="crossx"><ul>
+<li><b>Neuroscience · Complementary learning systems (McClelland, McNaughton &amp; O'Reilly, 1995)</b>: the hippocampus quickly records single fresh episodes, the neocortex slowly absorbs them into long-term statistical structure, and replay during sleep moves one into the other: an online store, an offline store, and a materialization pipeline. The difference: the brain flows from "latest" into "full history," and every replay rewrites the memory, so it runs with built-in skew and nobody reconciles it bit by bit.</li>
+<li><b>Psychology · Hindsight bias (Baruch Fischhoff, 1975)</b>: people who know the outcome overrate how foreseeable it was at the time, which is label leakage inside a human head: judging moment T with information from after T. Unlike a model, which is clean once you filter on event_ts ≤ T, a person cannot delete a known outcome from memory.</li>
+<li><b>Evolutionary biology · Evolutionary mismatch</b>: traits "trained" in an ancestral environment keep running in a modern one and quietly misfire, as a craving for sugar and fat helped under scarcity and burdens us today. It is the same structure as training data drifting away from serving data; the difference is that evolution has no drift monitor or alert, and the mismatch only shows up as disease.</li>
+<li><b>Business · Goodhart's law (Charles Goodhart, 1975)</b>: once a measure becomes a target, it stops reliably reflecting what it was meant to measure. An A/B test that watches only the primary metric invites this law, and guardrail metrics are the insurance. The limit: guardrails only protect against side effects you thought of in advance, while Goodhart says the optimized metric itself goes bad.</li>
+</ul></div>
+<h2>Ten takeaways</h2>
+<ol class="takeaways">
+<li>Training wants throughput and inference wants latency; when the two sides compute different values for one feature, you get training-serving skew: high offline AUC, a drop online.</li>
+<li>The dual store is correct by necessity: a columnar warehouse keeps full history for training scans, and an in-memory KV keeps only each entity's latest value for millisecond lookups.</li>
+<li>The feature registry is the single source of truth: one definition drives both batch and streaming pipelines, which materialize into the offline and online stores.</li>
+<li>DoorDash picked Redis as its online store after YCSB benchmarks, and its online feature writes are only 0.1% of reads.</li>
+<li>A point-in-time join takes only the latest feature value with event_ts ≤ the label time; joining the feature table's current value is label leakage.</li>
+<li>Log-and-wait trains on serving logs with zero skew but a slow cold start; backfill trains right away but needs replay logic that matches online bit for bit.</li>
+<li>Separate transformation code for training and serving (a Python version plus a Java version) is the top source of skew, cured by sharing one definition or DSL.</li>
+<li>Feature fetching often takes over half of an online prediction's latency, cut down with batched pipelines, concurrent fetches, and an in-process L1 cache.</li>
+<li>Shipping a model needs a stably bucketed A/B test to establish causality, plus guardrail metrics like latency and refund rate so a rising primary metric does not hide damage.</li>
+<li>In a two-sided delivery market, user-randomized splits let both groups compete for one courier pool and overstate gains; switchback experiments by city and time slot fix this.</li>
+</ol>
 <h2>Resources</h2>
 <ul>
 <li><strong>DoorDash</strong>: <a href="https://doordash.engineering/2020/11/19/building-a-gigascale-ml-feature-store-with-redis/">Building a Gigascale ML Feature Store with Redis</a>—online store choice and compression in practice.</li>

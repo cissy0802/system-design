@@ -51,6 +51,14 @@ details[open] summary::before{transform:rotate(90deg);color:#5eead4}
 details .answer{margin-top:12px;padding-top:12px;border-top:1px dashed rgba(100,200,255,0.18);color:#c8cfd6;font-size:0.93rem;line-height:1.7}
 details .answer ul,details .answer ol{margin:6px 0 6px 22px}
 @media(max-width:600px){h1{font-size:1.4rem}h2{font-size:1.05rem}pre{font-size:0.72rem}}
+.crossx{border:1px solid rgba(255,180,80,0.3);border-radius:10px;padding:4px 20px;margin:14px 0;background:rgba(255,180,80,0.04)}
+.crossx ul{list-style:none;margin:0}
+.crossx li{margin:12px 0;font-size:0.94rem}
+.crossx b{color:#ffb450}
+.takeaways{counter-reset:tk;list-style:none;margin:14px 0;padding:0;border:1px solid rgba(100,200,255,0.28);border-radius:10px;background:rgba(100,200,255,0.04)}
+.takeaways li{counter-increment:tk;position:relative;margin:0;padding:11px 18px 11px 52px;border-top:1px solid rgba(100,200,255,0.12);font-size:0.93rem;line-height:1.75;color:#c8cfd6}
+.takeaways li:first-child{border-top:none}
+.takeaways li::before{content:counter(tk,decimal-leading-zero);position:absolute;left:18px;top:12px;font-family:"SF Mono",Menlo,monospace;font-size:0.78rem;color:#64c8ff}
 </style>
 <script type="module">
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -277,6 +285,26 @@ def govern(rule):
 <strong>5. Interview follow-up:</strong> "How do you measure whether a code-review bot is good?" — anyone who can't say "effective FP rate / adoption rate / escaped defects" and only offers "high coverage" hasn't grasped the signal-detection nature. Follow-up two: "Is driving the FP rate to 0 a good thing?" (No — it almost certainly means recall cratered.)
 </div>
 
+<h2>Crossovers</h2>
+<div class="crossx"><ul>
+<li><b>Neuroscience · Habituation (Kandel's sea slug)</b>: Touch Aplysia gently again and again with no harm following, and its gill-withdrawal reflex weakens each time; Kandel's dissection of that circuit earned him the 2000 Nobel Prize. Engineers scrolling past bot comments are learning the same way: a stimulus without consequence gets turned down. Where it breaks: one strong shock restores the slug's sensitivity, while broken trust in a bot takes months to return.</li>
+<li><b>Evolution · Batesian mimicry</b>: A harmless hoverfly wearing a wasp's warning stripes is protected only while fakes are rarer than real wasps; once fakes abound, predators stop avoiding the pattern. False positives dilute true reports by the same frequency-dependent rule. Where it breaks: the mimic profits, while a false positive profits no one.</li>
+<li><b>Investing · Buffett's 20-slot punch card</b>: Buffett imagines a card with only twenty punches for a lifetime, so you act only on ideas you have thought through. A high triage threshold is the same self-restraint. Where it breaks: the investor spends his own quota, the bot spends the whole team's attention.</li>
+<li><b>Psychology · Kahneman and Klein on intuitive expertise</b>: Their 2009 paper argues intuition becomes reliable only in regular environments with timely, clear feedback. Diff-time reports get fixed for a similar reason: the feedback lands while the author still holds the context. Where it breaks: they studied how people learn judgment; here people fix a bug on the spot.</li>
+</ul></div>
+<h2>Ten takeaways</h2>
+<ol class="takeaways">
+<li>The core metric for automated code review is precision, not throughput: a true report nobody reads is a miss.</li>
+<li>Google defines an "effective false positive" as a report the developer saw and took no positive action on.</li>
+<li>Google's rule of thumb keeps the effective false-positive rate under 10%; checks above it get ignored wholesale.</li>
+<li>The objective for automated review is not maximum recall but maximum recall within a false-positive budget.</li>
+<li>A triage layer uses severity × confidence to make each comment blocking, collapsed, or dropped, and hands style nitpicks to an autoformatter.</li>
+<li>When Meta moved Infer from batch scans to diff time, the same analyzer's fix rate jumped from near zero to substantial.</li>
+<li>Report only issues the current diff introduces; legacy debt is for measurement and prioritization, never for review comments.</li>
+<li>Manage each rule's false-positive rate like an SLO error budget, auto-downgrading or disabling it when over, with looser budgets for security rules.</li>
+<li>Using comment counts or coverage as KPIs rewards noise; track adoption rate, escaped defects, and effective false-positive rate instead.</li>
+<li>Sea slugs habituate to harmless touches, and engineers likewise learn to ignore bot comments that carry no consequence.</li>
+</ol>
 <h2>Deep Resources</h2>
 <ul>
 <li><strong>Sadowski et al., "Tricorder: Building a Program Analysis Ecosystem" (ICSE 2015)</strong>: the NOT USEFUL button, user-vantage FPs, analyzer admission.</li>
